@@ -1,0 +1,25 @@
+# Python/cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+# Persistent personal disk, should never be included in version control
+matryoshka_user_disk.img
+*user_disk*.img
+# Secret and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+# Temporary files / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.bak
+# Keep reproducible system images in images/ (not personal disks)

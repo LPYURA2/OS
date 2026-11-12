@@ -1,0 +1,29 @@
+digraph MATRYOSHKA_M8 {
+  graph [rankdir=LR, bgcolor=white, fontname="DejaVu Sans", pad=0.24, nodesep=0.35, ranksep=0.55];
+  node [shape=box, style="rounded,filled", fillcolor="#f1f5f9", color="#64748b", fontname="DejaVu Sans", fontsize=11];
+  edge [color="#64748b", fontname="DejaVu Sans", fontsize=10];
+  clock [label="Clock / 4-phase\nT0 T1 T2 T3",fillcolor="#fef3c7"];
+  pc [label="16-bit PC\nCounter/Jump"];
+  ir [label="IR / IMM_LO / IMM_HI\n3 × 8-bit latches"];
+  decode [label="Opcode decoder\nFlags Z/C"];
+  alu [label="8-bit ALU\nA and B registers", fillcolor="#dbeafe"];
+  x [label="16-bit X\nData address"];
+  mux [label="Address MUX\nPC or X"];
+  rom [label="32 KiB ROM\n27256\nboot.hex",fillcolor="#dcfce7"];
+  ram [label="32 KiB RAM\n62256",fillcolor="#dcfce7"];
+  io [label="8-bit OUT / IN ports\nLEDs -> LCD/UART later",fillcolor="#fce7f3"];
+  clock -> pc; clock -> ir; clock -> decode;
+  pc -> mux [label="fetch"];
+  x -> mux [label="load/store"];
+  mux -> rom [label="A0..A14, A15=0"];
+  mux -> ram [label="A0..A14, A15=1"];
+  rom -> ir [label="D0..D7"];
+  ram -> ir [label="D0..D7"];
+  ir -> decode;
+  decode -> alu;
+  decode -> pc [label="branch"];
+  decode -> x;
+  alu -> ram [label="STA_X"];
+  alu -> io [label="OUT 0"];
+  io -> alu [label="IN 1"];
+}

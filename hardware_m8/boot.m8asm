@@ -1,0 +1,88 @@
+; M8 custom 8-bit machine: no AVR, no PIC, no Python guest opcodes.
+; Every instruction below is EXACTLY 3 bytes in ROM.
+; Hardware: 16-bit address bus, A/B 8-bit registers, X/PC 16-bit, Z/C flags.
+boot:
+    LDXI bootmsg
+print_boot:
+    LDA_X
+    CMPI 0
+    JZ menu
+    OUT 0
+    INX
+    JMP print_boot
+menu:
+    LDXI prompt
+print_prompt:
+    LDA_X
+    CMPI 0
+    JZ keywait
+    OUT 0
+    INX
+    JMP print_prompt
+keywait:
+    IN 1
+    CMPI 0
+    JZ keywait
+    CMPI 104
+    JZ help
+    CMPI 109
+    JZ ramcheck
+    CMPI 112
+    JZ print_status
+    CMPI 113
+    JZ quit
+    LDXI unknown
+    JMP print_string
+help:
+    LDXI helpmsg
+    JMP print_string
+print_status:
+    LDXI statusmsg
+    JMP print_string
+ramcheck:
+    LDAI 90
+    LDXI 32768
+    STA_X
+    LDAI 0
+    LDA_X
+    CMPI 90
+    JNZ ramfail
+    LDXI rampass
+    JMP print_string
+ramfail:
+    LDXI ramerror
+    JMP print_string
+quit:
+    LDXI shutdown
+print_exit:
+    LDA_X
+    CMPI 0
+    JZ halted
+    OUT 0
+    INX
+    JMP print_exit
+halted:
+    HALT
+print_string:
+    LDA_X
+    CMPI 0
+    JZ menu
+    OUT 0
+    INX
+    JMP print_string
+bootmsg:
+    .asciz "MATRYOSHKA M8 ROM MONITOR 0.2\nCustom 8-bit CPU / 64 KiB address bus\n"
+prompt:
+    .asciz "M8> "
+helpmsg:
+    .asciz "help: h=help m=RAM-test p=status q=halt\n"
+statusmsg:
+    .asciz "M8 STATUS: ROM 32 KiB, RAM 32 KiB, A/B 8b, X/PC 16b\n"
+rampass:
+    .asciz "RAM TEST OK (0x5A at 0x8000)\n"
+ramerror:
+    .asciz "RAM TEST FAILED\n"
+shutdown:
+    .asciz "M8 SHUTDOWN\n"
+unknown:
+    .asciz "unknown key, press h\n"
