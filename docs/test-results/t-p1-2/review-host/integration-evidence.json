@@ -1,0 +1,44 @@
+{
+  "x86_64": {
+    "saved_pc": "0x602db42",
+    "runtime_base": "0x6029000",
+    "binary_opcode": "0f0b",
+    "binary_sha256_matches": true,
+    "full_records": 1,
+    "emergency_markers": 1,
+    "ordinary_halt_absent": true,
+    "rva": "0x4b42",
+    "expected_pc": "0x602db42",
+    "actual_relocation_exercised": true
+  },
+  "aarch64": {
+    "saved_pc": "0x40083908",
+    "runtime_base": "0x40080000",
+    "binary_opcode": "002420d4",
+    "binary_sha256_matches": true,
+    "full_records": 1,
+    "emergency_markers": 1,
+    "ordinary_halt_absent": true,
+    "elf_symbol_pc": "0x40083908",
+    "raw_opcode": "002420d4",
+    "raw_sha256_matches": true
+  },
+  "protected_unchanged_from_e482": {
+    "include/styleos/boot_info.h": true,
+    "kernel/boot_info.c": true,
+    "include/styleos/boot_memory.h": true,
+    "kernel/boot_memory.c": true,
+    "kernel/boot_memory_diagnostic.c": true,
+    "boot/x86_64/memory_map.c": true,
+    "boot/aarch64/fdt_memory.c": true,
+    "boot/x86_64/exit_boot.c": true,
+    "boot/x86_64/exit_boot.h": true,
+    "arch/x86_64/serial.c": true,
+    "arch/aarch64/console.c": true,
+    "boot/aarch64/linker.ld": true
+  },
+  "normal_injection_labels_absent": {
+    "aarch64": true,
+    "x86_64": true
+  }
+}

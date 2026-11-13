@@ -1,0 +1,9 @@
+{
+  "runner": [
+    "fake-exit",
+    "PASS",
+    "UART handoff/memory/exception contract checked; QEMU stopped by harness"
+  ],
+  "actual_process_returncode": 1,
+  "note": "fake process prints valid exception evidence then exits 1; no real QEMU"
+}

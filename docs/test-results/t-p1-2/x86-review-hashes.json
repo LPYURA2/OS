@@ -1,0 +1,9 @@
+{
+  "source_sha256": {
+    "arch/x86_64/entry.S": "850a4ee072a4eeabbc9a3a35035bc6b6ae7e44091c9f54e5fad6d55ed446c038",
+    "arch/x86_64/exceptions.c": "ec2e125336abecd5a8feca4d6ca0fb77ba4c9ddf2d59a90d3a64e054acd86b03",
+    "arch/x86_64/exceptions.h": "7c4cefdadd44248184a97ed7786897c473064c8fbef314208be28a44e1b7ef40",
+    "arch/x86_64/exception_entry.S": "5b46b3cb1ca30e98f81aac87856c8509a9e0bae6fffe75a922e6a11188d377ec"
+  },
+  "stub_and_table_vector_lists_exact_0_255": true
+}

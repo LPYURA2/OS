@@ -1,0 +1,10 @@
+{
+  "arch": "x86_64",
+  "symbol": "styleos_test_fault",
+  "rva": 19266,
+  "preferred_image_base": 5368709120,
+  "offset": 16194,
+  "instruction_hex": "0f0b",
+  "binary_sha256": "dd77051a94ef8f1f22792c9ce47a596fa38eb38ea417c18839ed9701b86d8e8d",
+  "disk_sha256": "b08d0be2326b878d04ab7b2421782d5b844d4443fc06a86f87cfd0c6d4a62f15"
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "case": "qemu-x86_64-exception",
+    "arch": "x86_64",
+    "saved_pc": "0x602db42",
+    "instruction_hex": "0f0b",
+    "record": "STYLEOS EXCEPTION arch=x86_64 kind=sync vector=6 reason=invalid-opcode pc=0x000000000602db42 error=absent cr2=absent",
+    "runtime_image_base": "0x6029000",
+    "rva": "0x4b42",
+    "preferred_image_base": "0x140000000"
+  },
+  {
+    "case": "qemu-aarch64-exception",
+    "arch": "aarch64",
+    "saved_pc": "0x40083908",
+    "instruction_hex": "002420d4",
+    "record": "STYLEOS EXCEPTION arch=aarch64 kind=sync class=0x3c reason=brk pc=0x0000000040083908 esr=0x00000000f2000120 elr=0x0000000040083908 spsr=0x00000000600003c5 far=absent",
+    "linked_symbol_pc": "0x40083908",
+    "raw_image_offset": 14600
+  },
+  {
+    "case": "qemu-aarch64-exception-el2",
+    "arch": "aarch64",
+    "saved_pc": "0x40083908",
+    "instruction_hex": "002420d4",
+    "record": "STYLEOS EXCEPTION arch=aarch64 kind=sync class=0x3c reason=brk pc=0x0000000040083908 esr=0x00000000f2000120 elr=0x0000000040083908 spsr=0x00000000600003c5 far=absent",
+    "linked_symbol_pc": "0x40083908",
+    "raw_image_offset": 14600
+  }
+]

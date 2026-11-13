@@ -1,0 +1,25 @@
+{
+  "date_utc": "2026-11-13T11:11:43.741142+00:00",
+  "host": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "python": "3.12.14",
+  "source_commit": "b497cfd92a8f308360a86ef1d8dfd3594940dd56",
+  "base_commit": "e4823f2eaf1bfbdca6ea7a93768b76a3b289523b",
+  "full_command": "python3 tools/test.py --all --output build/t-p1-2",
+  "full_exit_code": 0,
+  "arm_only_command": "CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux",
+  "arm_only_exit_code": 0,
+  "arm_only_platform": "Linux, NOT Android/Termux phone",
+  "arm_only_unavailable_selectors": {
+    "OVMF_CODE": "/unavailable/no-ovmf-code",
+    "OVMF_VARS": "/unavailable/no-ovmf-vars",
+    "LLD_LINK": "/unavailable/no-lld-link",
+    "QEMU_X86": "/unavailable/no-x86-qemu"
+  },
+  "phone_tp12": "SKIPPED: no new phone run",
+  "native_physical_boot": "SKIPPED",
+  "virtualbox": "SKIPPED",
+  "firmware_sha256": {
+    "OVMF_CODE_4M.fd": "624e06de18b4fa535e90db7160d00d3d07d206422b89999bf1e27d920264e4e0",
+    "OVMF_VARS_4M.fd": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e"
+  }
+}

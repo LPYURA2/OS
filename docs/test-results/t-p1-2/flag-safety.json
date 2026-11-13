@@ -1,0 +1,21 @@
+[
+  {
+    "args": [
+      "--test-exception",
+      "--output",
+      "build"
+    ],
+    "expected_exit": 2,
+    "actual_exit": 2,
+    "stderr": "usage: build.py [-h] [--arch {all,x86_64,aarch64}] [--output OUTPUT]\n                [--invalid-boot-info | --invalid-memory-map | --test-exception]\nbuild.py: error: --test-exception needs a separate directory, e.g. build/exception\n"
+  },
+  {
+    "args": [
+      "--test-exception",
+      "--invalid-memory-map"
+    ],
+    "expected_exit": 2,
+    "actual_exit": 2,
+    "stderr": "usage: build.py [-h] [--arch {all,x86_64,aarch64}] [--output OUTPUT]\n                [--invalid-boot-info | --invalid-memory-map | --test-exception]\nbuild.py: error: argument --invalid-memory-map: not allowed with argument --test-exception\n"
+  }
+]

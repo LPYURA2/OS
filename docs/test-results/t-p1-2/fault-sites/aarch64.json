@@ -1,0 +1,12 @@
+{
+  "arch": "aarch64",
+  "symbol": "styleos_test_fault",
+  "pc": 1074280712,
+  "offset": 80136,
+  "image_base": 1074266112,
+  "image_offset": 14600,
+  "instruction_hex": "002420d4",
+  "instruction_word": 3558876160,
+  "binary_sha256": "fd0e291f8b6f44952e690b5d2ba513e3407ebe5586f0dec4c9739ec566f291b8",
+  "raw_image_sha256": "acb06b6eb8479da58a71fdb056b652dc4625fd42a58aa4bedb4953c07d189199"
+}

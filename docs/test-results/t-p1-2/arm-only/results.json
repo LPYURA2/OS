@@ -1,0 +1,98 @@
+[
+  {
+    "name": "host-boot-info",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-boot-info.log"
+  },
+  {
+    "name": "host-uefi",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-uefi.log"
+  },
+  {
+    "name": "host-exception",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-exception.log"
+  },
+  {
+    "name": "host-memory",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-memory.log"
+  },
+  {
+    "name": "host-python",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-python.log"
+  },
+  {
+    "name": "build-for-qemu",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-for-qemu.log"
+  },
+  {
+    "name": "build-negative",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-negative.log"
+  },
+  {
+    "name": "build-negative-memory",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-negative-memory.log"
+  },
+  {
+    "name": "build-exception",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-exception.log"
+  },
+  {
+    "name": "qemu-aarch64-normal",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-normal.log"
+  },
+  {
+    "name": "qemu-aarch64-invalid",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-invalid.log"
+  },
+  {
+    "name": "qemu-aarch64-invalid-map",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-invalid-map.log"
+  },
+  {
+    "name": "qemu-aarch64-exception",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-exception.log"
+  },
+  {
+    "name": "qemu-aarch64-exception-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-exception-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-256m",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-256m.log"
+  }
+]
