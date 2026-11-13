@@ -109,7 +109,7 @@ python3 tools/test.py --all --output build/t-p1-3
 
 Протоколы, точные команды, lifecycle QEMU и смысл статусов описаны в [TESTING.md](docs/TESTING.md). Фактические результаты нового этапа публикуются в [отчёте T-P1.3](docs/test-results/t-p1-3/README.md). Сохранённые [T-P1.2](docs/test-results/t-p1-2/README.md), [T-P1.1](docs/test-results/t-p1-1/README.md) и [T-P1.0](docs/test-results/t-p1-0/README.md) относятся к своим исходникам и не заменяют новый прогон.
 
-Принятая база T-P1.2 — [`07fe425a0d4d5c0b9fbb65f8a37b30924523ec81`](https://github.com/LPYURA2/OS/commit/07fe425a0d4d5c0b9fbb65f8a37b30924523ec81). Она имеет подтверждённые 23/23 Linux-этапа и отдельные 16/16 Android/Termux; [телефонный отчёт](docs/test-results/t-p1-2/termux/README.md) относится к исходникам `ce24525169e1d47ea8dc2d2d1f63f767dbc54890`, после которых менялась только документация. **T-P1.3 на Android/Termux — SKIPPED**, пока владелец не выполнит новый прогон.
+Принятая база T-P1.2 — [`07fe425a0d4d5c0b9fbb65f8a37b30924523ec81`](https://github.com/LPYURA2/OS/commit/07fe425a0d4d5c0b9fbb65f8a37b30924523ec81). Она имеет подтверждённые 23/23 Linux-этапа и отдельные 16/16 Android/Termux; [телефонный отчёт](docs/test-results/t-p1-2/termux/README.md) относится к исходникам `ce24525169e1d47ea8dc2d2d1f63f767dbc54890`, после которых менялась только документация. Отдельный прогон T-P1.3 владельца на Android/Termux с QEMU 11.1.3 — **20/20 PASS**. [Отчёт Termux](docs/test-results/t-p1-3/termux/README.md).
 
 ## Termux: новый каталог и закреплённый коммит
 
@@ -125,7 +125,7 @@ qemu-system-aarch64 --version
 CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux
 ```
 
-Используйте новый каталог, оставив предыдущие результаты как историю. Этот маршрут не требует OVMF, `lld-link` и x86 QEMU. Runner сам завершает VM и сохраняет `build/termux/test-results/results.json` и журналы. Передайте владельцу полный набор новых журналов, особенно `qemu-aarch64-bootpool.log`, `qemu-aarch64-bootpool-el2.log` и две exception-проверки. Linux ARM64-only не засчитывается как результат Android.
+Используйте новый каталог, оставив предыдущие результаты как историю. Этот маршрут не требует OVMF, `lld-link` и x86 QEMU. Runner сам завершает VM и сохраняет `build/termux/test-results/results.json` и журналы. Для выполненного владельцем прогона в отчёте приложены сводка и два UART-журнала пула. Состояние двух exception-сценариев указано в сводке. Linux ARM64-only не засчитывается как результат Android.
 
 ## Ручной запуск и VirtualBox
 

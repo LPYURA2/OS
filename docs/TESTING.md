@@ -222,7 +222,7 @@ qemu-system-aarch64 -machine virt -cpu cortex-a57 -m 128M \
 |---|---|---|
 | Linux, полный QEMU/OVMF x86-64 и AArch64 | См. [новый отчёт](test-results/t-p1-3/README.md) | Результаты должны включать реальные pool- и exception-сценарии |
 | Linux, ARM64-only без OVMF/x86 tools | См. [новый отчёт](test-results/t-p1-3/README.md) | Проверяет независимость маршрута, не телефон |
-| Android/Termux владельца | SKIPPED | До фактического нового прогона T-P1.3 |
+| Android/Termux владельца, QEMU 11.1.3 | PASS, 20/20 | [Отдельный отчёт и два UART-журнала пула](test-results/t-p1-3/termux/README.md) |
 | VirtualBox и физическое оборудование | SKIPPED | В T-P1.3 отдельно не испытаны |
 
 История принятой базы: Linux T-P1.2 **23/23 этапа PASS**, host Python **39/39**; ARM64-only Linux **16/16** и отдельный Android/Termux владельца **16/16** на QEMU 11.1.3. [Телефонный отчёт T-P1.2](test-results/t-p1-2/termux/README.md) относится к `ce24525169e1d47ea8dc2d2d1f63f767dbc54890`; принятый `07fe425a0d4d5c0b9fbb65f8a37b30924523ec81` добавляет только документацию. Эти результаты не засчитывают T-P1.3 как проверенный на Android. [T-P1.0](test-results/t-p1-0/README.md), [T-P1.1](test-results/t-p1-1/README.md) и их телефонные прогоны остаются отдельной историей.
@@ -249,7 +249,7 @@ qemu-system-aarch64 --version
 CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux
 ```
 
-Runner сам завершает QEMU и не требует Ctrl+A. Команда не запускает x86 и сравнение повторяемости. Сохраните новый `build/termux/test-results/results.json`, все `*.log`, особенно две pool- и две exception-проверки ARM EL1/EL2. Для разбора размещения полезны `build/termux/bootpool/aarch64/pool-site.json` и `manifest.json` соответствующей сборки. Версии Python, Clang/LLD и QEMU также относятся к результату. До получения этих данных статус телефона — SKIPPED.
+Runner сам завершает QEMU и не требует Ctrl+A. Команда не запускает x86 и сравнение повторяемости. Сохраните новый `build/termux/test-results/results.json`, все `*.log`, особенно две pool- и две exception-проверки ARM EL1/EL2. Для разбора размещения полезны `build/termux/bootpool/aarch64/pool-site.json` и `manifest.json` соответствующей сборки. Версии Python, Clang/LLD и QEMU также относятся к результату. Фактический прогон владельца подтверждён итоговой сводкой и двумя UART-журналами пула. Какие дополнительные файлы не приложены, указано в [отчёте Termux](test-results/t-p1-3/termux/README.md).
 
 ## Риски и откат
 
