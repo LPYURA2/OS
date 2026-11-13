@@ -185,7 +185,7 @@ qemu-system-aarch64 -machine virt -cpu cortex-a57 -m 128M \
 |---|---|---|
 | Linux, полный QEMU/OVMF x86-64 и AArch64 | PASS, 23/23 | Включает реальные UD2 и ARM BRK EL1/EL2, host Python 39/39 |
 | Linux, ARM64-only без OVMF/x86 tools | PASS, 16/16 | Не доказывает работу текущего этапа в Android |
-| Android/Termux владельца | SKIPPED | Нового прогона T-P1.2 на телефоне нет |
+| Android/Termux владельца, QEMU 11.1.3 | PASS, 16/16 | [Отдельный отчёт и UART](test-results/t-p1-2/termux/README.md) |
 | VirtualBox и физическое оборудование | SKIPPED | Отдельные реальные устройства/гипервизор в этом этапе не проверены |
 
 Старые [T-P1.0](test-results/t-p1-0/README.md) и [T-P1.1](test-results/t-p1-1/README.md) сохраняются как история. На телефоне владельца T-P1.1 ранее дал [12 этапов PASS](test-results/t-p1-1/termux-arm64.md); телефонный коммит `1a22e961946c4b08e058d65d91955271c4a502c4` отличается от принятой документальной базы `e4823f2eaf1bfbdca6ea7a93768b76a3b289523b` только документацией. Эти факты не засчитывают новые exception-обработчики T-P1.2 как проверенные на Android.
@@ -198,7 +198,7 @@ qemu-system-aarch64 --version
 CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux
 ```
 
-Runner сам завершает QEMU и не требует Ctrl+A. Ожидаются 16 этапов выбранного ARM64-маршрута; команда не запускает x86 и сравнение повторяемости. Сохраните полный новый `build/termux/test-results/results.json` и UART-журналы, включая две exception-проверки BRK с начальным EL1/EL2. До получения этих данных телефон остаётся SKIPPED.
+Runner сам завершает QEMU и не требует Ctrl+A. Ожидаются 16 этапов выбранного ARM64-маршрута; команда не запускает x86 и сравнение повторяемости. Сохраните полный новый `build/termux/test-results/results.json` и UART-журналы, включая две exception-проверки BRK с начальным EL1/EL2. Полученный от владельца results.json и оба UART-журнала опубликованы в [отчёте Termux](test-results/t-p1-2/termux/README.md).
 
 
 ## Риски и откат

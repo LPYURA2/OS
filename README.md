@@ -135,7 +135,7 @@ python3 tools/test.py --all --output build/t-p1-2
 
 Оболочки Makefile: `make`, `make host-test`, `make repro`, `make smoke`, `make test`. Подробности — [TESTING.md](docs/TESTING.md), фактические журналы — [T-P1.2](docs/test-results/t-p1-2/README.md), [T-P1.1](docs/test-results/t-p1-1/README.md) и [T-P1.0](docs/test-results/t-p1-0/README.md). Runner возвращает 0 при PASS, 1 при FAIL и 2 при пропущенных обязательных средствах без FAIL.
 
-T-P1.2 сохраняет прежние проверки и добавляет host exception-тесты, реальный x86 UD2 и ARM BRK с начальными EL1/EL2. Полный Linux-прогон — **23/23 этапа PASS** (host Python 39/39); отдельный ARM64-only Linux-маршрут без OVMF/x86-инструментов — **16/16 PASS**. Детали в TESTING и отчёте. **T-P1.2 на телефоне — SKIPPED** до нового прогона владельца.
+T-P1.2 сохраняет прежние проверки и добавляет host exception-тесты, реальный x86 UD2 и ARM BRK с начальными EL1/EL2. Полный Linux-прогон — **23/23 этапа PASS** (host Python 39/39); отдельный ARM64-only Linux-маршрут без OVMF/x86-инструментов — **16/16 PASS**. Детали в TESTING и отчёте. Отдельный прогон владельца в Android/Termux на QEMU 11.1.3 — **16/16 PASS**. [Отчёт Termux](docs/test-results/t-p1-2/termux/README.md).
 
 Ранее T-P1.1 прошёл 18 Linux-этапов и отдельные **12 этапов PASS на Android/Termux**, включая пять ARM64-сценариев. Это история проверенной базы, а не проверка новых exception-handler на телефоне: [отчёт T-P1.1 Termux](docs/test-results/t-p1-1/termux-arm64.md).
 
@@ -174,7 +174,7 @@ cd styleos-tp12
 CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux
 ```
 
-Для этой ARM64-проверки не нужны `lld-link` и OVMF. Runner сам завершает QEMU и сохраняет журналы в `build/termux/test-results/`. Прежние папки T-P1.0/T-P1.1 можно оставить как есть. Новая команда T-P1.2 на телефоне ещё не проверена; Linux ARM64-only прогон не заменяет её.
+Для этой ARM64-проверки не нужны `lld-link` и OVMF. Runner сам завершает QEMU и сохраняет журналы в `build/termux/test-results/`. Прежние папки T-P1.0/T-P1.1 можно оставить как есть. Команда T-P1.2 проверена отдельно в Android/Termux. Она не подтверждает нативную загрузку устройства.
 
 Отдельный прогон **T-P1.0** на телефоне владельца 13.11.2026: **PASS** для сборки AArch64 в Termux и трёх загрузочных сценариев в QEMU `virt` (EL1, EL2 → EL1, отказ при неверном `boot_info`). Host-тесты, воспроизводимость и x86-64 в Termux не проверялись. Нативная загрузка телефона также не проверялась. [Результаты Termux](docs/test-results/t-p1-0/termux-arm64.md).
 
