@@ -1,0 +1,6 @@
+[
+  "fixed-x86-error",
+  "FAIL",
+  "serial handoff checked; QEMU terminated by harness",
+  "$ /workspace/scratch/styleos-t-p1-0/review-host/fake-qemu/qemu-fake -accel tcg,thread=single -m 128M -display none -serial stdio -monitor none -net none -no-reboot -machine q35 -vga none -drive if=pflash,format=raw,readonly=on,file=/workspace/scratch/styleos-t-p1-0/review-host/fake-qemu/code.fd -drive if=pflash,format=raw,file=/workspace/scratch/styleos-t-p1-0/review-host/fake-qemu/test-results/fixed-x86-error/OVMF_VARS.fd -drive if=none,id=styleos,format=raw,readonly=on,file=/workspace/scratch/styleos-t-p1-0/review-host/fake-qemu/x86_64/styleos.img -device virtio-blk-pci,drive=styleos\nSTYLEOS BOOT_ERROR invalid UEFI system table\nSTYLEOS HANDOFF PASS x86_64\nSTYLEOS KERNEL HALT\n"
+]

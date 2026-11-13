@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Build real freestanding CPU binaries; no downloaded dependencies or root."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def tool(variable, names):
+    value = os.environ.get(variable)
+    if value:
+        found = shutil.which(value)
+        if found:
+            return found
+        raise RuntimeError(f'{variable} is not executable: {value}')
+    for name in names:
+        found = shutil.which(name)
+        if found:
+            return found
+    raise RuntimeError(f'Missing {variable}: install {" / ".join(names)}')
+
+
+def run(args):
+    print('+', ' '.join(map(str, args)), flush=True)
+    subprocess.run(list(map(str, args)), check=True, cwd=ROOT)
+
+
+def build(arch, output, invalid=False):
+    cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
+    folder = output / arch
+    folder.mkdir(parents=True, exist_ok=True)
+    common = ['kernel/main.c', 'kernel/boot_info.c', 'kernel/runtime.c']
+    if arch == 'x86_64':
+        target = 'x86_64-pc-win32-coff'
+        sources = common + ['boot/x86_64/exit_boot.c', 'boot/x86_64/uefi.c',
+                            'arch/x86_64/serial.c', 'arch/x86_64/entry.S']
+        cpu_flags = ['-mno-red-zone', '-mno-sse', '-mno-mmx', '-msoft-float']
+        arch_id = '1'
+    else:
+        target = 'aarch64-none-elf'
+        sources = common + ['boot/aarch64/platform.c', 'boot/aarch64/start.S',
+                            'arch/aarch64/console.c']
+        cpu_flags = ['-mgeneral-regs-only', '-mno-outline-atomics']
+        arch_id = '2'
+    objects = []
+    flags = ['--target=' + target, '-O2', '-g0', '-ffreestanding',
+             '-fno-stack-protector', '-fno-builtin', '-fno-pic', '-fno-pie',
+             '-fno-asynchronous-unwind-tables', '-fno-unwind-tables',
+             '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'include'),
+             '-I', str(ROOT / 'boot/x86_64'),
+             '-DSTYLEOS_EXPECT_ARCH=' + arch_id,
+             '-ffile-prefix-map=' + str(ROOT) + '=.'] + cpu_flags
+    if invalid:
+        flags.append('-DSTYLEOS_TEST_INVALID_BOOT_INFO=1')
+    for rel in sources:
+        source = ROOT / rel
+        obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
+        extra = ['-std=c11'] if source.suffix == '.c' else []
+        run([cc, *flags, *extra, '-c', source, '-o', obj])
+        objects.append(obj)
+    if arch == 'x86_64':
+        linker = tool('LLD_LINK', ['lld-link', 'lld-link-19', 'lld-link-18'])
+        binary = folder / 'BOOTX64.EFI'
+        run([linker, '/subsystem:efi_application', '/entry:efi_main',
+             '/machine:x64', '/nodefaultlib', '/timestamp:0', '/fixed:no',
+             '/dynamicbase', '/nxcompat', '/out:' + str(binary), *objects])
+        run([sys.executable, ROOT / 'tools/make_disk.py', '--efi', binary,
+             '--output', folder / 'styleos.img'])
+        artifacts = [binary, folder / 'styleos.img']
+    else:
+        linker = tool('LD_LLD', ['ld.lld', 'ld.lld-19', 'ld.lld-18'])
+        base = [linker, '-T', ROOT / 'boot/aarch64/linker.ld', '--build-id=none']
+        run([*base, '-o', folder / 'kernel.elf', *objects])
+        run([*base, '--oformat=binary', '-o', folder / 'styleos.bin', *objects])
+        artifacts = [folder / 'kernel.elf', folder / 'styleos.bin']
+    return [{'path': str(p.relative_to(output)), 'size': p.stat().st_size,
+             'sha256': hashlib.sha256(p.read_bytes()).hexdigest()} for p in artifacts]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--arch', choices=['all', 'x86_64', 'aarch64'], default='all')
+    parser.add_argument('--output', type=Path, default=ROOT / 'build')
+    parser.add_argument('--invalid-boot-info', action='store_true',
+                        help='Negative test only: corrupt the handoff magic')
+    args = parser.parse_args()
+    output = args.output.resolve()
+    arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
+    records = []
+    for arch in arches:
+        records.extend(build(arch, output, args.invalid_boot_info))
+    cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
+    version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
+    (output / 'manifest.json').write_text(json.dumps({
+        'prototype': 'StyleOS T-P1.0', 'compiler': version,
+        'invalid_boot_info': args.invalid_boot_info, 'artifacts': records
+    }, indent=2) + '\n')
+    print('BUILD PASS:', ', '.join(arches))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (RuntimeError, OSError, subprocess.CalledProcessError) as error:
+        print('BUILD FAIL:', error, file=sys.stderr)
+        sys.exit(1)

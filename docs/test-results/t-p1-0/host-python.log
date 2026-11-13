@@ -1,0 +1,16 @@
+$ /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m unittest discover -s tests -p test_*.py -v
+test_empty_input_preserves_existing_output (test_disk.DiskImageTests.test_empty_input_preserves_existing_output) ... ok
+test_fat16_directories_and_multicluster_file (test_disk.DiskImageTests.test_fat16_directories_and_multicluster_file) ... ok
+test_gpt_headers_arrays_and_protective_mbr (test_disk.DiskImageTests.test_gpt_headers_arrays_and_protective_mbr) ... ok
+test_oversized_input_preserves_existing_output (test_disk.DiskImageTests.test_oversized_input_preserves_existing_output) ... ok
+test_reproducible_image_and_unchanged_input (test_disk.DiskImageTests.test_reproducible_image_and_unchanged_input) ... ok
+test_source_and_output_cannot_alias (test_disk.DiskImageTests.test_source_and_output_cannot_alias) ... ok
+test_arm_must_prove_requested_initial_el (test_qemu_output.SerialEvidenceTests.test_arm_must_prove_requested_initial_el) ... ok
+test_negative_requires_exact_expected_error_without_success (test_qemu_output.SerialEvidenceTests.test_negative_requires_exact_expected_error_without_success) ... ok
+test_normal_requires_handoff_and_halt (test_qemu_output.SerialEvidenceTests.test_normal_requires_handoff_and_halt) ... ok
+test_prior_failure_cannot_be_hidden_by_later_success (test_qemu_output.SerialEvidenceTests.test_prior_failure_cannot_be_hidden_by_later_success) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.631s
+
+OK

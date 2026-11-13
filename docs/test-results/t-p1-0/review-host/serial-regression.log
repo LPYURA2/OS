@@ -1,0 +1,9 @@
+test_arm_must_prove_requested_initial_el (__main__.SerialEvidenceTests.test_arm_must_prove_requested_initial_el) ... ok
+test_negative_requires_exact_expected_error_without_success (__main__.SerialEvidenceTests.test_negative_requires_exact_expected_error_without_success) ... ok
+test_normal_requires_handoff_and_halt (__main__.SerialEvidenceTests.test_normal_requires_handoff_and_halt) ... ok
+test_prior_failure_cannot_be_hidden_by_later_success (__main__.SerialEvidenceTests.test_prior_failure_cannot_be_hidden_by_later_success) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.000s
+
+OK

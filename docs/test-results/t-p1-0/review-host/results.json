@@ -1,0 +1,9 @@
+{
+  "nonregular_source": "PASS: rejected before opening device",
+  "nonregular_output": "PASS: rejected before opening device",
+  "hardlink_alias": "PASS",
+  "failed_publish_preserves_output": "PASS",
+  "output_symlink_target_preserved": "PASS",
+  "host_boot_info_sanitizers": "PASS: ASan+UBSan existing host contract tests",
+  "host_uefi_sanitizers": "PASS: ASan+UBSan existing 14 host scenarios"
+}

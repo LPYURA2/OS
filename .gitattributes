@@ -1,0 +1,2 @@
+# Preserve actual UART CRLF evidence without classifying CR as a code defect.
+docs/test-results/**/*.log -text whitespace=cr-at-eol

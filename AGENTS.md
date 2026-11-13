@@ -1,38 +1,26 @@
-# Instructions for coding agents — MATRYOSHKA OS
+# StyleOS — engineering rules
 
-The owner has final approval on architecture and releases. Treat current source as a working research prototype, not a mature OS.
+The owner authorizes T-P1.0 to replace the MATRYOSHKA working tree, update main
+after verification, and archive its original commit. These instructions govern
+StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
 
-## Read first
-- `MATRYOSHKA_RAZRYV_OS_MASTER.docx`
-- `README_RU.md`
-- `ARCHITECTURE.md`
-- `docs/TERMUX_PLAN.md`
-- `docs/ADR_001_ISA.md`
-- `docs/PROJECT_STATUS.md`
-
-## Invariants
-1. Guest OS logic must execute as guest CPU machine instructions. Never claim that Python host helpers are guest OS features.
-2. Preserve the tested v0.3.1 baseline and T1A v0.3.2 source separately. Avoid rewrites and broad refactoring without authorization.
-3. Never unilaterally change the existing ISA, existing syscall numbers, memory map, or persistent user disk format. T1A extends the experimental M32 ABI with catalog MAPP and syscall 10; future changes require owner approval.
-4. `images/system.img` is a read-only boot/system image; `matryoshka_user_disk.img` is user data. Never overwrite personal data or commit user disks.
-5. No destructive shell commands and no secrets in the repo. Respect the Termux user's other projects.
-6. No root permissions or Android-side changes outside the project directory.
-7. Report test commands and evidence, limitations, and a rollback plan with every PR. Tests passed in Linux do not prove Android compatibility.
-8. Do not merge your own PR or tag a release without the owner's explicit approval.
-
-## Baseline tests
-```sh
-python matryoshka.py --selftest
-python tools/export_images.py --check
-python -m unittest discover -s tests -v
-```
-
-## Development workflow
-Use a narrow `feature/...` branch and a PR; update `CHANGELOG.md` and the passport with confirmed changes only. Honor the current Codex task file in `docs/TASK_001_CODEX.md`.
-
-## Product vision and learning obligations (2026-11-12)
-- Before proposing new architecture read `docs/PRODUCT_VISION_RU.md`, `docs/QUALITY_GATES_RU.md`, and `docs/CURRENT_BASELINE_RU.md`.
-- MATRYOSHKA aims to be a distinct competitive OS alternative, not a Linux or Windows clone. Compatibility goals APK/EXE/.tea are unimplemented.
-- Always separate guest OS functions from host engine demos, and prototype, verified Android results, and product aspirations.
-- For each major change provide a short technical explanation and one learn-by-doing exercise for the owner.
-- T1B console repair is only a proposal pending architecture approval; see `docs/TASK_002_T1B_CODEX.md`.
+- Read README.md and docs/adr/ before changing boot or hardware contracts.
+- Build for real x86-64/AArch64 instruction sets. Never reuse M32/M8 emulation as
+  a kernel or claim a boot demonstration is a complete OS.
+- Keep common code in kernel/ and include/styleos/, platform adapters in boot/
+  and arch/. kernel_main() and versioned boot_info form the prototype boundary.
+- Kernel model (microkernel, hybrid, monolithic), production ABI, memory manager,
+  drivers, application formats and compatibility remain owner decisions.
+- Do not modify LPYURA2/Portable-os. Preserve Git history; never force push.
+- Use a task branch. T-P1.0 explicitly permits a verified fast-forward of main;
+  later work requires a separate task. Do not create releases automatically.
+- No secrets, personal disk images, firmware downloads or binary build outputs
+  in Git. Selected text evidence belongs in docs/test-results/. Build tools may
+  write only their declared output directories.
+- Run the documented host checks, both builds, reproducibility and available
+  QEMU smoke/negative checks. Record logs and PASS/FAIL/SKIPPED honestly. QEMU
+  success does not establish VirtualBox, Android-host or physical-device support.
+- Keep diagnostics usable before a scheduler/allocator exists. Handle invalid
+  handoffs and UEFI failures explicitly; do not silently continue after errors.
+- Explain important source files and the limits of each result in documentation.
+- Stop after T-P1.0; architecture beyond boot requires the owner's decision.

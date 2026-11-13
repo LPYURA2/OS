@@ -1,0 +1,2 @@
+$ /workspace/scratch/styleos-toolchain/bin/qemu-system-x86_64 -accel tcg,thread=single -m 128M -display none -serial stdio -monitor none -net none -no-reboot -machine q35 -drive if=pflash,format=raw,readonly=on,file=/workspace/scratch/styleos-toolchain/root/usr/share/OVMF/OVMF_CODE_4M.fd -drive if=pflash,format=raw,file=/workspace/OS/build/test-results/qemu-x86_64-normal/OVMF_VARS.fd -drive if=none,id=styleos,format=raw,readonly=on,file=/workspace/OS/build/x86_64/styleos.img -device virtio-blk-pci,drive=styleos
+qemu-system-x86_64: failed to find romfile "vgabios-stdvga.bin"

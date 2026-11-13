@@ -1,0 +1,80 @@
+[
+  {
+    "name": "host-boot-info",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-boot-info.log"
+  },
+  {
+    "name": "host-uefi",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-uefi.log"
+  },
+  {
+    "name": "host-python",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-python.log"
+  },
+  {
+    "name": "repro-build-one",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "repro-build-one.log"
+  },
+  {
+    "name": "repro-build-two",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "repro-build-two.log"
+  },
+  {
+    "name": "reproducibility",
+    "status": "PASS",
+    "detail": "all 4 artifacts identical",
+    "log": "reproducibility.log"
+  },
+  {
+    "name": "build-for-qemu",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-for-qemu.log"
+  },
+  {
+    "name": "build-negative",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-negative.log"
+  },
+  {
+    "name": "qemu-x86_64-normal",
+    "status": "PASS",
+    "detail": "serial handoff checked; QEMU terminated by harness",
+    "log": "qemu-x86_64-normal.log"
+  },
+  {
+    "name": "qemu-x86_64-invalid",
+    "status": "PASS",
+    "detail": "serial handoff checked; QEMU terminated by harness",
+    "log": "qemu-x86_64-invalid.log"
+  },
+  {
+    "name": "qemu-aarch64-normal",
+    "status": "PASS",
+    "detail": "serial handoff checked; QEMU terminated by harness",
+    "log": "qemu-aarch64-normal.log"
+  },
+  {
+    "name": "qemu-aarch64-invalid",
+    "status": "PASS",
+    "detail": "serial handoff checked; QEMU terminated by harness",
+    "log": "qemu-aarch64-invalid.log"
+  },
+  {
+    "name": "qemu-aarch64-el2",
+    "status": "PASS",
+    "detail": "serial handoff checked; QEMU terminated by harness",
+    "log": "qemu-aarch64-el2.log"
+  }
+]

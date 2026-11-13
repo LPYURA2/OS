@@ -1,0 +1,18 @@
+{
+  "date_utc": "2026-11-13",
+  "python": "3.12.14",
+  "host": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "host_cc": "cc (Debian 14.2.0-19) 14.2.0",
+  "qemu": "10.0.13",
+  "clang_lld": "19.1.7",
+  "ovmf": "2025.02",
+  "test_command": "python3 tools/test.py --all",
+  "exit_code": 0,
+  "configuration": "TCG emulation, 128 MiB, one vCPU",
+  "skipped": {
+    "VirtualBox": "VBoxManage unavailable",
+    "Termux": "No Android host run",
+    "physical_x86_64": "No physical machine boot test",
+    "physical_ARM64": "No board/device boot test"
+  }
+}
