@@ -31,22 +31,27 @@ def run(args):
     subprocess.run(list(map(str, args)), check=True, cwd=ROOT)
 
 
-def build(arch, output, invalid=False):
+def build(arch, output, invalid=False, invalid_map=False):
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     folder = output / arch
     folder.mkdir(parents=True, exist_ok=True)
-    common = ['kernel/main.c', 'kernel/boot_info.c', 'kernel/runtime.c']
+    common = ['kernel/main.c', 'kernel/boot_info.c', 'kernel/runtime.c',
+              'kernel/boot_memory.c', 'kernel/boot_memory_diagnostic.c']
     if arch == 'x86_64':
         target = 'x86_64-pc-win32-coff'
         sources = common + ['boot/x86_64/exit_boot.c', 'boot/x86_64/uefi.c',
+                            'boot/x86_64/memory_map.c',
                             'arch/x86_64/serial.c', 'arch/x86_64/entry.S']
         cpu_flags = ['-mno-red-zone', '-mno-sse', '-mno-mmx', '-msoft-float']
         arch_id = '1'
     else:
         target = 'aarch64-none-elf'
         sources = common + ['boot/aarch64/platform.c', 'boot/aarch64/start.S',
+                            'boot/aarch64/fdt_memory.c',
                             'arch/aarch64/console.c']
-        cpu_flags = ['-mgeneral-regs-only', '-mno-outline-atomics']
+        # Early execution has the MMU off. Do not let Clang combine naturally
+        # aligned fields into wider unaligned accesses to stack or DTB data.
+        cpu_flags = ['-mgeneral-regs-only', '-mno-outline-atomics', '-mstrict-align']
         arch_id = '2'
     objects = []
     flags = ['--target=' + target, '-O2', '-g0', '-ffreestanding',
@@ -58,6 +63,8 @@ def build(arch, output, invalid=False):
              '-ffile-prefix-map=' + str(ROOT) + '=.'] + cpu_flags
     if invalid:
         flags.append('-DSTYLEOS_TEST_INVALID_BOOT_INFO=1')
+    if invalid_map:
+        flags.append('-DSTYLEOS_TEST_INVALID_MEMORY_MAP=1')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -87,19 +94,24 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--arch', choices=['all', 'x86_64', 'aarch64'], default='all')
     parser.add_argument('--output', type=Path, default=ROOT / 'build')
-    parser.add_argument('--invalid-boot-info', action='store_true',
+    negative = parser.add_mutually_exclusive_group()
+    negative.add_argument('--invalid-boot-info', action='store_true',
                         help='Negative test only: corrupt the handoff magic')
+    negative.add_argument('--invalid-memory-map', action='store_true',
+                          help='Negative test only: truncate the map input')
     args = parser.parse_args()
     output = args.output.resolve()
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
     records = []
     for arch in arches:
-        records.extend(build(arch, output, args.invalid_boot_info))
+        records.extend(build(arch, output, args.invalid_boot_info,
+                             args.invalid_memory_map))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS T-P1.0', 'compiler': version,
-        'invalid_boot_info': args.invalid_boot_info, 'artifacts': records
+        'prototype': 'StyleOS T-P1.1', 'compiler': version,
+        'invalid_boot_info': args.invalid_boot_info,
+        'invalid_memory_map': args.invalid_memory_map, 'artifacts': records
     }, indent=2) + '\n')
     print('BUILD PASS:', ', '.join(arches))
 

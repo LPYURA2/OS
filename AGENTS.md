@@ -23,4 +23,8 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
 - Keep diagnostics usable before a scheduler/allocator exists. Handle invalid
   handoffs and UEFI failures explicitly; do not silently continue after errors.
 - Explain important source files and the limits of each result in documentation.
-- Stop after T-P1.0; architecture beyond boot requires the owner's decision.
+- T-P1.1 is approved in its task branch only as diagnostic physical memory
+  discovery. Do not change boot_info v1, allocate or reclaim pages, change
+  translation/exception handling, or select a kernel model in this stage.
+- Leave main unchanged. Record the owner's Termux run separately from Linux QEMU
+  and stop before implementing a memory allocator or another architecture stage.

@@ -1,0 +1,4 @@
+$ cc -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_boot_info.c kernel/boot_info.c -o /workspace/scratch/e8f4eb235543/styleos-tp11/build/tp11-final/host-tests/host-boot-info
+
+$ /workspace/scratch/e8f4eb235543/styleos-tp11/build/tp11-final/host-tests/host-boot-info
+boot_info host tests: PASS

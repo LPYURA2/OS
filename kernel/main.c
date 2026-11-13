@@ -1,5 +1,6 @@
 #include "styleos/arch.h"
 #include "styleos/boot_info.h"
+#include "styleos/boot_memory.h"
 
 #ifndef STYLEOS_EXPECT_ARCH
 #error STYLEOS_EXPECT_ARCH must identify the compiled target
@@ -23,8 +24,8 @@ _Noreturn void kernel_main(const struct boot_info *info)
 #else
 #error Unsupported StyleOS target
 #endif
-    /* T-P1.0 ends at a verified handoff. No scheduler, allocator or final kernel
-     * model is implied by this deliberately small common entry point. */
+    boot_memory_diagnose(info);
+    /* T-P1.1 reports candidates only. It does not acquire or write pages. */
     arch_puts("STYLEOS KERNEL HALT\n");
     arch_halt();
 }

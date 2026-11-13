@@ -102,6 +102,8 @@ aarch64_vectors:
 
 .section .bss.stack, "aw", %nobits
 .balign 16
+.global __stack_bottom
+__stack_bottom:
     .skip 65536
 .global __stack_top
 __stack_top:

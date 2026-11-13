@@ -1,0 +1,7 @@
+$ /workspace/scratch/e8f4eb235543/tp11-tools/wrappers/qemu-system-aarch64 -accel tcg,thread=single -m 128M -display none -serial stdio -monitor none -net none -no-reboot -machine virt -cpu cortex-a57 -kernel /workspace/scratch/e8f4eb235543/styleos-tp11/build/tp11-final/negative/aarch64/styleos.bin
+STYLEOS AARCH64: initial EL1
+STYLEOS AARCH64: current EL1
+STYLEOS AARCH64: DTB header OK
+STYLEOS kernel_main entered
+STYLEOS BOOT_INFO ERROR: magic
+qemu-system-aarch64: terminating on signal 15 from pid 2 (python3)

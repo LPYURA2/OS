@@ -16,6 +16,8 @@ styleos_enter_kernel:
 
 .bss
 .p2align 4
+.globl styleos_stack_bottom
+.globl styleos_stack_top
 styleos_stack_bottom:
     .skip 65536
 styleos_stack_top:

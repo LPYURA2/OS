@@ -1,0 +1,22 @@
+[
+  {
+    "path": "x86_64/BOOTX64.EFI",
+    "size": 9728,
+    "sha256": "0963e5aeac09d996f6c18caac5fbd8f16b10be1e40412acfa04a8bfd2f131aca"
+  },
+  {
+    "path": "x86_64/styleos.img",
+    "size": 71303168,
+    "sha256": "1f65702e0e195df591ea7392bc997820e2052502c3645e8cb3b91d35cc2e1323"
+  },
+  {
+    "path": "aarch64/kernel.elf",
+    "size": 82144,
+    "sha256": "d258649147eb19607ac3eea92a8b31191e7b30ce868fdd01afff0e23c60ecb09"
+  },
+  {
+    "path": "aarch64/styleos.bin",
+    "size": 14112,
+    "sha256": "fc27dacbfec31314cac486cc3220208df46773e6e604bd871ac163585eb7cef9"
+  }
+]

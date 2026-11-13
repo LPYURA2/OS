@@ -50,6 +50,28 @@ typedef EFI_STATUS (EFIAPI *efi_allocate_pool)(uint32_t, UINTN, void **);
 typedef EFI_STATUS (EFIAPI *efi_free_pool)(void *);
 typedef EFI_STATUS (EFIAPI *efi_exit_boot_services)(EFI_HANDLE, UINTN);
 
+struct efi_guid {
+    uint32_t a;
+    uint16_t b, c;
+    uint8_t d[8];
+};
+
+struct efi_loaded_image {
+    uint32_t revision;
+    EFI_HANDLE parent_handle;
+    void *system_table;
+    EFI_HANDLE device_handle;
+    void *file_path;
+    void *reserved;
+    uint32_t load_options_size;
+    void *load_options;
+    void *image_base;
+    uint64_t image_size;
+};
+
+typedef EFI_STATUS (EFIAPI *efi_handle_protocol)(
+    EFI_HANDLE, struct efi_guid *, void **);
+
 struct efi_boot_services {
     struct efi_table_header hdr;
     void *raise_tpl;
@@ -68,7 +90,7 @@ struct efi_boot_services {
     void *install_protocol_interface;
     void *reinstall_protocol_interface;
     void *uninstall_protocol_interface;
-    void *handle_protocol;
+    efi_handle_protocol handle_protocol;
     void *reserved;
     void *register_protocol_notify;
     void *locate_handle;
@@ -108,6 +130,12 @@ _Static_assert(sizeof(struct efi_table_header) == 24, "UEFI header size");
 _Static_assert(sizeof(struct efi_memory_descriptor) == 40, "UEFI descriptor");
 _Static_assert(offsetof(struct efi_boot_services, get_memory_map) == 56,
                "UEFI GetMemoryMap offset");
+_Static_assert(sizeof(struct efi_guid) == 16, "UEFI GUID size");
+_Static_assert(offsetof(struct efi_loaded_image, image_base) == 64 &&
+               offsetof(struct efi_loaded_image, image_size) == 72,
+               "UEFI Loaded Image fields");
+_Static_assert(offsetof(struct efi_boot_services, handle_protocol) == 152,
+               "UEFI HandleProtocol offset");
 _Static_assert(offsetof(struct efi_boot_services, exit_boot_services) == 232,
                "UEFI ExitBootServices offset");
 _Static_assert(offsetof(struct efi_system_table, con_out) == 64,
