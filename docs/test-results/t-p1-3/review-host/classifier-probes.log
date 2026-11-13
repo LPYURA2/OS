@@ -1,0 +1,20 @@
+valid relocated x86 fixture: PASS
+empty: rejected PASS
+PASS-only: rejected PASS
+missing pool end: rejected PASS
+pool end one byte short: rejected PASS
+workspace overlap: rejected PASS
+metadata overlap: rejected PASS
+duplicate issue: rejected PASS
+missing RW: rejected PASS
+error before: rejected PASS
+error after: rejected PASS
+timeout before: rejected PASS
+timeout after: rejected PASS
+preferred base used: rejected PASS
+no image proof: rejected PASS
+wrong-sidecar-end: rejected PASS
+boolean-size: rejected PASS
+missing-proof: rejected PASS
+wrong-arch: rejected PASS
+Independent classifier probes: 1 valid + 18 negative PASS

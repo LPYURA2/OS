@@ -1,0 +1,9 @@
+$ /workspace/scratch/styleos-toolchain/bin/qemu-system-aarch64 -accel tcg,thread=single -m 128M -display none -serial stdio -monitor none -net none -no-reboot -machine virt -cpu cortex-a57 -kernel /workspace/OS/build/t-p1-3/negative/aarch64/styleos.bin
+STYLEOS AARCH64: initial EL1
+STYLEOS AARCH64: current EL1
+STYLEOS AARCH64: DTB header OK
+STYLEOS kernel_main entered
+STYLEOS BOOT_INFO ERROR: magic
+qemu-system-aarch64: terminating on signal 15 from pid 6317 (python3)
+
+[harness] requested_stop=True forced_stop=False natural_exit=False returncode=0 settled=True

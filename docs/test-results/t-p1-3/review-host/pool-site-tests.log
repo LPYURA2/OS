@@ -1,0 +1,16 @@
+test_arm_full_nobits_extent_and_raw_image_size (test_pool_site.PoolSiteTests.test_arm_full_nobits_extent_and_raw_image_size) ... ok
+test_arm_missing_duplicate_and_truncated_symbols (test_pool_site.PoolSiteTests.test_arm_missing_duplicate_and_truncated_symbols) ... ok
+test_arm_raw_header_and_initialized_bytes_must_match (test_pool_site.PoolSiteTests.test_arm_raw_header_and_initialized_bytes_must_match) ... ok
+test_arm_rejects_incomplete_interval_proofs (test_pool_site.PoolSiteTests.test_arm_rejects_incomplete_interval_proofs) ... ok
+test_missing_required_sidecar_and_invalid_arch (test_pool_site.PoolSiteTests.test_missing_required_sidecar_and_invalid_arch) ... ok
+test_pe_rejects_ambiguous_overlapping_sections (test_pool_site.PoolSiteTests.test_pe_rejects_ambiguous_overlapping_sections) ... ok
+test_pe_rejects_full_interval_end_crossing_and_bad_layout (test_pool_site.PoolSiteTests.test_pe_rejects_full_interval_end_crossing_and_bad_layout) ... ok
+test_pe_rejects_missing_duplicate_or_inconsistent_map (test_pool_site.PoolSiteTests.test_pe_rejects_missing_duplicate_or_inconsistent_map) ... ok
+test_pe_rejects_nonzero_initialization_and_truncated_raw (test_pool_site.PoolSiteTests.test_pe_rejects_nonzero_initialization_and_truncated_raw) ... ok
+test_pe_rvas_include_last_byte_and_ignore_preferred_runtime_address (test_pool_site.PoolSiteTests.test_pe_rvas_include_last_byte_and_ignore_preferred_runtime_address) ... ok
+test_pe_zero_preferred_base_and_initialized_zero_prefix (test_pool_site.PoolSiteTests.test_pe_zero_preferred_base_and_initialized_zero_prefix) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.052s
+
+OK

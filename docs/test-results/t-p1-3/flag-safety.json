@@ -1,0 +1,16 @@
+{
+  "source_commit": "f10ee3313b7d8d428a3207e5bcfff6b93842be09",
+  "build_mode_cli_suite": "tests/test_build_modes.py, 5/5 methods PASS",
+  "actual_images": {
+    "x86_64": {
+      "normal_has_selftest_pass": false,
+      "bootpool_has_selftest_pass": true,
+      "normal_selftest_object_linked": false
+    },
+    "aarch64": {
+      "normal_has_selftest_pass": false,
+      "bootpool_has_selftest_pass": true,
+      "normal_selftest_object_linked": false
+    }
+  }
+}

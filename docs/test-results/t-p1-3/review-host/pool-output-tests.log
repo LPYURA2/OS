@@ -1,0 +1,19 @@
+test_all_eight_indices_unique_aligned_addresses_and_reuse_must_match (test_pool_output.PoolOutputTests.test_all_eight_indices_unique_aligned_addresses_and_reuse_must_match) ... ok
+test_both_architectures_and_arm_initial_els (test_pool_output.PoolOutputTests.test_both_architectures_and_arm_initial_els) ... ok
+test_empty_pass_only_and_missing_real_prefix_do_not_pass (test_pool_output.PoolOutputTests.test_empty_pass_only_and_missing_real_prefix_do_not_pass) ... ok
+test_error_and_timeout_cannot_be_hidden_by_success_markers (test_pool_output.PoolOutputTests.test_error_and_timeout_cannot_be_hidden_by_success_markers) ... ok
+test_exact_order_and_terminal_halt_are_required (test_pool_output.PoolOutputTests.test_exact_order_and_terminal_halt_are_required) ... ok
+test_full_bounds_metadata_and_workspace_are_checked (test_pool_output.PoolOutputTests.test_full_bounds_metadata_and_workspace_are_checked) ... ok
+test_memory_reservations_and_candidates_remain_independently_checked (test_pool_output.PoolOutputTests.test_memory_reservations_and_candidates_remain_independently_checked) ... ok
+test_old_modes_reject_any_unexpected_pool_execution (test_pool_output.PoolOutputTests.test_old_modes_reject_any_unexpected_pool_execution) ... ok
+test_pe_pool_proof_uses_runtime_base_instead_of_preferred_base (test_pool_output.PoolOutputTests.test_pe_pool_proof_uses_runtime_base_instead_of_preferred_base) ... ok
+test_site_types_sizes_address_spaces_and_complete_bss_are_validated (test_pool_output.PoolOutputTests.test_site_types_sizes_address_spaces_and_complete_bss_are_validated) ... ok
+test_stack_handoff_and_source_are_exclusions_for_the_whole_span (test_pool_output.PoolOutputTests.test_stack_handoff_and_source_are_exclusions_for_the_whole_span) ... ok
+test_actual_pe_disk_hash_is_required_alongside_binary_map_proof (test_pool_output.PoolProofBindingTests.test_actual_pe_disk_hash_is_required_alongside_binary_map_proof) ... ok
+test_static_proof_is_rederived_and_edited_sidecar_is_rejected (test_pool_output.PoolProofBindingTests.test_static_proof_is_rederived_and_edited_sidecar_is_rejected) ... ok
+test_pool_pass_followed_by_timeout_is_not_classified_as_success (test_pool_output.PoolTimeoutTests.test_pool_pass_followed_by_timeout_is_not_classified_as_success) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.328s
+
+OK

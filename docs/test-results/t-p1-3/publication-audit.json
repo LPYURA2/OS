@@ -1,0 +1,146 @@
+{
+  "audit_utc": "2026-11-13T21:41:01.044637+00:00",
+  "scope": "read-only publication-scope audit before commit/push; no remote writes",
+  "base_sha": "07fe425a0d4d5c0b9fbb65f8a37b30924523ec81",
+  "branch": "feature/styleos-t-p1-3",
+  "local_main": "dfc5be9c2f699928a42903e70066f1bd8b20f65a",
+  "phone_to_base": {
+    "files": [
+      "README.md",
+      "docs/TESTING.md",
+      "docs/adr/0005-early-exception-diagnostics.md",
+      "docs/test-results/t-p1-2/README.md",
+      "docs/test-results/t-p1-2/termux/README.md",
+      "docs/test-results/t-p1-2/termux/qemu-aarch64-exception-el2.log",
+      "docs/test-results/t-p1-2/termux/qemu-aarch64-exception.log",
+      "docs/test-results/t-p1-2/termux/results.json"
+    ],
+    "docs_only": true
+  },
+  "protected_sources": {
+    "include/styleos/boot_info.h": {
+      "sha256": "d4ffdd17fccb8fdea3c6002a788bfb45f4903d5539bab187544f66d2b6be0b8e",
+      "identical_to_base": true
+    },
+    "include/styleos/arch.h": {
+      "sha256": "58358cffd1c11d462b33b2b0f5adb8faef35aa67e65801d61e818a2ce9e22c6d",
+      "identical_to_base": true
+    },
+    "include/styleos/exception.h": {
+      "sha256": "d9e8792a8dea762f90b21c1ba8ec9a5e3f497213056f534c852209ae653010cd",
+      "identical_to_base": true
+    },
+    "kernel/boot_info.c": {
+      "sha256": "2fb617913d9d88f0bdc63ca41b6e192f9b647f5aab3602adfae440d620bae1df",
+      "identical_to_base": true
+    },
+    "kernel/boot_memory.c": {
+      "sha256": "40d522eba967865d52d7567b4e4037708594db48bab2460225c6f24be5086d76",
+      "identical_to_base": true
+    },
+    "kernel/exception.c": {
+      "sha256": "017263dc248befdfff5787657f9aef95822de5ec937b2824486f04bfff9693d4",
+      "identical_to_base": true
+    },
+    "kernel/runtime.c": {
+      "sha256": "9a1c701c31e972291e719d931c2ac2ef798ab05e566328edaa6586e0527f386c",
+      "identical_to_base": true
+    },
+    "boot/x86_64/efi.h": {
+      "sha256": "83827f2ea32e753c207f2b46dee66c2c7230e272748875e8fe30924b3f2eb008",
+      "identical_to_base": true
+    },
+    "boot/x86_64/exit_boot.h": {
+      "sha256": "5a14c19c8fd91f0341f76415b7c299a14afc268263028cb7ac3bd5f8ce50eb98",
+      "identical_to_base": true
+    },
+    "boot/x86_64/exit_boot.c": {
+      "sha256": "2fb5981131419666ce3dd806458cbaafa0a1af41079c6f1d5da738dac80d5d68",
+      "identical_to_base": true
+    },
+    "boot/x86_64/memory_map.c": {
+      "sha256": "4c64ce8bf68b3405c9e790da35b94eec7356e3549edae3f604dd899876367a00",
+      "identical_to_base": true
+    },
+    "boot/x86_64/uefi.c": {
+      "sha256": "f091a33d9b1429fc8c6a00d2a1022757544d1ade1454ecb52803637836715080",
+      "identical_to_base": true
+    },
+    "boot/aarch64/fdt_memory.c": {
+      "sha256": "ec5f9be04610f55e0e7f5fb2460e92a9c5dd86652501d9f591774447f832eb16",
+      "identical_to_base": true
+    },
+    "boot/aarch64/linker.ld": {
+      "sha256": "8441e7020977b80e402e1532a5671096af18fc6c7a93403ce3381770a7df649c",
+      "identical_to_base": true
+    },
+    "boot/aarch64/platform.c": {
+      "sha256": "1ff451afc49bbb2f06448b0955d25843b18ce09c3145c277325d36be5d8e6f7c",
+      "identical_to_base": true
+    },
+    "boot/aarch64/start.S": {
+      "sha256": "765bc4e51adf37935e50c495eadf3fc3cd12ab462c5d12e6a1e23782e3b82f6c",
+      "identical_to_base": true
+    },
+    "arch/aarch64/console.c": {
+      "sha256": "3517fe3b8a3b086cd2a1bf7574f6982ac3d7b617fef94a4cfa5a2263c26564a7",
+      "identical_to_base": true
+    },
+    "arch/x86_64/serial.c": {
+      "sha256": "42bcf79dded6c3317f7c38fdaa9472732441fe895728e8b4190cee8d9daf4a0f",
+      "identical_to_base": true
+    },
+    "arch/x86_64/entry.S": {
+      "sha256": "850a4ee072a4eeabbc9a3a35035bc6b6ae7e44091c9f54e5fad6d55ed446c038",
+      "identical_to_base": true
+    },
+    "arch/x86_64/exception_entry.S": {
+      "sha256": "5b46b3cb1ca30e98f81aac87856c8509a9e0bae6fffe75a922e6a11188d377ec",
+      "identical_to_base": true
+    },
+    "arch/x86_64/exceptions.c": {
+      "sha256": "ec2e125336abecd5a8feca4d6ca0fb77ba4c9ddf2d59a90d3a64e054acd86b03",
+      "identical_to_base": true
+    },
+    "arch/x86_64/exceptions.h": {
+      "sha256": "7c4cefdadd44248184a97ed7786897c473064c8fbef314208be28a44e1b7ef40",
+      "identical_to_base": true
+    },
+    "tools/fault_site.py": {
+      "sha256": "90587c8e2f9f03813c36142c4515b43690befc74b5a11900e34b8a92f87eb6b7",
+      "identical_to_base": true
+    },
+    "tools/make_disk.py": {
+      "sha256": "9345283e366ace45bc9a1fe694744c0a60e9fdaa21b8d9cadcd68c8ded3288cc",
+      "identical_to_base": true
+    }
+  },
+  "unexpected_protected_changes": [],
+  "remote_refs": {
+    "os": {
+      "unchanged_all_refs": true,
+      "snapshot_before": "os-refs-before.txt",
+      "snapshot_audit": "os-refs-audit.txt"
+    },
+    "portable": {
+      "unchanged_all_refs": true,
+      "snapshot_before": "portable-refs-before.txt",
+      "snapshot_audit": "portable-refs-audit.txt"
+    }
+  },
+  "candidate_source_ownership": {
+    "boot_pool_inspects_candidates": false,
+    "comment": "Only full image reservation admission is consumed; candidates never inspected or granted."
+  },
+  "git_visible_scan": {
+    "path_count": 177,
+    "NUL_files": [],
+    "binary_or_secret_filename_candidates": [],
+    "known_secret_pattern_match_paths": [],
+    "limitations": "Heuristic names/patterns and text scan, not proof of every possible secret. Credential values not read."
+  },
+  "claims_review": {
+    "readme_limits_correct": true,
+    "comment": "README explicitly calls T-P1.3 a boot prototype, no PMM/heap/SMP/UAF promise; kernel model undecided; Android/physical/VirtualBox SKIPPED; Portable-os and main excluded. README being edited concurrently; final root review required."
+  }
+}

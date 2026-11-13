@@ -1,0 +1,116 @@
+[
+  {
+    "arch": "x86_64",
+    "initial_el2": false,
+    "log": "qemu-x86_64-bootpool.log",
+    "log_sha256": "c151a7134210029a6226a6c356a5e5350e421f974ed41a5c6b93421259c4eac2",
+    "static_proof": "pool-sites/bootpool/x86_64.json",
+    "uart_ranges": {
+      "IMAGE": [
+        100777984,
+        100941824
+      ],
+      "STACK": [
+        100864016,
+        100929552
+      ],
+      "HANDOFF": [
+        100810752,
+        100810848
+      ],
+      "SOURCE": [
+        108720152,
+        108725528
+      ],
+      "RANGE": [
+        100827136,
+        100859904
+      ],
+      "META": [
+        100859904,
+        100864000
+      ],
+      "WORKSPACE": [
+        100810848,
+        100823248
+      ]
+    },
+    "full_span_and_serial_check": "PASS"
+  },
+  {
+    "arch": "aarch64",
+    "initial_el2": false,
+    "log": "qemu-aarch64-bootpool.log",
+    "log_sha256": "dfac9116e5dd463be31750a761cd174fc00ea72cbd4196367330543290917417",
+    "static_proof": "pool-sites/bootpool/aarch64.json",
+    "uart_ranges": {
+      "IMAGE": [
+        1074266112,
+        1074413568
+      ],
+      "STACK": [
+        1074348032,
+        1074413568
+      ],
+      "HANDOFF": [
+        1074413376,
+        1074413472
+      ],
+      "SOURCE": [
+        1140850688,
+        1141899264
+      ],
+      "RANGE": [
+        1074311168,
+        1074343936
+      ],
+      "META": [
+        1074343936,
+        1074348032
+      ],
+      "WORKSPACE": [
+        1074294784,
+        1074307184
+      ]
+    },
+    "full_span_and_serial_check": "PASS"
+  },
+  {
+    "arch": "aarch64",
+    "initial_el2": true,
+    "log": "qemu-aarch64-bootpool-el2.log",
+    "log_sha256": "1a14c6a40af32ddf4941ec74b8354977f73186acb0e923ad1197c350f217d1d3",
+    "static_proof": "pool-sites/bootpool/aarch64.json",
+    "uart_ranges": {
+      "IMAGE": [
+        1074266112,
+        1074413568
+      ],
+      "STACK": [
+        1074348032,
+        1074413568
+      ],
+      "HANDOFF": [
+        1074413376,
+        1074413472
+      ],
+      "SOURCE": [
+        1140850688,
+        1141899264
+      ],
+      "RANGE": [
+        1074311168,
+        1074343936
+      ],
+      "META": [
+        1074343936,
+        1074348032
+      ],
+      "WORKSPACE": [
+        1074294784,
+        1074307184
+      ]
+    },
+    "full_span_and_serial_check": "PASS"
+  }
+]

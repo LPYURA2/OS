@@ -1,0 +1,20 @@
+host-boot-info: PASS — exit 0
+host-uefi: PASS — exit 0
+host-exception: PASS — exit 0
+host-pool: PASS — exit 0
+host-memory: PASS — exit 0
+host-python: PASS — exit 0
+build-for-qemu: PASS — exit 0
+build-negative: PASS — exit 0
+build-negative-memory: PASS — exit 0
+build-exception: PASS — exit 0
+build-bootpool: PASS — exit 0
+qemu-aarch64-normal: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
+qemu-aarch64-invalid: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
+qemu-aarch64-invalid-map: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
+qemu-aarch64-exception: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
+qemu-aarch64-bootpool: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
+qemu-aarch64-exception-el2: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
+qemu-aarch64-bootpool-el2: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
+qemu-aarch64-el2: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
+qemu-aarch64-256m: PASS — UART handoff/memory/exception/pool contract checked; QEMU stopped by harness
