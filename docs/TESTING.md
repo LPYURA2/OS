@@ -151,7 +151,8 @@ qemu-system-aarch64 -machine virt -cpu cortex-a57 -m 128M \
 | Среда, не охваченная cloud Linux по умолчанию | Статус | Причина |
 |---|---|---|
 | VirtualBox EFI x86-64 | SKIPPED | Требуется отдельный реальный запуск VirtualBox и COM1-журнал |
-| Android/Termux host | SKIPPED | Нет нового прогона StyleOS на Android владельца |
+| Android/Termux: сборка AArch64 и QEMU `virt` | PASS | EL1, EL2 → EL1 и отказ при неверном `boot_info` в отдельном ручном [прогоне владельца](test-results/t-p1-0/termux-arm64.md) |
+| Android/Termux: host-тесты, воспроизводимость и x86-64 | SKIPPED | Не запускались в этом окружении |
 | Физический PC UEFI | SKIPPED | Реальное устройство не предоставлено для проверки |
 | ARM-плата/телефон/планшет | SKIPPED | QEMU `virt` не подтверждает boot конкретной аппаратной платформы |
 

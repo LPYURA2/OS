@@ -107,7 +107,7 @@ python3 tools/test.py --all
 
 Оболочки Makefile: `make`, `make host-test`, `make repro`, `make smoke`, `make test`. Подробности — [TESTING.md](docs/TESTING.md), фактические журналы — [T-P1.0 results](docs/test-results/t-p1-0/README.md). Runner возвращает 0 при PASS, 1 при FAIL и 2 при пропущенных обязательных средствах без FAIL.
 
-Финальный прогон 13.11.2026 в Linux: **PASS** — host-проверки `boot_info`, 14 сценариев UEFI, 6 тестов GPT/FAT и 4 проверки классификации serial-логов; сборки обеих ISA; побайтная повторяемость четырёх артефактов; пять QEMU-сценариев (x86 обычный/ошибочный handoff, ARM EL1/EL2 и ошибочный handoff). **SKIPPED** — VirtualBox, Android/Termux и физическое оборудование: эти среды не проверены. Это подтверждение начальной загрузки, а не готовой ОС.
+Финальный прогон 13.11.2026 в Linux: **PASS** — host-проверки `boot_info`, 14 сценариев UEFI, 6 тестов GPT/FAT и 4 проверки классификации serial-логов; сборки обеих ISA; побайтная повторяемость четырёх артефактов; пять QEMU-сценариев (x86 обычный/ошибочный handoff, ARM EL1/EL2 и ошибочный handoff). **SKIPPED в Linux-прогоне** — VirtualBox, Android/Termux и физическое оборудование. Отдельная проверка ARM64 в Termux описана ниже. Это подтверждение начальной загрузки, а не готовой ОС.
 
 Для ручного AArch64 boot с обычным QEMU:
 
@@ -143,7 +143,7 @@ python tools/build.py --arch all --output build
 
 Clang/LLD должны содержать оба нужных target backend и `lld-link`; проверьте наличие команд через `command -v clang lld-link ld.lld`. Доступность QEMU и OVMF зависит от текущих пакетов Termux: сначала используйте `pkg search qemu`, затем установите подходящий пакет отдельно. Названия Linux apt-пакетов нельзя автоматически переносить в Termux.
 
-Сборка/host-тесты/QEMU непосредственно в Android Termux в рамках T-P1.0 считаются **SKIPPED**, пока не получен отдельный реальный журнал владельца. Linux cloud PASS не заменяет такого прогона. Старый Android smoke MATRYOSHKA относится к Portable OS.
+Отдельный прогон на телефоне владельца 13.11.2026: **PASS** для сборки AArch64 в Termux и трёх загрузочных сценариев в QEMU `virt` (EL1, EL2 → EL1, отказ при неверном `boot_info`). Host-тесты, воспроизводимость и x86-64 в Termux не проверялись. Нативная загрузка телефона также не проверялась. [Результаты Termux](docs/test-results/t-p1-0/termux-arm64.md).
 
 ## VirtualBox: воспроизводимый ручной сценарий x86-64
 
