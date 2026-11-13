@@ -31,13 +31,16 @@ def run(args):
     subprocess.run(list(map(str, args)), check=True, cwd=ROOT)
 
 
-def build(arch, output, invalid=False, invalid_map=False, test_exception=False):
+def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
+          test_bootpool=False):
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     folder = output / arch
     folder.mkdir(parents=True, exist_ok=True)
     common = ['kernel/main.c', 'kernel/boot_info.c', 'kernel/runtime.c',
               'kernel/boot_memory.c', 'kernel/boot_memory_diagnostic.c',
-              'kernel/exception.c']
+              'kernel/exception.c', 'kernel/boot_pool.c']
+    if test_bootpool:
+        common.append('kernel/boot_pool_selftest.c')
     if arch == 'x86_64':
         target = 'x86_64-pc-win32-coff'
         sources = common + ['boot/x86_64/exit_boot.c', 'boot/x86_64/uefi.c',
@@ -69,6 +72,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False):
         flags.append('-DSTYLEOS_TEST_INVALID_MEMORY_MAP=1')
     if test_exception:
         flags.append('-DSTYLEOS_TEST_EXCEPTION=1')
+    if test_bootpool:
+        flags.append('-DSTYLEOS_TEST_BOOTPOOL=1')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -78,7 +83,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False):
     if arch == 'x86_64':
         linker = tool('LLD_LINK', ['lld-link', 'lld-link-19', 'lld-link-18'])
         binary = folder / 'BOOTX64.EFI'
-        map_options = ['/map:' + str(folder / 'kernel.map')] if test_exception else []
+        map_options = ['/map:' + str(folder / 'kernel.map')]
         run([linker, '/subsystem:efi_application', '/entry:efi_main',
              '/machine:x64', '/nodefaultlib', '/timestamp:0', '/fixed:no',
              '/dynamicbase', '/nxcompat', '/out:' + str(binary), *map_options, *objects])
@@ -91,6 +96,15 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False):
         run([*base, '-o', folder / 'kernel.elf', *objects])
         run([*base, '--oformat=binary', '-o', folder / 'styleos.bin', *objects])
         artifacts = [folder / 'kernel.elf', folder / 'styleos.bin']
+    # Derive full-span placement from the linked image, never from a UART PASS.
+    from pool_site import describe_pool
+    pool_site = describe_pool(arch, artifacts[0],
+                              folder / 'kernel.map' if arch == 'x86_64' else None,
+                              folder / 'styleos.bin' if arch == 'aarch64' else None)
+    if arch == 'x86_64':
+        pool_site['disk_sha256'] = hashlib.sha256(
+            (folder / 'styleos.img').read_bytes()).hexdigest()
+    (folder / 'pool-site.json').write_text(json.dumps(pool_site, indent=2) + '\n')
     if test_exception:
         from fault_site import describe_fault
         site = describe_fault(arch, artifacts[0],
@@ -113,7 +127,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--arch', choices=['all', 'x86_64', 'aarch64'], default='all')
     parser.add_argument('--output', type=Path,
-                        help='Default build/; test-exception defaults to build/exception')
+                        help='Default build/; dedicated tests use build/exception or build/bootpool')
     negative = parser.add_mutually_exclusive_group()
     negative.add_argument('--invalid-boot-info', action='store_true',
                         help='Negative test only: corrupt the handoff magic')
@@ -121,23 +135,28 @@ def main():
                           help='Negative test only: truncate the map input')
     negative.add_argument('--test-exception', action='store_true',
                           help='Dedicated image only: BRK / UD2 after valid handoff')
+    negative.add_argument('--test-bootpool', action='store_true',
+                          help='Dedicated image only: image-owned page pool write/read test')
     args = parser.parse_args()
     output = (args.output or ROOT / 'build' /
-              ('exception' if args.test_exception else '')).resolve()
-    if args.test_exception and output == (ROOT / 'build').resolve():
-        parser.error('--test-exception needs a separate directory, e.g. build/exception')
+              ('exception' if args.test_exception else
+               'bootpool' if args.test_bootpool else '')).resolve()
+    if (args.test_exception or args.test_bootpool) and output == (ROOT / 'build').resolve():
+        parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
     records = []
     for arch in arches:
         records.extend(build(arch, output, args.invalid_boot_info,
-                             args.invalid_memory_map, args.test_exception))
+                             args.invalid_memory_map, args.test_exception,
+                             args.test_bootpool))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS T-P1.2', 'compiler': version,
+        'prototype': 'StyleOS T-P1.3', 'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,
         'invalid_memory_map': args.invalid_memory_map,
-        'test_exception': args.test_exception, 'artifacts': records
+        'test_exception': args.test_exception,
+        'test_bootpool': args.test_bootpool, 'artifacts': records
     }, indent=2) + '\n')
     print('BUILD PASS:', ', '.join(arches))
 

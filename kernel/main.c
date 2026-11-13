@@ -1,6 +1,7 @@
 #include "styleos/arch.h"
 #include "styleos/boot_info.h"
 #include "styleos/boot_memory.h"
+#include "styleos/boot_pool.h"
 #include "styleos/exception.h"
 
 #ifndef STYLEOS_EXPECT_ARCH
@@ -25,14 +26,19 @@ _Noreturn void kernel_main(const struct boot_info *info)
 #else
 #error Unsupported StyleOS target
 #endif
-    boot_memory_diagnose(info);
+    const struct boot_memory_evidence *evidence = boot_memory_diagnose(info);
+#ifdef STYLEOS_TEST_BOOTPOOL
+    boot_pool_selftest(evidence);
+#else
+    (void)evidence;
+#endif
 #ifdef STYLEOS_TEST_EXCEPTION
     /* Dedicated test image only, after valid handoff and diagnostic map. */
     arch_test_exception();
     arch_puts("STYLEOS BOOT_ERROR exception trigger returned\n");
     arch_halt();
 #endif
-    /* T-P1.1 reports candidates only. It does not acquire or write pages. */
+    /* Candidate RAM remains diagnostic only, including in the pool test. */
     arch_puts("STYLEOS KERNEL HALT\n");
     arch_halt();
 }

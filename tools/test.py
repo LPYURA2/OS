@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host, reproducible-build and bounded real-QEMU checks for T-P1.2."""
+"""Host, reproducible-build and bounded real-QEMU checks for T-P1.3."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -13,13 +13,18 @@ import subprocess
 import sys
 import time
 
+try:
+    from .pool_site import describe_pool
+except ImportError:  # Direct tools/test.py invocation.
+    from pool_site import describe_pool
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def serial_handoff_ok(output, arch, invalid=False, el2=False):
     """A successful marker cannot erase a prior boot failure in the same run."""
     errors = (b'BOOT ERROR', b'BOOT_ERROR', b'early exception',
-              b'STYLEOS EXCEPTION', b'STYLEOS EMERGENCY')
+              b'STYLEOS EXCEPTION', b'STYLEOS EMERGENCY', b'STYLEOS BOOTPOOL')
     if any(marker in output for marker in errors):
         return False
     lines = output.splitlines()
@@ -172,6 +177,138 @@ def serial_exception_ok(output, arch, site, ram_mib=128, el2=False):
             style_tail == [records[0], emergency])
 
 
+_POOL_RANGE = re.compile(rb'STYLEOS BOOTPOOL (RANGE|META|WORKSPACE)'
+                         rb' 0x([0-9a-f]{16}) 0x([0-9a-f]{16})')
+
+
+def serial_pool_ok(output, arch, site, ram_mib=128, el2=False):
+    """Prove complete admitted spans and the exact selftest record sequence.
+
+    The caller binds site to the actual ELF/raw Image or PE/map/disk. PE RVAs
+    are relocated using the live MEMMAP IMAGE base, never its preferred base.
+    The unmodified UART prefix must independently pass the memory validator.
+    """
+    if (not isinstance(site, dict) or site.get('arch') != arch or
+            b'BOOTPOOL ERROR' in output or b'timeout' in output.lower() or
+            b'timed out' in output.lower()):
+        return False
+    integer_keys = ('pool_start', 'pool_end', 'metadata_start', 'metadata_end',
+                    'pool_bytes', 'metadata_bytes', 'page_size', 'image_start',
+                    'image_end', 'image_size')
+    if any(type(site.get(key)) is not int or not 0 <= site[key] < 1 << 64
+           for key in integer_keys):
+        return False
+    if (site['pool_bytes'] != 32768 or site['metadata_bytes'] != 4096 or
+            site['page_size'] != 4096 or
+            site['pool_end'] - site['pool_start'] != 32768 or
+            site['metadata_end'] - site['metadata_start'] != 4096):
+        return False
+
+    lines = output.splitlines()
+    first = next((i for i, line in enumerate(lines)
+                  if line.startswith(b'STYLEOS BOOTPOOL')), None)
+    if first is None:
+        return False
+    prefix = b'\n'.join(lines[:first]) + b'\n'
+    if not serial_memory_ok(prefix, arch, 'normal', ram_mib, el2, terminal=False):
+        return False
+    memory = {}
+    for line in prefix.splitlines():
+        match = _RANGE.fullmatch(line)
+        if match:
+            memory.setdefault(match[1], []).append((int(match[2], 16), int(match[3], 16)))
+    image, stack, handoff, source = (memory[key][0]
+                                   for key in (b'IMAGE', b'STACK', b'HANDOFF', b'SOURCE'))
+
+    # The very first pool records declare all exclusion-relevant intervals.
+    tail = [line for line in lines[first:] if line.startswith(b'STYLEOS ')]
+    if len(tail) < 3:
+        return False
+    declared = []
+    for name, line in zip((b'RANGE', b'META', b'WORKSPACE'), tail[:3]):
+        match = _POOL_RANGE.fullmatch(line)
+        if not match or match[1] != name:
+            return False
+        bounds = int(match[2], 16), int(match[3], 16)
+        if bounds[0] >= bounds[1]:
+            return False
+        declared.append(bounds)
+    pool, metadata, workspace = declared
+
+    def inside(inner, outer):
+        return outer[0] <= inner[0] < inner[1] <= outer[1]
+
+    def overlaps(one, two):
+        return one[0] < two[1] and two[0] < one[1]
+
+    if (pool[1] - pool[0] != 32768 or metadata[1] - metadata[0] != 4096 or
+            any((start | end) & 4095 for start, end in (pool, metadata)) or
+            overlaps(pool, metadata) or
+            any(not inside(bounds, image) or
+                not any(inside(bounds, reserve) for reserve in memory[b'RESERVED'])
+                for bounds in (pool, metadata, workspace)) or
+            any(overlaps(bounds, excluded) for bounds in (pool, metadata)
+                for excluded in (stack, handoff, source, workspace))):
+        return False
+
+    if arch == 'x86_64':
+        rva_keys = ('pool_rva_start', 'pool_rva_end', 'metadata_rva_start',
+                    'metadata_rva_end', 'preferred_image_base')
+        if (site.get('address_space') != 'image-rva' or
+                any(type(site.get(key)) is not int or not 0 <= site[key] < 1 << 64
+                    for key in rva_keys) or
+                tuple(site[key] for key in rva_keys[:4]) !=
+                tuple(site[key] for key in integer_keys[:4]) or
+                site['image_start'] != 0 or site['image_end'] != site['image_size'] or
+                site['image_size'] != image[1] - image[0]):
+            return False
+        expected_pool = image[0] + site['pool_start'], image[0] + site['pool_end']
+        expected_metadata = (image[0] + site['metadata_start'],
+                             image[0] + site['metadata_end'])
+    elif arch == 'aarch64':
+        if (site.get('address_space') != 'identity-image-address' or
+                any(type(site.get(key)) is not int or not 0 <= site[key] < 1 << 64
+                    for key in ('bss_start', 'bss_end')) or
+                image != (site['image_start'], site['image_end']) or
+                site['image_size'] != image[1] - image[0] or
+                not inside((site['bss_start'], site['bss_end']), image) or
+                any(not inside(bounds, (site['bss_start'], site['bss_end']))
+                    for bounds in (pool, metadata))):
+            return False
+        expected_pool = site['pool_start'], site['pool_end']
+        expected_metadata = site['metadata_start'], site['metadata_end']
+    else:
+        return False
+    if pool != expected_pool or metadata != expected_metadata:
+        return False
+
+    # Eight aligned, distinct pages spanning this exact pool leave no freedom
+    # to conceal a page outside the verified interval. Core uses first-free
+    # order, and the test frees/reissues exactly allocation index 3.
+    expected = list(tail[:3]) + [b'STYLEOS BOOTPOOL ADMIT PASS']
+    expected.extend(f'STYLEOS BOOTPOOL ALLOC {index} 0x{pool[0] + index * 4096:016x} ZERO'.encode()
+                    for index in range(8))
+    expected += [b'STYLEOS BOOTPOOL RW PASS pages=8 bytes=4096',
+                 b'STYLEOS BOOTPOOL EXHAUSTED PASS',
+                 f'STYLEOS BOOTPOOL REUSE 0x{pool[0] + 3 * 4096:016x} ZERO'.encode(),
+                 b'STYLEOS BOOTPOOL PASS', b'STYLEOS KERNEL HALT']
+    return tail == expected
+
+
+def verified_pool_site(folder, arch):
+    """Rebuild the static proof and bind it to every input actually booted."""
+    target = folder / arch
+    site = json.loads((target / 'pool-site.json').read_text())
+    if arch == 'x86_64':
+        verified = describe_pool(arch, target / 'BOOTX64.EFI', target / 'kernel.map')
+        verified['disk_sha256'] = hashlib.sha256((target / 'styleos.img').read_bytes()).hexdigest()
+    else:
+        verified = describe_pool(arch, target / 'kernel.elf', raw_path=target / 'styleos.bin')
+    if site != verified:
+        raise ValueError('pool-site metadata differs from independently checked image proof/SHA-256')
+    return verified
+
+
 def serial_idt_ready(output):
     """An actual-CS IDT-ready marker must follow EBS and precede common C."""
     lines = output.splitlines()
@@ -232,6 +369,7 @@ class Checks:
             ('host-boot-info', ['tests/test_boot_info.c', 'kernel/boot_info.c']),
             ('host-uefi', ['tests/test_uefi.c', 'boot/x86_64/exit_boot.c']),
             ('host-exception', ['tests/test_exception.c', 'kernel/exception.c']),
+            ('host-pool', ['tests/test_boot_pool.c', 'kernel/boot_pool.c']),
             ('host-memory', ['tests/test_boot_memory.c', 'kernel/boot_memory.c',
                              'boot/x86_64/memory_map.c', 'boot/aarch64/fdt_memory.c'])
         ]:
@@ -246,7 +384,8 @@ class Checks:
         if mode != 'normal':
             cmd.append({'invalid': '--invalid-boot-info',
                         'invalid-map': '--invalid-memory-map',
-                        'exception': '--test-exception'}[mode])
+                        'exception': '--test-exception',
+                        'bootpool': '--test-bootpool'}[mode])
         return self.command(name, [cmd])
 
     def repro(self):
@@ -274,8 +413,10 @@ class Checks:
         build_arch = arches[0] if len(arches) == 1 else 'all'
         folders = {'normal': self.output, 'invalid': self.output / 'negative',
                    'invalid-map': self.output / 'negative-memory',
-                   'exception': self.output / 'exception'}
-        names = ('build-for-qemu', 'build-negative', 'build-negative-memory', 'build-exception')
+                   'exception': self.output / 'exception',
+                   'bootpool': self.output / 'bootpool'}
+        names = ('build-for-qemu', 'build-negative', 'build-negative-memory',
+                 'build-exception', 'build-bootpool')
         for (mode, folder), name in zip(folders.items(), names):
             if not self.build(folder, mode, name, build_arch):
                 return
@@ -304,6 +445,8 @@ class Checks:
             if arch == 'aarch64':
                 jobs.append(('qemu-aarch64-exception-el2', arch, binary, folders['exception'],
                              None, 'exception', True, 128, timeout))
+                jobs.append(('qemu-aarch64-bootpool-el2', arch, binary, folders['bootpool'],
+                             None, 'bootpool', True, 128, timeout))
                 jobs.extend((f'qemu-{arch}-{suffix}', arch, binary, self.output,
                              None, 'normal', el2, mib, timeout)
                             for suffix, el2, mib in [('el2', True, 128), ('256m', False, 256)])
@@ -332,6 +475,7 @@ class Checks:
         expected = {'invalid': b'STYLEOS BOOT_INFO ERROR: magic',
                     'invalid-map': b'STYLEOS MEMMAP ERROR: ',
                     'exception': b'STYLEOS EMERGENCY HALT',
+                    'bootpool': b'STYLEOS KERNEL HALT',
                     'normal': b'STYLEOS KERNEL HALT'}[mode]
         output = bytearray()
         started = time.monotonic()
@@ -406,11 +550,17 @@ class Checks:
             except (OSError, ValueError) as error:
                 return name, 'FAIL', 'fault-site metadata unavailable: ' + str(error), text
             good = serial_exception_ok(output, arch, site, mib, el2)
+        elif mode == 'bootpool':
+            try:
+                site = verified_pool_site(folder, arch)
+            except (OSError, ValueError) as error:
+                return name, 'FAIL', 'pool-site proof unavailable/mismatched: ' + str(error), text
+            good = serial_pool_ok(output, arch, site, mib, el2)
         else:
             good = serial_memory_ok(output, arch, mode, mib, el2)
         if arch == 'x86_64':
             good = good and serial_idt_ready(output)
-        return name, ('PASS' if good else 'FAIL'), 'UART handoff/memory/exception contract checked; QEMU stopped by harness', text
+        return name, ('PASS' if good else 'FAIL'), 'UART handoff/memory/exception/pool contract checked; QEMU stopped by harness', text
 
 
 def firmware_path(variable, prefix):

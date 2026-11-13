@@ -41,3 +41,31 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
   the OVMF-independent ARM64 runner. Record phone results separately.
 - No recovery, broken-stack/UART guarantees, IRQ enabling or kernel-model choice.
   Stop after the task branch and its factual report are delivered.
+
+## Approved T-P1.3 task
+- Branch feature/styleos-t-p1-3 starts from accepted 07fe425a0d4d5c0b9fbb65f8a37b30924523ec81.
+  Publish this branch only; do not update main, merge, release, force push, or
+  modify Portable-os. Preserve parallel work and all historical test logs.
+- This task narrowly permits one fixed image-owned pool: eight 4096-byte pages
+  in BSS, with separate 4096-byte metadata. It does not permit general physical
+  allocation, heap, candidate RAM use, boot-memory reclamation or an ownership
+  transfer of general RAM. Historical no-allocation stage rules remain in force
+  outside this explicit image-buffer scope.
+- Admit the complete pool and metadata intervals only after valid handoff and
+  successful diagnostic map. Prove alignment, arithmetic, loaded/reserved image
+  containment and exclusions for stack, handoff, source map/DTB and workspace.
+  Reuse read-only internal diagnostic evidence without changing boot_info v1,
+  map values/normalization, MMU, GDT, IDT, VBAR or exception protocol.
+- Return mapped kernel addresses from this known array, never claim a generic
+  C-pointer-to-physical translation. Prove full ARM ELF/BSS/Image coverage and
+  full PE sections plus actual relocated placement, not just a start address.
+- Keep one-CPU/page-at-a-time semantics, zero on every allocation, clear errors
+  and unchanged allocation state on refusal. Document reuse/UAF and SMP limits.
+- Place write/read selftest in a separate --test-bootpool image/output. Reject
+  mixing with negative or exception modes; ordinary images do not run it.
+- Preserve T-P1.2 regressions, exception PC proofs and four-artifact repro. Add
+  host refusal/zero/reuse tests, strict binary/UART validation and real pool runs
+  on x86-64, ARM initial EL1 and EL2. Keep ARM64-only route independent of OVMF
+  and x86 tools. Record actual counts and logs; phone T-P1.3 is SKIPPED until run.
+- Stop after this task's evidence and branch publication. General PMM, memory
+  ownership, own translation tables and the kernel model need owner decisions.

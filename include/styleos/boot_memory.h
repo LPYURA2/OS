@@ -28,6 +28,15 @@ struct boot_memory_live {
     struct boot_range image, stack, handoff, source;
 };
 
+/* Internal read-only evidence after successful diagnostic normalization. The
+ * workspace covers the map and this snapshot, both reserved in the image.
+ * This does not transfer ownership of any candidate range. */
+struct boot_memory_evidence {
+    struct boot_memory_live live;
+    struct boot_range workspace;
+    const struct boot_memory_map *map;
+};
+
 enum boot_memory_error bm_extent(uint64_t base, uint64_t size,
                                  struct boot_range *out);
 enum boot_memory_error bm_add(struct boot_memory_map *, uint64_t base,
@@ -44,6 +53,6 @@ int bm_ram_contains(const struct boot_memory_map *, struct boot_range);
 enum boot_memory_error boot_memory_collect(const struct boot_info *,
                                             struct boot_memory_map *,
                                             struct boot_memory_live *);
-void boot_memory_diagnose(const struct boot_info *);
+const struct boot_memory_evidence *boot_memory_diagnose(const struct boot_info *);
 
 #endif

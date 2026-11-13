@@ -2,7 +2,10 @@
 #include "styleos/boot_memory.h"
 
 /* In the image's BSS, not in any reported candidate RAM or boot stack. */
-static struct boot_memory_map map;
+static struct {
+    struct boot_memory_map map;
+    struct boot_memory_evidence proof;
+} diagnostic;
 
 static const char *reason(enum boot_memory_error error)
 {
@@ -48,22 +51,22 @@ static int contains(struct boot_range outer, struct boot_range inner)
 static enum boot_memory_error reserve(struct boot_range r)
 {
     if (r.start >= r.end) return BM_METADATA;
-    return bm_add(&map, r.start, r.end - r.start, 1);
+    return bm_add(&diagnostic.map, r.start, r.end - r.start, 1);
 }
 
-void boot_memory_diagnose(const struct boot_info *info)
+const struct boot_memory_evidence *boot_memory_diagnose(const struct boot_info *info)
 {
     struct boot_memory_live live = {0};
     struct boot_range working;
-    enum boot_memory_error e = boot_memory_collect(info, &map, &live);
-    if (!e) e = bm_extent((uintptr_t)&map, sizeof(map), &working);
+    enum boot_memory_error e = boot_memory_collect(info, &diagnostic.map, &live);
+    if (!e) e = bm_extent((uintptr_t)&diagnostic, sizeof(diagnostic), &working);
     if (!e && (!contains(live.image, live.handoff) ||
                !contains(live.image, live.stack) ||
                !contains(live.image, working))) e = BM_METADATA;
     if (!e) e = reserve(live.image);
     if (!e) e = reserve(live.handoff);
     if (!e) e = reserve(live.source);
-    if (!e) e = bm_normalize(&map);
+    if (!e) e = bm_normalize(&diagnostic.map);
     if (e) {
         arch_puts("STYLEOS MEMMAP ERROR: ");
         arch_puts(reason(e));
@@ -76,10 +79,15 @@ void boot_memory_diagnose(const struct boot_info *info)
     print_range("STACK", live.stack);
     print_range("HANDOFF", live.handoff);
     print_range("SOURCE", live.source);
-    for (size_t i = 0; i < map.nr_ram; ++i) print_range("RAM", map.ram[i]);
-    for (size_t i = 0; i < map.nr_reserved; ++i)
-        print_range("RESERVED", map.reserved[i]);
-    for (size_t i = 0; i < map.nr_candidates; ++i)
-        print_range("CANDIDATE", map.candidates[i]);
+    for (size_t i = 0; i < diagnostic.map.nr_ram; ++i)
+        print_range("RAM", diagnostic.map.ram[i]);
+    for (size_t i = 0; i < diagnostic.map.nr_reserved; ++i)
+        print_range("RESERVED", diagnostic.map.reserved[i]);
+    for (size_t i = 0; i < diagnostic.map.nr_candidates; ++i)
+        print_range("CANDIDATE", diagnostic.map.candidates[i]);
+    diagnostic.proof.live = live;
+    diagnostic.proof.workspace = working;
+    diagnostic.proof.map = &diagnostic.map;
     arch_puts("STYLEOS MEMMAP PASS\n");
+    return &diagnostic.proof;
 }
