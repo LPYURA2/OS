@@ -1,6 +1,7 @@
 #include "styleos/arch.h"
 #include "styleos/boot_info.h"
 #include "styleos/boot_memory.h"
+#include "styleos/exception.h"
 
 #ifndef STYLEOS_EXPECT_ARCH
 #error STYLEOS_EXPECT_ARCH must identify the compiled target
@@ -25,6 +26,12 @@ _Noreturn void kernel_main(const struct boot_info *info)
 #error Unsupported StyleOS target
 #endif
     boot_memory_diagnose(info);
+#ifdef STYLEOS_TEST_EXCEPTION
+    /* Dedicated test image only, after valid handoff and diagnostic map. */
+    arch_test_exception();
+    arch_puts("STYLEOS BOOT_ERROR exception trigger returned\n");
+    arch_halt();
+#endif
     /* T-P1.1 reports candidates only. It does not acquire or write pages. */
     arch_puts("STYLEOS KERNEL HALT\n");
     arch_halt();

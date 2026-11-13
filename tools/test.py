@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host, reproducible-build and bounded real-QEMU checks for T-P1.1."""
+"""Host, reproducible-build and bounded real-QEMU checks for T-P1.2."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def serial_handoff_ok(output, arch, invalid=False, el2=False):
     """A successful marker cannot erase a prior boot failure in the same run."""
-    errors = (b'BOOT ERROR', b'BOOT_ERROR', b'early exception')
+    errors = (b'BOOT ERROR', b'BOOT_ERROR', b'early exception',
+              b'STYLEOS EXCEPTION', b'STYLEOS EMERGENCY')
     if any(marker in output for marker in errors):
         return False
     lines = output.splitlines()
@@ -41,7 +42,7 @@ _RANGE = re.compile(rb'STYLEOS MEMMAP (IMAGE|STACK|HANDOFF|SOURCE|RAM|RESERVED|C
                     rb' 0x([0-9a-f]{16}) 0x([0-9a-f]{16})')
 
 
-def serial_memory_ok(output, arch, mode, ram_mib=128, el2=False):
+def serial_memory_ok(output, arch, mode, ram_mib=128, el2=False, terminal=True):
     """Check UART order and independently reconstruct the diagnostic ranges."""
     if not serial_handoff_ok(output, arch, mode == 'invalid', el2):
         return False
@@ -57,9 +58,12 @@ def serial_memory_ok(output, arch, mode, ram_mib=128, el2=False):
         err = b'STYLEOS MEMMAP ERROR: ' + reason
         return mmap == [err] and halt not in lines and lines.index(handoff) < lines.index(err)
     if (not mmap or mmap[0] != diagnostic or mmap[-1] != passed or
-            b'MEMMAP ERROR' in output or lines.count(halt) != 1 or
-            not lines.index(handoff) < lines.index(diagnostic) <
-            lines.index(passed) < lines.index(halt)):
+            b'MEMMAP ERROR' in output or
+            not lines.index(handoff) < lines.index(diagnostic) < lines.index(passed)):
+        return False
+    if terminal and (lines.count(halt) != 1 or lines.index(passed) >= lines.index(halt)):
+        return False
+    if not terminal and halt in lines:
         return False
     kinds = (b'IMAGE', b'STACK', b'HANDOFF', b'SOURCE', b'RAM', b'RESERVED', b'CANDIDATE')
     by_kind = {kind: [] for kind in kinds}
@@ -113,6 +117,78 @@ def serial_memory_ok(output, arch, mode, ram_mib=128, el2=False):
     return True
 
 
+def serial_exception_ok(output, arch, site, ram_mib=128, el2=False):
+    """Check a fault against the built instruction, including PE relocation.
+
+    The prefix check consumes actual UART lines without synthesizing a HALT.
+    """
+    lines = output.splitlines()
+    records = [line for line in lines if line.startswith(b'STYLEOS EXCEPTION arch=')]
+    emergency = b'STYLEOS EMERGENCY HALT'
+    if (len(records) != 1 or lines.count(emergency) != 1 or
+            b'STYLEOS KERNEL HALT' in output or site.get('arch') != arch or
+            site.get('symbol') != 'styleos_test_fault'):
+        return False
+    first = next((i for i, line in enumerate(lines)
+                  if line.startswith(b'STYLEOS EXCEPTION')), None)
+    if first is None:
+        return False
+    prefix = b'\n'.join(lines[:first]) + b'\n'
+    if not serial_memory_ok(prefix, arch, 'normal', ram_mib, el2, terminal=False):
+        return False
+    style_tail = [line for line in lines[first:] if line.startswith(b'STYLEOS ')]
+    images = [_RANGE.fullmatch(line) for line in prefix.splitlines()]
+    images = [match for match in images if match and match[1] == b'IMAGE']
+    if len(images) != 1:
+        return False
+    image_base, image_end = int(images[0][2], 16), int(images[0][3], 16)
+    if arch == 'x86_64':
+        match = re.fullmatch(rb'STYLEOS EXCEPTION arch=x86_64 kind=sync vector=6 '
+                             rb'reason=invalid-opcode pc=(0x[0-9a-f]{16}) '
+                             rb'error=absent cr2=absent', records[0])
+        tests = [line for line in lines if line.startswith(b'STYLEOS EXCEPTION TEST')]
+        if not match or len(tests) != 1 or site.get('instruction_hex') != '0f0b':
+            return False
+        probe = re.fullmatch(rb'STYLEOS EXCEPTION TEST x86_64 pc=(0x[0-9a-f]{16})', tests[0])
+        rva = site.get('rva')
+        if not probe or not isinstance(rva, int) or rva < 0:
+            return False
+        expected = image_base + rva
+        return (image_base <= expected and expected + 2 <= image_end and
+                int(match[1], 16) == expected == int(probe[1], 16) and
+                style_tail == [tests[0], records[0], emergency])
+    if arch != 'aarch64' or site.get('instruction_hex') != '002420d4':
+        return False
+    match = re.fullmatch(rb'STYLEOS EXCEPTION arch=aarch64 kind=sync class=0x3c '
+                         rb'reason=brk pc=(0x[0-9a-f]{16}) esr=(0x[0-9a-f]{16}) '
+                         rb'elr=(0x[0-9a-f]{16}) spsr=(0x[0-9a-f]{16}) far=absent', records[0])
+    if not match:
+        return False
+    pc, esr, elr, spsr = (int(value, 16) for value in match.groups())
+    return (pc == elr == site.get('pc') and image_base == site.get('image_base') and
+            image_base <= pc and pc + 4 <= image_end and pc % 4 == 0 and
+            (esr >> 26) & 63 == 0x3c and esr & 0x1ffffff == 0x120 and
+            esr & (1 << 25) != 0 and spsr & 0x3df == 0x3c5 and
+            style_tail == [records[0], emergency])
+
+
+def serial_idt_ready(output):
+    """An actual-CS IDT-ready marker must follow EBS and precede common C."""
+    lines = output.splitlines()
+    ready = [(i, re.fullmatch(rb'STYLEOS x86_64 IDT ready cs=0x([0-9a-f]{16})', line))
+             for i, line in enumerate(lines) if line.startswith(b'STYLEOS x86_64 IDT ready')]
+    try:
+        if len(ready) != 1 or not ready[0][1]:
+            return False
+        index, match = ready[0]
+        selector = int(match[1], 16)
+        return (0 < selector <= 0xfff8 and selector & 7 == 0 and
+                lines.index(b'STYLEOS x86_64 ExitBootServices OK') < index <
+                lines.index(b'STYLEOS kernel_main entered'))
+    except ValueError:
+        return False
+
+
 class Checks:
     def __init__(self, output):
         self.output = output
@@ -155,6 +231,7 @@ class Checks:
         for name, sources in [
             ('host-boot-info', ['tests/test_boot_info.c', 'kernel/boot_info.c']),
             ('host-uefi', ['tests/test_uefi.c', 'boot/x86_64/exit_boot.c']),
+            ('host-exception', ['tests/test_exception.c', 'kernel/exception.c']),
             ('host-memory', ['tests/test_boot_memory.c', 'kernel/boot_memory.c',
                              'boot/x86_64/memory_map.c', 'boot/aarch64/fdt_memory.c'])
         ]:
@@ -167,7 +244,9 @@ class Checks:
         cmd = [sys.executable, ROOT / 'tools/build.py', '--arch', arch,
                '--output', folder]
         if mode != 'normal':
-            cmd.append('--invalid-boot-info' if mode == 'invalid' else '--invalid-memory-map')
+            cmd.append({'invalid': '--invalid-boot-info',
+                        'invalid-map': '--invalid-memory-map',
+                        'exception': '--test-exception'}[mode])
         return self.command(name, [cmd])
 
     def repro(self):
@@ -194,8 +273,9 @@ class Checks:
     def qemu(self, timeout, arches):
         build_arch = arches[0] if len(arches) == 1 else 'all'
         folders = {'normal': self.output, 'invalid': self.output / 'negative',
-                   'invalid-map': self.output / 'negative-memory'}
-        names = ('build-for-qemu', 'build-negative', 'build-negative-memory')
+                   'invalid-map': self.output / 'negative-memory',
+                   'exception': self.output / 'exception'}
+        names = ('build-for-qemu', 'build-negative', 'build-negative-memory', 'build-exception')
         for (mode, folder), name in zip(folders.items(), names):
             if not self.build(folder, mode, name, build_arch):
                 return
@@ -222,6 +302,8 @@ class Checks:
                 jobs.append((f'qemu-{arch}-{mode}', arch, binary, folder,
                              firmware, mode, False, 128, timeout))
             if arch == 'aarch64':
+                jobs.append(('qemu-aarch64-exception-el2', arch, binary, folders['exception'],
+                             None, 'exception', True, 128, timeout))
                 jobs.extend((f'qemu-{arch}-{suffix}', arch, binary, self.output,
                              None, 'normal', el2, mib, timeout)
                             for suffix, el2, mib in [('el2', True, 128), ('256m', False, 256)])
@@ -249,10 +331,16 @@ class Checks:
                     str(folder / arch / 'styleos.bin')]
         expected = {'invalid': b'STYLEOS BOOT_INFO ERROR: magic',
                     'invalid-map': b'STYLEOS MEMMAP ERROR: ',
+                    'exception': b'STYLEOS EMERGENCY HALT',
                     'normal': b'STYLEOS KERNEL HALT'}[mode]
         output = bytearray()
         started = time.monotonic()
         process = None
+        terminal_seen_at = None
+        settled = False
+        natural_exit = False
+        requested_stop = False
+        forced_stop = False
         selector = selectors.DefaultSelector()
         try:
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -264,7 +352,16 @@ class Checks:
                         output.extend(chunk)
                     else:
                         selector.unregister(key.fileobj)
-                if any(line.startswith(expected) for line in output.split(b'\n')[:-1]) or process.poll() is not None:
+                if (terminal_seen_at is None and
+                        any(line.startswith(expected) for line in output.split(b'\n')[:-1])):
+                    terminal_seen_at = time.monotonic()
+                if process.poll() is not None:
+                    natural_exit = True
+                    break
+                # A marker followed immediately by reset/exit is not a halt.
+                # Keep collecting output briefly before our intentional stop.
+                if terminal_seen_at is not None and time.monotonic() - terminal_seen_at >= 0.2:
+                    settled = True
                     break
         except OSError as error:
             return name, 'FAIL', str(error), '$ ' + ' '.join(cmd)
@@ -272,20 +369,48 @@ class Checks:
             selector.close()
             if process is not None:
                 if process.poll() is None:
+                    requested_stop = True
                     process.terminate()
                     try:
                         process.wait(timeout=3)
                     except subprocess.TimeoutExpired:
+                        forced_stop = True
                         process.kill()
                         process.wait()
+                else:
+                    natural_exit = True
                 if process.stdout:
                     output.extend(process.stdout.read())
                     process.stdout.close()
         text = '$ ' + ' '.join(cmd) + '\n' + output.decode('utf-8', 'replace')
+        text += (f'\n[harness] requested_stop={requested_stop} forced_stop={forced_stop} '
+                 f'natural_exit={natural_exit} returncode={process.returncode} settled={settled}\n')
         if expected not in output:
             return name, 'FAIL', 'expected serial marker missing / timeout', text
-        good = serial_memory_ok(output, arch, mode, mib, el2)
-        return name, ('PASS' if good else 'FAIL'), 'UART handoff and memory contract checked; QEMU stopped by harness', text
+        if natural_exit or not requested_stop:
+            return name, 'FAIL', 'QEMU exited/reset before intentional harness stop', text
+        # QEMU may handle SIGTERM and return 0; an unrelated error/abort is not OK.
+        if process.returncode not in ((0, -9) if forced_stop else (0, -15)):
+            return name, 'FAIL', 'unexpected QEMU process exit status', text
+        if not settled:
+            return name, 'FAIL', 'terminal marker observation window incomplete', text
+        if mode == 'exception':
+            try:
+                site = json.loads((folder / arch / 'fault-site.json').read_text())
+                executable = folder / arch / ('BOOTX64.EFI' if arch == 'x86_64' else 'kernel.elf')
+                loaded = folder / arch / ('styleos.img' if arch == 'x86_64' else 'styleos.bin')
+                loaded_key = 'disk_sha256' if arch == 'x86_64' else 'raw_image_sha256'
+                if (hashlib.sha256(executable.read_bytes()).hexdigest() != site.get('binary_sha256') or
+                        hashlib.sha256(loaded.read_bytes()).hexdigest() != site.get(loaded_key)):
+                    return name, 'FAIL', 'fault-site metadata/image SHA-256 mismatch', text
+            except (OSError, ValueError) as error:
+                return name, 'FAIL', 'fault-site metadata unavailable: ' + str(error), text
+            good = serial_exception_ok(output, arch, site, mib, el2)
+        else:
+            good = serial_memory_ok(output, arch, mode, mib, el2)
+        if arch == 'x86_64':
+            good = good and serial_idt_ready(output)
+        return name, ('PASS' if good else 'FAIL'), 'UART handoff/memory/exception contract checked; QEMU stopped by harness', text
 
 
 def firmware_path(variable, prefix):

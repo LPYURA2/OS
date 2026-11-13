@@ -48,15 +48,9 @@ _Noreturn void aarch64_bad_el(uint64_t el)
     arch_halt();
 }
 
-_Noreturn void aarch64_exception(void)
-{
-    arch_puts("STYLEOS AARCH64 BOOT ERROR: early exception\n");
-    arch_halt();
-}
-
 _Noreturn void aarch64_boot_main(uint64_t dtb, uint64_t initial_el)
 {
-    arch_console_init();
+    /* start.S initialized the UART before installing our EL1 vector table. */
     if (initial_el == 2)
         arch_puts("STYLEOS AARCH64: initial EL2\n");
     else

@@ -28,3 +28,16 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
   translation/exception handling, or select a kernel model in this stage.
 - Leave main unchanged. Record the owner's Termux run separately from Linux QEMU
   and stop before implementing a memory allocator or another architecture stage.
+
+## Approved T-P1.2 task
+- Branch feature/styleos-t-p1-2 starts from e4823f2. Publish this task branch only;
+  do not update main, merge, release, force push, or modify Portable-os.
+- Add terminal early exception diagnostics after own vectors/IDT installation.
+  Preserve boot_info v1 and the T-P1.1 memory policy, MMU and allocator state.
+- Keep synchronous syndromes distinct from unsupported asynchronous paths, real
+  x86 hardware error codes distinct from absent fields, and validate saved PC
+  against the injected instruction including actual PE relocation.
+- Keep fault injection out of ordinary images. Preserve all T-P1.1 checks and
+  the OVMF-independent ARM64 runner. Record phone results separately.
+- No recovery, broken-stack/UART guarantees, IRQ enabling or kernel-model choice.
+  Stop after the task branch and its factual report are delivered.

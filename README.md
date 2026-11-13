@@ -1,10 +1,10 @@
-# StyleOS — T-P1.1
+# StyleOS — T-P1.2
 
 **Начальный загрузочный прототип на реальных ISA x86-64 и AArch64 с общим минимальным C-ядром.**
 
-StyleOS — отдельный проект в `LPYURA2/OS`. После запуска обеих архитектур в T-P1.0, в T-P1.1 общее C-ядро строит и выводит диагностическую карту физической памяти. Оно не выделяет страницы и не пишет в отмеченные как кандидаты диапазоны. Это ещё не пользовательская ОС: процессов, аллокатора, файловой системы, графики и приложений здесь нет.
+StyleOS — отдельный проект в `LPYURA2/OS`. После загрузочных T-P1.0 и диагностической карты памяти T-P1.1 этап T-P1.2 добавляет собственную раннюю диагностику синхронных исключений в UART. Ядро по-прежнему не выделяет страницы и не пишет в отмеченные как кандидаты диапазоны. Это ещё не пользовательская ОС: процессов, аллокатора, файловой системы, графики и приложений здесь нет.
 
-Историческая MATRYOSHKA v0.3.2, её Python VM, ISA M32/M8, ASM-ОС и `engine_lab` остаются в [LPYURA2/Portable-os](https://github.com/LPYURA2/Portable-os). Код Portable OS не является ядром StyleOS и при T-P1.0 не меняется. Исходная точка прежнего проекта — [`c5b62a4b4fc19d6db25d53f52eebcfba89dae708`](https://github.com/LPYURA2/OS/commit/c5b62a4b4fc19d6db25d53f52eebcfba89dae708), сохранённая в Git-истории. Подробности — [HISTORY.md](docs/HISTORY.md).
+Историческая MATRYOSHKA v0.3.2, её Python VM, ISA M32/M8, ASM-ОС и `engine_lab` остаются в [LPYURA2/Portable-os](https://github.com/LPYURA2/Portable-os). Код Portable OS не является ядром StyleOS и при T-P1.2 не меняется. Исходная точка прежнего проекта — [`c5b62a4b4fc19d6db25d53f52eebcfba89dae708`](https://github.com/LPYURA2/OS/commit/c5b62a4b4fc19d6db25d53f52eebcfba89dae708), сохранённая в Git-истории. Подробности — [HISTORY.md](docs/HISTORY.md).
 
 ## Что реализует прототип
 
@@ -12,7 +12,8 @@ StyleOS — отдельный проект в `LPYURA2/OS`. После запу
 |---|---|---|
 | `kernel/main.c`, одна функция `kernel_main()` | UEFI PE/COFF EFI application | raw Image для QEMU `virt`, загрузка `0x40080000` |
 | `boot_info` v1, 96 байт | `GetMemoryMap` → `ExitBootServices`, ограниченные повторы | DTB из `x0`, проверка заголовка, поддерживаемый EL2/EL1 → EL1 |
-| Проверка handoff и явный отказ | Собственный 64-КиБ стек и Microsoft x64 ABI | Собственный 64-КиБ стек, очистка BSS, ранние exception vectors |
+| Проверка handoff и явный отказ | Собственный 64-КиБ стек, Microsoft x64 ABI и собственная IDT | Собственный 64-КиБ стек, BSS, собственные EL1 exception vectors |
+| Терминальная ранняя exception-диагностика | Вектор, причина, saved RIP, аппаратный error code при наличии | EC/причина, ESR/ELR/SPSR, FAR только при достоверности |
 | Узкий HAL для serial и halt | COM1, порт `0x3F8`, после EBS без вызовов firmware | PL011 MMIO `0x09000000`, polling без IRQ-драйвера |
 | Общие C-исходники и тестовая граница | Машинный код x86-64 | Машинный код AArch64 |
 
@@ -29,7 +30,7 @@ UEFI firmware
   → GPT-диск / FAT-раздел / EFI/BOOT/BOOTX64.EFI
   → efi_main(): подготовка и проверка firmware boundary
   → GetMemoryMap() → ExitBootServices() с актуальным MapKey
-  → собственный стек, ABI Microsoft x64
+  → собственный стек, ABI Microsoft x64, установка собственной IDT
   → kernel_main(boot_info)
   → проверка handoff, карта памяти по UEFI, COM1 и halt
 ```
@@ -43,13 +44,13 @@ UEFI firmware
 ```text
 QEMU virt, AArch64 Image boot convention
   → Image по 0x40080000, x0 = физический адрес DTB
-  → стартовый ASM: сохранить x0, подготовить EL1 и стек
+  → стартовый ASM: x0, EL1, стек, UART и собственный VBAR_EL1
   → проверить заголовок DTB, сформировать boot_info
   → kernel_main(boot_info)
   → проверка handoff, карта памяти по DTB, PL011 и halt
 ```
 
-Image использует загрузочное соглашение ARM64 Image, а не код или сервисы ядра Linux. При входе EL2 выполняется переход в EL1; EL1 entry также поддерживается. Дополнительные CPU паркуются, IRQ остаются маскированными. Ранний вектор ошибок даёт диагностику, но не является системой восстановления исключений.
+Image использует загрузочное соглашение ARM64 Image, а не код или сервисы ядра Linux. При входе EL2 выполняется переход в EL1; EL1 entry также поддерживается. Дополнительные CPU паркуются, IRQ остаются маскированными. После готовности стека и UART устанавливаются собственные EL1-векторы. Новый синхронный путь захватывает ESR/ELR/SPSR; это терминальная диагностика, не восстановление исключений.
 
 Ранний адаптер проверяет заголовок DTB. После проверки handoff отдельный парсер читает RAM и резервы из поддерживаемого подмножества DTB. Обнаружение устройств не реализовано, а PL011 остаётся фиксированным свойством QEMU `virt`, не поддержкой произвольного телефона или платы ARM.
 
@@ -66,6 +67,27 @@ Image использует загрузочное соглашение ARM64 Ima
 T-P1.1 сводит карту UEFI и данные DTB к общей модели полуинтервалов `[start, end)`. Резервы перекрывают RAM. В UART видны диапазоны образа, стека, handoff, исходной карты или DTB, RAM, резервов и кандидатов. `MEMMAP PASS` подтверждает только построение карты, а `MEMMAP ERROR` останавливает раннюю загрузку без публикации частичного результата.
 
 Раскладка `boot_info v1` не менялась. Детали и границы — [ADR-0004](docs/adr/0004-early-physical-memory-proposal.md).
+
+## Ранние исключения T-P1.2
+
+После установки собственных векторов/IDT первая поддерживаемая синхронная ошибка печатает одну строку `STYLEOS EXCEPTION arch=...` с причиной и сохранённым адресом инструкции, затем отдельный `STYLEOS EMERGENCY HALT`. Возврата к инструкции и обычного `STYLEOS KERNEL HALT` на этом пути нет. PC и адрес обращения печатаются как числа без разыменования.
+
+На ARM64 синхронный вход захватывает `ESR_EL1`, `ELR_EL1`, `SPSR_EL1`; `FAR_EL1` выводится только при консервативной проверке EC/FSC/FnV. Для BRK FAR отсутствует. Неподдерживаемые IRQ/FIQ/SError не трактуют старый ESR как свежий синдром и помечаются `kind=unsupported` с отсутствующими syndrome-полями.
+
+На x86 IDT ставится **после ExitBootServices и перехода на стек StyleOS, до общего ядра**. Gate использует активный ring-0 CS и по-прежнему зависит от firmware GDT; собственных GDT/TSS/IST и аварийного стека нет. Аппаратный код ошибки отличается от служебного padding; `#UD` даёт `error=absent`. CR2 читается только для `#PF`.
+
+Guard разрешает полную диагностику только первому входу; повторный сбой сразу останавливает CPU без рекурсивной печати. UART polling ограничен, но отказ UART/стека/памяти может лишить нас вывода. Покрытие до установки обработчиков, recovery и полноценная асинхронная обработка не обещаются. Подробности — [ADR-0005](docs/adr/0005-early-exception-diagnostics.md).
+
+Тестовая провокация включается **отдельно**, после валидного handoff и `MEMMAP PASS`:
+
+```sh
+python3 tools/build.py --arch all --test-exception
+# По умолчанию результат в build/exception, отдельно от обычного build.
+# Для выбранной архитектуры и своего тестового каталога:
+python3 tools/build.py --arch aarch64 --test-exception --output build/exception-arm64
+```
+
+`--test-exception` взаимоисключающий с двумя прежними negative-флагами. Обычный образ не содержит trigger. Отдельные образы исполняют реальные `UD2` (x86) и `BRK #0x120` (ARM). Проверка saved PC использует `fault-site.json`: для PE учитывает фактический runtime ImageBase + RVA, для ARM сверяет ELF/raw Image и opcode. Декодирование исторического ESR `0x96000061` проверяется на хосте; новый аппаратный Data Abort этим не заявляется.
 
 ## Сборка в Linux
 
@@ -108,12 +130,14 @@ python3 tools/test.py --host
 python3 tools/test.py --repro
 python3 tools/test.py --qemu
 # Полный набор:
-python3 tools/test.py --all
+python3 tools/test.py --all --output build/t-p1-2
 ```
 
-Оболочки Makefile: `make`, `make host-test`, `make repro`, `make smoke`, `make test`. Подробности — [TESTING.md](docs/TESTING.md), фактические журналы — [T-P1.1](docs/test-results/t-p1-1/README.md) и [T-P1.0](docs/test-results/t-p1-0/README.md). Runner возвращает 0 при PASS, 1 при FAIL и 2 при пропущенных обязательных средствах без FAIL.
+Оболочки Makefile: `make`, `make host-test`, `make repro`, `make smoke`, `make test`. Подробности — [TESTING.md](docs/TESTING.md), фактические журналы — [T-P1.2](docs/test-results/t-p1-2/README.md), [T-P1.1](docs/test-results/t-p1-1/README.md) и [T-P1.0](docs/test-results/t-p1-0/README.md). Runner возвращает 0 при PASS, 1 при FAIL и 2 при пропущенных обязательных средствах без FAIL.
 
-Linux, T-P1.1 — **18 проверочных этапов PASS**, включая 8 сценариев QEMU и побайтную повторяемость четырёх артефактов. ARM64 проверен с 128 и 256 МиБ. Отдельный прогон T-P1.1 на Android/Termux — **12 этапов PASS**, включая пять ARM64-сценариев QEMU. [Отчёт Termux](docs/test-results/t-p1-1/termux-arm64.md).
+T-P1.2 сохраняет прежние проверки и добавляет host exception-тесты, реальный x86 UD2 и ARM BRK с начальными EL1/EL2. Полный Linux-прогон — **23/23 этапа PASS** (host Python 39/39); отдельный ARM64-only Linux-маршрут без OVMF/x86-инструментов — **16/16 PASS**. Детали в TESTING и отчёте. **T-P1.2 на телефоне — SKIPPED** до нового прогона владельца.
+
+Ранее T-P1.1 прошёл 18 Linux-этапов и отдельные **12 этапов PASS на Android/Termux**, включая пять ARM64-сценариев. Это история проверенной базы, а не проверка новых exception-handler на телефоне: [отчёт T-P1.1 Termux](docs/test-results/t-p1-1/termux-arm64.md).
 
 Для ручного AArch64 boot с обычным QEMU:
 
@@ -145,12 +169,12 @@ x86 требует внешнюю UEFI firmware OVMF. Конкретные CODE/
 
 ```sh
 pkg install python clang lld git qemu-system-aarch64-headless
-git clone --branch feature/styleos-t-p1-1 --single-branch https://github.com/LPYURA2/OS.git styleos-tp11
-cd styleos-tp11
+git clone --branch feature/styleos-t-p1-2 --single-branch https://github.com/LPYURA2/OS.git styleos-tp12
+cd styleos-tp12
 CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux
 ```
 
-Для этой ARM64-проверки не нужны `lld-link` и OVMF. Runner сам завершает QEMU и сохраняет журналы в `build/termux/test-results/`. Старую папку T-P1.0 можно оставить как есть.
+Для этой ARM64-проверки не нужны `lld-link` и OVMF. Runner сам завершает QEMU и сохраняет журналы в `build/termux/test-results/`. Прежние папки T-P1.0/T-P1.1 можно оставить как есть. Новая команда T-P1.2 на телефоне ещё не проверена; Linux ARM64-only прогон не заменяет её.
 
 Отдельный прогон **T-P1.0** на телефоне владельца 13.11.2026: **PASS** для сборки AArch64 в Termux и трёх загрузочных сценариев в QEMU `virt` (EL1, EL2 → EL1, отказ при неверном `boot_info`). Host-тесты, воспроизводимость и x86-64 в Termux не проверялись. Нативная загрузка телефона также не проверялась. [Результаты Termux](docs/test-results/t-p1-0/termux-arm64.md).
 
@@ -173,7 +197,7 @@ VBoxManage startvm StyleOS-TP10
 
 Замените `/absolute/path/` на действительные пути и используйте новое имя VM, если такое уже есть. Диагностика идёт в COM1-файл; рабочего стола или текстовой shell на VGA не ожидается. После halt VM нужно выключить вручную средствами VirtualBox. AArch64 `virt`-образ не является диском для этой x86 VM.
 
-Результат VirtualBox в T-P1.0 — **SKIPPED**, если не приложен журнал реального запуска. Физический PC, ARM-плата, смартфон и планшет также не подтверждены.
+Результат VirtualBox для T-P1.2 — **SKIPPED**: реальный новый запуск не выполнен. Физический PC, ARM-плата, смартфон и планшет также не подтверждены.
 
 ## Карта проекта
 
@@ -183,29 +207,29 @@ OS/
 ├── Makefile                  оболочки сборки и тестов
 ├── README.md                 этот документ
 ├── include/styleos/          boot_info v1, интерфейс раннего HAL
-├── kernel/                   общее C-ядро, валидация handoff, runtime минимум
+├── kernel/                   ядро, handoff, карта памяти, exception decoder/formatter
 ├── boot/x86_64/              UEFI entry, типы EFI, GetMemoryMap/ExitBootServices
-├── arch/x86_64/              собственный стек, COM1, halt
+├── arch/x86_64/              стек, COM1, IDT/exception entry, halt
 ├── boot/aarch64/             Image entry, linker script, проверка DTB/handoff
 ├── arch/aarch64/             PL011 и halt
 ├── tools/                    build, GPT/FAT packaging, test orchestration
 ├── tests/                    host-тесты контрактов и образа
 └── docs/
-    ├── adr/                  причины решений T-P1.0
+    ├── adr/                  решения и границы T-P1.0–T-P1.2
     ├── HISTORY.md            связь с архивной MATRYOSHKA и Portable OS
     ├── LEARNING_RU.md        разбор загрузки и учебные упражнения
     ├── TESTING.md            команды, границы доказательств и результаты
-    └── test-results/t-p1-0/  фактические текстовые журналы и SHA-256 артефактов
+    └── test-results/         раздельные фактические журналы T-P1.0/T-P1.1/T-P1.2
 ```
 
 Выходной `build/` и пользовательская firmware/toolchain находятся вне отслеживаемых исходников. Состав фактических файлов уточняется непосредственно деревом Git.
 
 ## Пределы и следующий шаг
 
-Текущее ядро выводит результат проверки handoff, диагностическую карту памяти и останавливается. Нет установки, загрузки пользовательских программ, процессов, аллокатора, VM/MMU-подсистемы, IRQ/GIC-драйвера, ФС, GUI, сетевого стека, `.tea`, APK или EXE. Включённый firmware adapter и ранняя exception-диагностика не обеспечивают secure boot, восстановление, изоляцию, обновление или промышленную безопасность.
+Обычное ядро выводит результат handoff, диагностическую карту памяти и останавливается. Тестовый exception-образ после них завершает управляемую ошибку собственной UART-диагностикой. Нет установки, загрузки пользовательских программ, процессов, аллокатора, VM/MMU-подсистемы, IRQ/GIC-драйвера, ФС, GUI, сетевого стека, `.tea`, APK или EXE. Включённый firmware adapter и ранняя exception-диагностика не обеспечивают secure boot, восстановление, изоляцию, обновление или промышленную безопасность.
 
 Сохранность данных, разграничение доступа, восстановление после сбоев, измеряемая производительность и отдельные модели совместимости остаются обязательными целями будущей StyleOS. Они вводятся проверяемыми этапами. Окончательные архитектурные решения принимает владелец.
 
-После проверки T-P1.1 в Linux и Termux перед реальной выдачей страниц нужно отдельно доказать сохранность используемых таблиц трансляции и определить порядок перехода владения. Модель ядра и новая обработка исключений этим этапом не утверждены.
+T-P1.2 публикуется только в `feature/styleos-t-p1-2`: **без обновления main, merge или релиза**. После отчёта этап останавливается. Перед реальной выдачей страниц всё ещё нужно отдельно доказать сохранность таблиц трансляции и определить переход владения; модель ядра, аллокатор и recovery не утверждаются этой диагностикой.
 
 Учебный разбор файлов, ISA/ABI, стека, DTB и различий между host-test и boot-smoke — [LEARNING_RU.md](docs/LEARNING_RU.md).
