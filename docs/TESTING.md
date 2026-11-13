@@ -158,7 +158,8 @@ qemu-system-aarch64 -machine virt -cpu cortex-a57 -m 128M \
 | Среда | Статус T-P1.1 |
 |---|---|
 | Linux, QEMU/OVMF x86-64 и QEMU AArch64 | PASS |
-| Android/Termux | SKIPPED, ожидается прогон владельца |
+| Android/Termux, host-тесты, сборки AArch64 и QEMU `virt` | [12 этапов PASS](test-results/t-p1-1/termux-arm64.md) |
+| Android/Termux, x86-64 QEMU и повторяемость артефактов | SKIPPED, не входили в ARM64-прогон |
 | VirtualBox и физическое оборудование | SKIPPED |
 
 Для Termux из checkout T-P1.1:
