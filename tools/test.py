@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host, reproducible-build and bounded real-QEMU checks for T-P1.4."""
+"""Host, reproducible-build and bounded real-QEMU checks for T-P1.5."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -23,6 +23,11 @@ try:
 except ImportError:  # Direct tools/test.py invocation.
     from paging_site import describe_paging
 
+try:
+    from .ownership_site import describe_ownership
+except ImportError:  # Direct tools/test.py invocation.
+    from ownership_site import describe_ownership
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -30,7 +35,7 @@ def serial_handoff_ok(output, arch, invalid=False, el2=False):
     """A successful marker cannot erase a prior boot failure in the same run."""
     errors = (b'BOOT ERROR', b'BOOT_ERROR', b'early exception',
               b'STYLEOS EXCEPTION', b'STYLEOS EMERGENCY', b'STYLEOS BOOTPOOL',
-              b'STYLEOS PAGING')
+              b'STYLEOS PAGING', b'STYLEOS OWNERSHIP')
     if any(marker in output for marker in errors):
         return False
     lines = output.splitlines()
@@ -640,6 +645,406 @@ def verified_paging_site(folder, arch, fault=False):
     return verified
 
 
+_OWNERSHIP_CLAIM = re.compile(
+    rb'STYLEOS OWNERSHIP CLAIM kind=([A-Z_]+) proof=([A-Z_]+) va=' + _HEX16 +
+    rb' pa=' + _HEX16 + rb' bytes=' + _HEX16)
+_OWNERSHIP_RANGE = re.compile(
+    rb'STYLEOS OWNERSHIP (PROTECTED|REVIEW) ' + _HEX16 + rb' ' + _HEX16 +
+    rb'( reason=no-transfer)?')
+_OWNERSHIP_STATE_FIELDS = ('mode', 'root', 'aux0', 'aux1', 'pat', 'rflags', 'bits',
+                           'features', 'gdt_va', 'gdt_bytes', 'idt_va', 'idt_bytes', 'cs')
+
+
+def _ownership_union(ranges):
+    result = []
+    for a, b in sorted(ranges):
+        if result and a <= result[-1][1]:
+            result[-1] = result[-1][0], max(b, result[-1][1])
+        else:
+            result.append((a, b))
+    return result
+
+
+def _ownership_subtract(candidates, protected):
+    result = []
+    for a, b in candidates:
+        for c, d in protected:
+            if d <= a:
+                continue
+            if c >= b:
+                break
+            if a < c:
+                result.append((a, c))
+            a = max(a, d)
+            if a >= b:
+                break
+        if a < b:
+            result.append((a, b))
+    return _ownership_union(result)
+
+
+def serial_ownership_ok(output, arch, site, invalid=False, ram_mib=128, el2=False):
+    """Reconstruct the whole declared read-only plan from binary and UART facts.
+
+    Claims are dependencies, never grants. Inherited x86 table coverage remains
+    explicitly incomplete; only pages observed by the bounded collector can be
+    checked, and no claim turns firmware reservations into reviewable RAM.
+    """
+    try:
+        return _serial_ownership_ok(output, arch, site, invalid, ram_mib, el2)
+    except (KeyError, TypeError, ValueError, IndexError, OverflowError):
+        return False
+
+
+def _serial_ownership_ok(output, arch, site, invalid, ram_mib, el2):
+    if (not isinstance(site, dict) or site.get('arch') != arch or
+            arch not in ('x86_64', 'aarch64') or type(invalid) is not bool or
+            site.get('invalid') is not invalid or site.get('page_size') != 4096 or
+            type(site.get('page_size')) is not int or
+            b'timeout' in output.lower() or b'timed out' in output.lower()):
+        return False
+    lines = output.splitlines()
+    first = next((i for i, line in enumerate(lines)
+                  if line.startswith(b'STYLEOS OWNERSHIP')), None)
+    if first is None:
+        return False
+    prefix = b'\n'.join(lines[:first]) + b'\n'
+    if not serial_memory_ok(prefix, arch, 'normal', ram_mib, el2, terminal=False):
+        return False
+    tail = [line for line in lines[first:] if line.startswith(b'STYLEOS ')]
+    if invalid:
+        # Required-claim refusal publishes no partial claims, range or PASS.
+        return tail == [b'STYLEOS OWNERSHIP ERROR: required']
+    if len(tail) < 15:
+        return False
+    memory = {}
+    for line in prefix.splitlines():
+        match = _RANGE.fullmatch(line)
+        if match:
+            memory.setdefault(match[1], []).append((int(match[2], 16), int(match[3], 16)))
+    if any(len(memory.get(key, [])) > 256 for key in (b'RAM', b'RESERVED', b'CANDIDATE')):
+        return False
+    image, stack, handoff, source = (memory[k][0] for k in
+                                    (b'IMAGE', b'STACK', b'HANDOFF', b'SOURCE'))
+    phase, provenance = ('inherited', 'uefi') if arch == 'x86_64' else ('mmu-off', 'fdt')
+    if tail[0] != f'STYLEOS OWNERSHIP PLAN arch={arch} phase={phase} source={provenance}'.encode():
+        return False
+    image_keys = ('image_start', 'image_end', 'image_size')
+    if (any(type(site.get(k)) is not int or not 0 <= site[k] < 1 << 64 for k in image_keys) or
+            site['image_size'] != image[1] - image[0]):
+        return False
+    if arch == 'x86_64':
+        if (site.get('address_space') != 'image-rva' or site['image_start'] != 0 or
+                site['image_end'] != site['image_size']):
+            return False
+        relocation = image[0]
+    else:
+        if (site.get('address_space') != 'identity-image-address' or
+                image != (site['image_start'], site['image_end']) or
+                any(type(site.get(k)) is not int for k in ('bss_start', 'bss_end')) or
+                not image[0] <= site['bss_start'] < site['bss_end'] <= image[1]):
+            return False
+        relocation = 0
+    sizes = {'workspace': 65536, 'diagnostic': 12400, 'stack': 65536,
+             'pool': 32768, 'pool_metadata': 4096}
+    sizes.update({'idt': 4096, 'handoff': 96} if arch == 'x86_64' else {'vectors': 2048})
+    objects = site.get('objects')
+    if not isinstance(objects, dict) or set(objects) != set(sizes):
+        return False
+    expected = {}
+    for name, size in sizes.items():
+        item = objects[name]
+        if (not isinstance(item, dict) or
+                any(type(item.get(k)) is not int or not 0 <= item[k] < 1 << 64
+                    for k in ('start', 'end', 'bytes')) or item['bytes'] != size or
+                item['end'] - item['start'] != size):
+            return False
+        a, b = item['start'] + relocation, item['end'] + relocation
+        if not image[0] <= a < b <= image[1]:
+            return False
+        alignment = {'stack': 16, 'diagnostic': 8, 'handoff': 8, 'vectors': 2048,
+                     'idt': 16}.get(name, 4096)
+        if a % alignment:
+            return False
+        expected[name] = a, b
+    if (expected['stack'] != stack or
+            (arch == 'x86_64' and expected['handoff'] != handoff) or
+            any(a < d and c < b for i, (a, b) in enumerate(expected.values())
+                for c, d in list(expected.values())[i + 1:])):
+        return False
+    own = _paging_fields(tail[1], b'STYLEOS OWNERSHIP WORKSPACE', ('pa', 'bytes'))
+    origin = _paging_fields(tail[2], b'STYLEOS OWNERSHIP SOURCE', ('pa', 'bytes', 'stride', 'version'))
+    state = _paging_fields(tail[3], b'STYLEOS OWNERSHIP STATE', _OWNERSHIP_STATE_FIELDS)
+    if (not own or not origin or not state or
+            (own['pa'], own['pa'] + own['bytes']) != expected['workspace'] or
+            (origin['pa'], origin['pa'] + origin['bytes']) != source or
+            not 32 <= state['bits'] <= (52 if arch == 'x86_64' else 48) or
+            (arch == 'aarch64' and state['bits'] not in (32, 36, 40, 42, 44, 48))):
+        return False
+    limit = 1 << state['bits']
+    if any(b > limit for ranges in memory.values() for _a, b in ranges):
+        return False
+    if arch == 'x86_64':
+        if (origin['version'] != 1 or origin['stride'] < 40 or origin['stride'] & 7 or
+                not origin['bytes'] or origin['bytes'] % origin['stride'] or
+                state['mode'] & 0x80000001 != 0x80000001 or state['mode'] & 0x60000000 or
+                not state['aux0'] & (1 << 5) or
+                state['aux0'] & sum(1 << bit for bit in (12, 17, 21, 22, 23, 24)) or
+                state['aux1'] & 0xd00 != 0xd00 or state['pat'] & 255 != 6 or
+                state['rflags'] & ((1 << 9) | (1 << 10)) or
+                state['features'] not in (1, 3) or not state['root'] or
+                state['root'] & 4095 or state['root'] + 4096 > limit or
+                not 0 < state['gdt_bytes'] <= 65536 or state['gdt_va'] & 7 or
+                state['gdt_va'] + state['gdt_bytes'] > 1 << 47 or
+                not 0 < state['cs'] <= 0xfff8 or state['cs'] & 7 or
+                state['cs'] + 8 > state['gdt_bytes'] or
+                (state['idt_va'], state['idt_va'] + state['idt_bytes']) != expected['idt'] or
+                prefix.splitlines().count(
+                    f'STYLEOS x86_64 IDT ready cs=0x{state["cs"]:016x}'.encode()) != 1):
+            return False
+    elif (origin['stride'] or origin['version'] or not 40 <= origin['bytes'] <= 16 * 1024 * 1024 or
+          state['root'] or state['mode'] & ((1 << 25) | (1 << 24) | (1 << 12) | 5) or
+          state['aux0'] != expected['vectors'][0] or state['aux1'] & 0x3c0 != 0x3c0 or
+          any(state[key] for key in ('pat', 'rflags', 'features', 'gdt_va', 'gdt_bytes', 'idt_va', 'idt_bytes', 'cs'))):
+        return False
+    common = {'IMAGE': image, 'STACK': stack, 'HANDOFF': handoff, 'SOURCE_BUFFER': source,
+              'MAP_WORKSPACE': expected['diagnostic'], 'OWN_WORKSPACE': expected['workspace'],
+              'BOOT_POOL': expected['pool'], 'POOL_METADATA': expected['pool_metadata']}
+    claims, cursor = [], 4
+    while cursor < len(tail) and tail[cursor].startswith(b'STYLEOS OWNERSHIP CLAIM'):
+        match = _OWNERSHIP_CLAIM.fullmatch(tail[cursor])
+        if not match or len(claims) >= 96:
+            return False
+        kind, proof = (part.decode() for part in match.groups()[:2])
+        va, pa, size = (int(part, 16) for part in match.groups()[2:])
+        if (not size or pa + size >= 1 << 64 or va + size >= 1 << 64 or
+                ((pa + size + 4095) & ~4095) > limit):
+            return False
+        claim = kind, proof, va, pa, size
+        if claim in claims:
+            return False
+        claims.append(claim)
+        cursor += 1
+    # All common live ranges must appear once, with complete byte extents.
+    for kind, (a, b) in common.items():
+        found = [c for c in claims if c[0] == kind]
+        proof = 'BOOT_SOURCE' if kind == 'SOURCE_BUFFER' else 'IMAGE_IDENTITY'
+        if found != [(kind, proof, a, a, b - a)]:
+            return False
+    extra = [c for c in claims if c[0] not in common]
+    def reserved(pa, size):
+        return any(a <= pa and pa + size <= b for a, b in memory[b'RESERVED'])
+    if arch == 'aarch64':
+        a, b = expected['vectors']
+        if set(extra) != {('VECTORS', 'IMAGE_IDENTITY', a, a, b - a),
+                          ('MMIO', 'FIXED_DEVICE', 0x9000000, 0x9000000, 4096)}:
+            return False
+    else:
+        allowed = {'GDT', 'IDT', 'ROOT', 'OLD_TABLE'}
+        if any(c[0] not in allowed for c in extra):
+            return False
+        idt, root = [c for c in extra if c[0] == 'IDT'], [c for c in extra if c[0] == 'ROOT']
+        if (idt != [('IDT', 'OLD_WALK', state['idt_va'], state['idt_va'], 4096)] or
+                root != [('ROOT', 'REGISTER', 0, state['root'], 4096)]):
+            return False
+        gdts = [c for c in extra if c[0] == 'GDT']
+        pages = list(range(state['gdt_va'] & ~4095,
+                           (state['gdt_va'] + state['gdt_bytes'] + 4095) & ~4095, 4096))
+        if (sorted(c[2] for c in gdts) != pages or
+                any(proof != 'OLD_WALK' or (va | pa) & 4095 or size != 4096 or
+                    not reserved(pa, size) for _k, proof, va, pa, size in gdts)):
+            return False
+        tables = [c for c in extra if c[0] == 'OLD_TABLE']
+        if (not 0 < len(tables) <= 64 or state['root'] not in [c[3] for c in tables] or
+                len({c[3] for c in tables}) != len(tables) or
+                any(proof != 'OLD_WALK' or va != pa or pa & 4095 or size != 4096 or
+                    not reserved(pa, size) for _k, proof, va, pa, size in tables) or
+                not reserved(state['root'], 4096)):
+            return False
+        # Conflicting claims for the same VA cannot prove two translations.
+        translated = [c for c in claims if c[0] != 'ROOT']
+        for i, (_k, _p, va, pa, size) in enumerate(translated):
+            for _ok, _op, ova, opa, osize in translated[:i]:
+                start = max(va, ova)
+                if start < min(va + size, ova + osize) and pa + start - va != opa + start - ova:
+                    return False
+    # Independently replay every recorded descriptor path. The same entry
+    # cannot have contradictory values in two walks, and every visited table
+    # must have its own complete identity proof in this bounded closure.
+    walks, entry_values = [], {}
+    old_tables = {c[3] for c in claims if c[0] == 'OLD_TABLE'}
+    while cursor < len(tail) and tail[cursor].startswith(b'STYLEOS OWNERSHIP WALK'):
+        walk = re.fullmatch(rb'STYLEOS OWNERSHIP WALK kind=(GDT|TABLE) va=' + _HEX16 +
+                            rb' pa=' + _HEX16 + rb' levels=' + _HEX16, tail[cursor])
+        if arch != 'x86_64' or not walk or len(walks) >= 66:
+            return False
+        kind, va, pa, levels = walk.groups()
+        kind = kind.decode()
+        va, pa, levels = (int(v, 16) for v in (va, pa, levels))
+        if not 2 <= levels <= 4 or (va | pa) & 4095 or va >= 1 << 47:
+            return False
+        if ((kind == 'GDT' and ('GDT', 'OLD_WALK', va, pa, 4096) not in claims) or
+                (kind == 'TABLE' and (va != pa or pa not in old_tables))):
+            return False
+        if (kind, va, pa) in walks:
+            return False
+        cursor += 1
+        table = state['root']
+        address_mask = 0x000ffffffffff000
+        pa_mask = (limit - 1) & address_mask
+        for level in range(levels):
+            step = _paging_fields(tail[cursor], b'STYLEOS OWNERSHIP STEP',
+                                   ('level', 'table', 'entry'))
+            if not step or step['level'] != level or step['table'] != table or table not in old_tables:
+                return False
+            entry, shift = step['entry'], 39 - 9 * level
+            index = va >> shift & 511
+            key = table, index
+            if key in entry_values and (entry_values[key] ^ entry) & ~0x60:
+                return False
+            entry_values[key] = entry
+            if (not entry & 1 or entry & address_mask & ~pa_mask or
+                    entry & 0x7800000000000000):
+                return False
+            large = level < 3 and bool(entry & 128)
+            if large and (level == 0 or (level == 1 and not state['features'] & 2)):
+                return False
+            leaf = level == 3 or large
+            if leaf != (level == levels - 1):
+                return False
+            if leaf:
+                leaf_shift = shift if large else 12
+                offset_mask = (1 << leaf_shift) - 1
+                if large and entry & address_mask & offset_mask & ~(1 << 12):
+                    return False
+                mapped = (entry & pa_mask & ~offset_mask) | (va & offset_mask)
+                pat_index = (entry >> 3 & 3) | ((entry >> (12 if large else 7) & 1) << 2)
+                if mapped != pa or (state['pat'] >> (8 * pat_index) & 255) != 6:
+                    return False
+            else:
+                if entry & 0x18:
+                    return False
+                table = entry & pa_mask & address_mask
+            cursor += 1
+        walks.append((kind, va, pa))
+    if arch == 'x86_64':
+        expected_walks = {('GDT', c[2], c[3]) for c in claims if c[0] == 'GDT'}
+        expected_walks.update(('TABLE', pa, pa) for pa in old_tables)
+        if set(walks) != expected_walks:
+            return False
+    if tail[cursor:cursor + 2] != [b'STYLEOS OWNERSHIP INACTIVE paging=not-built pool=not-admitted',
+                                   f'STYLEOS OWNERSHIP UNRESOLVED flags=0x{3 if arch == "x86_64" else 0:016x}'.encode()]:
+        return False
+    cursor += 2
+    protected = _ownership_union(memory[b'RESERVED'] +
+                                 [(pa & ~4095, (pa + size + 4095) & ~4095)
+                                  for _kind, _proof, _va, pa, size in claims])
+    review = _ownership_subtract(memory[b'CANDIDATE'], protected)
+    for kind, ranges in ((b'PROTECTED', protected), (b'REVIEW', review)):
+        for a, b in ranges:
+            match = _OWNERSHIP_RANGE.fullmatch(tail[cursor])
+            if (not match or match[1] != kind or (int(match[2], 16), int(match[3], 16)) != (a, b) or
+                    bool(match[4]) != (kind == b'REVIEW')):
+                return False
+            cursor += 1
+    if tail[cursor] != b'STYLEOS OWNERSHIP UNCLASSIFIED outside-covered-union':
+        return False
+    totals = _paging_fields(tail[cursor + 1], b'STYLEOS OWNERSHIP TOTAL',
+                             ('protected', 'review', 'granted'))
+    after = _paging_fields(tail[cursor + 2], b'STYLEOS OWNERSHIP STATE AFTER',
+                           _OWNERSHIP_STATE_FIELDS)
+    return (totals == {'protected': sum(b - a for a, b in protected) // 4096,
+                       'review': sum(b - a for a, b in review) // 4096, 'granted': 0} and
+            after is not None and
+            all(after[k] == state[k] for k in state if k != 'rflags') and
+            not (after['rflags'] ^ state['rflags']) & ~0x8d5 and
+            not after['rflags'] & ((1 << 9) | (1 << 10)) and
+            (arch == 'x86_64' or after['rflags'] == 0) and tail[cursor + 3:] == [b'STYLEOS OWNERSHIP PASS', b'STYLEOS KERNEL HALT'])
+
+
+def ownership_report(output, arch):
+    """Serialize evidence only after serial_ownership_ok has accepted it."""
+    lines = output.splitlines()
+    report = {'arch': arch, 'phase': 'inherited' if arch == 'x86_64' else 'mmu-off',
+              'source': 'uefi' if arch == 'x86_64' else 'fdt',
+              'protected': [], 'review': [], 'claims': [], 'walks': [],
+              'unclassified': 'outside-covered-union', 'granted': 0}
+    for line in lines:
+        for label, key, fields in (
+            (b'WORKSPACE', 'workspace', ('pa', 'bytes')),
+            (b'SOURCE', 'source_data', ('pa', 'bytes', 'stride', 'version')),
+            (b'STATE', 'state_before', _OWNERSHIP_STATE_FIELDS),
+            (b'STATE AFTER', 'state_after', _OWNERSHIP_STATE_FIELDS),
+            (b'UNRESOLVED', 'unresolved', ('flags',)),
+            (b'TOTAL', 'totals', ('protected', 'review', 'granted'))):
+            values = _paging_fields(line, b'STYLEOS OWNERSHIP ' + label, fields)
+            if values is not None:
+                report[key] = values
+        claim = _OWNERSHIP_CLAIM.fullmatch(line)
+        if claim:
+            kind, proof, va, pa, size = claim.groups()
+            report['claims'].append(dict(kind=kind.decode(), proof=proof.decode(),
+                                         va=int(va, 16), pa=int(pa, 16), bytes=int(size, 16)))
+        bounds = _OWNERSHIP_RANGE.fullmatch(line)
+        if bounds:
+            kind, start, end, _reason = bounds.groups()
+            item = dict(start=int(start, 16), end=int(end, 16))
+            if kind == b'REVIEW':
+                item['reason'] = 'no-transfer'
+            report['protected' if kind == b'PROTECTED' else 'review'].append(item)
+        walk = re.fullmatch(rb'STYLEOS OWNERSHIP WALK kind=(GDT|TABLE) va=' + _HEX16 +
+                            rb' pa=' + _HEX16 + rb' levels=' + _HEX16, line)
+        if walk:
+            kind, va, pa, levels = walk.groups()
+            report['walks'].append(dict(kind=kind.decode(), va=int(va, 16),
+                                        pa=int(pa, 16), levels=int(levels, 16), steps=[]))
+        step = _paging_fields(line, b'STYLEOS OWNERSHIP STEP', ('level', 'table', 'entry'))
+        if step is not None:
+            report['walks'][-1]['steps'].append(step)
+    report['inactive'] = {'paging': 'not-built', 'pool': 'not-admitted'}
+    report['unresolved']['dependencies'] = (['inherited-table-set-incomplete', 'other-firmware-state']
+                                             if arch == 'x86_64' else [])
+    return report
+
+
+def verified_ownership_site(folder, arch, invalid=False):
+    """Rebuild the binary proof and bind modes and artifacts actually booted."""
+    target = folder / arch
+    site = json.loads((target / 'ownership-site.json').read_text())
+    if arch == 'x86_64':
+        verified = describe_ownership(arch, target / 'BOOTX64.EFI', target / 'kernel.map', invalid=invalid)
+        verified['disk_sha256'] = hashlib.sha256((target / 'styleos.img').read_bytes()).hexdigest()
+    else:
+        verified = describe_ownership(arch, target / 'kernel.elf', raw_path=target / 'styleos.bin', invalid=invalid)
+    if site != verified:
+        raise ValueError('ownership-site metadata differs from independently checked image proof/SHA-256')
+    manifest = json.loads((folder / 'manifest.json').read_text())
+    expected_modes = {'invalid_boot_info': False, 'invalid_memory_map': False,
+                      'test_exception': False, 'test_bootpool': False,
+                      'test_paging': False, 'test_paging_fault': False,
+                      'test_ownership_plan': not invalid, 'test_ownership_plan_invalid': invalid}
+    if (not isinstance(manifest, dict) or
+            any(type(manifest.get(key)) is not bool or manifest[key] != value
+                for key, value in expected_modes.items())):
+        raise ValueError('ownership manifest mode mismatch')
+    artifacts = manifest.get('artifacts')
+    if (not isinstance(artifacts, list) or any(not isinstance(row, dict) or
+            not isinstance(row.get('path'), str) for row in artifacts)):
+        raise ValueError('ownership manifest artifacts are invalid')
+    names = (('BOOTX64.EFI', 'binary_sha256'), ('styleos.img', 'disk_sha256')) if arch == 'x86_64' else (
+        ('kernel.elf', 'binary_sha256'), ('styleos.bin', 'raw_sha256'))
+    selected = [row for row in artifacts if row['path'].startswith(arch + '/')]
+    if len(selected) != 2:
+        raise ValueError('ownership manifest needs exactly two artifacts for selected architecture')
+    for name, key in names:
+        matches = [row for row in selected if row['path'] == arch + '/' + name]
+        if (len(matches) != 1 or type(matches[0].get('size')) is not int or
+                matches[0]['size'] != (target / name).stat().st_size or
+                matches[0].get('sha256') != verified.get(key)):
+            raise ValueError('ownership manifest artifact size/SHA-256 mismatch')
+    return verified
+
+
 def serial_idt_ready(output):
     """An actual-CS IDT-ready marker must follow EBS and precede common C."""
     lines = output.splitlines()
@@ -702,6 +1107,8 @@ class Checks:
             ('host-exception', ['tests/test_exception.c', 'kernel/exception.c']),
             ('host-pool', ['tests/test_boot_pool.c', 'kernel/boot_pool.c']),
             ('host-paging', ['tests/test_paging.c', 'kernel/paging.c']),
+            ('host-ownership', ['tests/test_ownership.c', 'kernel/ownership.c',
+                                'kernel/boot_memory.c']),
             ('host-memory', ['tests/test_boot_memory.c', 'kernel/boot_memory.c',
                              'boot/x86_64/memory_map.c', 'boot/aarch64/fdt_memory.c'])
         ]:
@@ -714,6 +1121,9 @@ class Checks:
                               '-o', admission], [admission]]
                 x86 = folder / 'test-paging-x86'
                 commands += [[cc, *flags, 'tests/test_paging_x86.c', '-o', x86], [x86]]
+            if name == 'host-ownership':
+                x86 = folder / 'test-ownership-x86'
+                commands += [[cc, *flags, 'tests/test_ownership_x86.c', '-o', x86], [x86]]
             self.command(name, commands)
         self.command('host-python', [[sys.executable, '-m', 'unittest', 'discover',
                                     '-s', 'tests', '-p', 'test_*.py', '-v']])
@@ -727,7 +1137,9 @@ class Checks:
                         'exception': '--test-exception',
                         'bootpool': '--test-bootpool',
                         'paging': '--test-paging',
-                        'paging-fault': '--test-paging-fault'}[mode])
+                        'paging-fault': '--test-paging-fault',
+                        'ownership': '--test-ownership-plan',
+                        'ownership-invalid': '--test-ownership-plan-invalid'}[mode])
         return self.command(name, [cmd])
 
     def repro(self):
@@ -758,10 +1170,12 @@ class Checks:
                    'exception': self.output / 'exception',
                    'bootpool': self.output / 'bootpool',
                    'paging': self.output / 'paging',
-                   'paging-fault': self.output / 'paging-fault'}
+                   'paging-fault': self.output / 'paging-fault',
+                   'ownership': self.output / 'ownership',
+                   'ownership-invalid': self.output / 'ownership-invalid'}
         names = ('build-for-qemu', 'build-negative', 'build-negative-memory',
                  'build-exception', 'build-bootpool', 'build-paging',
-                 'build-paging-fault')
+                 'build-paging-fault', 'build-ownership', 'build-ownership-invalid')
         for (mode, folder), name in zip(folders.items(), names):
             if not self.build(folder, mode, name, build_arch):
                 return
@@ -795,6 +1209,11 @@ class Checks:
                 for mode in ('paging', 'paging-fault'):
                     jobs.append((f'qemu-aarch64-{mode}-el2', arch, binary, folders[mode],
                                  None, mode, True, 128, timeout))
+                for mode in ('ownership', 'ownership-invalid'):
+                    jobs.append((f'qemu-aarch64-{mode}-el2', arch, binary, folders[mode],
+                                 None, mode, True, 128, timeout))
+                jobs.append(('qemu-aarch64-ownership-256m', arch, binary, folders['ownership'],
+                             None, 'ownership', False, 256, timeout))
                 jobs.extend((f'qemu-{arch}-{suffix}', arch, binary, self.output,
                              None, 'normal', el2, mib, timeout)
                             for suffix, el2, mib in [('el2', True, 128), ('256m', False, 256)])
@@ -826,8 +1245,11 @@ class Checks:
                     'bootpool': b'STYLEOS KERNEL HALT',
                     'paging': b'STYLEOS KERNEL HALT',
                     'paging-fault': b'STYLEOS EMERGENCY HALT',
+                    'ownership': b'STYLEOS KERNEL HALT',
+                    'ownership-invalid': b'STYLEOS OWNERSHIP ERROR: required',
                     'normal': b'STYLEOS KERNEL HALT'}[mode]
         output = bytearray()
+        site = None
         started = time.monotonic()
         process = None
         terminal_seen_at = None
@@ -836,6 +1258,27 @@ class Checks:
         requested_stop = False
         forced_stop = False
         selector = selectors.DefaultSelector()
+
+        def result(status, detail, text):
+            if mode in ('ownership', 'ownership-invalid'):
+                try:
+                    manifest_sha = hashlib.sha256((folder / 'manifest.json').read_bytes()).hexdigest()
+                except OSError:
+                    manifest_sha = None
+                payload = {
+                    'arch': arch, 'mode': mode, 'initial_el2': el2, 'ram_mib': mib,
+                    'status': status, 'uart_sha256': hashlib.sha256(output).hexdigest(),
+                    'manifest_sha256': manifest_sha, 'ownership_site': site,
+                    'ownership_plan': ownership_report(output, arch)
+                        if status == 'PASS' and mode == 'ownership' else None,
+                    'refusal': 'required' if status == 'PASS' and mode == 'ownership-invalid' else None,
+                    'requested_stop': requested_stop, 'forced_stop': forced_stop,
+                    'natural_exit': natural_exit, 'settled': settled,
+                    'returncode': process.returncode if process is not None else None,
+                }
+                (self.logs / (name + '.json')).write_text(json.dumps(payload, indent=2) + '\n')
+            return name, status, detail, text
+
         try:
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             selector.register(process.stdout, selectors.EVENT_READ)
@@ -858,7 +1301,7 @@ class Checks:
                     settled = True
                     break
         except OSError as error:
-            return name, 'FAIL', str(error), '$ ' + ' '.join(cmd)
+            return result('FAIL', str(error), '$ ' + ' '.join(cmd))
         finally:
             selector.close()
             if process is not None:
@@ -880,14 +1323,14 @@ class Checks:
         text += (f'\n[harness] requested_stop={requested_stop} forced_stop={forced_stop} '
                  f'natural_exit={natural_exit} returncode={process.returncode} settled={settled}\n')
         if expected not in output:
-            return name, 'FAIL', 'expected serial marker missing / timeout', text
+            return result('FAIL', 'expected serial marker missing / timeout', text)
         if natural_exit or not requested_stop:
-            return name, 'FAIL', 'QEMU exited/reset before intentional harness stop', text
+            return result('FAIL', 'QEMU exited/reset before intentional harness stop', text)
         # QEMU may handle SIGTERM and return 0; an unrelated error/abort is not OK.
         if process.returncode not in ((0, -9) if forced_stop else (0, -15)):
-            return name, 'FAIL', 'unexpected QEMU process exit status', text
+            return result('FAIL', 'unexpected QEMU process exit status', text)
         if not settled:
-            return name, 'FAIL', 'terminal marker observation window incomplete', text
+            return result('FAIL', 'terminal marker observation window incomplete', text)
         if mode == 'exception':
             try:
                 site = json.loads((folder / arch / 'fault-site.json').read_text())
@@ -896,22 +1339,28 @@ class Checks:
                 loaded_key = 'disk_sha256' if arch == 'x86_64' else 'raw_image_sha256'
                 if (hashlib.sha256(executable.read_bytes()).hexdigest() != site.get('binary_sha256') or
                         hashlib.sha256(loaded.read_bytes()).hexdigest() != site.get(loaded_key)):
-                    return name, 'FAIL', 'fault-site metadata/image SHA-256 mismatch', text
+                    return result('FAIL', 'fault-site metadata/image SHA-256 mismatch', text)
             except (OSError, ValueError) as error:
-                return name, 'FAIL', 'fault-site metadata unavailable: ' + str(error), text
+                return result('FAIL', 'fault-site metadata unavailable: ' + str(error), text)
             good = serial_exception_ok(output, arch, site, mib, el2)
         elif mode == 'bootpool':
             try:
                 site = verified_pool_site(folder, arch)
             except (OSError, ValueError) as error:
-                return name, 'FAIL', 'pool-site proof unavailable/mismatched: ' + str(error), text
+                return result('FAIL', 'pool-site proof unavailable/mismatched: ' + str(error), text)
             good = serial_pool_ok(output, arch, site, mib, el2)
         elif mode in ('paging', 'paging-fault'):
             try:
                 site = verified_paging_site(folder, arch, mode == 'paging-fault')
             except (OSError, ValueError) as error:
-                return name, 'FAIL', 'paging-site proof unavailable/mismatched: ' + str(error), text
+                return result('FAIL', 'paging-site proof unavailable/mismatched: ' + str(error), text)
             good = serial_paging_ok(output, arch, site, mode == 'paging-fault', mib, el2)
+        elif mode in ('ownership', 'ownership-invalid'):
+            try:
+                site = verified_ownership_site(folder, arch, mode == 'ownership-invalid')
+            except (OSError, ValueError) as error:
+                return result('FAIL', 'ownership-site proof unavailable/mismatched: ' + str(error), text)
+            good = serial_ownership_ok(output, arch, site, mode == 'ownership-invalid', mib, el2)
         else:
             good = serial_memory_ok(output, arch, mode, mib, el2)
         if arch == 'x86_64':
@@ -926,7 +1375,7 @@ class Checks:
                 'forced_stop': forced_stop, 'natural_exit': natural_exit,
                 'returncode': process.returncode, 'settled': settled
             }, indent=2) + '\n')
-        return name, ('PASS' if good else 'FAIL'), 'UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness', text
+        return result('PASS' if good else 'FAIL', 'UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness', text)
 
 
 def firmware_path(variable, prefix):

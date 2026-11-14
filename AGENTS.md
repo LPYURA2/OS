@@ -103,3 +103,44 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
 - Stop after evidence and task-branch publication. General PMM/heap, ownership,
   recovery, IRQ, SMP, scheduler, processes, IPC, user mode, drivers and kernel
   model remain outside this task and require a separate owner decision.
+
+## Approved T-P1.5 task
+- Branch `feature/styleos-t-p1-5` starts from
+  `8bc7e78592c1aef78429042658f9ae02f71637c5`. Publish this branch only; preserve
+  main, previous refs, Portable-os and history. No merge, force push or release.
+- Add a read-only physical ownership plan only in `--test-ownership-plan` and
+  `--test-ownership-plan-invalid`, with separate outputs. All eight test flags
+  are mutually exclusive. Keep boot_info v1, normalization, pool, exceptions,
+  paging profiles and the four ordinary reproducible artifacts unchanged.
+- Run after valid handoff/MEMMAP on inherited x86 CR3 or ARM EL1 MMU off.
+  No CR3/MMU/GDT/IDT/VBAR changes, IRQ, candidate-RAM probes/reads/writes,
+  general allocation or reclaim. New persistent writes use only the admitted
+  aligned 65536-byte image-owned BSS metadata workspace; C locals use the
+  existing image-owned stack. Keep new code/buffers out of previous profiles.
+- PROTECTED is the union of baseline policy reserves and outward-rounded live
+  physical claims. REVIEW is the inward-rounded diagnostic candidate remainder,
+  with no-transfer reason; outside coverage stays UNCLASSIFIED. Merge nested
+  ranges without double counting. GRANTED is always zero; structural validity
+  and even unresolved=0 do not prove an ownership transfer.
+- Prove full image/BSS, stack, handoff, source map/DTB, diagnostic/plan workspace,
+  pool/metadata, and active architectural dependencies. Protect loader/firmware,
+  unknown UEFI types and FDT reservations by baseline policy even when they are
+  not separately listed live objects. Pool is present but not admitted here;
+  T-P1.4 paging buffers are not built in this profile.
+- Permit read-only old-root x86 walks only after full table/GDT PA-page RESERVED
+  and non-CANDIDATE admission, under the documented narrow UEFI access contract.
+  Verify visited-table identity closure and real GDT translations; emit partial
+  descriptor evidence without claiming all inherited tables or image leaves.
+  Preserve unresolved flags for incomplete old tables and other firmware state.
+  ARM EL1/EL2-to-EL1 remains MMU off with full Image/DTB/vectors and PL011 as MMIO.
+- Reject invalid/missing/contradictory mandatory evidence before publishing any
+  partial plan. The controlled invalid profile changes only its own IMAGE proof.
+  Independently verify binary extents/SHA, UART sources/ranges/walks/mode and
+  zero grants; a PASS string, timeout, reset or silence alone is insufficient.
+- Preserve all old regressions; test new positive/refusal profiles on both ISAs,
+  ARM initial EL1/EL2 and changed DTB memory sizes. Record actual counts, logs,
+  tool versions and base/code/report SHA. Linux ARM-only is not Android PASS;
+  T-P1.5 Termux, VirtualBox and physical runs stay SKIPPED until actually run.
+- Stop after report and task-branch publication. The first general-RAM pool,
+  PMM/heap, reclaim, own GDT, IRQ/SMP, recovery, processes/drivers and kernel model
+  remain separate decisions. A plan with zero grants does not authorize them.

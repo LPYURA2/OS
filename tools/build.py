@@ -32,7 +32,8 @@ def run(args):
 
 
 def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
-          test_bootpool=False, test_paging=False, test_paging_fault=False):
+          test_bootpool=False, test_paging=False, test_paging_fault=False,
+          test_ownership_plan=False, test_ownership_plan_invalid=False):
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     folder = output / arch
     folder.mkdir(parents=True, exist_ok=True)
@@ -41,6 +42,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
               'kernel/exception.c', 'kernel/boot_pool.c']
     if test_bootpool:
         common.append('kernel/boot_pool_selftest.c')
+    ownership = test_ownership_plan or test_ownership_plan_invalid
+    if ownership:
+        common += ['kernel/ownership.c', 'kernel/ownership_plan.c',
+                   f'arch/{arch}/ownership.c']
     paging = test_paging or test_paging_fault
     if paging:
         common += ['kernel/paging.c', 'kernel/paging_admission.c',
@@ -84,6 +89,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_PAGING=1')
     if test_paging_fault:
         flags.append('-DSTYLEOS_TEST_PAGING_FAULT=1')
+    if ownership:
+        flags.append('-DSTYLEOS_TEST_OWNERSHIP=1')
+    if test_ownership_plan_invalid:
+        flags.append('-DSTYLEOS_TEST_OWNERSHIP_INVALID=1')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -115,6 +124,16 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         pool_site['disk_sha256'] = hashlib.sha256(
             (folder / 'styleos.img').read_bytes()).hexdigest()
     (folder / 'pool-site.json').write_text(json.dumps(pool_site, indent=2) + '\n')
+    if ownership:
+        from ownership_site import describe_ownership
+        site = describe_ownership(arch, artifacts[0],
+            folder / 'kernel.map' if arch == 'x86_64' else None,
+            folder / 'styleos.bin' if arch == 'aarch64' else None,
+            invalid=test_ownership_plan_invalid)
+        if arch == 'x86_64':
+            site['disk_sha256'] = hashlib.sha256(
+                (folder / 'styleos.img').read_bytes()).hexdigest()
+        (folder / 'ownership-site.json').write_text(json.dumps(site, indent=2) + '\n')
     if paging:
         from paging_site import describe_paging
         site = describe_paging(arch, artifacts[0],
@@ -147,7 +166,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--arch', choices=['all', 'x86_64', 'aarch64'], default='all')
     parser.add_argument('--output', type=Path,
-                        help='Default build/; dedicated tests use build/exception or build/bootpool')
+                        help='Default build/; dedicated test profiles use separate subdirectories')
     negative = parser.add_mutually_exclusive_group()
     negative.add_argument('--invalid-boot-info', action='store_true',
                         help='Negative test only: corrupt the handoff magic')
@@ -161,14 +180,21 @@ def main():
                           help='Dedicated image only: owned translation tables and alias RW')
     negative.add_argument('--test-paging-fault', action='store_true',
                           help='Dedicated image only: owned tables and real unmapped read')
+    negative.add_argument('--test-ownership-plan', action='store_true',
+                          help='Dedicated image only: read-only ownership plan, GRANTED=0')
+    negative.add_argument('--test-ownership-plan-invalid', action='store_true',
+                          help='Dedicated image only: refuse an unproven mandatory claim')
     args = parser.parse_args()
     output = (args.output or ROOT / 'build' /
               ('exception' if args.test_exception else
                'bootpool' if args.test_bootpool else
                'paging' if args.test_paging else
-               'paging-fault' if args.test_paging_fault else '')).resolve()
+               'paging-fault' if args.test_paging_fault else
+               'ownership' if args.test_ownership_plan else
+               'ownership-invalid' if args.test_ownership_plan_invalid else '')).resolve()
     if (args.test_exception or args.test_bootpool or args.test_paging or
-            args.test_paging_fault) and output == (ROOT / 'build').resolve():
+            args.test_paging_fault or args.test_ownership_plan or
+            args.test_ownership_plan_invalid) and output == (ROOT / 'build').resolve():
         parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
     records = []
@@ -176,16 +202,19 @@ def main():
         records.extend(build(arch, output, args.invalid_boot_info,
                              args.invalid_memory_map, args.test_exception,
                              args.test_bootpool, args.test_paging,
-                             args.test_paging_fault))
+                             args.test_paging_fault, args.test_ownership_plan,
+                             args.test_ownership_plan_invalid))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS T-P1.4', 'compiler': version,
+        'prototype': 'StyleOS T-P1.5', 'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,
         'invalid_memory_map': args.invalid_memory_map,
         'test_exception': args.test_exception,
         'test_bootpool': args.test_bootpool,
         'test_paging': args.test_paging, 'test_paging_fault': args.test_paging_fault,
+        'test_ownership_plan': args.test_ownership_plan,
+        'test_ownership_plan_invalid': args.test_ownership_plan_invalid,
         'artifacts': records
     }, indent=2) + '\n')
     print('BUILD PASS:', ', '.join(arches))

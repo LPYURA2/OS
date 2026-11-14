@@ -1,8 +1,8 @@
-# StyleOS — T-P1.4
+# StyleOS — T-P1.5
 
 **Начальный загрузочный прототип на реальных ISA x86-64 и AArch64 с общим минимальным C-ядром.**
 
-StyleOS развивается в `LPYURA2/OS`. После handoff, диагностической карты, ранних исключений и image-owned пула T-P1.4 добавляет **отдельный эксперимент с собственными таблицами трансляции**. Два новых образа проверяют продолжение исполнения и намеренное чтение неотображённого VA. Обычный образ и прежние тестовые варианты сохраняют старый путь. Ни пул, ни новые таблицы не используют `MEMMAP CANDIDATE` и не передают ядру владение общей RAM.
+StyleOS развивается в `LPYURA2/OS`. T-P1.5 добавляет **отдельный проверяемый план защиты физической памяти**: какие страницы защищены, какие остаются кандидатами на рассмотрение и какие зависимости ещё не доказаны полностью. Переданных страниц всегда ноль: `granted=0`. Новый профиль работает на прежнем CR3 x86 / MMU off ARM, после handoff и MEMMAP. Обычные и прежние тестовые образы сохраняют своё поведение; `MEMMAP CANDIDATE` не используется для проб, записи или выдачи.
 
 Это ещё не пользовательская ОС: процессов, общей выдачи физических страниц, heap, файловой системы, графики и приложений здесь нет. Микроядерная, гибридная или монолитная модель не выбрана. Окончательные инженерные решения принимает владелец.
 
@@ -18,6 +18,7 @@ StyleOS развивается в `LPYURA2/OS`. После handoff, диагно
 | Ранняя терминальная exception-диагностика | Собственная IDT; vector, saved RIP, error code при наличии | Собственные EL1 vectors; ESR/ELR/SPSR, достоверный FAR |
 | Один фиксированный пул внутри образа | Полные границы PE/RVA и runtime Loaded Image | ELF/BSS/PT_LOAD и полный размер raw Image |
 | Только T-P1.4: собственные 4-КиБ таблицы, alias RW и translation fault | Новый CR3, проверенные GDT/IDT/CS, аппаратный #PF | TTBR0/TCR/MAIR/SCTLR EL1, отдельный device PL011, Data Abort |
+| Только T-P1.5: план PROTECTED / REVIEW, нулевая выдача | Унаследованный CR3, GDT/IDT/root и явно неполный набор старых таблиц | EL1 MMU off, полный Image/DTB, vectors и отдельный PL011 MMIO |
 | Ранний UART и halt | COM1, port I/O после EBS | PL011 MMIO `0x09000000`, polling без IRQ |
 
 Python собирает, упаковывает и проверяет образы. Функции ядра исполняются как скомпилированный машинный код целевой ISA; Python не заменяет ядро.
@@ -93,7 +94,24 @@ python3 tools/build.py --arch all --test-paging-fault
 
 Отдельный `--test-exception` создаёт образы с реальными `UD2` и `BRK #0x120` после `MEMMAP PASS`; по умолчанию они находятся в `build/exception`. `fault-site.json` связывает saved PC с opcode в ELF/raw Image или с фактическим runtime PE ImageBase + RVA. Детали — [ADR-0005](docs/adr/0005-early-exception-diagnostics.md).
 
-Все шесть флагов `--test-paging`, `--test-paging-fault`, `--test-bootpool`, `--test-exception`, `--invalid-boot-info` и `--invalid-memory-map` взаимоисключающие. Тестовые режимы не смешиваются с обычным образом и друг с другом.
+Все восемь флагов `--test-ownership-plan`, `--test-ownership-plan-invalid`, `--test-paging`, `--test-paging-fault`, `--test-bootpool`, `--test-exception`, `--invalid-boot-info` и `--invalid-memory-map` взаимоисключающие. Тестовые режимы не смешиваются с обычным образом и друг с другом.
+
+## План защиты физической памяти T-P1.5
+
+```sh
+python3 tools/build.py --arch all --test-ownership-plan
+# По умолчанию build/ownership.
+python3 tools/build.py --arch all --test-ownership-plan-invalid
+# По умолчанию build/ownership-invalid.
+```
+
+`PROTECTED` объединяет базовые резервы источника и страницы всех доказанных живых объектов: полный образ с BSS, стек, handoff, источник карты/DTB, workspace диагностики, новый 65536-байтный workspace плана, boot pool и его metadata. На x86 добавлены действующие GDT/IDT/root и известные посещённые старые table pages; на ARM — vectors и PL011 как MMIO. Вложенные диапазоны не считаются повторно. Защита означает запрет будущей выдачи, а не текущие права mapping.
+
+`REVIEW` — остаток диагностических CANDIDATE после вычитания защиты, с причиной `no-transfer`. Его нельзя читать пробами, обнулять, записывать или выдавать. За пределами известного покрытия действует `UNCLASSIFIED`, без вывода о свободной RAM. `OWNERSHIP PASS` означает структурную согласованность заявленного набора; **`granted=0` и передачи владения нет**.
+
+x86 читает только подтверждённые зависимости активного старого CR3: перед чтением вся table/GDT PA-page должна быть RESERVED и вне CANDIDATE; сохраняется узкая предпосылка физического доступа UEFI/OVMF. Реальные `WALK/STEP` позволяют runner воспроизвести GDT translations и identity посещённых table pages. Это частичный набор, поэтому обязательны `unresolved=3` — неполнота старых таблиц и прочих firmware-зависимостей. На ARM `root=0` обозначает фазу MMU off; `unresolved=0` также не разрешает передачу страниц. CR3/MMU/GDT не меняются. Пул присутствует, но не допускается, paging buffers T-P1.4 не собраны.
+
+Новый код пишет metadata только в свой выровненный BSS workspace и использует существующий стек. `ownership-site.json` доказывает полные объекты по PE/map или ELF/BSS/raw Image и SHA; runner независимо пересчитывает защиту/REVIEW и проверяет снимки режима. Invalid-профиль снимает доказательство IMAGE только в собственном input и требует `STYLEOS OWNERSHIP ERROR: required`, без частичного плана или PASS. Правила владельцев, времени жизни, исходных политик UEFI/FDT и будущей фазы своего root — [ADR-0008](docs/adr/0008-physical-memory-ownership-plan.md).
 
 ## Сборка и проверка в Linux
 
@@ -113,7 +131,7 @@ python3 tools/build.py --arch all --output build
 python3 tools/test.py --host
 python3 tools/test.py --repro
 python3 tools/test.py --qemu
-python3 tools/test.py --all --output build/t-p1-4
+python3 tools/test.py --all --output build/t-p1-5
 ```
 
 | Артефакт обычной сборки | Назначение |
@@ -125,12 +143,15 @@ python3 tools/test.py --all --output build/t-p1-4
 | `build/manifest.json` | SHA-256, размеры и параметры сборки |
 | `build/<arch>/pool-site.json` | Полные границы объектов пула, доказанные по связанным артефактам |
 | `build/paging[-fault]/<arch>/paging-site.json` | Резерв, data, fault opcode и SHA отдельного paging-образа |
+| `build/ownership[-invalid]/<arch>/ownership-site.json` | Полные image-owned объекты, признаки профиля и SHA для плана защиты |
 
 Воспроизводимость сравнивает четыре обычных артефакта в двух независимых каталогах с одинаковым toolchain. Иные версии компилятора могут создавать иной код. Бинарники, объектные файлы и firmware не коммитятся.
 
-Протоколы, точные команды, lifecycle QEMU и смысл статусов описаны в [TESTING.md](docs/TESTING.md). Фактические результаты нового этапа публикуются в [отчёте T-P1.4](docs/test-results/t-p1-4/README.md). Сохранённые [T-P1.3](docs/test-results/t-p1-3/README.md), [T-P1.2](docs/test-results/t-p1-2/README.md), [T-P1.1](docs/test-results/t-p1-1/README.md) и [T-P1.0](docs/test-results/t-p1-0/README.md) относятся к своим исходникам и не заменяют новый прогон.
+Протоколы, точные команды, lifecycle QEMU и смысл статусов описаны в [TESTING.md](docs/TESTING.md). Фактические результаты нового этапа публикуются в [отчёте T-P1.5](docs/test-results/t-p1-5/README.md). Сохранённые [T-P1.4](docs/test-results/t-p1-4/README.md), [T-P1.3](docs/test-results/t-p1-3/README.md), [T-P1.2](docs/test-results/t-p1-2/README.md), [T-P1.1](docs/test-results/t-p1-1/README.md) и [T-P1.0](docs/test-results/t-p1-0/README.md) относятся к своим исходникам и не заменяют новый прогон.
 
-Принятая база T-P1.4 — [`877f5e2bb85d484852a627e3a76a4bb956b40d50`](https://github.com/LPYURA2/OS/commit/877f5e2bb85d484852a627e3a76a4bb956b40d50). Код T-P1.3 проверен на `f10ee3313b7d8d428a3207e5bcfff6b93842be09`; последующие коммиты добавили документы и журналы. Его Linux-набор имеет 28/28 PASS, а [отдельный прогон владельца Android/Termux](docs/test-results/t-p1-3/termux/README.md) — 20/20 PASS с QEMU 11.1.3. Это история базы. **T-P1.4 на Android/Termux — SKIPPED** до нового прогона.
+Фактический Linux-прогон T-P1.5: **47/47 PASS**, отдельный Linux ARM64-only — **35/35 PASS**, Python — **138/138 PASS**. Пройдены все семь новых QEMU ownership-сценариев; ни одна REVIEW-страница не передана. Эти результаты не являются Android/Termux, VirtualBox или физическим запуском.
+
+База T-P1.5 — [`8bc7e78592c1aef78429042658f9ae02f71637c5`](https://github.com/LPYURA2/OS/commit/8bc7e78592c1aef78429042658f9ae02f71637c5). Проверенный код T-P1.4 — `68314ee6be30096e70267e6b003fd4cc771dba0e`: Linux 37/37, Linux ARM64-only 27/27, Python 101/101. Новый отчёт владельца T-P1.4 на телефоне не получен; исторический [Android/Termux T-P1.3](docs/test-results/t-p1-3/termux/README.md) имеет 20/20 PASS и учитывается отдельно. **T-P1.5 на Android/Termux — SKIPPED**, Linux ARM64-only не заменяет его.
 
 ## Termux: новый каталог и закреплённый коммит
 
@@ -138,15 +159,15 @@ Termux — host для сборки и эмуляции. Это не устан�
 
 ```sh
 pkg install python clang lld git qemu-system-aarch64-headless
-git clone --branch feature/styleos-t-p1-4 --single-branch https://github.com/LPYURA2/OS.git styleos-tp14
-cd styleos-tp14
-git checkout --detach 68314ee6be30096e70267e6b003fd4cc771dba0e
+git clone --branch feature/styleos-t-p1-5 --single-branch https://github.com/LPYURA2/OS.git styleos-tp15
+cd styleos-tp15
+git checkout --detach __T_P1_5_SHA__
 git rev-parse HEAD
 qemu-system-aarch64 --version
-CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp14
+CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp15
 ```
 
-Используйте новый каталог, оставив прежние результаты как историю. Маршрут не требует OVMF, `lld-link` и x86 QEMU. Runner сам завершает VM и сохраняет `build/termux-tp14/test-results/results.json` и журналы. Нужен полный набор новых логов, особенно `qemu-aarch64-paging[-el2].log`, `qemu-aarch64-paging-fault[-el2].log`, две pool- и две exception-проверки; также `paging-site.json` и manifest новых сборок. Точный список — [TESTING](docs/TESTING.md). Linux ARM64-only не считается результатом Android.
+Замените `__T_P1_5_SHA__` точным опубликованным SHA кода из [отчёта T-P1.5](docs/test-results/t-p1-5/README.md). Используйте новый каталог, оставив прежние результаты как историю. Маршрут не требует OVMF, `lld-link` и x86 QEMU. Runner сам завершает VM и сохраняет `build/termux-tp15/test-results/results.json`, UART и проверенные ownership JSON. Сохраните все логи, manifest и `ownership-site.json` обоих новых вариантов; точный список — [TESTING](docs/TESTING.md). Если воспроизводимо падает база T-P1.4 на телефоне, сначала требуется разобрать это расхождение; новый этап не объявляется принятым поверх него.
 
 ## Ручной запуск и VirtualBox
 
@@ -172,7 +193,7 @@ VBoxManage storageattach StyleOS-TP13 --storagectl SATA --port 0 --device 0 \
 VBoxManage startvm StyleOS-TP13
 ```
 
-Замените пути и имя VM на свои; после halt выключите VM. Ранний вывод идёт в COM1, рабочего стола на VGA нет. VirtualBox и физические устройства для T-P1.4 — **SKIPPED** до отдельного реального испытания. Ручная проверка VirtualBox T-P1.3 самостоятельна и не блокирует QEMU-приёмку T-P1.4.
+Замените пути и имя VM на свои; после halt выключите VM. Ранний вывод идёт в COM1, рабочего стола на VGA нет. VirtualBox и физические устройства для T-P1.5 — **SKIPPED** до отдельного реального испытания. Исторические ручные проверки учитываются отдельно.
 
 ## Карта проекта
 
@@ -181,8 +202,8 @@ OS/
 ├── AGENTS.md                 правила и границы этапов
 ├── Makefile                  оболочки сборки и тестов
 ├── README.md                 этот документ
-├── include/styleos/          boot_info, HAL, evidence, pool, paging, exceptions
-├── kernel/                   общее ядро, карта, пул и отдельные paging-опыты
+├── include/styleos/          boot_info, HAL, evidence, pool, paging, ownership
+├── kernel/                   ядро, карта, пул и отдельные paging/ownership-профили
 ├── boot/x86_64/              UEFI, GetMemoryMap/ExitBootServices
 ├── arch/x86_64/              стек, COM1, IDT, paging и fault entry
 ├── boot/aarch64/             Image/startup, linker, DTB/handoff
@@ -190,7 +211,7 @@ OS/
 ├── tools/                    сборка, GPT/FAT, бинарные доказательства, runner
 ├── tests/                    host C/Python проверки
 └── docs/
-    ├── adr/                  решения T-P1.0–T-P1.4
+    ├── adr/                  решения T-P1.0–T-P1.5
     ├── HISTORY.md            архив MATRYOSHKA и Portable OS
     ├── LEARNING_RU.md        учебная карта кода
     ├── TESTING.md            воспроизводимый протокол
@@ -201,6 +222,6 @@ OS/
 
 ## Ограничения и следующий шаг
 
-Обычный образ сохраняет прежний путь; новые эксперименты проверяют только конечные image-owned таблицы и терминальный translation fault на имеющихся QEMU-профилях. Общий PMM/heap, передача владения RAM, reclaim, recovery исключений, IRQ, SMP, процессы, IPC, драйверная модель, ФС, GUI, `.tea`, APK и EXE не реализованы. Нет W^X и промышленной изоляции. Сохранность данных, разграничение доступа, восстановление, измеряемая производительность и ограниченные модели совместимости остаются целями проекта.
+Обычный образ сохраняет прежний путь. Новый план проверяет заявленный набор защиты и явные зависимости с нулевой выдачей; прежние paging-профили проверяют ограниченную трансляцию и настоящий fault. Общий PMM/heap, передача владения RAM, reclaim, recovery исключений, IRQ, SMP, процессы, IPC, драйверная модель, ФС, GUI, `.tea`, APK и EXE не реализованы. Нет W^X и промышленной изоляции. Сохранность данных, разграничение доступа, восстановление, измеряемая производительность и ограниченные модели совместимости остаются целями проекта.
 
-T-P1.4 публикуется только в `feature/styleos-t-p1-4`: **без обновления main, прежних refs, merge, force push, релиза или изменений Portable-os**. После отчёта работа останавливается. Новая телефонная проверка и следующее решение о владении памятью/архитектуре принадлежат владельцу; этот эксперимент не утверждает модель ядра.
+T-P1.5 публикуется только в `feature/styleos-t-p1-5`: **без обновления main, прежних refs, merge, force push, релиза или изменений Portable-os**. После отчёта работа останавливается. Первый пул из общей RAM, reclaim, собственная GDT и выбор модели ядра требуют отдельных решений владельца.

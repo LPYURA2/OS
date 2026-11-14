@@ -16,7 +16,8 @@ from tools import build
 
 
 MODES = ('--invalid-boot-info', '--invalid-memory-map',
-         '--test-exception', '--test-bootpool', '--test-paging', '--test-paging-fault')
+         '--test-exception', '--test-bootpool', '--test-paging', '--test-paging-fault',
+         '--test-ownership-plan', '--test-ownership-plan-invalid')
 
 
 class BuildModeTests(unittest.TestCase):
@@ -43,7 +44,7 @@ class BuildModeTests(unittest.TestCase):
                 status = error.code
         return status, compile_image, tool
 
-    def test_all_six_test_modes_are_pairwise_exclusive(self):
+    def test_all_eight_test_modes_are_pairwise_exclusive(self):
         for pair in combinations(MODES, 2):
             with self.subTest(pair=pair):
                 status, compile_image, tool = self.invoke(list(pair))
@@ -51,10 +52,12 @@ class BuildModeTests(unittest.TestCase):
                 compile_image.assert_not_called()
                 tool.assert_not_called()
 
-    def test_default_directories_separate_both_dedicated_images(self):
+    def test_default_directories_separate_all_dedicated_images(self):
         for flag, suffix in ((None, ''), ('--test-exception', 'exception'),
                              ('--test-bootpool', 'bootpool'), ('--test-paging', 'paging'),
-                             ('--test-paging-fault', 'paging-fault')):
+                             ('--test-paging-fault', 'paging-fault'),
+                             ('--test-ownership-plan', 'ownership'),
+                             ('--test-ownership-plan-invalid', 'ownership-invalid')):
             with self.subTest(flag=flag):
                 status, compile_image, _ = self.invoke([] if flag is None else [flag])
                 self.assertEqual(status, 0)
@@ -67,12 +70,17 @@ class BuildModeTests(unittest.TestCase):
                     self.assertEqual(call.args[2:],
                                      (False, False, flag == '--test-exception',
                                       flag == '--test-bootpool', flag == '--test-paging',
-                                      flag == '--test-paging-fault'))
+                                      flag == '--test-paging-fault',
+                                      flag == '--test-ownership-plan',
+                                      flag == '--test-ownership-plan-invalid'))
                 manifest = json.loads((output / 'manifest.json').read_text())
                 self.assertEqual(manifest['test_exception'], flag == '--test-exception')
                 self.assertEqual(manifest['test_bootpool'], flag == '--test-bootpool')
                 self.assertEqual(manifest['test_paging'], flag == '--test-paging')
                 self.assertEqual(manifest['test_paging_fault'], flag == '--test-paging-fault')
+                self.assertEqual(manifest['test_ownership_plan'], flag == '--test-ownership-plan')
+                self.assertEqual(manifest['test_ownership_plan_invalid'],
+                                 flag == '--test-ownership-plan-invalid')
 
     def test_dedicated_images_reject_explicit_ordinary_output(self):
         for flag in MODES[2:]:
@@ -92,7 +100,8 @@ class BuildModeTests(unittest.TestCase):
                 self.assertEqual(status, 0)
                 compile_image.assert_called_once_with('aarch64', output.resolve(),
                     False, False, flag == '--test-exception', flag == '--test-bootpool',
-                    flag == '--test-paging', flag == '--test-paging-fault')
+                    flag == '--test-paging', flag == '--test-paging-fault',
+                    flag == '--test-ownership-plan', flag == '--test-ownership-plan-invalid')
 
     def test_page_writes_and_test_define_only_enter_bootpool_images(self):
         for arch in ('x86_64', 'aarch64'):
@@ -151,13 +160,84 @@ class BuildModeTests(unittest.TestCase):
                     self.assertEqual(ROOT / f'arch/{arch}/paging_fault.S' in sources,
                                      mode == 'paging-fault')
                     self.assertNotIn(ROOT / 'kernel/boot_pool_selftest.c', sources)
+                    for path in ('kernel/ownership.c', 'kernel/ownership_plan.c',
+                                 f'arch/{arch}/ownership.c'):
+                        self.assertNotIn(ROOT / path, sources)
                     for cmd in compiles:
                         self.assertEqual('-DSTYLEOS_TEST_PAGING=1' in cmd, mode != 'normal')
                         self.assertEqual('-DSTYLEOS_TEST_PAGING_FAULT=1' in cmd,
                                          mode == 'paging-fault')
                         for define in ('EXCEPTION', 'BOOTPOOL', 'INVALID_BOOT_INFO',
-                                       'INVALID_MEMORY_MAP'):
+                                       'INVALID_MEMORY_MAP', 'OWNERSHIP', 'OWNERSHIP_INVALID'):
                             self.assertNotIn(f'-DSTYLEOS_TEST_{define}=1', cmd)
+
+
+    def test_ownership_code_and_refusal_only_enter_dedicated_profiles(self):
+        for arch in ('x86_64', 'aarch64'):
+            for mode in ('normal', 'ownership', 'ownership-invalid'):
+                with self.subTest(arch=arch, mode=mode):
+                    output = self.root / (arch + mode)
+                    folder = output / arch
+                    folder.mkdir(parents=True)
+                    for artifact in (('BOOTX64.EFI', 'styleos.img') if arch == 'x86_64'
+                                     else ('kernel.elf', 'styleos.bin')):
+                        (folder / artifact).write_bytes(b'fixture command isolation bytes')
+                    with (patch.object(build, 'tool', return_value='/fake/tool'),
+                          patch.object(build, 'run') as commands,
+                          patch.dict(sys.modules, {
+                              'pool_site': types.SimpleNamespace(describe_pool=Mock(return_value={})),
+                              'ownership_site': types.SimpleNamespace(
+                                  describe_ownership=Mock(return_value={}))})):
+                        build.build(arch, output, test_ownership_plan=mode == 'ownership',
+                                    test_ownership_plan_invalid=mode == 'ownership-invalid')
+                    compiles = [call.args[0] for call in commands.call_args_list
+                                if '-c' in call.args[0]]
+                    sources = [Path(cmd[cmd.index('-c') + 1]) for cmd in compiles]
+                    for path in ('kernel/ownership.c', 'kernel/ownership_plan.c',
+                                 f'arch/{arch}/ownership.c'):
+                        self.assertEqual(ROOT / path in sources, mode != 'normal')
+                    for path in ('kernel/paging.c', 'kernel/paging_admission.c',
+                                 'kernel/paging_experiment.c', 'kernel/boot_pool_selftest.c',
+                                 f'arch/{arch}/paging.c', f'arch/{arch}/paging_fault.S'):
+                        self.assertNotIn(ROOT / path, sources)
+                    for cmd in compiles:
+                        self.assertEqual('-DSTYLEOS_TEST_OWNERSHIP=1' in cmd,
+                                         mode != 'normal')
+                        self.assertEqual('-DSTYLEOS_TEST_OWNERSHIP_INVALID=1' in cmd,
+                                         mode == 'ownership-invalid')
+                        for define in ('EXCEPTION', 'BOOTPOOL', 'PAGING', 'PAGING_FAULT',
+                                       'INVALID_BOOT_INFO', 'INVALID_MEMORY_MAP'):
+                            self.assertNotIn(f'-DSTYLEOS_TEST_{define}=1', cmd)
+
+
+    def test_every_legacy_profile_excludes_ownership_code_and_defines(self):
+        for arch in ('x86_64', 'aarch64'):
+            for index in range(7):
+                with self.subTest(arch=arch, legacy_mode=index):
+                    output = self.root / f'legacy-{arch}-{index}'
+                    folder = output / arch
+                    folder.mkdir(parents=True)
+                    data = b'fixture static bytes'
+                    for artifact in (('BOOTX64.EFI', 'styleos.img') if arch == 'x86_64'
+                                     else ('kernel.elf', 'styleos.bin')):
+                        (folder / artifact).write_bytes(data)
+                    modes = [False] * 6
+                    if index:
+                        modes[index - 1] = True
+                    with (patch.object(build, 'tool', return_value='/fake/tool'),
+                          patch.object(build, 'run') as commands,
+                          patch.dict(sys.modules, {
+                              'pool_site': types.SimpleNamespace(describe_pool=Mock(return_value={})),
+                              'paging_site': types.SimpleNamespace(describe_paging=Mock(return_value={})),
+                              'fault_site': types.SimpleNamespace(describe_fault=Mock(return_value={
+                                  'image_offset': 0, 'instruction_hex': data[:4].hex()}))})):
+                        build.build(arch, output, *modes)
+                    for call in commands.call_args_list:
+                        cmd = call.args[0]
+                        if '-c' not in cmd:
+                            continue
+                        self.assertNotIn('ownership', str(cmd[cmd.index('-c') + 1]))
+                        self.assertFalse(any('STYLEOS_TEST_OWNERSHIP' in str(arg) for arg in cmd))
 
 
 if __name__ == '__main__':
