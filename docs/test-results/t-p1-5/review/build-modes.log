@@ -1,0 +1,12 @@
+test_all_eight_test_modes_are_pairwise_exclusive (test_build_modes.BuildModeTests.test_all_eight_test_modes_are_pairwise_exclusive) ... ok
+test_custom_dedicated_output_preserves_requested_arch_and_mode (test_build_modes.BuildModeTests.test_custom_dedicated_output_preserves_requested_arch_and_mode) ... ok
+test_dedicated_images_reject_explicit_ordinary_output (test_build_modes.BuildModeTests.test_dedicated_images_reject_explicit_ordinary_output) ... ok
+test_default_directories_separate_all_dedicated_images (test_build_modes.BuildModeTests.test_default_directories_separate_all_dedicated_images) ... ok
+test_ownership_code_and_refusal_only_enter_dedicated_profiles (test_build_modes.BuildModeTests.test_ownership_code_and_refusal_only_enter_dedicated_profiles) ... ok
+test_page_writes_and_test_define_only_enter_bootpool_images (test_build_modes.BuildModeTests.test_page_writes_and_test_define_only_enter_bootpool_images) ... ok
+test_paging_reserve_and_injection_only_enter_their_dedicated_images (test_build_modes.BuildModeTests.test_paging_reserve_and_injection_only_enter_their_dedicated_images) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.102s
+
+OK

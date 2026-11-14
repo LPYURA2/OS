@@ -1,0 +1,22 @@
+$ cc -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_ownership.c kernel/ownership.c kernel/boot_memory.c -o /workspace/OS/build/t-p1-5-host-review/host-tests/host-ownership
+In function ‘overlaps’,
+    inlined from ‘check_claims’ at kernel/ownership.c:262:22,
+    inlined from ‘op_build’ at kernel/ownership.c:475:48:
+kernel/ownership.c:14:28: error: ‘gdt.start’ may be used uninitialized [-Werror=maybe-uninitialized]
+   14 |     return a.start < b.end && b.start < a.end;
+      |            ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~
+kernel/ownership.c: In function ‘op_build’:
+kernel/ownership.c:237:23: note: ‘gdt.start’ was declared here
+  237 |     struct boot_range gdt;
+      |                       ^~~
+In function ‘overlaps’,
+    inlined from ‘check_claims’ at kernel/ownership.c:262:22,
+    inlined from ‘op_build’ at kernel/ownership.c:475:48:
+kernel/ownership.c:14:28: error: ‘gdt.end’ may be used uninitialized [-Werror=maybe-uninitialized]
+   14 |     return a.start < b.end && b.start < a.end;
+      |            ~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~
+kernel/ownership.c: In function ‘op_build’:
+kernel/ownership.c:237:23: note: ‘gdt.end’ was declared here
+  237 |     struct boot_range gdt;
+      |                       ^~~
+cc1: all warnings being treated as errors

@@ -1,0 +1,413 @@
+{
+  "arch": "x86_64",
+  "mode": "ownership",
+  "initial_el2": false,
+  "ram_mib": 128,
+  "status": "PASS",
+  "uart_sha256": "e91286e178a86cd9de8e337710e63e43adf83904c6524f9857c0322600a517d1",
+  "manifest_sha256": "5185f39d8a27ef2e586878618bc917d263b08a94ef5c01c72eac28144ff54008",
+  "ownership_site": {
+    "arch": "x86_64",
+    "address_space": "image-rva",
+    "image_start": 0,
+    "image_end": 245760,
+    "image_size": 245760,
+    "preferred_image_base": 5368709120,
+    "binary_sha256": "9708d5cfc606340cdf342bd292a19cf57a79c492359a6247159cf0cf38e145ba",
+    "map_sha256": "037a51bab07932d8a2188bbc889de2d58f7e3861056675c7d28d06e41dd217d2",
+    "objects": {
+      "workspace": {
+        "symbol": "styleos_ownership_workspace",
+        "start": 102400,
+        "end": 167936,
+        "bytes": 65536
+      },
+      "diagnostic": {
+        "symbol": "diagnostic",
+        "start": 49248,
+        "end": 61648,
+        "bytes": 12400
+      },
+      "stack": {
+        "symbol": "styleos_stack_bottom",
+        "start": 167952,
+        "end": 233488,
+        "bytes": 65536
+      },
+      "idt": {
+        "symbol": "early_idt",
+        "start": 233488,
+        "end": 237584,
+        "bytes": 4096
+      },
+      "handoff": {
+        "symbol": "handoff",
+        "start": 49152,
+        "end": 49248,
+        "bytes": 96
+      },
+      "pool": {
+        "symbol": "styleos_bootpool_storage",
+        "start": 65536,
+        "end": 98304,
+        "bytes": 32768
+      },
+      "pool_metadata": {
+        "symbol": "styleos_bootpool_metadata",
+        "start": 98304,
+        "end": 102400,
+        "bytes": 4096
+      }
+    },
+    "page_size": 4096,
+    "invalid": false,
+    "disk_sha256": "d1d4c3e7c12edad944de9de4ab5e1dbc78b819449ab0f8b0fa13110a6848f482"
+  },
+  "ownership_plan": {
+    "arch": "x86_64",
+    "phase": "inherited",
+    "source": "uefi",
+    "protected": [
+      {
+        "start": 8388608,
+        "end": 8421376
+      },
+      {
+        "start": 8433664,
+        "end": 8437760
+      },
+      {
+        "start": 8458240,
+        "end": 24641536
+      },
+      {
+        "start": 62308352,
+        "end": 62439424
+      },
+      {
+        "start": 100683776,
+        "end": 100929536
+      },
+      {
+        "start": 100974592,
+        "end": 132120576
+      },
+      {
+        "start": 132575232,
+        "end": 134217728
+      },
+      {
+        "start": 3758096384,
+        "end": 4026531840
+      },
+      {
+        "start": 4290772992,
+        "end": 4294967296
+      },
+      {
+        "start": 1086626725888,
+        "end": 1099511627776
+      }
+    ],
+    "review": [
+      {
+        "start": 0,
+        "end": 655360,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 1048576,
+        "end": 8388608,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 8421376,
+        "end": 8433664,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 8437760,
+        "end": 8458240,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 24641536,
+        "end": 62308352,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 62439424,
+        "end": 100683776,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 100929536,
+        "end": 100974592,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 132120576,
+        "end": 132575232,
+        "reason": "no-transfer"
+      }
+    ],
+    "claims": [
+      {
+        "kind": "IMAGE",
+        "proof": "IMAGE_IDENTITY",
+        "va": 100683776,
+        "pa": 100683776,
+        "bytes": 245760
+      },
+      {
+        "kind": "STACK",
+        "proof": "IMAGE_IDENTITY",
+        "va": 100851728,
+        "pa": 100851728,
+        "bytes": 65536
+      },
+      {
+        "kind": "HANDOFF",
+        "proof": "IMAGE_IDENTITY",
+        "va": 100732928,
+        "pa": 100732928,
+        "bytes": 96
+      },
+      {
+        "kind": "SOURCE_BUFFER",
+        "proof": "BOOT_SOURCE",
+        "va": 108720152,
+        "pa": 108720152,
+        "bytes": 5376
+      },
+      {
+        "kind": "MAP_WORKSPACE",
+        "proof": "IMAGE_IDENTITY",
+        "va": 100733024,
+        "pa": 100733024,
+        "bytes": 12400
+      },
+      {
+        "kind": "OWN_WORKSPACE",
+        "proof": "IMAGE_IDENTITY",
+        "va": 100786176,
+        "pa": 100786176,
+        "bytes": 65536
+      },
+      {
+        "kind": "BOOT_POOL",
+        "proof": "IMAGE_IDENTITY",
+        "va": 100749312,
+        "pa": 100749312,
+        "bytes": 32768
+      },
+      {
+        "kind": "POOL_METADATA",
+        "proof": "IMAGE_IDENTITY",
+        "va": 100782080,
+        "pa": 100782080,
+        "bytes": 4096
+      },
+      {
+        "kind": "ROOT",
+        "proof": "REGISTER",
+        "va": 0,
+        "pa": 125833216,
+        "bytes": 4096
+      },
+      {
+        "kind": "OLD_TABLE",
+        "proof": "OLD_WALK",
+        "va": 125833216,
+        "pa": 125833216,
+        "bytes": 4096
+      },
+      {
+        "kind": "OLD_TABLE",
+        "proof": "OLD_WALK",
+        "va": 125837312,
+        "pa": 125837312,
+        "bytes": 4096
+      },
+      {
+        "kind": "OLD_TABLE",
+        "proof": "OLD_WALK",
+        "va": 125841408,
+        "pa": 125841408,
+        "bytes": 4096
+      },
+      {
+        "kind": "GDT",
+        "proof": "OLD_WALK",
+        "va": 123584512,
+        "pa": 123584512,
+        "bytes": 4096
+      },
+      {
+        "kind": "IDT",
+        "proof": "OLD_WALK",
+        "va": 100917264,
+        "pa": 100917264,
+        "bytes": 4096
+      }
+    ],
+    "walks": [
+      {
+        "kind": "GDT",
+        "va": 123584512,
+        "pa": 123584512,
+        "levels": 3,
+        "steps": [
+          {
+            "level": 0,
+            "table": 125833216,
+            "entry": 125837347
+          },
+          {
+            "level": 1,
+            "table": 125837312,
+            "entry": 125841443
+          },
+          {
+            "level": 2,
+            "table": 125841408,
+            "entry": 121635043
+          }
+        ]
+      },
+      {
+        "kind": "TABLE",
+        "va": 125833216,
+        "pa": 125833216,
+        "levels": 3,
+        "steps": [
+          {
+            "level": 0,
+            "table": 125833216,
+            "entry": 125837347
+          },
+          {
+            "level": 1,
+            "table": 125837312,
+            "entry": 125841443
+          },
+          {
+            "level": 2,
+            "table": 125841408,
+            "entry": 125829345
+          }
+        ]
+      },
+      {
+        "kind": "TABLE",
+        "va": 125837312,
+        "pa": 125837312,
+        "levels": 3,
+        "steps": [
+          {
+            "level": 0,
+            "table": 125833216,
+            "entry": 125837347
+          },
+          {
+            "level": 1,
+            "table": 125837312,
+            "entry": 125841443
+          },
+          {
+            "level": 2,
+            "table": 125841408,
+            "entry": 125829345
+          }
+        ]
+      },
+      {
+        "kind": "TABLE",
+        "va": 125841408,
+        "pa": 125841408,
+        "levels": 3,
+        "steps": [
+          {
+            "level": 0,
+            "table": 125833216,
+            "entry": 125837347
+          },
+          {
+            "level": 1,
+            "table": 125837312,
+            "entry": 125841443
+          },
+          {
+            "level": 2,
+            "table": 125841408,
+            "entry": 125829345
+          }
+        ]
+      }
+    ],
+    "unclassified": "outside-covered-union",
+    "granted": 0,
+    "workspace": {
+      "pa": 100786176,
+      "bytes": 65536
+    },
+    "source_data": {
+      "pa": 108720152,
+      "bytes": 5376,
+      "stride": 48,
+      "version": 1
+    },
+    "state_before": {
+      "mode": 2147549235,
+      "root": 125833216,
+      "aux0": 1640,
+      "aux1": 3328,
+      "pat": 1974748653749254,
+      "rflags": 6,
+      "bits": 40,
+      "features": 1,
+      "gdt_va": 123584512,
+      "gdt_bytes": 72,
+      "idt_va": 100917264,
+      "idt_bytes": 4096,
+      "cs": 56
+    },
+    "unresolved": {
+      "flags": 3,
+      "dependencies": [
+        "inherited-table-set-incomplete",
+        "other-firmware-state"
+      ]
+    },
+    "totals": {
+      "protected": 3224345,
+      "review": 20615,
+      "granted": 0
+    },
+    "state_after": {
+      "mode": 2147549235,
+      "root": 125833216,
+      "aux0": 1640,
+      "aux1": 3328,
+      "pat": 1974748653749254,
+      "rflags": 6,
+      "bits": 40,
+      "features": 1,
+      "gdt_va": 123584512,
+      "gdt_bytes": 72,
+      "idt_va": 100917264,
+      "idt_bytes": 4096,
+      "cs": 56
+    },
+    "inactive": {
+      "paging": "not-built",
+      "pool": "not-admitted"
+    }
+  },
+  "refusal": null,
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "settled": true,
+  "returncode": 0
+}

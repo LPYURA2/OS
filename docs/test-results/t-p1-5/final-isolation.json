@@ -1,0 +1,86 @@
+{
+  "normal": {
+    "x86_64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    },
+    "aarch64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    }
+  },
+  "invalid": {
+    "x86_64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    },
+    "aarch64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    }
+  },
+  "invalid-map": {
+    "x86_64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    },
+    "aarch64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    }
+  },
+  "exception": {
+    "x86_64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    },
+    "aarch64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    }
+  },
+  "bootpool": {
+    "x86_64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    },
+    "aarch64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    }
+  },
+  "paging": {
+    "x86_64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    },
+    "aarch64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    }
+  },
+  "paging-fault": {
+    "x86_64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    },
+    "aarch64": {
+      "ownership_symbols_absent": true,
+      "ownership_diagnostics_absent": true,
+      "ownership_objects_absent": true
+    }
+  }
+}

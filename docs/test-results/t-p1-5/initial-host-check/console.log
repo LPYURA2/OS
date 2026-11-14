@@ -1,0 +1,8 @@
+host-boot-info: PASS — exit 0
+host-uefi: PASS — exit 0
+host-exception: PASS — exit 0
+host-pool: PASS — exit 0
+host-paging: PASS — exit 0
+host-ownership: FAIL — exit 1
+host-memory: PASS — exit 0
+host-python: PASS — exit 0

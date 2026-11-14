@@ -1,0 +1,22 @@
+test_arm_complete_workspace_stack_vectors_and_input_hashes (test_ownership_site.OwnershipSiteTests.test_arm_complete_workspace_stack_vectors_and_input_hashes) ... ok
+test_arm_missing_duplicate_and_static_local_diagnostic (test_ownership_site.OwnershipSiteTests.test_arm_missing_duplicate_and_static_local_diagnostic) ... ok
+test_arm_raw_header_and_executable_content_must_match (test_ownership_site.OwnershipSiteTests.test_arm_raw_header_and_executable_content_must_match) ... ok
+test_arm_rejects_truncated_bss_section_load_and_image_tail (test_ownership_site.OwnershipSiteTests.test_arm_rejects_truncated_bss_section_load_and_image_tail) ... ok
+test_arm_rejects_workspace_full_end_misplacement_and_overlaps (test_ownership_site.OwnershipSiteTests.test_arm_rejects_workspace_full_end_misplacement_and_overlaps) ... ok
+test_arm_rejects_wrong_diagnostic_stack_and_executable_vectors (test_ownership_site.OwnershipSiteTests.test_arm_rejects_wrong_diagnostic_stack_and_executable_vectors) ... ok
+test_arm_rejects_wrong_workspace_size_alignment_kind_and_binding (test_ownership_site.OwnershipSiteTests.test_arm_rejects_wrong_workspace_size_alignment_kind_and_binding) ... ok
+test_invalid_profile_keeps_full_static_proof (test_ownership_site.OwnershipSiteTests.test_invalid_profile_keeps_full_static_proof) ... ok
+test_overlapping_loads_and_sections_are_not_complete_unique_proofs (test_ownership_site.OwnershipSiteTests.test_overlapping_loads_and_sections_are_not_complete_unique_proofs) ... ok
+test_pe_rejects_section_image_and_header_truncation (test_ownership_site.OwnershipSiteTests.test_pe_rejects_section_image_and_header_truncation) ... ok
+test_pe_rejects_workspace_full_end_misplacement_alignment_and_overlap (test_ownership_site.OwnershipSiteTests.test_pe_rejects_workspace_full_end_misplacement_alignment_and_overlap) ... ok
+test_pe_rvas_static_symbols_and_input_hashes (test_ownership_site.OwnershipSiteTests.test_pe_rvas_static_symbols_and_input_hashes) ... ok
+test_pe_static_origin_disambiguation_and_bad_map_rows (test_ownership_site.OwnershipSiteTests.test_pe_static_origin_disambiguation_and_bad_map_rows) ... ok
+test_pe_zero_prefix_and_virtual_tail_prove_complete_workspace (test_ownership_site.OwnershipSiteTests.test_pe_zero_prefix_and_virtual_tail_prove_complete_workspace) ... ok
+test_rejects_paging_buffers_and_fault_symbols_in_either_profile (test_ownership_site.OwnershipSiteTests.test_rejects_paging_buffers_and_fault_symbols_in_either_profile) ... ok
+test_requires_arch_sidecars_regular_files_and_full_headers (test_ownership_site.OwnershipSiteTests.test_requires_arch_sidecars_regular_files_and_full_headers) ... ok
+test_sidecar_hash_changes_with_equivalent_map_evidence (test_ownership_site.OwnershipSiteTests.test_sidecar_hash_changes_with_equivalent_map_evidence) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.073s
+
+OK

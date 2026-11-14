@@ -1,0 +1,67 @@
+{
+  "arch": "aarch64",
+  "mode": "ownership-invalid",
+  "initial_el2": false,
+  "ram_mib": 128,
+  "status": "PASS",
+  "uart_sha256": "9606c420565c75381b56d1eea652c54ee16e720d868f893216ab28637d27922a",
+  "manifest_sha256": "0b0f49abd48aa7da5965db6bf4452fc0f47c36a000f365bf7709391769ee9acd",
+  "ownership_site": {
+    "arch": "aarch64",
+    "address_space": "identity-image-address",
+    "image_start": 1074266112,
+    "image_end": 1074483200,
+    "image_size": 217088,
+    "bss_start": 1074298880,
+    "bss_end": 1074483200,
+    "binary_sha256": "172ed21a9b4fbbc9cdbc2cc6f4137247b145dc988feb0e29fef68954e5c49cc2",
+    "raw_sha256": "46d01a410a71c4eaed7fc29eb2a659dbfb8262f07b4c5f0ced045c4ca1e295cb",
+    "objects": {
+      "workspace": {
+        "symbol": "styleos_ownership_workspace",
+        "start": 1074352128,
+        "end": 1074417664,
+        "bytes": 65536
+      },
+      "diagnostic": {
+        "symbol": "diagnostic",
+        "start": 1074298880,
+        "end": 1074311280,
+        "bytes": 12400
+      },
+      "stack": {
+        "symbol": "__stack_bottom",
+        "start": 1074417664,
+        "end": 1074483200,
+        "bytes": 65536
+      },
+      "vectors": {
+        "symbol": "aarch64_vectors",
+        "start": 1074268160,
+        "end": 1074270208,
+        "bytes": 2048
+      },
+      "pool": {
+        "symbol": "styleos_bootpool_storage",
+        "start": 1074315264,
+        "end": 1074348032,
+        "bytes": 32768
+      },
+      "pool_metadata": {
+        "symbol": "styleos_bootpool_metadata",
+        "start": 1074348032,
+        "end": 1074352128,
+        "bytes": 4096
+      }
+    },
+    "page_size": 4096,
+    "invalid": true
+  },
+  "ownership_plan": null,
+  "refusal": "required",
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "settled": true,
+  "returncode": 0
+}

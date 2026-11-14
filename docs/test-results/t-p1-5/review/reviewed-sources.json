@@ -1,0 +1,27 @@
+{
+  "utc": "2026-11-14T15:23:17.544958+00:00",
+  "base": "8bc7e78592c1aef78429042658f9ae02f71637c5",
+  "sources": {
+    "include/styleos/ownership.h": "01a4b69123d4516ba7f2148f49c87148d0029eaa0674f9eecd5b16efa1398688",
+    "kernel/ownership.c": "60fccd3d7474a7d297f3bfaa31ee26153fd73f50fa9414343eeea93c49976f90",
+    "kernel/ownership_plan.c": "48420b2ba4aa50657744ffc95c4e3dff24b9b5949f1928da83324fdf9dc26f5b",
+    "arch/x86_64/ownership.c": "239aaf03ead9ce7d02ba1ee2a69d3c72fbe58b4c75a838f5f518a5e5a2c2150b",
+    "arch/aarch64/ownership.c": "2dcb191560de2cdbfced40e23dcafada13ddfb17f342d692a271efa4afc6346c",
+    "kernel/main.c": "882f7e688473e8336f1ff6c83ccd2eac2b31276c318235295a07559fc24d53fa",
+    "tools/ownership_site.py": "48f3f14d055b1b8c22c2d400583f1cc3a2afb0b92035104b23e3b3fa8c57fb55",
+    "tools/build.py": "6f285ab1d376253f5cd4d85f7279b2b0dc0e30eb5b69c8616fd1a2e4b20d3e9f",
+    "tools/test.py": "5d04dccfe6330a8996991078cc8a5ce124c6f134d17c94e9c3247d92a58ba9c1",
+    "tests/test_ownership.c": "b48baa98f78d3291e5d145e4a044ce436aa7c3bda60d7176243aa80f2aa4ad9d",
+    "tests/test_ownership_x86.c": "e5f2d5775493e612b80d50648f3d8c94e5526f9b880b57c01f84ceb99efb63ef",
+    "tests/test_ownership_site.py": "6a0f0fae55a9928cc58ea81e52d0bcf1c3fd7c2d75eb1f65b07b51ad76a9ba28",
+    "tests/test_ownership_output.py": "1025a2c51e4f358720f7ce4fbb7b0041c274379d89df76bea8bbe55cf10b79f4",
+    "tests/test_build_modes.py": "14394fe6d6aada86a0b5f6cdc26750cd44095b90e7aaba86ca788106659e79ac"
+  },
+  "documentation": {
+    "README.md": "7426fe8292ce5b331fd40c0e6b588f890236b13dbee8c5b6beacd4e4befb70f2",
+    "AGENTS.md": "f937289a8259c356117de775c38a848bf6965c145f6045a7f165d8b54d898328",
+    "docs/TESTING.md": "5a1da1e04f643dffdd9d957e4af88d08bff873859f29924fa08f53fa025dc321",
+    "docs/LEARNING_RU.md": "197889576c71800b6617fb7af34b73fa3a580d49503fb6169d6294208784a519",
+    "docs/adr/0008-physical-memory-ownership-plan.md": "f6e4e52c34f5203cb368c3292f68864b3d343db3e3e757bec0ab454b240b5698"
+  }
+}

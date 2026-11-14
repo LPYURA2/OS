@@ -1,0 +1,116 @@
+[
+  {
+    "job": "qemu-aarch64-ownership-256m",
+    "negative": false,
+    "phase": "mmu-off",
+    "root": "0x0",
+    "unresolved": 0,
+    "granted": 0,
+    "protected_ranges": 3,
+    "review_ranges": 3,
+    "walks": 0,
+    "ram": [
+      [
+        1073741824,
+        1342177280
+      ]
+    ]
+  },
+  {
+    "job": "qemu-aarch64-ownership-el2",
+    "negative": false,
+    "phase": "mmu-off",
+    "root": "0x0",
+    "unresolved": 0,
+    "granted": 0,
+    "protected_ranges": 3,
+    "review_ranges": 3,
+    "walks": 0,
+    "ram": [
+      [
+        1073741824,
+        1207959552
+      ]
+    ]
+  },
+  {
+    "job": "qemu-aarch64-ownership-invalid-el2",
+    "negative": true,
+    "refusal": "required",
+    "partial_plan": false
+  },
+  {
+    "job": "qemu-aarch64-ownership-invalid",
+    "negative": true,
+    "refusal": "required",
+    "partial_plan": false
+  },
+  {
+    "job": "qemu-aarch64-ownership",
+    "negative": false,
+    "phase": "mmu-off",
+    "root": "0x0",
+    "unresolved": 0,
+    "granted": 0,
+    "protected_ranges": 3,
+    "review_ranges": 3,
+    "walks": 0,
+    "ram": [
+      [
+        1073741824,
+        1207959552
+      ]
+    ]
+  },
+  {
+    "job": "qemu-x86_64-ownership-invalid",
+    "negative": true,
+    "refusal": "required",
+    "partial_plan": false
+  },
+  {
+    "job": "qemu-x86_64-ownership",
+    "negative": false,
+    "phase": "inherited",
+    "root": "0x7801000",
+    "unresolved": 3,
+    "granted": 0,
+    "protected_ranges": 10,
+    "review_ranges": 8,
+    "walks": 4,
+    "ram": [
+      [
+        0,
+        655360
+      ],
+      [
+        1048576,
+        8388608
+      ],
+      [
+        8421376,
+        8433664
+      ],
+      [
+        8437760,
+        8458240
+      ],
+      [
+        24641536,
+        62308352
+      ],
+      [
+        62439424,
+        100683776
+      ],
+      [
+        100929536,
+        100974592
+      ],
+      [
+        132120576,
+        132575232
+      ]
+    ]
+  }
+]

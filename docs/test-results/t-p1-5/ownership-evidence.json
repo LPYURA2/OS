@@ -1,0 +1,131 @@
+[
+  {
+    "name": "qemu-x86_64-ownership",
+    "status": "PASS",
+    "log_sha256": "fda5da7801c5860ac52a1d0a3c3d3f21fb7dfaf907596fda8a53d6e12c5c197c",
+    "mode": "ownership",
+    "phase": "inherited",
+    "source": "uefi",
+    "root": 125833216,
+    "totals": {
+      "protected": 3224345,
+      "review": 20615,
+      "granted": 0
+    },
+    "unresolved": {
+      "flags": 3,
+      "dependencies": [
+        "inherited-table-set-incomplete",
+        "other-firmware-state"
+      ]
+    },
+    "walks": 4,
+    "refusal": null,
+    "json": "qemu-x86_64-ownership.json"
+  },
+  {
+    "name": "qemu-x86_64-ownership-invalid",
+    "status": "PASS",
+    "log_sha256": "19d55edb1c7f4fac43fe96deab141e48fbc8a12489f411968a218246b87048f6",
+    "mode": "ownership-invalid",
+    "phase": null,
+    "source": null,
+    "root": null,
+    "totals": null,
+    "unresolved": null,
+    "walks": null,
+    "refusal": "required",
+    "json": "qemu-x86_64-ownership-invalid.json"
+  },
+  {
+    "name": "qemu-aarch64-ownership",
+    "status": "PASS",
+    "log_sha256": "f71268a57d00872863b8db87906d6b74abe5fe5a0e089adb96785f33888a48e9",
+    "mode": "ownership",
+    "phase": "mmu-off",
+    "source": "fdt",
+    "root": 0,
+    "totals": {
+      "protected": 311,
+      "review": 32458,
+      "granted": 0
+    },
+    "unresolved": {
+      "flags": 0,
+      "dependencies": []
+    },
+    "walks": 0,
+    "refusal": null,
+    "json": "qemu-aarch64-ownership.json"
+  },
+  {
+    "name": "qemu-aarch64-ownership-el2",
+    "status": "PASS",
+    "log_sha256": "cf2b2edc4ce5d169a8c8f4583c802f515b9d3cd329d38d1b139bdb48f4cfe089",
+    "mode": "ownership",
+    "phase": "mmu-off",
+    "source": "fdt",
+    "root": 0,
+    "totals": {
+      "protected": 311,
+      "review": 32458,
+      "granted": 0
+    },
+    "unresolved": {
+      "flags": 0,
+      "dependencies": []
+    },
+    "walks": 0,
+    "refusal": null,
+    "json": "qemu-aarch64-ownership-el2.json"
+  },
+  {
+    "name": "qemu-aarch64-ownership-256m",
+    "status": "PASS",
+    "log_sha256": "cddbcd0ab0597882d15329ac704b619af57af2ede966b6d0a1795841efbeee0c",
+    "mode": "ownership",
+    "phase": "mmu-off",
+    "source": "fdt",
+    "root": 0,
+    "totals": {
+      "protected": 311,
+      "review": 65226,
+      "granted": 0
+    },
+    "unresolved": {
+      "flags": 0,
+      "dependencies": []
+    },
+    "walks": 0,
+    "refusal": null,
+    "json": "qemu-aarch64-ownership-256m.json"
+  },
+  {
+    "name": "qemu-aarch64-ownership-invalid",
+    "status": "PASS",
+    "log_sha256": "b7ea1c4ece51c4266dde59f6f9eb61f2ef6bbeb99898673ff94adf420171e678",
+    "mode": "ownership-invalid",
+    "phase": null,
+    "source": null,
+    "root": null,
+    "totals": null,
+    "unresolved": null,
+    "walks": null,
+    "refusal": "required",
+    "json": "qemu-aarch64-ownership-invalid.json"
+  },
+  {
+    "name": "qemu-aarch64-ownership-invalid-el2",
+    "status": "PASS",
+    "log_sha256": "7ee8fa049d7da1d69352ca1d205f78725763d2175c9ae4c1bf0a7959fb2ae601",
+    "mode": "ownership-invalid",
+    "phase": null,
+    "source": null,
+    "root": null,
+    "totals": null,
+    "unresolved": null,
+    "walks": null,
+    "refusal": "required",
+    "json": "qemu-aarch64-ownership-invalid-el2.json"
+  }
+]

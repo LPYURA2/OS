@@ -1,0 +1,69 @@
+{
+  "arch": "aarch64",
+  "mode": "paging",
+  "initial_el2": false,
+  "ram_mib": 128,
+  "status": "PASS",
+  "uart_sha256": "62ce429224bdc8b3bd7bb42fb89ab2377137a3a374604ad80470fd8446909b27",
+  "manifest_sha256": "2beedb54b7aa4ba5b5a11017d3c6a759c97092d21331b978ed71c51160f2308e",
+  "paging_site": {
+    "objects": {
+      "tables": {
+        "symbol": "styleos_paging_tables",
+        "start": 1074356224,
+        "end": 1074487296,
+        "bytes": 131072,
+        "section": ".bss"
+      },
+      "control": {
+        "symbol": "styleos_paging_control",
+        "start": 1074487296,
+        "end": 1074491392,
+        "bytes": 4096,
+        "section": ".bss"
+      },
+      "data": {
+        "symbol": "styleos_paging_data",
+        "start": 1074298880,
+        "end": 1074302976,
+        "bytes": 4096,
+        "section": ".data"
+      }
+    },
+    "boot_pool": {
+      "pool": {
+        "symbol": "styleos_bootpool_storage",
+        "start": 1074319360,
+        "end": 1074352128,
+        "bytes": 32768,
+        "section": ".bss"
+      },
+      "pool_metadata": {
+        "symbol": "styleos_bootpool_metadata",
+        "start": 1074352128,
+        "end": 1074356224,
+        "bytes": 4096,
+        "section": ".bss"
+      }
+    },
+    "page_size": 4096,
+    "table_pages": 32,
+    "alias": 70368744177664,
+    "probe": 70368744181760,
+    "arch": "aarch64",
+    "address_space": "identity-image-address",
+    "fault": false,
+    "image_start": 1074266112,
+    "image_end": 1074556928,
+    "image_size": 290816,
+    "bss_start": 1074302976,
+    "bss_end": 1074556928,
+    "raw_sha256": "ad6a978508cb3df205cbac773716b69026e25e767a5789d6112638d109ee8884",
+    "binary_sha256": "959dde612f9207846b168470ed0d627d2339cbe1cd15bbdb35983a736a8dcdf2"
+  },
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "returncode": 0,
+  "settled": true
+}

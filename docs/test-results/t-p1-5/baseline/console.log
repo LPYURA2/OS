@@ -1,0 +1,37 @@
+host-boot-info: PASS — exit 0
+host-uefi: PASS — exit 0
+host-exception: PASS — exit 0
+host-pool: PASS — exit 0
+host-paging: PASS — exit 0
+host-memory: PASS — exit 0
+host-python: PASS — exit 0
+repro-build-one: PASS — exit 0
+repro-build-two: PASS — exit 0
+reproducibility: PASS — all 4 artifacts identical
+build-for-qemu: PASS — exit 0
+build-negative: PASS — exit 0
+build-negative-memory: PASS — exit 0
+build-exception: PASS — exit 0
+build-bootpool: PASS — exit 0
+build-paging: PASS — exit 0
+build-paging-fault: PASS — exit 0
+qemu-x86_64-normal: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-x86_64-invalid: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-x86_64-invalid-map: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-x86_64-exception: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-x86_64-bootpool: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-x86_64-paging: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-x86_64-paging-fault: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-normal: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-invalid: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-invalid-map: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-exception: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-bootpool: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-paging: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-paging-fault: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-exception-el2: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-bootpool-el2: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-paging-el2: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-paging-fault-el2: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-el2: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness
+qemu-aarch64-256m: PASS — UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness

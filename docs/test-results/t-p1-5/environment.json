@@ -1,0 +1,30 @@
+{
+  "utc": "2026-11-14T19:38:51Z",
+  "host": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "base_sha": "8bc7e78592c1aef78429042658f9ae02f71637c5",
+  "implementation_sha": "a284c30abbea2999eeaef721e0bd380c582c6dd0",
+  "full_command": "python3 tools/test.py --all --output build/t-p1-5",
+  "arm_command": "CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp15",
+  "arm_disabled_tools": {
+    "OVMF_CODE": "/nonexistent/styleos-t-p1-5/OVMF_CODE",
+    "OVMF_VARS": "/nonexistent/styleos-t-p1-5/OVMF_VARS",
+    "LLD_LINK": "/nonexistent/styleos-t-p1-5/LLD_LINK",
+    "QEMU_X86": "/nonexistent/styleos-t-p1-5/QEMU_X86"
+  },
+  "firmware": {
+    "OVMF_CODE": {
+      "path": "/workspace/scratch/styleos-toolchain/root/usr/share/OVMF/OVMF_CODE_4M.fd",
+      "sha256": "624e06de18b4fa535e90db7160d00d3d07d206422b89999bf1e27d920264e4e0"
+    },
+    "OVMF_VARS": {
+      "path": "/workspace/scratch/styleos-toolchain/root/usr/share/OVMF/OVMF_VARS_4M.fd",
+      "sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e"
+    }
+  },
+  "limits": [
+    "Linux QEMU, not Android/Termux",
+    "No VirtualBox/physical run",
+    "Toolchain/firmware/binaries outside Git"
+  ]
+}

@@ -348,13 +348,13 @@ CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/
 pkg install python clang lld git qemu-system-aarch64-headless
 git clone --branch feature/styleos-t-p1-5 --single-branch https://github.com/LPYURA2/OS.git styleos-tp15
 cd styleos-tp15
-git checkout --detach __T_P1_5_SHA__
+git checkout --detach a284c30abbea2999eeaef721e0bd380c582c6dd0
 git rev-parse HEAD
 qemu-system-aarch64 --version
 CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp15
 ```
 
-Замените `__T_P1_5_SHA__` точным опубликованным SHA кода из [отчёта T-P1.5](test-results/t-p1-5/README.md). Runner сам завершает QEMU и не требует Ctrl+A. Сводку получите командой:
+Замените `a284c30abbea2999eeaef721e0bd380c582c6dd0` точным опубликованным SHA кода из [отчёта T-P1.5](test-results/t-p1-5/README.md). Runner сам завершает QEMU и не требует Ctrl+A. Сводку получите командой:
 
 ```sh
 cat build/termux-tp15/test-results/results.json
