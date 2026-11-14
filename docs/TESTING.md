@@ -1,6 +1,6 @@
-# Проверка StyleOS T-P1.3
+# Проверка StyleOS T-P1.4
 
-Проверка разделяет четыре разных доказательства: C-логика на хосте, сборка целевых машинных форматов, побайтная повторяемость и прохождение загрузки в QEMU. PASS одного уровня не заменяет остальные. [Фактический прогон T-P1.3 и журналы](test-results/t-p1-3/README.md) публикуются отдельно; [T-P1.2](test-results/t-p1-2/README.md) и прежние этапы сохраняются как история базы. Ниже описан воспроизводимый протокол текущего этапа.
+Проверка разделяет четыре разных доказательства: C-логика на хосте, сборка целевых машинных форматов, побайтная повторяемость и прохождение загрузки в QEMU. PASS одного уровня не заменяет остальные. [Фактический прогон T-P1.4 и журналы](test-results/t-p1-4/README.md) публикуются отдельно; [T-P1.3](test-results/t-p1-3/README.md), [T-P1.2](test-results/t-p1-2/README.md) и прежние этапы сохраняются как история базы. Ниже описан воспроизводимый протокол текущего этапа.
 
 ## Требования и выбор инструментов
 
@@ -28,7 +28,7 @@ CODE и VARS должны подходить друг к другу по вар�
 ```sh
 export OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.fd
 export OVMF_VARS=/usr/share/OVMF/OVMF_VARS_4M.fd
-python3 tools/test.py --all --output build/t-p1-3
+python3 tools/test.py --all --output build/t-p1-4
 ```
 
 ## Точные команды
@@ -41,7 +41,7 @@ python3 tools/test.py --host --output build
 python3 tools/test.py --repro --output build
 python3 tools/test.py --qemu --output build
 # Либо один полный прогон:
-python3 tools/test.py --all --output build/t-p1-3
+python3 tools/test.py --all --output build/t-p1-4
 ```
 
 Код завершения test runner: **0** — все выбранные проверки прошли; **1** — есть FAIL; **2** — есть SKIPPED без FAIL. Отсутствующий обязательный QEMU/OVMF виден в сводке и не превращается в зелёный прогон. Если флаг набора не задан, запускается полный набор.
@@ -70,7 +70,7 @@ make test        # полный набор
 
 `tests/test_boot_memory.c` проверяет нормализацию, лимиты, несовместимые диапазоны, правила UEFI и поддерживаемые/повреждённые DTB.
 
-`tests/test_qemu_output.py` проверяет достоверность serial-доказательств: ошибка ранней загрузки не должна превращаться в PASS из-за последующего успешного маркера. Также проверяются отрицательный handoff, обязательный halt и различение начальных EL1/EL2. T-P1.2 добавляет `tests/test_exception.c` для причин/полей/first-entry guard, `test_exception_output.py` для UART-контракта, `test_fault_site.py` для связи symbol → исполняемые opcode-байты и `test_qemu_process.py` для жизненного цикла QEMU. В историческом T-P1.2 `host-python` дал **39/39 unittest PASS**, включая восемь проверок остановки процесса. Счётчик Python unittest отличается от количества этапов runner; актуальные числа T-P1.3 берутся из нового отчёта.
+`tests/test_qemu_output.py` проверяет достоверность serial-доказательств: ошибка ранней загрузки не должна превращаться в PASS из-за последующего успешного маркера. Также проверяются отрицательный handoff, обязательный halt и различение начальных EL1/EL2. T-P1.2 добавляет `tests/test_exception.c` для причин/полей/first-entry guard, `test_exception_output.py` для UART-контракта, `test_fault_site.py` для связи symbol → исполняемые opcode-байты и `test_qemu_process.py` для жизненного цикла QEMU. В историческом T-P1.2 `host-python` дал **39/39 unittest PASS**, включая восемь проверок остановки процесса. Счётчик Python unittest отличается от количества этапов runner; актуальные числа T-P1.4 берутся из нового отчёта.
 
 Исторический ARM ESR `0x96000061` host-декодер узнаёт как `alignment-fault` (Data Abort текущего EL). Это тест классификатора на сохранённом числе. Реальный Data Abort новым обработчиком в T-P1.2 не провоцировался и не объявляется проверенным.
 
@@ -120,7 +120,7 @@ python3 tools/build.py --arch all --test-exception
 python3 tools/build.py --arch all --test-exception --output build/exception-check
 ```
 
-`--test-exception` взаимоисключающий с `--invalid-boot-info`, `--invalid-memory-map` и `--test-bootpool`; обычный корневой `build` нельзя явно выбрать выходом exception-сборки. Trigger отсутствует в обычных образах. В тестовом образе собственные векторы/IDT уже установлены, handoff валиден и карта дошла до `MEMMAP PASS`; только затем исполняются `UD2` либо `BRK #0x120`.
+`--test-exception` взаимоисключающий с `--invalid-boot-info`, `--invalid-memory-map`, `--test-bootpool` и обоими paging-флагами; обычный корневой `build` нельзя явно выбрать выходом exception-сборки. Trigger отсутствует в обычных образах. В тестовом образе собственные векторы/IDT уже установлены, handoff валиден и карта дошла до `MEMMAP PASS`; только затем исполняются `UD2` либо `BRK #0x120`.
 
 Три реальные QEMU-проверки — `qemu-x86_64-exception`, `qemu-aarch64-exception`, `qemu-aarch64-exception-el2`. Каждая требует ровно одну полную строку `STYLEOS EXCEPTION arch=...`, затем отдельный `STYLEOS EMERGENCY HALT`, без `STYLEOS KERNEL HALT`. В строке ARM ожидаются EC `0x3c`, `reason=brk`, ESR/ELR/SPSR и `far=absent`; в строке x86 — vector 6, `reason=invalid-opcode`, `error=absent cr2=absent`. Служебный ноль нормализации кадра не считается аппаратным error code.
 
@@ -140,7 +140,7 @@ python3 tools/build.py --arch all --test-bootpool
 python3 tools/build.py --arch aarch64 --test-bootpool --output build/pool-check
 ```
 
-`--test-bootpool` взаимоисключающий с двумя отрицательными флагами и `--test-exception`. Обычный `build` нельзя явно выбрать выходом самотеста. Обычные образы содержат зарезервированный массив, но не выполняют тестовую выдачу, запись или чтение страниц.
+`--test-bootpool` взаимоисключающий с двумя отрицательными флагами, `--test-exception` и обоими paging-флагами. Обычный `build` нельзя явно выбрать выходом самотеста. Обычные образы содержат зарезервированный массив, но не выполняют тестовую выдачу, запись или чтение страниц.
 
 После успешного `MEMMAP PASS` самотест допускает пул, печатает RANGE/META/WORKSPACE и требует следующий порядок:
 
@@ -164,6 +164,55 @@ STYLEOS KERNEL HALT
 QEMU-сценарии — `qemu-x86_64-bootpool`, `qemu-aarch64-bootpool` и `qemu-aarch64-bootpool-el2`. Runner сопоставляет весь runtime RANGE/META с `pool-site.json`: на ARM — с ELF, на x86 — с реальным MEMMAP IMAGE start + RVA, без подстановки preferred ImageBase. Проверяются оба конца внутри IMAGE/RESERVED, отсутствие перекрытий со стеком, handoff, source, workspace и метаданными, точный набор выдаваемых страниц и порядок всех итогов. Память `MEMMAP CANDIDATE` не предоставляется пулу.
 
 `BOOTPOOL ERROR`, exception/emergency marker, пустой журнал, timeout, отсутствующие/неподтверждённые границы, повторный адрес или PASS без выполненных шагов означают FAIL. Полный terminal marker дополнительно проходит прежнюю проверку живого процесса и штатной остановки harness. Самотест подтверждает фиксированный image-owned пул в выбранных QEMU-профилях, не общий физический аллокатор. Основания для сравнения адресных пространств и ограничения API — [ADR-0006](adr/0006-image-owned-boot-pool.md).
+
+## Собственные таблицы T-P1.4
+
+```sh
+python3 tools/build.py --arch all --test-paging
+# Отдельный build/paging.
+python3 tools/build.py --arch all --test-paging-fault
+# Отдельный build/paging-fault.
+```
+
+Все шесть тестовых флагов взаимоисключающие. Новые образы нельзя явно записать в обычный корневой `build`. Paging-код, 32-страничный table reserve, control/data и fault site не включаются в обычные или старые варианты; positive paging image также не содержит fault site. Отдельные binary/source-list проверки подтверждают изоляцию, а не просто разные имена каталогов.
+
+Host-набор добавляет `test_paging.c` для построителя/реального descriptor lookup, `test_paging_admission.c` для полных резервов/исключений и `test_paging_x86.c` для чистой модели режима/унаследованного walker. Проверяются края, переполнение, PA-ширина, конфликт VA и alias rights/type, finite capacity, missing leaf/probe, неподходящий режим и `root=0` на отказе. `test_paging_site.py` повреждает PE/ELF/Image/initializer/fault proofs; `test_paging_output.py` проверяет строгий UART-контракт. Эти host fixtures не являются аппаратными запусками.
+
+Новые сборки создают `paging-site.json`: полные tables/control/data объекты, отсутствие пересечения с boot pool, IMAGE/BSS/PE-section bounds, известный initializer, hashes. Fault-вариант дополнительно связывает `styleos_paging_fault` с настоящими байтами executable read. Runner заново выводит proof из актуальных бинарников, сверяет sidecar и SHA загрузочного raw/GPT-образа, затем учитывает runtime PE base. Preferred base не подставляется вместо фактической.
+
+Схема порядка UART (многоточия — только объяснение, не принимаемый журнал):
+
+```text
+STYLEOS MEMMAP PASS
+STYLEOS PAGING TABLES <start> <end>
+STYLEOS PAGING CONTROL <start> <end>
+STYLEOS PAGING DATA <start> <end>
+STYLEOS PAGING WORKSPACE <start> <end>
+STYLEOS PAGING <X86|ARM> BEFORE ...
+# Для x86 также GDT и IDT.
+STYLEOS PAGING MAP va=... pa=... bytes=... flags=...
+...
+STYLEOS PAGING ROOT pa=... pages=...
+STYLEOS PAGING <X86|ARM> AFTER ...
+STYLEOS PAGING PTE va=... pa=... flags=...
+...
+STYLEOS PAGING ALIAS va=... pa=... before=... after=...
+```
+
+ROOT должен быть первой страницей собственного полного резерва, число использованных таблиц — в его пределах. AFTER содержит фактический CR3/режим x86 или TTBR/TCR/MAIR/SCTLR/VBAR ARM. Runner сверяет точный ограниченный MAP-набор и **каждую** фактическую PTE после перехода: image closure RWX, data alias RW/NX, x86 GDT NX с RO либо узким RW-разрешением для Accessed либо ARM PL011 Device RW/NX. Flags используют WRITE=1, EXEC=2, DEVICE=4; ноль означает RO/NX normal, а не отсутствие страницы. Image closure намеренно RWX и не доказывает W^X. GDT record содержит исходный raw descriptor: runner независимо проверяет A и разрешает RW только странице его Accessed-байта при A=0, требуя полный PA-резерв вне CANDIDATE. Остальные GDT pages должны быть RO; программная запись дескриптора не выполняется.
+
+Alias VA `0x0000400000000000` видит PA выделенной data page. Before обязан быть `0x123456789abcdef0`, after — `0xfedcba9876543210`; код читает через alias, пишет через alias и проверяет исходный адрес. Это отдельное свидетельство работы новой трансляции, а не один маркер записи регистра.
+
+Положительные jobs `qemu-x86_64-paging`, `qemu-aarch64-paging` и `qemu-aarch64-paging-el2` требуют затем ровно `STYLEOS PAGING PASS` и `STYLEOS KERNEL HALT`.
+
+Fault jobs имеют суффикс `paging-fault` / `paging-fault-el2`. После тех же readback/PTE/alias проверок требуются `STYLEOS PAGING FAULT READY va=... pc=...`, одна настоящая exception-запись и один `STYLEOS EMERGENCY HALT`. Цель `0x0000400000001000` — канонический VA внутри выбранного режима без mapping. Обычный halt, PAGING PASS и продолжение запрещены:
+
+- x86: `vector=14 reason=page-fault`, аппаратный `error=0`, `cr2=probe`; RIP совпадает с `mov rax,[rcx]` (`488b01`) после реальной PE relocation;
+- ARM: `class=0x25 reason=translation-fault`, read/translation DFSC и достоверный `far=probe`; PC/ELR совпадают с `ldr x1,[x0]` (`010040f9`) в ELF и raw Image.
+
+Любая подмена границ, mapped probe, неправильные root/права/тип/PC/syndrome, пропущенная или лишняя запись, ERROR, timeout, reset и тишина означают FAIL. После терминального маркера сохраняются прежние 200 мс наблюдения живого QEMU и штатная остановка harness; собственный exit 0 до этой остановки не принимается. Старые UART-протоколы не меняются ради нового опыта и отвергают неожиданные PAGING-записи.
+
+Подробные входные режимы и пределы доказательства — [ADR-0007](adr/0007-owned-translation-tables-experiment.md). Публикуемые UART/JSON должны соответствовать конкретным SHA и версии toolchain; новые результаты не выводятся из успешного T-P1.3.
 
 ## Ручной запуск x86-64
 
@@ -214,25 +263,25 @@ qemu-system-aarch64 -machine virt -cpu cortex-a57 -m 128M \
 - **FAIL:** команда выполнена и выявила несоответствие; причина и журнал сохраняются.
 - **SKIPPED:** команда/платформа не проверена; указывается отсутствующий инструмент, доступ или устройство. SKIPPED не повышается до PASS по аналогии.
 
-Фактические числа нового этапа, команды, версии, SHA и журналы находятся в [отчёте T-P1.3](test-results/t-p1-3/README.md). Количество этапов считают по его `results.json`, а Python unittest — по `host-python.log`; предполагаемое число тестов не является результатом.
+Фактические числа T-P1.4, команды, версии, SHA и журналы находятся в [отчёте](test-results/t-p1-4/README.md). Количество этапов считают по `results.json`, Python unittest — по `host-python.log`. Ожидаемый счётчик не является результатом.
 
-Полный T-P1.3 сохраняет все T-P1.2 сценарии: реальные UD2/BRK и PC/opcode-проверки, normal/negative handoff/negative map, ARM64 initial EL1/EL2, 128/256 МиБ и повторяемость EFI, диска, ELF и raw Image. Дополнительно проверяются host-логика пула, доказательства его размещения и три целевых самотеста.
+Полный набор сохраняет normal/negative handoff/negative map, реальные UD2/BRK с PC/opcode proof, boot pool, ARM initial EL1/EL2, 128/256 МиБ и четыре обычных reproducibility artifacts. К ним добавлены host/binary/UART проверки и шесть новых QEMU paging jobs.
 
-| Среда | Статус T-P1.3 | Граница результата |
+| Среда | Статус T-P1.4 | Граница результата |
 |---|---|---|
-| Linux, полный QEMU/OVMF x86-64 и AArch64 | См. [новый отчёт](test-results/t-p1-3/README.md) | Результаты должны включать реальные pool- и exception-сценарии |
-| Linux, ARM64-only без OVMF/x86 tools | См. [новый отчёт](test-results/t-p1-3/README.md) | Проверяет независимость маршрута, не телефон |
-| Android/Termux владельца, QEMU 11.1.3 | PASS, 20/20 | [Отдельный отчёт и два UART-журнала пула](test-results/t-p1-3/termux/README.md) |
-| VirtualBox и физическое оборудование | SKIPPED | В T-P1.3 отдельно не испытаны |
+| Linux, QEMU/OVMF x86-64 и AArch64 | См. [фактический отчёт](test-results/t-p1-4/README.md) | Новый positive/fault опыт и все прежние сценарии |
+| Linux, ARM64-only без OVMF/x86 tools | См. [фактический отчёт](test-results/t-p1-4/README.md) | Включает обычные и оба новых ARM64 варианта; не телефон |
+| Новый Android/Termux владельца | SKIPPED до фактического прогона | Не наследует телефонный PASS T-P1.3 |
+| VirtualBox, физические устройства | SKIPPED до отдельного испытания | Ручной VirtualBox T-P1.3 не блокирует QEMU-приёмку T-P1.4 |
 
-История принятой базы: Linux T-P1.2 **23/23 этапа PASS**, host Python **39/39**; ARM64-only Linux **16/16** и отдельный Android/Termux владельца **16/16** на QEMU 11.1.3. [Телефонный отчёт T-P1.2](test-results/t-p1-2/termux/README.md) относится к `ce24525169e1d47ea8dc2d2d1f63f767dbc54890`; принятый `07fe425a0d4d5c0b9fbb65f8a37b30924523ec81` добавляет только документацию. Эти результаты не засчитывают T-P1.3 как проверенный на Android. [T-P1.0](test-results/t-p1-0/README.md), [T-P1.1](test-results/t-p1-1/README.md) и их телефонные прогоны остаются отдельной историей.
+Принятая база `877f5e2bb85d484852a627e3a76a4bb956b40d50` содержит проверенный код пула `f10ee3313b7d8d428a3207e5bcfff6b93842be09` и последующие документы/журналы. Исторический T-P1.3: Linux 28/28 этапов, Python 71/71, ARM64-only Linux 20/20 и отдельный [Android/Termux владельца](test-results/t-p1-3/termux/README.md) 20/20 на QEMU 11.1.3. [T-P1.2](test-results/t-p1-2/README.md), [T-P1.1](test-results/t-p1-1/README.md) и [T-P1.0](test-results/t-p1-0/README.md) остаются отдельной историей. Ни один прежний результат не подтверждает новый paging-профиль.
 
 Для проверки ARM64-only маршрута в Linux намеренно задайте отсутствующие x86-инструменты и OVMF:
 
 ```sh
 OVMF_CODE=/nonexistent/styleos-code.fd OVMF_VARS=/nonexistent/styleos-vars.fd \
 LLD_LINK=/nonexistent/lld-link QEMU_X86=/nonexistent/qemu-system-x86_64 \
-CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/arm-only
+CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/arm-only-tp14
 ```
 
 Этот эксперимент должен завершаться без обращения к выбранным отсутствующим средствам. Он остаётся Linux-проверкой.
@@ -241,19 +290,25 @@ CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/
 
 ```sh
 pkg install python clang lld git qemu-system-aarch64-headless
-git clone --branch feature/styleos-t-p1-3 --single-branch https://github.com/LPYURA2/OS.git styleos-tp13
-cd styleos-tp13
-git checkout --detach f10ee3313b7d8d428a3207e5bcfff6b93842be09
+git clone --branch feature/styleos-t-p1-4 --single-branch https://github.com/LPYURA2/OS.git styleos-tp14
+cd styleos-tp14
+git checkout --detach __T_P1_4_SHA__
 git rev-parse HEAD
 qemu-system-aarch64 --version
-CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux
+CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp14
 ```
 
-Runner сам завершает QEMU и не требует Ctrl+A. Команда не запускает x86 и сравнение повторяемости. Сохраните новый `build/termux/test-results/results.json`, все `*.log`, особенно две pool- и две exception-проверки ARM EL1/EL2. Для разбора размещения полезны `build/termux/bootpool/aarch64/pool-site.json` и `manifest.json` соответствующей сборки. Версии Python, Clang/LLD и QEMU также относятся к результату. Фактический прогон владельца подтверждён итоговой сводкой и двумя UART-журналами пула. Какие дополнительные файлы не приложены, указано в [отчёте Termux](test-results/t-p1-3/termux/README.md).
+Runner сам завершает QEMU и не требует Ctrl+A. Сводку получите командой:
+
+```sh
+cat build/termux-tp14/test-results/results.json
+```
+
+Сохраните все `build/termux-tp14/test-results/*.log`, особенно `host-paging.log`, `build-paging.log`, `build-paging-fault.log`, `qemu-aarch64-paging.log`, `qemu-aarch64-paging-el2.log`, `qemu-aarch64-paging-fault.log`, `qemu-aarch64-paging-fault-el2.log`, обе pool- и обе exception-проверки. Нужны также `paging-site.json` из `paging/aarch64` и `paging-fault/aarch64`, manifest соответствующих сборок, точный `git rev-parse HEAD` и версии Python/Clang/LLD/QEMU. Этот маршрут не запускает x86 и reproducibility; до получения фактических файлов результат телефона остаётся SKIPPED.
 
 ## Риски и откат
 
-Работа T-P1.3 остаётся в `feature/styleos-t-p1-3` от принятой базы `07fe425a0d4d5c0b9fbb65f8a37b30924523ec81`. Обновление `main`, merge, release и изменения Portable-os запрещены этой задачей.
+Работа T-P1.4 остаётся в `feature/styleos-t-p1-4` от принятой базы `877f5e2bb85d484852a627e3a76a4bb956b40d50`. Обновление `main`, прежних refs, merge, force push, release и изменения Portable-os запрещены этой задачей.
 
 Ошибки UEFI handoff, неправильный стек, неверные physical pointers и неподходящая firmware могут остановить boot до диагностики. Отсутствующий UART может скрыть результат, даже если CPU выполняется. Тесты должны фиксировать конфигурацию и отделять отсутствие вывода от ожидаемого halt.
 

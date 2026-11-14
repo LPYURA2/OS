@@ -32,7 +32,7 @@ def run(args):
 
 
 def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
-          test_bootpool=False):
+          test_bootpool=False, test_paging=False, test_paging_fault=False):
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     folder = output / arch
     folder.mkdir(parents=True, exist_ok=True)
@@ -41,6 +41,12 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
               'kernel/exception.c', 'kernel/boot_pool.c']
     if test_bootpool:
         common.append('kernel/boot_pool_selftest.c')
+    paging = test_paging or test_paging_fault
+    if paging:
+        common += ['kernel/paging.c', 'kernel/paging_admission.c',
+                   'kernel/paging_experiment.c', f'arch/{arch}/paging.c']
+        if test_paging_fault:
+            common.append(f'arch/{arch}/paging_fault.S')
     if arch == 'x86_64':
         target = 'x86_64-pc-win32-coff'
         sources = common + ['boot/x86_64/exit_boot.c', 'boot/x86_64/uefi.c',
@@ -74,6 +80,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_EXCEPTION=1')
     if test_bootpool:
         flags.append('-DSTYLEOS_TEST_BOOTPOOL=1')
+    if paging:
+        flags.append('-DSTYLEOS_TEST_PAGING=1')
+    if test_paging_fault:
+        flags.append('-DSTYLEOS_TEST_PAGING_FAULT=1')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -105,6 +115,16 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         pool_site['disk_sha256'] = hashlib.sha256(
             (folder / 'styleos.img').read_bytes()).hexdigest()
     (folder / 'pool-site.json').write_text(json.dumps(pool_site, indent=2) + '\n')
+    if paging:
+        from paging_site import describe_paging
+        site = describe_paging(arch, artifacts[0],
+            folder / 'kernel.map' if arch == 'x86_64' else None,
+            folder / 'styleos.bin' if arch == 'aarch64' else None,
+            fault=test_paging_fault)
+        if arch == 'x86_64':
+            site['disk_sha256'] = hashlib.sha256(
+                (folder / 'styleos.img').read_bytes()).hexdigest()
+        (folder / 'paging-site.json').write_text(json.dumps(site, indent=2) + '\n')
     if test_exception:
         from fault_site import describe_fault
         site = describe_fault(arch, artifacts[0],
@@ -137,26 +157,36 @@ def main():
                           help='Dedicated image only: BRK / UD2 after valid handoff')
     negative.add_argument('--test-bootpool', action='store_true',
                           help='Dedicated image only: image-owned page pool write/read test')
+    negative.add_argument('--test-paging', action='store_true',
+                          help='Dedicated image only: owned translation tables and alias RW')
+    negative.add_argument('--test-paging-fault', action='store_true',
+                          help='Dedicated image only: owned tables and real unmapped read')
     args = parser.parse_args()
     output = (args.output or ROOT / 'build' /
               ('exception' if args.test_exception else
-               'bootpool' if args.test_bootpool else '')).resolve()
-    if (args.test_exception or args.test_bootpool) and output == (ROOT / 'build').resolve():
+               'bootpool' if args.test_bootpool else
+               'paging' if args.test_paging else
+               'paging-fault' if args.test_paging_fault else '')).resolve()
+    if (args.test_exception or args.test_bootpool or args.test_paging or
+            args.test_paging_fault) and output == (ROOT / 'build').resolve():
         parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
     records = []
     for arch in arches:
         records.extend(build(arch, output, args.invalid_boot_info,
                              args.invalid_memory_map, args.test_exception,
-                             args.test_bootpool))
+                             args.test_bootpool, args.test_paging,
+                             args.test_paging_fault))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS T-P1.3', 'compiler': version,
+        'prototype': 'StyleOS T-P1.4', 'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,
         'invalid_memory_map': args.invalid_memory_map,
         'test_exception': args.test_exception,
-        'test_bootpool': args.test_bootpool, 'artifacts': records
+        'test_bootpool': args.test_bootpool,
+        'test_paging': args.test_paging, 'test_paging_fault': args.test_paging_fault,
+        'artifacts': records
     }, indent=2) + '\n')
     print('BUILD PASS:', ', '.join(arches))
 

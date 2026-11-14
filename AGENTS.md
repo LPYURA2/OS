@@ -69,3 +69,37 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
   and x86 tools. Record actual counts and logs; phone T-P1.3 is SKIPPED until run.
 - Stop after this task's evidence and branch publication. General PMM, memory
   ownership, own translation tables and the kernel model need owner decisions.
+
+## Approved T-P1.4 task
+- Branch feature/styleos-t-p1-4 starts from accepted
+  877f5e2bb85d484852a627e3a76a4bb956b40d50. Publish this branch only. Do not
+  change main, previous remote refs, Portable-os, history or releases; no merge
+  or force push. Preserve parallel work and historical logs.
+- Only --test-paging and --test-paging-fault may switch translation tables.
+  Both use separate outputs and are mutually exclusive with each other and
+  all older test modes. Ordinary images and older profiles keep their previous
+  x86 CR3 / ARM MMU path and contain no paging-test code, buffers or fault site.
+- Keep boot_info v1, memory normalization, the eight-page boot pool and older
+  exception protocols unchanged. Use only a finite image-owned table reserve,
+  separate control/data pages, whole-span admission and explicit VA/PA proofs.
+  Never use candidate RAM, reclaim boot memory or return active tables to a pool.
+- Validate mode, widths, critical mappings, rights/type, capacity and an absent
+  canonical probe before activation. Refusal must not publish a usable root.
+  Preserve the current stack, exception path and console; no new GDT/TSS/IST.
+- Use 4-KiB leaves for a bounded image closure plus only required GDT/PL011
+  pages and one data alias. State the image RWX policy honestly; do not claim
+  W^X, production isolation, arbitrary pointer translation or general RAM ownership.
+- Retain the current GDT. Permit hardware Accessed-bit update only through a
+  bounded RW/NX mapping of its active descriptor byte page when A=0; prove
+  the whole PA page already reserved and outside CANDIDATE. Keep other GDT
+  pages RO/NX, do not write descriptors in software or create a new GDT.
+- Prove hardware root/mode readback, live per-page descriptors and alias RW.
+  Fault images must produce one real #PF or EL1 Data Abort with precise
+  read/translation syndrome, target VA and saved instruction PC bound to the
+  binary. PASS-only, silence, timeout, reset and software imitation are failures.
+- Preserve all older tests and four-artifact reproducibility. Add host refusal,
+  binary/UART and six QEMU paging scenarios; retain the OVMF-independent ARM64
+  route. Record actual counts and distinguish Linux from Android/Termux.
+- Stop after evidence and task-branch publication. General PMM/heap, ownership,
+  recovery, IRQ, SMP, scheduler, processes, IPC, user mode, drivers and kernel
+  model remain outside this task and require a separate owner decision.
