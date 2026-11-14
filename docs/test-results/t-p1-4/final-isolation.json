@@ -1,0 +1,64 @@
+{
+  "normal": {
+    "x86_64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    },
+    "aarch64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    }
+  },
+  "invalid": {
+    "x86_64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    },
+    "aarch64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    }
+  },
+  "invalid-map": {
+    "x86_64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    },
+    "aarch64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    }
+  },
+  "exception": {
+    "x86_64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    },
+    "aarch64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    }
+  },
+  "bootpool": {
+    "x86_64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    },
+    "aarch64": {
+      "paging_diagnostics_absent": true,
+      "paging_symbols_absent": true,
+      "paging_objects_absent": true
+    }
+  },
+  "ordinary_artifacts_identical_to_base_build": true,
+  "source_commit": "68314ee6be30096e70267e6b003fd4cc771dba0e"
+}

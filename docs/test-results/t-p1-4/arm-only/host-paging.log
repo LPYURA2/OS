@@ -1,0 +1,14 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_paging.c kernel/paging.c -o /workspace/OS/build/termux-tp14/host-tests/host-paging
+
+$ /workspace/OS/build/termux-tp14/host-tests/host-paging
+paging constructor/lookup host tests PASS (x86-64 + AArch64)
+
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_paging_admission.c kernel/paging_admission.c kernel/boot_pool.c -o /workspace/OS/build/termux-tp14/host-tests/test-paging-admission
+
+$ /workspace/OS/build/termux-tp14/host-tests/test-paging-admission
+paging admission host tests PASS
+
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_paging_x86.c -o /workspace/OS/build/termux-tp14/host-tests/test-paging-x86
+
+$ /workspace/OS/build/termux-tp14/host-tests/test-paging-x86
+x86 paging mode/descriptor/old-walk checks PASS

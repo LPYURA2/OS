@@ -1,0 +1,38 @@
+[
+  {
+    "name": "integration-x86_64-paging",
+    "status": "FAIL",
+    "detail": "expected serial marker missing / timeout",
+    "log": "integration-x86_64-paging.log"
+  },
+  {
+    "name": "integration-aarch64-paging",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness",
+    "log": "integration-aarch64-paging.log"
+  },
+  {
+    "name": "integration-aarch64-paging-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness",
+    "log": "integration-aarch64-paging-el2.log"
+  },
+  {
+    "name": "integration-x86_64-paging-fault",
+    "status": "FAIL",
+    "detail": "expected serial marker missing / timeout",
+    "log": "integration-x86_64-paging-fault.log"
+  },
+  {
+    "name": "integration-aarch64-paging-fault",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness",
+    "log": "integration-aarch64-paging-fault.log"
+  },
+  {
+    "name": "integration-aarch64-paging-fault-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging contract checked; QEMU stopped by harness",
+    "log": "integration-aarch64-paging-fault-el2.log"
+  }
+]

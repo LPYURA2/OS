@@ -1,0 +1,2 @@
+$ cc -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -Iinclude tests/test_paging_x86.c -o /workspace/scratch/styleos-t-p1-4/final-sanitize-x86
+x86 paging mode/descriptor/old-walk checks PASS

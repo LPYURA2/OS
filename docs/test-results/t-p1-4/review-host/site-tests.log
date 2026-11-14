@@ -1,0 +1,17 @@
+test_arm_complete_nobits_and_image_size (test_paging_site.PagingSiteTests.test_arm_complete_nobits_and_image_size) ... ok
+test_both_managed_read_sites (test_paging_site.PagingSiteTests.test_both_managed_read_sites) ... ok
+test_exact_symbol_size_alignment_and_pool_overlap (test_paging_site.PagingSiteTests.test_exact_symbol_size_alignment_and_pool_overlap) ... ok
+test_fault_symbol_is_absent_from_positive_images (test_paging_site.PagingSiteTests.test_fault_symbol_is_absent_from_positive_images) ... ok
+test_full_end_must_fit_bss_and_pt_load (test_paging_site.PagingSiteTests.test_full_end_must_fit_bss_and_pt_load) ... ok
+test_full_end_must_fit_pe_section_and_image (test_paging_site.PagingSiteTests.test_full_end_must_fit_pe_section_and_image) ... ok
+test_header_raw_bytes_and_initializer_are_bound (test_paging_site.PagingSiteTests.test_header_raw_bytes_and_initializer_are_bound) ... ok
+test_missing_duplicate_truncated_and_bad_sidecars (test_paging_site.PagingSiteTests.test_missing_duplicate_truncated_and_bad_sidecars) ... ok
+test_nonidentity_load_and_wrong_section_types (test_paging_site.PagingSiteTests.test_nonidentity_load_and_wrong_section_types) ... ok
+test_pe_virtual_tail_and_rvas (test_paging_site.PagingSiteTests.test_pe_virtual_tail_and_rvas) ... ok
+test_required_sidecars_and_arch (test_paging_site.PagingSiteTests.test_required_sidecars_and_arch) ... ok
+test_wrong_read_opcodes_rejected (test_paging_site.PagingSiteTests.test_wrong_read_opcodes_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.020s
+
+OK

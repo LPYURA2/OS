@@ -292,7 +292,7 @@ CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/
 pkg install python clang lld git qemu-system-aarch64-headless
 git clone --branch feature/styleos-t-p1-4 --single-branch https://github.com/LPYURA2/OS.git styleos-tp14
 cd styleos-tp14
-git checkout --detach __T_P1_4_SHA__
+git checkout --detach 68314ee6be30096e70267e6b003fd4cc771dba0e
 git rev-parse HEAD
 qemu-system-aarch64 --version
 CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp14

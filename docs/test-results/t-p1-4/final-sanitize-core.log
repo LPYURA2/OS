@@ -1,0 +1,2 @@
+$ cc -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -Iinclude kernel/paging.c tests/test_paging.c -o /workspace/scratch/styleos-t-p1-4/final-sanitize-core
+paging constructor/lookup host tests PASS (x86-64 + AArch64)
