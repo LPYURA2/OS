@@ -1,5 +1,6 @@
 """Adversarial storage evidence/lifecycle tests; no QEMU or LLVM is required."""
 from copy import deepcopy
+import errno
 import hashlib
 import json
 import os
@@ -283,21 +284,41 @@ class StorageOutputOwnershipTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), b'keep evidence')
             self.assertFalse((root/'persist.img').exists())
 
-    def test_disk_identity_size_regular_type_hardlinks_and_symlinks_are_checked(self):
+    def test_disk_identity_size_regular_type_and_symlinks_are_checked(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             run = runner.new_run_directory(root/'output')
             disk, state = runner.create_zero_disk(run, 'crash')
             altered = dict(state, inode=state['inode']+1)
             with self.assertRaises(ValueError): runner.disk_state(disk, altered)
-            hardlink = root/'hardlink'; os.link(disk, hardlink)
-            with self.assertRaises(ValueError): runner.disk_state(disk)
-            hardlink.unlink()
             symbolic = root/'symbolic'; symbolic.symlink_to(disk)
             with self.assertRaises(OSError): runner.disk_state(symbolic)
             with disk.open('r+b') as stream: stream.truncate(runner.DISK_BYTES-1)
             with self.assertRaises(ValueError): runner.disk_state(disk)
             with self.assertRaises((ValueError, IsADirectoryError)): runner.disk_state(root)
+
+    def test_disk_hardlinks_are_rejected_when_supported(self):
+        link = getattr(os, 'link', None)
+        if not callable(link):
+            self.skipTest('os.link is unavailable on this platform')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run = runner.new_run_directory(root/'output')
+            disk, state = runner.create_zero_disk(run, 'crash')
+            hardlink = root/'hardlink'
+            try:
+                link(disk, hardlink)
+            except NotImplementedError:
+                self.skipTest('hard links are not implemented on this platform')
+            except OSError as error:
+                if error.errno in (errno.ENOSYS, errno.EOPNOTSUPP, errno.EPERM):
+                    self.skipTest('hard links are unsupported or prohibited: ' + str(error))
+                raise
+            try:
+                with self.assertRaises(ValueError): runner.disk_state(disk)
+            finally:
+                hardlink.unlink()
+            self.assertEqual(runner.disk_state(disk), state)
 
     def test_qemu_uses_json_blockdev_for_untrusted_filename_punctuation(self):
         with tempfile.TemporaryDirectory(prefix='styleos,path,') as temporary:
@@ -481,6 +502,33 @@ class StorageInventoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             run = runner.new_run_directory(Path(temporary)/'output')
             calls = []
+            real_check_output = subprocess.check_output
+            real_run = subprocess.run
+            real_which = runner.shutil.which
+            real_platform = runner.platform.platform
+            def check_output(command, *args, **kwargs):
+                if command == ['git', 'rev-parse', 'HEAD']:
+                    self.assertTrue(kwargs.get('text'))
+                    return 'fixture'
+                if command == ['git', 'status', '--porcelain']:
+                    self.assertFalse(kwargs.get('text', False))
+                    return b''
+                return real_check_output(command, *args, **kwargs)
+            def run_command(command, *args, **kwargs):
+                if command == ['/fake/qemu', '--version']:
+                    return subprocess.CompletedProcess(command, 0, 'QEMU fixture')
+                return real_run(command, *args, **kwargs)
+            def which(command, *args, **kwargs):
+                if command == 'styleos-inventory-qemu':
+                    return '/fake/qemu'
+                return real_which(command, *args, **kwargs)
+            def platform_description():
+                # Force the stdlib subprocess path even if platform() is cached.
+                # Python 3.14/Termux reaches it while describing the host.
+                probe = getattr(runner.platform, '_syscmd_file', None)
+                if probe is not None:
+                    self.assertIsInstance(probe(sys.executable), str)
+                return real_platform()
             def vm(checks, name, disk, identity, phase, qemu, boot, site):
                 state = runner.disk_state(disk, identity)
                 calls.append((name, disk, phase))
@@ -492,12 +540,17 @@ class StorageInventoryTests(unittest.TestCase):
                   patch('tools.test_storage.verified_storage_site', return_value=valid_site()),
                   patch('tools.test_storage.metadata_snapshot', return_value={'fixture': 'a'*64}),
                   patch('tools.test_storage.source_snapshot', return_value={'fixture.py': 'b'*64}),
-                  patch('tools.test_storage.subprocess.check_output', return_value='fixture'),
-                  patch('tools.test_storage.shutil.which', return_value='/fake/qemu'),
-                  patch('tools.test_storage.subprocess.run', return_value=
-                        subprocess.CompletedProcess(['/fake/qemu', '--version'], 0, 'QEMU fixture')),
+                  patch('tools.test_storage.tool_versions', return_value={'fixture': 'versions'}),
+                  patch.dict(os.environ, {'QEMU_AARCH64': 'styleos-inventory-qemu'}),
+                  patch('tools.test_storage.platform.platform', side_effect=platform_description),
+                  patch('tools.test_storage.subprocess.check_output', side_effect=check_output),
+                  patch('tools.test_storage.shutil.which', side_effect=which),
+                  patch('tools.test_storage.subprocess.run', side_effect=run_command),
                   patch('builtins.print')):
                 checks, provenance = runner.execute(run, 1.5)
+            self.assertEqual(provenance['git_head'], 'fixture')
+            self.assertFalse(provenance['git_dirty'])
+            self.assertEqual(provenance['qemu_version'], 'QEMU fixture')
             self.assertEqual([(name, phase) for name, _disk, phase in calls],
                              [(name, phase) for name, _disk, phase in runner.STAGES])
             self.assertEqual(len({disk for _name, disk, _phase in calls}), 2)
