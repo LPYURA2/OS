@@ -1,0 +1,76 @@
+{
+  "arch": "aarch64",
+  "mode": "paging-fault",
+  "initial_el2": false,
+  "ram_mib": 128,
+  "status": "PASS",
+  "uart_sha256": "053aabe81399d81f22d23ddaaf563f067e65be133ec3b7f997dd62811b8de87d",
+  "manifest_sha256": "091f92e4eeea47c4b8e02ee49618bda2602d37e86178c9beee84870b98ec3eca",
+  "paging_site": {
+    "objects": {
+      "tables": {
+        "symbol": "styleos_paging_tables",
+        "start": 1074356224,
+        "end": 1074487296,
+        "bytes": 131072,
+        "section": ".bss"
+      },
+      "control": {
+        "symbol": "styleos_paging_control",
+        "start": 1074487296,
+        "end": 1074491392,
+        "bytes": 4096,
+        "section": ".bss"
+      },
+      "data": {
+        "symbol": "styleos_paging_data",
+        "start": 1074298880,
+        "end": 1074302976,
+        "bytes": 4096,
+        "section": ".data"
+      }
+    },
+    "boot_pool": {
+      "pool": {
+        "symbol": "styleos_bootpool_storage",
+        "start": 1074319360,
+        "end": 1074352128,
+        "bytes": 32768,
+        "section": ".bss"
+      },
+      "pool_metadata": {
+        "symbol": "styleos_bootpool_metadata",
+        "start": 1074352128,
+        "end": 1074356224,
+        "bytes": 4096,
+        "section": ".bss"
+      }
+    },
+    "page_size": 4096,
+    "table_pages": 32,
+    "alias": 70368744177664,
+    "probe": 70368744181760,
+    "fault_site": {
+      "symbol": "styleos_paging_fault",
+      "pc": 1074287372,
+      "offset": 86796,
+      "image_offset": 21260,
+      "instruction_hex": "010040f9"
+    },
+    "arch": "aarch64",
+    "address_space": "identity-image-address",
+    "fault": true,
+    "image_start": 1074266112,
+    "image_end": 1074556928,
+    "image_size": 290816,
+    "bss_start": 1074302976,
+    "bss_end": 1074556928,
+    "raw_sha256": "8d1cb595ecb24da9b8c98ea607ac32381de0295e1d701a1b46867fee8bae5f12",
+    "binary_sha256": "644071456be356497bfddd2ea90f2b7a96de6c5a171d6fe4764f6d3e0e3a5238"
+  },
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "returncode": 0,
+  "settled": true
+}

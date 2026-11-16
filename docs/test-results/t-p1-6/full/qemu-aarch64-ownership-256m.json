@@ -1,0 +1,230 @@
+{
+  "arch": "aarch64",
+  "mode": "ownership",
+  "initial_el2": false,
+  "ram_mib": 256,
+  "status": "PASS",
+  "uart_sha256": "0d2715bc61be16c12ca8b0f6abd94a00300a2e2c891ba66b9b037b805782b866",
+  "manifest_sha256": "66b8630cda6d48f3dbd2a11c90e01f2f384f0404f0a675fb18abf4addecd6523",
+  "ownership_site": {
+    "arch": "aarch64",
+    "address_space": "identity-image-address",
+    "image_start": 1074266112,
+    "image_end": 1074487296,
+    "image_size": 221184,
+    "bss_start": 1074302976,
+    "bss_end": 1074487296,
+    "binary_sha256": "bf453fe723e72a3f45252ddb41df23204937b2a738181cc89b4cd5ac3a46d9cd",
+    "raw_sha256": "360ffefa51a5a454f506194e92cab6c5e7cbfa311c0444217dac1452a3853d38",
+    "objects": {
+      "workspace": {
+        "symbol": "styleos_ownership_workspace",
+        "start": 1074356224,
+        "end": 1074421760,
+        "bytes": 65536
+      },
+      "diagnostic": {
+        "symbol": "diagnostic",
+        "start": 1074302976,
+        "end": 1074315376,
+        "bytes": 12400
+      },
+      "stack": {
+        "symbol": "__stack_bottom",
+        "start": 1074421760,
+        "end": 1074487296,
+        "bytes": 65536
+      },
+      "vectors": {
+        "symbol": "aarch64_vectors",
+        "start": 1074268160,
+        "end": 1074270208,
+        "bytes": 2048
+      },
+      "pool": {
+        "symbol": "styleos_bootpool_storage",
+        "start": 1074319360,
+        "end": 1074352128,
+        "bytes": 32768
+      },
+      "pool_metadata": {
+        "symbol": "styleos_bootpool_metadata",
+        "start": 1074352128,
+        "end": 1074356224,
+        "bytes": 4096
+      }
+    },
+    "page_size": 4096,
+    "invalid": false
+  },
+  "ownership_plan": {
+    "arch": "aarch64",
+    "phase": "mmu-off",
+    "source": "fdt",
+    "protected": [
+      {
+        "start": 150994944,
+        "end": 150999040
+      },
+      {
+        "start": 1074266112,
+        "end": 1074487296
+      },
+      {
+        "start": 1207959552,
+        "end": 1209008128
+      }
+    ],
+    "review": [
+      {
+        "start": 1073741824,
+        "end": 1074266112,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 1074487296,
+        "end": 1207959552,
+        "reason": "no-transfer"
+      },
+      {
+        "start": 1209008128,
+        "end": 1342177280,
+        "reason": "no-transfer"
+      }
+    ],
+    "claims": [
+      {
+        "kind": "IMAGE",
+        "proof": "IMAGE_IDENTITY",
+        "va": 1074266112,
+        "pa": 1074266112,
+        "bytes": 221184
+      },
+      {
+        "kind": "STACK",
+        "proof": "IMAGE_IDENTITY",
+        "va": 1074421760,
+        "pa": 1074421760,
+        "bytes": 65536
+      },
+      {
+        "kind": "HANDOFF",
+        "proof": "IMAGE_IDENTITY",
+        "va": 1074487104,
+        "pa": 1074487104,
+        "bytes": 96
+      },
+      {
+        "kind": "SOURCE_BUFFER",
+        "proof": "BOOT_SOURCE",
+        "va": 1207959552,
+        "pa": 1207959552,
+        "bytes": 1048576
+      },
+      {
+        "kind": "MAP_WORKSPACE",
+        "proof": "IMAGE_IDENTITY",
+        "va": 1074302976,
+        "pa": 1074302976,
+        "bytes": 12400
+      },
+      {
+        "kind": "OWN_WORKSPACE",
+        "proof": "IMAGE_IDENTITY",
+        "va": 1074356224,
+        "pa": 1074356224,
+        "bytes": 65536
+      },
+      {
+        "kind": "BOOT_POOL",
+        "proof": "IMAGE_IDENTITY",
+        "va": 1074319360,
+        "pa": 1074319360,
+        "bytes": 32768
+      },
+      {
+        "kind": "POOL_METADATA",
+        "proof": "IMAGE_IDENTITY",
+        "va": 1074352128,
+        "pa": 1074352128,
+        "bytes": 4096
+      },
+      {
+        "kind": "VECTORS",
+        "proof": "IMAGE_IDENTITY",
+        "va": 1074268160,
+        "pa": 1074268160,
+        "bytes": 2048
+      },
+      {
+        "kind": "MMIO",
+        "proof": "FIXED_DEVICE",
+        "va": 150994944,
+        "pa": 150994944,
+        "bytes": 4096
+      }
+    ],
+    "walks": [],
+    "unclassified": "outside-covered-union",
+    "granted": 0,
+    "workspace": {
+      "pa": 1074356224,
+      "bytes": 65536
+    },
+    "source_data": {
+      "pa": 1207959552,
+      "bytes": 1048576,
+      "stride": 0,
+      "version": 0
+    },
+    "state_before": {
+      "mode": 12912696,
+      "root": 0,
+      "aux0": 1074268160,
+      "aux1": 960,
+      "pat": 0,
+      "rflags": 0,
+      "bits": 44,
+      "features": 0,
+      "gdt_va": 0,
+      "gdt_bytes": 0,
+      "idt_va": 0,
+      "idt_bytes": 0,
+      "cs": 0
+    },
+    "unresolved": {
+      "flags": 0,
+      "dependencies": []
+    },
+    "totals": {
+      "protected": 311,
+      "review": 65226,
+      "granted": 0
+    },
+    "state_after": {
+      "mode": 12912696,
+      "root": 0,
+      "aux0": 1074268160,
+      "aux1": 960,
+      "pat": 0,
+      "rflags": 0,
+      "bits": 44,
+      "features": 0,
+      "gdt_va": 0,
+      "gdt_bytes": 0,
+      "idt_va": 0,
+      "idt_bytes": 0,
+      "cs": 0
+    },
+    "inactive": {
+      "paging": "not-built",
+      "pool": "not-admitted"
+    }
+  },
+  "refusal": null,
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "settled": true,
+  "returncode": 0
+}

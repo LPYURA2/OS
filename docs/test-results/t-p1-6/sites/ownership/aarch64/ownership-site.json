@@ -1,0 +1,51 @@
+{
+  "arch": "aarch64",
+  "address_space": "identity-image-address",
+  "image_start": 1074266112,
+  "image_end": 1074487296,
+  "image_size": 221184,
+  "bss_start": 1074302976,
+  "bss_end": 1074487296,
+  "binary_sha256": "bf453fe723e72a3f45252ddb41df23204937b2a738181cc89b4cd5ac3a46d9cd",
+  "raw_sha256": "360ffefa51a5a454f506194e92cab6c5e7cbfa311c0444217dac1452a3853d38",
+  "objects": {
+    "workspace": {
+      "symbol": "styleos_ownership_workspace",
+      "start": 1074356224,
+      "end": 1074421760,
+      "bytes": 65536
+    },
+    "diagnostic": {
+      "symbol": "diagnostic",
+      "start": 1074302976,
+      "end": 1074315376,
+      "bytes": 12400
+    },
+    "stack": {
+      "symbol": "__stack_bottom",
+      "start": 1074421760,
+      "end": 1074487296,
+      "bytes": 65536
+    },
+    "vectors": {
+      "symbol": "aarch64_vectors",
+      "start": 1074268160,
+      "end": 1074270208,
+      "bytes": 2048
+    },
+    "pool": {
+      "symbol": "styleos_bootpool_storage",
+      "start": 1074319360,
+      "end": 1074352128,
+      "bytes": 32768
+    },
+    "pool_metadata": {
+      "symbol": "styleos_bootpool_metadata",
+      "start": 1074352128,
+      "end": 1074356224,
+      "bytes": 4096
+    }
+  },
+  "page_size": 4096,
+  "invalid": false
+}

@@ -1,0 +1,284 @@
+[
+  {
+    "name": "host-boot-info",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-boot-info.log"
+  },
+  {
+    "name": "host-uefi",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-uefi.log"
+  },
+  {
+    "name": "host-exception",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-exception.log"
+  },
+  {
+    "name": "host-pool",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-pool.log"
+  },
+  {
+    "name": "host-paging",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-paging.log"
+  },
+  {
+    "name": "host-ownership",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-ownership.log"
+  },
+  {
+    "name": "host-memory",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-memory.log"
+  },
+  {
+    "name": "host-python",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-python.log"
+  },
+  {
+    "name": "repro-build-one",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "repro-build-one.log"
+  },
+  {
+    "name": "repro-build-two",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "repro-build-two.log"
+  },
+  {
+    "name": "reproducibility",
+    "status": "PASS",
+    "detail": "all 4 artifacts identical",
+    "log": "reproducibility.log"
+  },
+  {
+    "name": "build-for-qemu",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-for-qemu.log"
+  },
+  {
+    "name": "build-negative",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-negative.log"
+  },
+  {
+    "name": "build-negative-memory",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-negative-memory.log"
+  },
+  {
+    "name": "build-exception",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-exception.log"
+  },
+  {
+    "name": "build-bootpool",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-bootpool.log"
+  },
+  {
+    "name": "build-paging",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-paging.log"
+  },
+  {
+    "name": "build-paging-fault",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-paging-fault.log"
+  },
+  {
+    "name": "build-ownership",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-ownership.log"
+  },
+  {
+    "name": "build-ownership-invalid",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-ownership-invalid.log"
+  },
+  {
+    "name": "qemu-x86_64-normal",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-normal.log"
+  },
+  {
+    "name": "qemu-x86_64-invalid",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-invalid.log"
+  },
+  {
+    "name": "qemu-x86_64-invalid-map",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-invalid-map.log"
+  },
+  {
+    "name": "qemu-x86_64-exception",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-exception.log"
+  },
+  {
+    "name": "qemu-x86_64-bootpool",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-bootpool.log"
+  },
+  {
+    "name": "qemu-x86_64-paging",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-paging.log"
+  },
+  {
+    "name": "qemu-x86_64-paging-fault",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-paging-fault.log"
+  },
+  {
+    "name": "qemu-x86_64-ownership",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-ownership.log"
+  },
+  {
+    "name": "qemu-x86_64-ownership-invalid",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-x86_64-ownership-invalid.log"
+  },
+  {
+    "name": "qemu-aarch64-normal",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-normal.log"
+  },
+  {
+    "name": "qemu-aarch64-invalid",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-invalid.log"
+  },
+  {
+    "name": "qemu-aarch64-invalid-map",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-invalid-map.log"
+  },
+  {
+    "name": "qemu-aarch64-exception",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-exception.log"
+  },
+  {
+    "name": "qemu-aarch64-bootpool",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-bootpool.log"
+  },
+  {
+    "name": "qemu-aarch64-paging",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-paging.log"
+  },
+  {
+    "name": "qemu-aarch64-paging-fault",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-paging-fault.log"
+  },
+  {
+    "name": "qemu-aarch64-ownership",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-ownership.log"
+  },
+  {
+    "name": "qemu-aarch64-ownership-invalid",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-ownership-invalid.log"
+  },
+  {
+    "name": "qemu-aarch64-exception-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-exception-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-bootpool-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-bootpool-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-paging-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-paging-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-paging-fault-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-paging-fault-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-ownership-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-ownership-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-ownership-invalid-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-ownership-invalid-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-ownership-256m",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-ownership-256m.log"
+  },
+  {
+    "name": "qemu-aarch64-el2",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-el2.log"
+  },
+  {
+    "name": "qemu-aarch64-256m",
+    "status": "PASS",
+    "detail": "UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness",
+    "log": "qemu-aarch64-256m.log"
+  }
+]

@@ -1,0 +1,54 @@
+{
+  "x86_64": {
+    "binary_sha256": "6c210259094d0e7fed9cf3e0d7a0279b521386326be71e762888f30d2c9e22c2",
+    "raw_sha256": null,
+    "disk_sha256": "f44b2a99efd8743bea92227d5b3a94ebbb57d6713313ff2b1ca515763c0ecb53",
+    "image_start": 0,
+    "image_end": 212992,
+    "integer_only": {
+      "decoded_bytes": 32166,
+      "instruction_count": 8340,
+      "zero_padding_bytes": 0,
+      "executable_sha256": "77c6c72bbe4334820a791c6c895771420396fb60f0227d2022cce8bfab46e633"
+    },
+    "code_sites": [
+      "styleos_tasks_bootstrap",
+      "styleos_tasks_a",
+      "styleos_tasks_b",
+      "tasks_arch_switch",
+      "styleos_tasks_probe_resume",
+      "styleos_tasks_exit_resume",
+      "styleos_tasks_trap_return",
+      "styleos_tasks_dispatch_resume",
+      "tasks_arch_dispatch",
+      "tasks_arch_probe",
+      "tasks_arch_finish"
+    ]
+  },
+  "aarch64": {
+    "binary_sha256": "94d4799334a502dab06ec87ddbe495e7011fc2f75dd9f0d7e378f2c78452bd58",
+    "raw_sha256": "3d919bfe1f29492d1ab9930bb60e3666db9b8c2c7134967d4f63bfdfe10974c4",
+    "disk_sha256": null,
+    "image_start": 1074266112,
+    "image_end": 1074458624,
+    "integer_only": {
+      "decoded_bytes": 32012,
+      "instruction_count": 7535,
+      "zero_padding_bytes": 1872,
+      "executable_sha256": "821768fe4e3be63da34cc30cd088f72b61cf13fbb3c14b37e3ec49b50f9c8bc1"
+    },
+    "code_sites": [
+      "styleos_tasks_bootstrap",
+      "styleos_tasks_a",
+      "styleos_tasks_b",
+      "tasks_arch_switch",
+      "styleos_tasks_probe_resume",
+      "styleos_tasks_exit_resume",
+      "styleos_tasks_trap_return",
+      "styleos_tasks_dispatch_resume",
+      "tasks_arch_dispatch",
+      "tasks_arch_probe",
+      "tasks_arch_finish"
+    ]
+  }
+}

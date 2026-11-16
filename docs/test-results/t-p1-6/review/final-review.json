@@ -1,0 +1,628 @@
+{
+  "review": "T-P1.6 read-only final review",
+  "timestamp_utc": "2026-11-16T11:07:34.010096+00:00",
+  "base": "ea37e76abb0a1b6e75c050c43e357d8c89981537",
+  "head_at_review": "d8065f31ae292eccd2558ddc8dc2cd91b78b855f",
+  "branch": "feature/styleos-t-p1-6",
+  "conclusion": "PASS: no open ABI, admission, lifecycle, linked-integer-proof, UART or scope blocker found; report/pin/publication remain root-owned",
+  "repo_edits_by_this_review": false,
+  "git_mutations_by_this_review": false,
+  "qemu_runs_by_this_review": false,
+  "reviewed_source_sha256": {
+    "AGENTS.md": "c7657e7c3c818935c868752762224ceca2720c1cb283546a418389375e02a0cf",
+    "arch/aarch64/tasks.c": "0642a060d8419f3d507c5f1791cbc3dc0a3839b34b9fddc4cd81d942489dc88b",
+    "arch/aarch64/tasks_context.S": "86f19ed5829e5ac2f5cf83ea54fa6bd91666502fb09b4fbca82735959e632a55",
+    "arch/x86_64/tasks.c": "e9a637cd1778f3d1576d795a9efad69fe64920508ec45096628be639b808266c",
+    "arch/x86_64/tasks_context.S": "6f64a0d3bf6adb2baebda40f97a9da771a4c5005936473419ffd3673e4450b41",
+    "docs/LEARNING_RU.md": "666e4a9ede6f0da2f665f69eb640894f14b57397182b5116cb4e24612fd24ce6",
+    "docs/TESTING.md": "cfb75008d8618c3a02a0924e8854a7b1dc848fd03c4f4c33cbad9e4f025ad316",
+    "docs/adr/0009-cooperative-kernel-tasks.md": "46ef3e177050a5de45bea2494bf41353cd0de8853115cb5cb659f3b29ae8590e",
+    "include/styleos/tasks.h": "04406b6ad5fbae8c96cd49f8e9989ea37bc1ac19e49bfaf8d672a55676734e9c",
+    "kernel/main.c": "d64accbcb03a286fd77a9bf522fceda935486d3f84c3d9d1fe15cb284388a7ff",
+    "kernel/tasks.c": "480ba986ba161997e008a3ff79b2c70b2d2929c06e3327306d207ee4cf206267",
+    "kernel/tasks_demo.c": "3c5f5695254fed255a541ff26f160b72cb30dd8cd3ad37c133f39d6651c113ca",
+    "tests/test_build_modes.py": "21658c2b8f9c0af780338132cb37f90e6d33d4a90bf8a98494c3bdd67b4a6d20",
+    "tests/test_integer_code.py": "c5040e4aee2735dedbd62a969427f27a3710ff499d959f8eeef920077b3438e5",
+    "tests/test_ownership_output.py": "90e407ad0b831b56ec242d5c866f832be0fae07ed2fd38ad49cd3a02d61228b0",
+    "tests/test_tasks.c": "ef49e9f4c92d7641279c4ed6f86b9d2d98b6c52b71162875a8ded6f752afe6ea",
+    "tests/test_tasks_output.py": "f86fbe0b67a1e07b84cc0bda66c9b451e217312191c4e5178d548bed683353c5",
+    "tests/test_tasks_site.py": "3825b2ed50a7cb790bca61016fc85619bd05999f64a8f34934e1ba87b246b2ea",
+    "tools/build.py": "3e59318d3a185b35f06c3276f50a61b98e77e94bda39c23c192ca0e3c2d5d83a",
+    "tools/integer_code.py": "07b8ff46d9e6bc77d20d8266bbf02bba9cbdb55e42edc7fecfa396882b5499a4",
+    "tools/tasks_site.py": "61524f55ed3065c3165b47c340a5b5bf823224fc0ad007fac03aa7e7547fcdd2",
+    "tools/test.py": "808b3385fefe7f31a364574e0c41dd80710327c39db64a8762576b1a95c36c32"
+  },
+  "source_snapshot_sha256": "0e562bab1451afc9abe7170c5a62694a784ce06f9c724375fdec04661ea7123b",
+  "scope": {
+    "base_files": 576,
+    "identical_base_files": 568,
+    "changed_base_files": [
+      "AGENTS.md",
+      "docs/LEARNING_RU.md",
+      "docs/TESTING.md",
+      "kernel/main.c",
+      "tests/test_build_modes.py",
+      "tests/test_ownership_output.py",
+      "tools/build.py",
+      "tools/test.py"
+    ],
+    "missing_base_files": [],
+    "new_files_at_snapshot": [
+      "arch/aarch64/tasks.c",
+      "arch/aarch64/tasks_context.S",
+      "arch/x86_64/tasks.c",
+      "arch/x86_64/tasks_context.S",
+      "docs/adr/0009-cooperative-kernel-tasks.md",
+      "include/styleos/tasks.h",
+      "kernel/tasks.c",
+      "kernel/tasks_demo.c",
+      "tests/test_integer_code.py",
+      "tests/test_tasks.c",
+      "tests/test_tasks_output.py",
+      "tests/test_tasks_site.py",
+      "tools/integer_code.py",
+      "tools/tasks_site.py"
+    ],
+    "historical_evidence_files": 490,
+    "historical_evidence_unchanged": true,
+    "presentation_readme_unchanged": true,
+    "readme_sha256": "e11ddd1bba20177a3fefabe52b395ac1017c164f6de316337098c7b611aeeb4f",
+    "ownership_inventory_change": "tests/test_ownership_output.py expected build count 9 to 10 only",
+    "remote_refs": {
+      "OS": {
+        "before_sha256": "d0c4b0b8ffcea2fcf098be391338eb2d8f5548fe6adb1e6b5441f20766ec864d",
+        "final_sha256": "d0c4b0b8ffcea2fcf098be391338eb2d8f5548fe6adb1e6b5441f20766ec864d",
+        "identical": true
+      },
+      "Portable-os": {
+        "before_sha256": "fd0dafb62a63d77fc0fdb2f6ac8f117dbf685f48cbfb214115180def00ba85ac",
+        "final_sha256": "fd0dafb62a63d77fc0fdb2f6ac8f117dbf685f48cbfb214115180def00ba85ac",
+        "identical": true
+      }
+    },
+    "protected_main": "dfc5be9c2f699928a42903e70066f1bd8b20f65a",
+    "portable_status_porcelain": ""
+  },
+  "check_counts": {
+    "baseline": {
+      "results_sha256": "de53044b38a4247f96892549ee62ab9493d9ed116e0abda6b8925153458b68f7",
+      "checks": 47,
+      "statuses": {
+        "PASS": 47
+      },
+      "python_unittest_count": 138,
+      "host_python_sha256": "0ab062d786ae75acda63fbe1879b10708cd246f80f371c04f9ce98ba8a246383"
+    },
+    "full": {
+      "results_sha256": "764fc5a6f6c0ff6ba0090d96fe649badb1adb4d38ce741d2ea6aefd2e1b39cec",
+      "checks": 52,
+      "statuses": {
+        "PASS": 52
+      },
+      "python_unittest_count": 188,
+      "host_python_sha256": "9bfb27aa4b2b131c9dc69a5386f25313b6bbffded31732170d2138fa45b75364"
+    },
+    "arm_only_linux": {
+      "results_sha256": "345aacb122da9c26d5392c7aa73d22d4608118f47edbccc3c3cda60b6d2c232a",
+      "checks": 39,
+      "statuses": {
+        "PASS": 39
+      },
+      "python_unittest_count": 188,
+      "host_python_sha256": "1691897753eef5564a4afd8fb062007144b3843e9368d3034804a467b2d78caf"
+    }
+  },
+  "old_artifacts": [
+    {
+      "path": "x86_64/BOOTX64.EFI",
+      "baseline_sha256": "1bd026d3406b7670d0e2cac1bacae20e2fe58e735afe7c6f8d8798d83500f7f2",
+      "final_sha256": "1bd026d3406b7670d0e2cac1bacae20e2fe58e735afe7c6f8d8798d83500f7f2",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "x86_64/styleos.img",
+      "baseline_sha256": "0d49846a842336938a851f94eff3b64b8b0795c325dd58e8a5a42a6569d45c76",
+      "final_sha256": "0d49846a842336938a851f94eff3b64b8b0795c325dd58e8a5a42a6569d45c76",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "aarch64/kernel.elf",
+      "baseline_sha256": "08f220a0c62a0d9eebec6c109c6852b9a20ec3772e40cdf104cab74f0042c215",
+      "final_sha256": "08f220a0c62a0d9eebec6c109c6852b9a20ec3772e40cdf104cab74f0042c215",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "aarch64/styleos.bin",
+      "baseline_sha256": "6d3651b99498e4108efb99d5eedd498feff858536a35ff168492ed972a420b70",
+      "final_sha256": "6d3651b99498e4108efb99d5eedd498feff858536a35ff168492ed972a420b70",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "negative/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "fbf4257ae12ddfbf9661fd3e4fd44a6a42efdcb76c3206b80b8d7d9b123f8a3e",
+      "final_sha256": "fbf4257ae12ddfbf9661fd3e4fd44a6a42efdcb76c3206b80b8d7d9b123f8a3e",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "negative/x86_64/styleos.img",
+      "baseline_sha256": "6be1578f40f37aea46afcfbaae571ecf497b7b7928558fa5316be9e3b1935a2e",
+      "final_sha256": "6be1578f40f37aea46afcfbaae571ecf497b7b7928558fa5316be9e3b1935a2e",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "negative/aarch64/kernel.elf",
+      "baseline_sha256": "1d9410a906bd8635c19574e0b37c0060f9eac98bf2c0137cbc3a01073092d599",
+      "final_sha256": "1d9410a906bd8635c19574e0b37c0060f9eac98bf2c0137cbc3a01073092d599",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "negative/aarch64/styleos.bin",
+      "baseline_sha256": "682ac2e299748d702ad6aa90264be1a8edaf26e44ac37b4c8d64b89212553357",
+      "final_sha256": "682ac2e299748d702ad6aa90264be1a8edaf26e44ac37b4c8d64b89212553357",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "negative-memory/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "159a9d2a1d270b93b0244d7ee54140750e829a13c2ca6c672f4cb3b44ce1c131",
+      "final_sha256": "159a9d2a1d270b93b0244d7ee54140750e829a13c2ca6c672f4cb3b44ce1c131",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "negative-memory/x86_64/styleos.img",
+      "baseline_sha256": "8ac1395a8c7c21fc16e4214646938b18028f778fc645e8233fe4b36fe5e7949d",
+      "final_sha256": "8ac1395a8c7c21fc16e4214646938b18028f778fc645e8233fe4b36fe5e7949d",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "negative-memory/aarch64/kernel.elf",
+      "baseline_sha256": "e1fb399a7e11ad1f7be90398bb5139ce2a2404ebeb62b22d370c8213a4b6ed3e",
+      "final_sha256": "e1fb399a7e11ad1f7be90398bb5139ce2a2404ebeb62b22d370c8213a4b6ed3e",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "negative-memory/aarch64/styleos.bin",
+      "baseline_sha256": "b5630a2f1cfb25bb236a3b680ff23578c1d1b0450edeba4762e6df99c4086168",
+      "final_sha256": "b5630a2f1cfb25bb236a3b680ff23578c1d1b0450edeba4762e6df99c4086168",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "exception/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "a43b1f319b2fa1b8ae40c8674eb7553b4235613ff1fa211b23325733f7e53393",
+      "final_sha256": "a43b1f319b2fa1b8ae40c8674eb7553b4235613ff1fa211b23325733f7e53393",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "exception/x86_64/styleos.img",
+      "baseline_sha256": "b863663cc9c72163fcb22e89bb450c60cf91692bf590b6d35fa5dbb813616a71",
+      "final_sha256": "b863663cc9c72163fcb22e89bb450c60cf91692bf590b6d35fa5dbb813616a71",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "exception/aarch64/kernel.elf",
+      "baseline_sha256": "9bc1ecac76d27f66369a00cc7c276cb053cf7a7bae11f02be643310a4b4b7562",
+      "final_sha256": "9bc1ecac76d27f66369a00cc7c276cb053cf7a7bae11f02be643310a4b4b7562",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "exception/aarch64/styleos.bin",
+      "baseline_sha256": "48ea255cd8cb2cd69d93c19e599b4dee74d2df76efae923ad8e0d5d130971dd9",
+      "final_sha256": "48ea255cd8cb2cd69d93c19e599b4dee74d2df76efae923ad8e0d5d130971dd9",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "bootpool/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "3ed9cca65deecd2854c34ff4503ed4c9926435c9589b59a221221cd17229a16d",
+      "final_sha256": "3ed9cca65deecd2854c34ff4503ed4c9926435c9589b59a221221cd17229a16d",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "bootpool/x86_64/styleos.img",
+      "baseline_sha256": "cfed6df7cebb2cb6e49ada6b131c74a5d9c5eb8517c5e6a468a53e0dd2c63aed",
+      "final_sha256": "cfed6df7cebb2cb6e49ada6b131c74a5d9c5eb8517c5e6a468a53e0dd2c63aed",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "bootpool/aarch64/kernel.elf",
+      "baseline_sha256": "142629c97f6538f360fc49be144b1cd70605006d6cf0de959dbb0d0d250c4397",
+      "final_sha256": "142629c97f6538f360fc49be144b1cd70605006d6cf0de959dbb0d0d250c4397",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "bootpool/aarch64/styleos.bin",
+      "baseline_sha256": "843811a619f4f046dec62aea0a717cfcbbbb65f43338e8afc5237d80e04d7e40",
+      "final_sha256": "843811a619f4f046dec62aea0a717cfcbbbb65f43338e8afc5237d80e04d7e40",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "paging/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "ee9462ee3af5a28c3f636c8871e085cdab3a4f014f8f4260ab5f41d4c647b901",
+      "final_sha256": "ee9462ee3af5a28c3f636c8871e085cdab3a4f014f8f4260ab5f41d4c647b901",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "paging/x86_64/styleos.img",
+      "baseline_sha256": "ad5151c1861c3037030176f4df2319f74ad3344869c1f6837ccdb7e61c9ea5ec",
+      "final_sha256": "ad5151c1861c3037030176f4df2319f74ad3344869c1f6837ccdb7e61c9ea5ec",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "paging/aarch64/kernel.elf",
+      "baseline_sha256": "959dde612f9207846b168470ed0d627d2339cbe1cd15bbdb35983a736a8dcdf2",
+      "final_sha256": "959dde612f9207846b168470ed0d627d2339cbe1cd15bbdb35983a736a8dcdf2",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "paging/aarch64/styleos.bin",
+      "baseline_sha256": "ad6a978508cb3df205cbac773716b69026e25e767a5789d6112638d109ee8884",
+      "final_sha256": "ad6a978508cb3df205cbac773716b69026e25e767a5789d6112638d109ee8884",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "paging-fault/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "221b6af5c4ee309fb6d07eb1fb282758a6be625e37ba5d823cf7d4ce28ecab5f",
+      "final_sha256": "221b6af5c4ee309fb6d07eb1fb282758a6be625e37ba5d823cf7d4ce28ecab5f",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "paging-fault/x86_64/styleos.img",
+      "baseline_sha256": "d4c2f614b4fddd391e3405390c5980981b0bbcf1a54ad484fde7a7f3c7d3388e",
+      "final_sha256": "d4c2f614b4fddd391e3405390c5980981b0bbcf1a54ad484fde7a7f3c7d3388e",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "paging-fault/aarch64/kernel.elf",
+      "baseline_sha256": "644071456be356497bfddd2ea90f2b7a96de6c5a171d6fe4764f6d3e0e3a5238",
+      "final_sha256": "644071456be356497bfddd2ea90f2b7a96de6c5a171d6fe4764f6d3e0e3a5238",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "paging-fault/aarch64/styleos.bin",
+      "baseline_sha256": "8d1cb595ecb24da9b8c98ea607ac32381de0295e1d701a1b46867fee8bae5f12",
+      "final_sha256": "8d1cb595ecb24da9b8c98ea607ac32381de0295e1d701a1b46867fee8bae5f12",
+      "identical": true,
+      "required_previous_28": true,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "ownership/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "9708d5cfc606340cdf342bd292a19cf57a79c492359a6247159cf0cf38e145ba",
+      "final_sha256": "9708d5cfc606340cdf342bd292a19cf57a79c492359a6247159cf0cf38e145ba",
+      "identical": true,
+      "required_previous_28": false,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "ownership/x86_64/styleos.img",
+      "baseline_sha256": "d1d4c3e7c12edad944de9de4ab5e1dbc78b819449ab0f8b0fa13110a6848f482",
+      "final_sha256": "d1d4c3e7c12edad944de9de4ab5e1dbc78b819449ab0f8b0fa13110a6848f482",
+      "identical": true,
+      "required_previous_28": false,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "ownership/aarch64/kernel.elf",
+      "baseline_sha256": "bf453fe723e72a3f45252ddb41df23204937b2a738181cc89b4cd5ac3a46d9cd",
+      "final_sha256": "bf453fe723e72a3f45252ddb41df23204937b2a738181cc89b4cd5ac3a46d9cd",
+      "identical": true,
+      "required_previous_28": false,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "ownership/aarch64/styleos.bin",
+      "baseline_sha256": "360ffefa51a5a454f506194e92cab6c5e7cbfa311c0444217dac1452a3853d38",
+      "final_sha256": "360ffefa51a5a454f506194e92cab6c5e7cbfa311c0444217dac1452a3853d38",
+      "identical": true,
+      "required_previous_28": false,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "ownership-invalid/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "d85f6365b61ce8f0556145a3c6d0a302a3774440b51c8121d186fcfd725ddcab",
+      "final_sha256": "d85f6365b61ce8f0556145a3c6d0a302a3774440b51c8121d186fcfd725ddcab",
+      "identical": true,
+      "required_previous_28": false,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "ownership-invalid/x86_64/styleos.img",
+      "baseline_sha256": "0c2c9a8a0e92a354c9baf32bac0f97a9eb4bc4050e486fd0e0d007a9f470917e",
+      "final_sha256": "0c2c9a8a0e92a354c9baf32bac0f97a9eb4bc4050e486fd0e0d007a9f470917e",
+      "identical": true,
+      "required_previous_28": false,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "ownership-invalid/aarch64/kernel.elf",
+      "baseline_sha256": "172ed21a9b4fbbc9cdbc2cc6f4137247b145dc988feb0e29fef68954e5c49cc2",
+      "final_sha256": "172ed21a9b4fbbc9cdbc2cc6f4137247b145dc988feb0e29fef68954e5c49cc2",
+      "identical": true,
+      "required_previous_28": false,
+      "tasks_marker_absent": true
+    },
+    {
+      "path": "ownership-invalid/aarch64/styleos.bin",
+      "baseline_sha256": "46d01a410a71c4eaed7fc29eb2a659dbfb8262f07b4c5f0ced045c4ca1e295cb",
+      "final_sha256": "46d01a410a71c4eaed7fc29eb2a659dbfb8262f07b4c5f0ced045c4ca1e295cb",
+      "identical": true,
+      "required_previous_28": false,
+      "tasks_marker_absent": true
+    }
+  ],
+  "old_artifact_summary": {
+    "all_previous_profiles_artifacts": 36,
+    "identical": 36,
+    "mandatory_previous_28_identical": 28,
+    "tasks_markers_absent": 36
+  },
+  "task_runs": [
+    {
+      "set": "full",
+      "job": "qemu-aarch64-tasks-el2",
+      "json_sha256": "d8ca37f66e6f9a148212d8dcf23903e75f1f9533fca598dc52714a6c818bd09f",
+      "log_sha256": "09f59702b562439922fea3f28fffc13561c8b69ef648a85b3643e1a42154bc7e",
+      "uart_sha256": "c4833442a1168d9a2e545b3060d47757b47b14d391f1ca49cd0fed314e186759",
+      "manifest_sha256": "c29813a45716ba3bcf18e081487f5fc1450d716f432f55108f401f9488ea52ad",
+      "site_sha256": "44129940287e615f2cdc665ec74b725bf1fa20c292b92aa15928b237981be415",
+      "independent_raw_uart_parse_matches_json": true,
+      "status": "PASS",
+      "arch": "aarch64",
+      "initial_el2": true,
+      "schedule": [
+        "A:START",
+        "B:START",
+        "A:RESUME",
+        "B:RESUME",
+        "A:EXIT",
+        "B:EXIT"
+      ],
+      "completed": 2,
+      "dispatches": 6,
+      "released": [
+        "A",
+        "B"
+      ],
+      "decoded_bytes": 32012,
+      "instruction_count": 7535,
+      "zero_padding_bytes": 1872,
+      "executable_sha256": "821768fe4e3be63da34cc30cd088f72b61cf13fbb3c14b37e3ec49b50f9c8bc1",
+      "binary_sha256": "94d4799334a502dab06ec87ddbe495e7011fc2f75dd9f0d7e378f2c78452bd58",
+      "raw_sha256": "3d919bfe1f29492d1ab9930bb60e3666db9b8c2c7134967d4f63bfdfe10974c4",
+      "disk_sha256": null,
+      "requested_stop": true,
+      "forced_stop": false,
+      "natural_exit": false,
+      "settled": true,
+      "returncode": 0
+    },
+    {
+      "set": "full",
+      "job": "qemu-aarch64-tasks",
+      "json_sha256": "fe1d1fe32d6d915eebdc4c69863474bdc0a8a91e910db6c67908179810e1aa7e",
+      "log_sha256": "c350697047881017c94c04c264e896835bc9257005785bf8c6e90587c350f7eb",
+      "uart_sha256": "da20930a5c1d0c955019b8af794ecb10b62d7002ea43735092c981240cfd751d",
+      "manifest_sha256": "c29813a45716ba3bcf18e081487f5fc1450d716f432f55108f401f9488ea52ad",
+      "site_sha256": "44129940287e615f2cdc665ec74b725bf1fa20c292b92aa15928b237981be415",
+      "independent_raw_uart_parse_matches_json": true,
+      "status": "PASS",
+      "arch": "aarch64",
+      "initial_el2": false,
+      "schedule": [
+        "A:START",
+        "B:START",
+        "A:RESUME",
+        "B:RESUME",
+        "A:EXIT",
+        "B:EXIT"
+      ],
+      "completed": 2,
+      "dispatches": 6,
+      "released": [
+        "A",
+        "B"
+      ],
+      "decoded_bytes": 32012,
+      "instruction_count": 7535,
+      "zero_padding_bytes": 1872,
+      "executable_sha256": "821768fe4e3be63da34cc30cd088f72b61cf13fbb3c14b37e3ec49b50f9c8bc1",
+      "binary_sha256": "94d4799334a502dab06ec87ddbe495e7011fc2f75dd9f0d7e378f2c78452bd58",
+      "raw_sha256": "3d919bfe1f29492d1ab9930bb60e3666db9b8c2c7134967d4f63bfdfe10974c4",
+      "disk_sha256": null,
+      "requested_stop": true,
+      "forced_stop": false,
+      "natural_exit": false,
+      "settled": true,
+      "returncode": 0
+    },
+    {
+      "set": "full",
+      "job": "qemu-x86_64-tasks",
+      "json_sha256": "555bb03da2d25ac6396a1f33fff70c4c6ef5337bdc3acdbf9947b78e4eb04bda",
+      "log_sha256": "4b481f1690bb41c02de6d030271b247421f2c2a0a18eebe5a3b5af3521b30725",
+      "uart_sha256": "0f52faccbc2aada939d1601a1871cf2744d5641515683a35ac07c102908fd5f1",
+      "manifest_sha256": "c29813a45716ba3bcf18e081487f5fc1450d716f432f55108f401f9488ea52ad",
+      "site_sha256": "d1a014cf4c7cf6792302aa967501456e1961e0f31f7dbe5f3137f97fd347b7cf",
+      "independent_raw_uart_parse_matches_json": true,
+      "status": "PASS",
+      "arch": "x86_64",
+      "initial_el2": false,
+      "schedule": [
+        "A:START",
+        "B:START",
+        "A:RESUME",
+        "B:RESUME",
+        "A:EXIT",
+        "B:EXIT"
+      ],
+      "completed": 2,
+      "dispatches": 6,
+      "released": [
+        "A",
+        "B"
+      ],
+      "decoded_bytes": 32166,
+      "instruction_count": 8340,
+      "zero_padding_bytes": 0,
+      "executable_sha256": "77c6c72bbe4334820a791c6c895771420396fb60f0227d2022cce8bfab46e633",
+      "binary_sha256": "6c210259094d0e7fed9cf3e0d7a0279b521386326be71e762888f30d2c9e22c2",
+      "raw_sha256": null,
+      "disk_sha256": "f44b2a99efd8743bea92227d5b3a94ebbb57d6713313ff2b1ca515763c0ecb53",
+      "requested_stop": true,
+      "forced_stop": false,
+      "natural_exit": false,
+      "settled": true,
+      "returncode": 0
+    },
+    {
+      "set": "arm_only_linux",
+      "job": "qemu-aarch64-tasks-el2",
+      "json_sha256": "f96c43a2bfca8bbfe7f611c5ba7d1ed6dd32ed941dba771dad76e2574868fcf3",
+      "log_sha256": "4d43176f476fd791edda90c8fdd492161cb04ae00a56c7205cb430891efea2c8",
+      "uart_sha256": "3c0b25222155a7a8e8ca389231f6fd70e88239f07b062cd90a01f52da99adcde",
+      "manifest_sha256": "19b8056c5c248330875dfb3f8b25bd02329fb7268e8be1fb4d0aeb99889b5c3e",
+      "site_sha256": "44129940287e615f2cdc665ec74b725bf1fa20c292b92aa15928b237981be415",
+      "independent_raw_uart_parse_matches_json": true,
+      "status": "PASS",
+      "arch": "aarch64",
+      "initial_el2": true,
+      "schedule": [
+        "A:START",
+        "B:START",
+        "A:RESUME",
+        "B:RESUME",
+        "A:EXIT",
+        "B:EXIT"
+      ],
+      "completed": 2,
+      "dispatches": 6,
+      "released": [
+        "A",
+        "B"
+      ],
+      "decoded_bytes": 32012,
+      "instruction_count": 7535,
+      "zero_padding_bytes": 1872,
+      "executable_sha256": "821768fe4e3be63da34cc30cd088f72b61cf13fbb3c14b37e3ec49b50f9c8bc1",
+      "binary_sha256": "94d4799334a502dab06ec87ddbe495e7011fc2f75dd9f0d7e378f2c78452bd58",
+      "raw_sha256": "3d919bfe1f29492d1ab9930bb60e3666db9b8c2c7134967d4f63bfdfe10974c4",
+      "disk_sha256": null,
+      "requested_stop": true,
+      "forced_stop": false,
+      "natural_exit": false,
+      "settled": true,
+      "returncode": 0
+    },
+    {
+      "set": "arm_only_linux",
+      "job": "qemu-aarch64-tasks",
+      "json_sha256": "916de0a5684dd9958aac2915ff53691fcc9411b95e24ee85f16d7ee01b7a00aa",
+      "log_sha256": "0cef0b860d32a0e4230c0e47e79d129639576f8f0157f3082e5da6139eae9417",
+      "uart_sha256": "c7cf180163eceb5a71af73ef9ebfbd714fe42c061ced477cda6645aeb36fb2c5",
+      "manifest_sha256": "19b8056c5c248330875dfb3f8b25bd02329fb7268e8be1fb4d0aeb99889b5c3e",
+      "site_sha256": "44129940287e615f2cdc665ec74b725bf1fa20c292b92aa15928b237981be415",
+      "independent_raw_uart_parse_matches_json": true,
+      "status": "PASS",
+      "arch": "aarch64",
+      "initial_el2": false,
+      "schedule": [
+        "A:START",
+        "B:START",
+        "A:RESUME",
+        "B:RESUME",
+        "A:EXIT",
+        "B:EXIT"
+      ],
+      "completed": 2,
+      "dispatches": 6,
+      "released": [
+        "A",
+        "B"
+      ],
+      "decoded_bytes": 32012,
+      "instruction_count": 7535,
+      "zero_padding_bytes": 1872,
+      "executable_sha256": "821768fe4e3be63da34cc30cd088f72b61cf13fbb3c14b37e3ec49b50f9c8bc1",
+      "binary_sha256": "94d4799334a502dab06ec87ddbe495e7011fc2f75dd9f0d7e378f2c78452bd58",
+      "raw_sha256": "3d919bfe1f29492d1ab9930bb60e3666db9b8c2c7134967d4f63bfdfe10974c4",
+      "disk_sha256": null,
+      "requested_stop": true,
+      "forced_stop": false,
+      "natural_exit": false,
+      "settled": true,
+      "returncode": 0
+    }
+  ],
+  "independent_decoder_recheck": {
+    "reviewer": "proof_audit",
+    "method": "verified_tasks_site recomputation on current final linked PE/ELF/Image using LLVM 19.1.7, then exact raw UART/JSON comparison",
+    "all_three_full_jobs_match": true
+  },
+  "prior_native_msabi_proof": {
+    "log": "review/msabi-host.log",
+    "log_sha256": "356555da077501cdbda93758a1614c8afd8621ae746eca7f36ee31487c90ec77",
+    "source_sha256": "13eb39f06b8b3a302cb0aa4c13b6d88975b3fb6576fd40aad08bd1f1f6285fc5",
+    "instruction_stream_adapter_sha256": "e3175115b2e8177f146b37b7e0f180d88260998a552f8e9fcc4d020c1b796089",
+    "result": "PASS: six real switches on independent static task stacks, actual live nonvolatile register masks, continuations and cookies; native Linux ms_abi evidence only"
+  },
+  "limits": [
+    "trusted cooperative kernel tasks on one CPU",
+    "integer-only call-boundary contexts; no general FP/SIMD context",
+    "software canaries are not hardware guards or task isolation",
+    "no PMM/heap, candidate/review RAM access, RAM grant or reclaim",
+    "no new CR3/MMU/GDT/IDT/VBAR policy, IRQ/preemption/SMP, user mode/syscalls/IPC",
+    "owner-reported T-P1.5 Termux 35/35 exit0 QEMU11.1.3 is historical report only; T-P1.6 phone/VirtualBox/physical SKIPPED"
+  ]
+}

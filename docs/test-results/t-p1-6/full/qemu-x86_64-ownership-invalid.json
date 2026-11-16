@@ -1,0 +1,73 @@
+{
+  "arch": "x86_64",
+  "mode": "ownership-invalid",
+  "initial_el2": false,
+  "ram_mib": 128,
+  "status": "PASS",
+  "uart_sha256": "9abcb53e8b5ba100b9276b8f6814d1744b2498464462ca6c7758f1dfb16eb769",
+  "manifest_sha256": "e4d75367403d4c18e89ef3b83b22f0214307ac1e400b3b0cdf2c47d0e3f4c4a6",
+  "ownership_site": {
+    "arch": "x86_64",
+    "address_space": "image-rva",
+    "image_start": 0,
+    "image_end": 241664,
+    "image_size": 241664,
+    "preferred_image_base": 5368709120,
+    "binary_sha256": "d85f6365b61ce8f0556145a3c6d0a302a3774440b51c8121d186fcfd725ddcab",
+    "map_sha256": "eddcd6eed87a44fb839dd7b0769bdb05e3fa98c9bcc70b62a9693a3edb310d9f",
+    "objects": {
+      "workspace": {
+        "symbol": "styleos_ownership_workspace",
+        "start": 98304,
+        "end": 163840,
+        "bytes": 65536
+      },
+      "diagnostic": {
+        "symbol": "diagnostic",
+        "start": 45152,
+        "end": 57552,
+        "bytes": 12400
+      },
+      "stack": {
+        "symbol": "styleos_stack_bottom",
+        "start": 163856,
+        "end": 229392,
+        "bytes": 65536
+      },
+      "idt": {
+        "symbol": "early_idt",
+        "start": 229392,
+        "end": 233488,
+        "bytes": 4096
+      },
+      "handoff": {
+        "symbol": "handoff",
+        "start": 45056,
+        "end": 45152,
+        "bytes": 96
+      },
+      "pool": {
+        "symbol": "styleos_bootpool_storage",
+        "start": 61440,
+        "end": 94208,
+        "bytes": 32768
+      },
+      "pool_metadata": {
+        "symbol": "styleos_bootpool_metadata",
+        "start": 94208,
+        "end": 98304,
+        "bytes": 4096
+      }
+    },
+    "page_size": 4096,
+    "invalid": true,
+    "disk_sha256": "0c2c9a8a0e92a354c9baf32bac0f97a9eb4bc4050e486fd0e0d007a9f470917e"
+  },
+  "ownership_plan": null,
+  "refusal": "required",
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "settled": true,
+  "returncode": 0
+}

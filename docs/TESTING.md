@@ -388,14 +388,14 @@ CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/
 pkg install python clang lld llvm git qemu-system-aarch64-headless
 git clone --branch feature/styleos-t-p1-6 --single-branch https://github.com/LPYURA2/OS.git styleos-tp16
 cd styleos-tp16
-git checkout --detach __T_P1_6_SHA__
+git checkout --detach d8065f31ae292eccd2558ddc8dc2cd91b78b855f
 git rev-parse HEAD
 qemu-system-aarch64 --version
 llvm-objdump --version
 CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp16
 ```
 
-Замените `__T_P1_6_SHA__` точным опубликованным SHA реализации из [отчёта T-P1.6](test-results/t-p1-6/README.md). Пакет `llvm` нужен, если `llvm-objdump` не входит в установленный набор; путь можно явно задать через `LLVM_OBJDUMP`. Runner сам завершает QEMU и не требует Ctrl+A. Сводку получите командой:
+Команда закреплена на SHA реализации из [отчёта T-P1.6](test-results/t-p1-6/README.md). Пакет `llvm` нужен, если `llvm-objdump` не входит в установленный набор; путь можно явно задать через `LLVM_OBJDUMP`. Runner сам завершает QEMU и не требует Ctrl+A. Сводку получите командой:
 
 ```sh
 cat build/termux-tp16/test-results/results.json
