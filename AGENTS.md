@@ -144,3 +144,50 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
 - Stop after report and task-branch publication. The first general-RAM pool,
   PMM/heap, reclaim, own GDT, IRQ/SMP, recovery, processes/drivers and kernel model
   remain separate decisions. A plan with zero grants does not authorize them.
+
+## Approved T-P1.6 task
+- Branch `feature/styleos-t-p1-6` starts from
+  `ea37e76abb0a1b6e75c050c43e357d8c89981537`, the accepted T-P1.5 branch tip.
+  Publish this task branch only. Preserve main, previous refs, Portable-os,
+  `docs/styleos-readme`, history and parallel work. No merge, force push or
+  release. Do not modify the presentation README for this technical task.
+- Only `--test-tasks` may include the two trusted cooperative kernel tasks,
+  context adapters, two 16384-byte stacks and 4096-byte control workspace.
+  Use separate outputs; all nine test flags are pairwise incompatible. Ordinary
+  and previous profiles retain their sources, artifacts and architecture paths.
+- Activate only after valid handoff and MEMMAP. Prove every complete image-owned
+  BSS/control/stack interval, arithmetic, alignment, reservation and disjointness
+  from all other live objects. Do not use CANDIDATE/REVIEW, heap, general PMM,
+  pool allocation, reclaim or new physical ownership; GRANTED remains zero.
+- One CPU, two fixed slots, explicit FREE/READY/RUNNING/DONE transitions and
+  round robin at explicit calls only. Refuse invalid arguments, state, overlap,
+  capacity and counter overflow without modifying control or output. DONE is
+  never selected; a returning task must enter the bootstrap's controlled DONE
+  path. Release clears slot bookkeeping only, without freeing stack RAM.
+- Use real ABI call-boundary SP/PC and nonvolatile integer registers: Microsoft
+  x64 with shadow space/no red zone and AAPCS64 with aligned SP. Preserve the
+  original dispatcher stack; construct an explicit initial frame and return
+  trap. The 16-byte software canaries at each stack end do not provide hardware
+  stack protection, task isolation or recovery from a damaged kernel task.
+- Keep the integer-only compiler profile and bind complete executable-byte
+  decoding to the linked image using LLVM objdump, rejecting gaps, bad decode
+  and FP/SIMD instructions. Do not claim general FP/SIMD context, unwind,
+  preemption, IRQ, SMP, TLS, user mode, processes, syscalls or IPC support.
+- Preserve inherited x86 CR3/GDT/IDT and ARM EL1 MMU-off/VBAR/DAIF. Read-only
+  architecture observations require the known-image/reserved-table/GDT proofs;
+  they do not create a general VA-to-PA translator or complete firmware closure.
+- Require the exact A:START, B:START, A:RESUME, B:RESUME, A:EXIT, B:EXIT trace,
+  six GO operations, two yields per task, return/DONE, dispatcher EMPTY/release,
+  live register checks, saved continuation/stack evidence, canaries, one TASKS
+  PASS and ordinary halt. Host logic tests do not prove machine switching.
+- Preserve old regressions, four-artifact reproducibility and same-toolchain
+  comparison of all 28 previous profile artifacts. Record actual counts and
+  SHA-bound PE/ELF/Image, UART/JSON and manifest evidence. Keep the ARM64-only
+  runner independent of OVMF, x86 QEMU and x86 linker; LLVM objdump is required
+  for the new task proof on either ISA.
+- Record the owner's T-P1.5 Termux 35/35 exit-0 QEMU 11.1.3 screenshot report
+  separately in the T-P1.6 report, without altering historical evidence or
+  treating it as a T-P1.6 result. T-P1.6 Android/Termux, VirtualBox and physical
+  devices remain SKIPPED until actually run. Stop after report and publication.
+  User-process fault containment belongs to the separate future T-P1.7; these
+  cooperative kernel tasks do not establish it or implement Deep Drop.

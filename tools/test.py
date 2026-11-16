@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host, reproducible-build and bounded real-QEMU checks for T-P1.5."""
+"""Host, reproducible-build and bounded real-QEMU checks for T-P1.6."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -28,6 +28,11 @@ try:
 except ImportError:  # Direct tools/test.py invocation.
     from ownership_site import describe_ownership
 
+try:
+    from .tasks_site import describe_tasks
+except ImportError:  # Direct tools/test.py invocation.
+    from tasks_site import describe_tasks
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -35,7 +40,7 @@ def serial_handoff_ok(output, arch, invalid=False, el2=False):
     """A successful marker cannot erase a prior boot failure in the same run."""
     errors = (b'BOOT ERROR', b'BOOT_ERROR', b'early exception',
               b'STYLEOS EXCEPTION', b'STYLEOS EMERGENCY', b'STYLEOS BOOTPOOL',
-              b'STYLEOS PAGING', b'STYLEOS OWNERSHIP')
+              b'STYLEOS PAGING', b'STYLEOS OWNERSHIP', b'STYLEOS TASKS')
     if any(marker in output for marker in errors):
         return False
     lines = output.splitlines()
@@ -1045,6 +1050,349 @@ def verified_ownership_site(folder, arch, invalid=False):
     return verified
 
 
+
+_TASKS_STATE_FIELDS = ('mode', 'root', 'control0', 'control1', 'flags', 'cs',
+                       'idt_base', 'idt_bytes', 'gdt_base', 'gdt_bytes', 'pat',
+                       'pa_bits', 'gdt_pages', 'gdt_pa0', 'gdt_pa1')
+def _tasks_sources(arch):
+    common = ['kernel/main.c', 'kernel/boot_info.c', 'kernel/runtime.c',
+              'kernel/boot_memory.c', 'kernel/boot_memory_diagnostic.c',
+              'kernel/exception.c', 'kernel/boot_pool.c', 'kernel/tasks.c',
+              'kernel/tasks_demo.c', f'arch/{arch}/tasks.c',
+              f'arch/{arch}/tasks_context.S']
+    platform = (['boot/x86_64/exit_boot.c', 'boot/x86_64/uefi.c',
+                 'boot/x86_64/memory_map.c', 'arch/x86_64/serial.c',
+                 'arch/x86_64/entry.S', 'arch/x86_64/exceptions.c',
+                 'arch/x86_64/exception_entry.S'] if arch == 'x86_64' else
+                ['boot/aarch64/platform.c', 'boot/aarch64/start.S',
+                 'boot/aarch64/fdt_memory.c', 'arch/aarch64/console.c'])
+    return common + platform
+
+
+_TASKS_CODE = ('styleos_tasks_bootstrap', 'styleos_tasks_a', 'styleos_tasks_b',
+               'tasks_arch_switch', 'tasks_arch_dispatch', 'tasks_arch_probe', 'tasks_arch_finish',
+               'styleos_tasks_probe_resume', 'styleos_tasks_exit_resume',
+               'styleos_tasks_trap_return', 'styleos_tasks_dispatch_resume')
+
+
+def serial_tasks_ok(output, arch, site, ram_mib=128, el2=False):
+    """Accept only the bound two-stack, six-dispatch machine-context trace."""
+    return tasks_report(output, arch, site, ram_mib, el2) is not None
+
+
+def tasks_report(output, arch, site, ram_mib=128, el2=False):
+    """Return parsed evidence only after every task contract has passed."""
+    try:
+        return _tasks_report(output, arch, site, ram_mib, el2)
+    except (ValueError, KeyError, TypeError, IndexError, OverflowError):
+        return None
+
+
+def _tasks_report(output, arch, site, ram_mib, el2):
+    def require(condition):
+        if not condition:
+            raise ValueError('invalid tasks trace')
+
+    def integer(value):
+        return type(value) is int and 0 <= value < 1 << 64
+
+    def inside(inner, outer):
+        return outer[0] <= inner[0] < inner[1] <= outer[1]
+
+    def overlaps(one, two):
+        return one[0] < two[1] and two[0] < one[1]
+
+    require(isinstance(site, dict) and site.get('arch') == arch and
+            arch in ('x86_64', 'aarch64') and type(site.get('page_size')) is int and
+            site['page_size'] == 4096 and not any(marker in output.lower() for marker in
+            (b'timeout', b'timed out', b'boot error', b'boot_error', b'early exception',
+             b'styleos exception', b'styleos emergency')))
+    lines = output.splitlines()
+    first = next((n for n, line in enumerate(lines) if line.startswith(b'STYLEOS TASKS')), None)
+    require(first is not None)
+    prefix = b'\n'.join(lines[:first]) + b'\n'
+    require(serial_memory_ok(prefix, arch, 'normal', ram_mib, el2, terminal=False))
+    require(arch != 'x86_64' or serial_idt_ready(prefix))
+    memory = {}
+    for line in lines[:first]:
+        match = _RANGE.fullmatch(line)
+        if match:
+            memory.setdefault(match[1], []).append((int(match[2], 16), int(match[3], 16)))
+    image, stack, handoff, source = (memory[key][0] for key in
+                                    (b'IMAGE', b'STACK', b'HANDOFF', b'SOURCE'))
+    require(all(integer(site.get(key)) for key in ('image_start', 'image_end', 'image_size')) and
+            site['image_size'] == image[1] - image[0])
+    if arch == 'x86_64':
+        require(site.get('address_space') == 'image-rva' and site['image_start'] == 0 and
+                site['image_end'] == site['image_size'])
+        relocation = image[0]
+    else:
+        require(site.get('address_space') == 'identity-image-address' and
+                (site['image_start'], site['image_end']) == image and
+                all(integer(site.get(key)) for key in ('bss_start', 'bss_end')) and
+                image[0] <= site['bss_start'] < site['bss_end'] <= image[1])
+        relocation = 0
+    sizes = dict(stack_a=16384, stack_b=16384, control=4096, diagnostic=12400,
+                 stack=65536, pool=32768, pool_metadata=4096)
+    sizes.update(dict(idt=4096, handoff=96) if arch == 'x86_64' else dict(vectors=2048))
+    objects = site.get('objects')
+    require(isinstance(objects, dict) and set(objects) == set(sizes))
+    expected = {}
+    for name, size in sizes.items():
+        item = objects[name]
+        require(isinstance(item, dict) and all(integer(item.get(key)) for key in
+                ('start', 'end', 'bytes')) and item['bytes'] == size and
+                item['end'] - item['start'] == size)
+        bounds = item['start'] + relocation, item['end'] + relocation
+        alignment = dict(stack=16, diagnostic=8, idt=16, handoff=8, vectors=2048).get(name, 4096)
+        require(bounds[1] < 1 << 64 and inside(bounds, image) and not bounds[0] % alignment and
+                any(inside(bounds, reserve) for reserve in memory[b'RESERVED']) and
+                not any(overlaps(bounds, candidate) for candidate in memory[b'CANDIDATE']))
+        expected[name] = bounds
+    require(expected['stack'] == stack and
+            (arch != 'x86_64' or expected['handoff'] == handoff))
+    rows = list(expected.values())
+    require(not any(overlaps(one, two) for n, one in enumerate(rows) for two in rows[n + 1:]))
+    for name in ('stack_a', 'stack_b', 'control'):
+        require(not any(overlaps(expected[name], other) for other in (handoff, source)))
+
+    code = site.get('code_sites')
+    require(isinstance(code, dict) and set(code) == set(_TASKS_CODE))
+    code_pcs = {}
+    for name in _TASKS_CODE:
+        item = code[name]
+        require(isinstance(item, dict) and item.get('symbol') == name and
+                all(integer(item.get(key)) for key in ('start', 'end', 'bytes')) and
+                item['bytes'] > 0 and item['end'] - item['start'] == item['bytes'] and
+                item.get('rva' if arch == 'x86_64' else 'pc') == item['start'])
+        raw = bytes.fromhex(item['raw_hex'])
+        instruction = bytes.fromhex(item['instruction_hex'])
+        require(len(raw) == item['bytes'] and raw.startswith(instruction) and instruction and
+                hashlib.sha256(raw).hexdigest() == item.get('sha256') and
+                inside((item['start'] + relocation, item['end'] + relocation), image) and
+                (arch != 'aarch64' or item['start'] % 4 == 0))
+        code_pcs[name] = item['start'] + relocation
+    proof = site.get('integer_only')
+    require(isinstance(proof, dict) and isinstance(proof.get('compiler_flags'), list) and
+            proof['compiler_flags'] and isinstance(proof.get('decoder_version'), str) and
+            re.search(r'\bLLVM version \d+', proof['decoder_version']) is not None and
+            type(proof.get('decoded_bytes')) is int and proof['decoded_bytes'] > 0 and
+            type(proof.get('instruction_count')) is int and proof['instruction_count'] > 0 and
+            re.fullmatch(r'[0-9a-f]{64}', proof.get('executable_sha256', '')) is not None and
+            isinstance(proof.get('executable_spans'), list) and proof['executable_spans'])
+
+    tail = [line for line in lines[first:] if line.startswith(b'STYLEOS ')]
+    cursor = 0
+
+    def take(pattern):
+        nonlocal cursor
+        require(cursor < len(tail))
+        match = re.fullmatch(pattern, tail[cursor])
+        require(match is not None)
+        cursor += 1
+        return match
+
+    def fields(label, names):
+        nonlocal cursor
+        require(cursor < len(tail))
+        values = _paging_fields(tail[cursor], b'STYLEOS TASKS ' + label, names)
+        require(values is not None)
+        cursor += 1
+        return values
+
+    def exact(line):
+        nonlocal cursor
+        require(cursor < len(tail) and tail[cursor] == line)
+        cursor += 1
+
+    for name, ident in (('stack_a', b'A'), ('stack_b', b'B')):
+        match = take(rb'STYLEOS TASKS STACK id=' + ident + rb' ' + _HEX16 + rb' ' + _HEX16)
+        require(tuple(int(value, 16) for value in match.groups()) == expected[name])
+    for label, name in ((b'CONTROL', 'control'), (b'MAP_WORKSPACE', 'diagnostic'),
+                        (b'DISPATCH_STACK', 'stack')):
+        match = take(b'STYLEOS TASKS ' + label + b' ' + _HEX16 + b' ' + _HEX16)
+        require(tuple(int(value, 16) for value in match.groups()) == expected[name])
+    before = fields(b'STATE', _TASKS_STATE_FIELDS)
+    require(32 <= before['pa_bits'] <= (52 if arch == 'x86_64' else 48))
+    limit = 1 << before['pa_bits']
+    require(all(end <= limit for ranges in memory.values() for _start, end in ranges))
+    if arch == 'x86_64':
+        require(before['mode'] & 0x80000001 == 0x80000001 and not before['mode'] & 0x60000000 and
+                before['root'] and not before['root'] % 4096 and before['root'] + 4096 <= limit and
+                before['control0'] & 0x20 and
+                not before['control0'] & sum(1 << bit for bit in (12, 17, 21, 22, 23, 24)) and
+                before['control1'] & 0xd00 == 0xd00 and before['pat'] & 255 == 6 and
+                not before['flags'] & 0x600 and 0 < before['cs'] <= 0xfff8 and not before['cs'] & 7 and
+                before['cs'] + 8 <= before['gdt_bytes'] and
+                (before['idt_base'], before['idt_base'] + before['idt_bytes']) == expected['idt'] and
+                0 < before['gdt_bytes'] <= 4096 and not before['gdt_base'] & 7 and
+                before['gdt_base'] + before['gdt_bytes'] < 1 << 47 and
+                not overlaps((before['gdt_base'], before['gdt_base'] + before['gdt_bytes']), image) and
+                before['gdt_pages'] in (1, 2) and
+                lines.count(f'STYLEOS x86_64 IDT ready cs=0x{before["cs"]:016x}'.encode()) == 1)
+        require(any(inside((before['root'], before['root'] + 4096), r) for r in memory[b'RESERVED']))
+        require(before['gdt_pages'] == ((before['gdt_base'] & 4095) + before['gdt_bytes'] + 4095) // 4096)
+        for n in range(2):
+            pa = before['gdt_pa' + str(n)]
+            require((n >= before['gdt_pages'] and pa == 0) or
+                    (n < before['gdt_pages'] and pa and not pa % 4096 and pa + 4096 <= limit and
+                     not overlaps((pa, pa + 4096), image) and
+                     any(inside((pa, pa + 4096), r) for r in memory[b'RESERVED']) and
+                     not any(overlaps((pa, pa + 4096), r) for r in memory[b'CANDIDATE'])))
+    else:
+        require(before['pa_bits'] in (32, 36, 40, 42, 44, 48) and before['root'] == 0 and
+                not before['mode'] & ((1 << 25) | (1 << 24) | (1 << 12) | 5) and
+                before['control0'] == 4 and before['control1'] == 1 and before['flags'] == 0x3c0 and
+                (before['idt_base'], before['idt_base'] + before['idt_bytes']) == expected['vectors'] and
+                all(before[key] == 0 for key in ('cs',
+                    'gdt_base', 'gdt_bytes', 'pat', 'gdt_pages', 'gdt_pa0', 'gdt_pa1')))
+    created = []
+    for ident, name in (('A', 'stack_a'), ('B', 'stack_b')):
+        match = take(rb'STYLEOS TASKS CREATE id=' + ident.encode() +
+                     rb' state=READY sp=' + _HEX16 + rb' pc=' + _HEX16 + rb' entry=' + _HEX16)
+        sp, pc, entry = (int(value, 16) for value in match.groups())
+        require(sp == expected[name][1] - (56 if arch == 'x86_64' else 16) and
+                pc == code_pcs['styleos_tasks_bootstrap'] and
+                entry == code_pcs['styleos_tasks_' + ident.lower()])
+        created.append(dict(id=ident, state='READY', sp=sp, pc=pc, entry=entry))
+    schedule, local_addresses, dispatcher_address = [], {}, None
+    register_count = 8 if arch == 'x86_64' else 11
+    full_mask = (1 << register_count) - 1
+    for dispatch, (ident, kind) in enumerate((('A', 'START'), ('B', 'START'),
+                                            ('A', 'RESUME'), ('B', 'RESUME'),
+                                            ('A', 'EXIT'), ('B', 'EXIT')), 1):
+        task_stack = expected['stack_' + ident.lower()]
+        go = fields(b'GO id=' + ident.encode(), ('count',))
+        require(go['count'] == dispatch)
+        event = fields(b'EVENT id=' + ident.encode() + b' kind=' + kind.encode(),
+                       ('local', 'value', 'regs'))
+        require(inside((event['local'], event['local'] + 8),
+                       (task_stack[0] + 16, task_stack[1] - 16)) and
+                not event['local'] % 8 and
+                event['value'] == (0xa11ce55a12345678 if ident == 'A' else 0xb0b55aa987654321) and
+                event['regs'] == (0 if kind == 'START' else full_mask))
+        require(ident not in local_addresses or local_addresses[ident] == event['local'])
+        local_addresses[ident] = event['local']
+        seq = (dispatch + 1) // 2
+        tag = (0x100 if ident == 'A' else 0x200) + seq
+        if kind != 'EXIT':
+            yielded = fields(b'YIELD id=' + ident.encode(), ('seq', 'tag'))
+            require(yielded == dict(seq=seq, tag=tag))
+        else:
+            exact(b'STYLEOS TASKS RETURN id=' + ident.encode())
+        state = b'DONE' if kind == 'EXIT' else b'READY'
+        saved = fields(b'SAVED id=' + ident.encode() + b' state=' + state,
+                       ('sp', 'pc', 'seq', 'mask'))
+        require(inside((saved['sp'], saved['sp'] + 8),
+                       (task_stack[0] + 16, task_stack[1] - 16)) and
+                saved['sp'] % 16 == 0 and
+                saved['pc'] == code_pcs['styleos_tasks_exit_resume' if kind == 'EXIT'
+                                          else 'styleos_tasks_probe_resume'] and
+                saved['seq'] == min(seq, 2) and saved['mask'] == (0 if kind == 'EXIT' else full_mask))
+        registers = []
+        if kind != 'EXIT':
+            for index in range(register_count):
+                reg = fields(b'REG id=' + ident.encode(), ('seq', 'index', 'value'))
+                require(reg == dict(seq=seq, index=index,
+                                    value=0x1122000000000000 + (index << 32) + tag))
+                registers.append(reg)
+        dispatch_state = fields(b'DISPATCH', ('local', 'value', 'sp', 'pc'))
+        require(inside((dispatch_state['local'], dispatch_state['local'] + 8), stack) and
+                not dispatch_state['local'] % 8 and dispatch_state['value'] == 0xd15ca11c12345678 and
+                inside((dispatch_state['sp'], dispatch_state['sp'] + 8), stack) and
+                dispatch_state['sp'] % 16 == 0 and
+                dispatch_state['pc'] == code_pcs['styleos_tasks_dispatch_resume'] and
+                (dispatcher_address is None or dispatcher_address == dispatch_state['local']))
+        dispatcher_address = dispatch_state['local']
+        schedule.append(dict(id=ident, kind=kind, count=dispatch, event=event,
+                             yielded=yielded if kind != 'EXIT' else None,
+                             returned=kind == 'EXIT', saved=dict(state=state.decode(), **saved), registers=registers,
+                             dispatcher=dispatch_state))
+    require(fields(b'EMPTY', ('completed', 'dispatches')) == dict(completed=2, dispatches=6))
+    exact(b'STYLEOS TASKS RELEASE id=A state=FREE')
+    exact(b'STYLEOS TASKS RELEASE id=B state=FREE')
+    canaries = []
+    for ident in ('A', 'B'):
+        values = fields(b'CANARY id=' + ident.encode(), ('low0', 'low1', 'high0', 'high1'))
+        require(values == dict(low0=0x6b6b6b6b6b6b6b6b, low1=0x6b6b6b6b6b6b6b6b,
+                               high0=0xa5a5a5a5a5a5a5a5, high1=0xa5a5a5a5a5a5a5a5))
+        canaries.append(dict(id=ident, **values))
+    exact(b'STYLEOS TASKS CANARY PASS')
+    after = fields(b'STATE AFTER', _TASKS_STATE_FIELDS)
+    require(all(before[key] == after[key] for key in _TASKS_STATE_FIELDS if key != 'flags') and
+            ((before['flags'] ^ after['flags']) & 0x600 == 0 if arch == 'x86_64' else
+             before['flags'] == after['flags']))
+    exact(b'STYLEOS TASKS PASS')
+    exact(b'STYLEOS KERNEL HALT')
+    require(cursor == len(tail))
+    return dict(arch=arch, created=created, schedule=schedule,
+                objects={name: dict(start=a, end=b, bytes=b-a) for name, (a, b) in expected.items()},
+                state_before=before, state_after=after, completed=2, dispatches=6, canaries=canaries,
+                memory_map={key.decode().lower(): [dict(start=a, end=b) for a, b in spans]
+                            for key, spans in memory.items()},
+                dispatcher_local=dispatcher_address, released=['A', 'B'])
+
+
+def verified_tasks_site(folder, arch):
+    """Recompute storage, continuation and decoded instruction evidence."""
+    target = folder / arch
+    manifest = json.loads((folder / 'manifest.json').read_text())
+    expected_modes = dict(invalid_boot_info=False, invalid_memory_map=False,
+                          test_exception=False, test_bootpool=False,
+                          test_paging=False, test_paging_fault=False,
+                          test_ownership_plan=False, test_ownership_plan_invalid=False,
+                          test_tasks=True)
+    if (not isinstance(manifest, dict) or
+            any(type(manifest.get(key)) is not bool or manifest[key] != value
+                for key, value in expected_modes.items())):
+        raise ValueError('tasks manifest mode mismatch')
+    flags_by_arch = manifest.get('compiler_flags')
+    flags = flags_by_arch.get(arch) if isinstance(flags_by_arch, dict) else None
+    if (not isinstance(flags, list) or not flags or
+            any(not isinstance(flag, str) or not flag for flag in flags)):
+        raise ValueError('tasks manifest actual compiler flags are missing')
+    sources_by_arch = manifest.get('task_sources')
+    sources = sources_by_arch.get(arch) if isinstance(sources_by_arch, dict) else None
+    if (not isinstance(sources, list) or any(not isinstance(source, str) for source in sources) or
+            len(sources) != len(_tasks_sources(arch)) or set(sources) != set(_tasks_sources(arch))):
+        raise ValueError('tasks manifest source list differs from the dedicated profile')
+    expected_target = '--target=' + ('x86_64-pc-win32-coff' if arch == 'x86_64' else 'aarch64-none-elf')
+    if (expected_target not in flags or flags.count('-DSTYLEOS_TEST_TASKS=1') != 1 or
+            any(flag.startswith('-DSTYLEOS_TEST_') and flag != '-DSTYLEOS_TEST_TASKS=1' for flag in flags)):
+        raise ValueError('tasks manifest compiler flags do not select the dedicated target/profile')
+    site = json.loads((target / 'tasks-site.json').read_text())
+    if arch == 'x86_64':
+        verified = describe_tasks(arch, target / 'BOOTX64.EFI', target / 'kernel.map',
+                                 compiler_flags=flags)
+        verified['disk_sha256'] = hashlib.sha256((target / 'styleos.img').read_bytes()).hexdigest()
+    elif arch == 'aarch64':
+        verified = describe_tasks(arch, target / 'kernel.elf', raw_path=target / 'styleos.bin',
+                                 compiler_flags=flags)
+    else:
+        raise ValueError('unsupported tasks architecture')
+    if (not isinstance(verified.get('integer_only'), dict) or
+            verified['integer_only'].get('compiler_flags') != flags):
+        raise ValueError('tasks compiler flags differ from manifest actual flags')
+    if site != verified:
+        raise ValueError('tasks-site metadata differs from independently checked image proof/SHA-256')
+    artifacts = manifest.get('artifacts')
+    if (not isinstance(artifacts, list) or any(not isinstance(row, dict) or
+            not isinstance(row.get('path'), str) for row in artifacts)):
+        raise ValueError('tasks manifest artifacts are invalid')
+    names = (('BOOTX64.EFI', 'binary_sha256'), ('styleos.img', 'disk_sha256')) if arch == 'x86_64' else (
+        ('kernel.elf', 'binary_sha256'), ('styleos.bin', 'raw_sha256'))
+    selected = [row for row in artifacts if row['path'].startswith(arch + '/')]
+    if len(selected) != 2:
+        raise ValueError('tasks manifest needs exactly two artifacts for selected architecture')
+    for name, key in names:
+        matches = [row for row in selected if row['path'] == arch + '/' + name]
+        if (len(matches) != 1 or type(matches[0].get('size')) is not int or
+                matches[0]['size'] != (target / name).stat().st_size or
+                matches[0].get('sha256') != verified.get(key)):
+            raise ValueError('tasks manifest artifact size/SHA-256 mismatch')
+    return verified
+
+
 def serial_idt_ready(output):
     """An actual-CS IDT-ready marker must follow EBS and precede common C."""
     lines = output.splitlines()
@@ -1109,6 +1457,7 @@ class Checks:
             ('host-paging', ['tests/test_paging.c', 'kernel/paging.c']),
             ('host-ownership', ['tests/test_ownership.c', 'kernel/ownership.c',
                                 'kernel/boot_memory.c']),
+            ('host-tasks', ['tests/test_tasks.c', 'kernel/tasks.c']),
             ('host-memory', ['tests/test_boot_memory.c', 'kernel/boot_memory.c',
                              'boot/x86_64/memory_map.c', 'boot/aarch64/fdt_memory.c'])
         ]:
@@ -1139,7 +1488,8 @@ class Checks:
                         'paging': '--test-paging',
                         'paging-fault': '--test-paging-fault',
                         'ownership': '--test-ownership-plan',
-                        'ownership-invalid': '--test-ownership-plan-invalid'}[mode])
+                        'ownership-invalid': '--test-ownership-plan-invalid',
+                        'tasks': '--test-tasks'}[mode])
         return self.command(name, [cmd])
 
     def repro(self):
@@ -1172,10 +1522,12 @@ class Checks:
                    'paging': self.output / 'paging',
                    'paging-fault': self.output / 'paging-fault',
                    'ownership': self.output / 'ownership',
-                   'ownership-invalid': self.output / 'ownership-invalid'}
+                   'ownership-invalid': self.output / 'ownership-invalid',
+                   'tasks': self.output / 'tasks'}
         names = ('build-for-qemu', 'build-negative', 'build-negative-memory',
                  'build-exception', 'build-bootpool', 'build-paging',
-                 'build-paging-fault', 'build-ownership', 'build-ownership-invalid')
+                 'build-paging-fault', 'build-ownership', 'build-ownership-invalid',
+                 'build-tasks')
         for (mode, folder), name in zip(folders.items(), names):
             if not self.build(folder, mode, name, build_arch):
                 return
@@ -1209,7 +1561,7 @@ class Checks:
                 for mode in ('paging', 'paging-fault'):
                     jobs.append((f'qemu-aarch64-{mode}-el2', arch, binary, folders[mode],
                                  None, mode, True, 128, timeout))
-                for mode in ('ownership', 'ownership-invalid'):
+                for mode in ('ownership', 'ownership-invalid', 'tasks'):
                     jobs.append((f'qemu-aarch64-{mode}-el2', arch, binary, folders[mode],
                                  None, mode, True, 128, timeout))
                 jobs.append(('qemu-aarch64-ownership-256m', arch, binary, folders['ownership'],
@@ -1247,6 +1599,7 @@ class Checks:
                     'paging-fault': b'STYLEOS EMERGENCY HALT',
                     'ownership': b'STYLEOS KERNEL HALT',
                     'ownership-invalid': b'STYLEOS OWNERSHIP ERROR: required',
+                    'tasks': b'STYLEOS KERNEL HALT',
                     'normal': b'STYLEOS KERNEL HALT'}[mode]
         output = bytearray()
         site = None
@@ -1257,9 +1610,26 @@ class Checks:
         natural_exit = False
         requested_stop = False
         forced_stop = False
+        process_error = None
         selector = selectors.DefaultSelector()
 
         def result(status, detail, text):
+            if mode == 'tasks':
+                try:
+                    manifest_sha = hashlib.sha256((folder / 'manifest.json').read_bytes()).hexdigest()
+                except OSError:
+                    manifest_sha = None
+                payload = {
+                    'arch': arch, 'mode': mode, 'initial_el2': el2, 'ram_mib': mib,
+                    'status': status, 'uart_sha256': hashlib.sha256(output).hexdigest(),
+                    'manifest_sha256': manifest_sha, 'tasks_site': site,
+                    'tasks_trace': tasks_report(output, arch, site, mib, el2)
+                        if status == 'PASS' else None,
+                    'requested_stop': requested_stop, 'forced_stop': forced_stop,
+                    'natural_exit': natural_exit, 'settled': settled,
+                    'returncode': process.returncode if process is not None else None,
+                }
+                (self.logs / (name + '.json')).write_text(json.dumps(payload, indent=2) + '\n')
             if mode in ('ownership', 'ownership-invalid'):
                 try:
                     manifest_sha = hashlib.sha256((folder / 'manifest.json').read_bytes()).hexdigest()
@@ -1301,7 +1671,7 @@ class Checks:
                     settled = True
                     break
         except OSError as error:
-            return result('FAIL', str(error), '$ ' + ' '.join(cmd))
+            process_error = error
         finally:
             selector.close()
             if process is not None:
@@ -1321,7 +1691,9 @@ class Checks:
                     process.stdout.close()
         text = '$ ' + ' '.join(cmd) + '\n' + output.decode('utf-8', 'replace')
         text += (f'\n[harness] requested_stop={requested_stop} forced_stop={forced_stop} '
-                 f'natural_exit={natural_exit} returncode={process.returncode} settled={settled}\n')
+                 f'natural_exit={natural_exit} returncode={process.returncode if process else None} settled={settled}\n')
+        if process_error is not None:
+            return result('FAIL', str(process_error), text)
         if expected not in output:
             return result('FAIL', 'expected serial marker missing / timeout', text)
         if natural_exit or not requested_stop:
@@ -1355,6 +1727,12 @@ class Checks:
             except (OSError, ValueError) as error:
                 return result('FAIL', 'paging-site proof unavailable/mismatched: ' + str(error), text)
             good = serial_paging_ok(output, arch, site, mode == 'paging-fault', mib, el2)
+        elif mode == 'tasks':
+            try:
+                site = verified_tasks_site(folder, arch)
+            except (OSError, ValueError) as error:
+                return result('FAIL', 'tasks-site proof unavailable/mismatched: ' + str(error), text)
+            good = serial_tasks_ok(output, arch, site, mib, el2)
         elif mode in ('ownership', 'ownership-invalid'):
             try:
                 site = verified_ownership_site(folder, arch, mode == 'ownership-invalid')
@@ -1375,7 +1753,7 @@ class Checks:
                 'forced_stop': forced_stop, 'natural_exit': natural_exit,
                 'returncode': process.returncode, 'settled': settled
             }, indent=2) + '\n')
-        return result('PASS' if good else 'FAIL', 'UART handoff/memory/exception/pool/paging/ownership contract checked; QEMU stopped by harness', text)
+        return result('PASS' if good else 'FAIL', 'UART handoff/memory/exception/pool/paging/ownership/tasks contract checked; QEMU stopped by harness', text)
 
 
 def firmware_path(variable, prefix):

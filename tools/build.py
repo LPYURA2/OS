@@ -33,7 +33,8 @@ def run(args):
 
 def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_bootpool=False, test_paging=False, test_paging_fault=False,
-          test_ownership_plan=False, test_ownership_plan_invalid=False):
+          test_ownership_plan=False, test_ownership_plan_invalid=False,
+          test_tasks=False):
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     folder = output / arch
     folder.mkdir(parents=True, exist_ok=True)
@@ -42,6 +43,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
               'kernel/exception.c', 'kernel/boot_pool.c']
     if test_bootpool:
         common.append('kernel/boot_pool_selftest.c')
+    if test_tasks:
+        common += ['kernel/tasks.c','kernel/tasks_demo.c',
+                   f'arch/{arch}/tasks.c',f'arch/{arch}/tasks_context.S']
     ownership = test_ownership_plan or test_ownership_plan_invalid
     if ownership:
         common += ['kernel/ownership.c', 'kernel/ownership_plan.c',
@@ -93,6 +97,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_OWNERSHIP=1')
     if test_ownership_plan_invalid:
         flags.append('-DSTYLEOS_TEST_OWNERSHIP_INVALID=1')
+    if test_tasks:
+        flags.append('-DSTYLEOS_TEST_TASKS=1')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -124,6 +130,18 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         pool_site['disk_sha256'] = hashlib.sha256(
             (folder / 'styleos.img').read_bytes()).hexdigest()
     (folder / 'pool-site.json').write_text(json.dumps(pool_site, indent=2) + '\n')
+    if test_tasks:
+        from tasks_site import describe_tasks
+        (folder / 'task-compiler.json').write_text(json.dumps({
+            'flags': flags, 'sources': sources},indent=2)+'\n')
+        site = describe_tasks(arch, artifacts[0],
+            folder / 'kernel.map' if arch == 'x86_64' else None,
+            folder / 'styleos.bin' if arch == 'aarch64' else None,
+            compiler_flags=flags)
+        if arch == 'x86_64':
+            site['disk_sha256'] = hashlib.sha256(
+                (folder / 'styleos.img').read_bytes()).hexdigest()
+        (folder / 'tasks-site.json').write_text(json.dumps(site,indent=2)+'\n')
     if ownership:
         from ownership_site import describe_ownership
         site = describe_ownership(arch, artifacts[0],
@@ -184,6 +202,8 @@ def main():
                           help='Dedicated image only: read-only ownership plan, GRANTED=0')
     negative.add_argument('--test-ownership-plan-invalid', action='store_true',
                           help='Dedicated image only: refuse an unproven mandatory claim')
+    negative.add_argument('--test-tasks', action='store_true',
+                          help='Dedicated image only: two cooperative integer kernel tasks')
     args = parser.parse_args()
     output = (args.output or ROOT / 'build' /
               ('exception' if args.test_exception else
@@ -191,10 +211,11 @@ def main():
                'paging' if args.test_paging else
                'paging-fault' if args.test_paging_fault else
                'ownership' if args.test_ownership_plan else
-               'ownership-invalid' if args.test_ownership_plan_invalid else '')).resolve()
+               'ownership-invalid' if args.test_ownership_plan_invalid else
+               'tasks' if args.test_tasks else '')).resolve()
     if (args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_ownership_plan or
-            args.test_ownership_plan_invalid) and output == (ROOT / 'build').resolve():
+            args.test_ownership_plan_invalid or args.test_tasks) and output == (ROOT / 'build').resolve():
         parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
     records = []
@@ -203,11 +224,11 @@ def main():
                              args.invalid_memory_map, args.test_exception,
                              args.test_bootpool, args.test_paging,
                              args.test_paging_fault, args.test_ownership_plan,
-                             args.test_ownership_plan_invalid))
+                             args.test_ownership_plan_invalid,args.test_tasks))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS T-P1.5', 'compiler': version,
+        'prototype': 'StyleOS T-P1.6', 'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,
         'invalid_memory_map': args.invalid_memory_map,
         'test_exception': args.test_exception,
@@ -215,6 +236,11 @@ def main():
         'test_paging': args.test_paging, 'test_paging_fault': args.test_paging_fault,
         'test_ownership_plan': args.test_ownership_plan,
         'test_ownership_plan_invalid': args.test_ownership_plan_invalid,
+        'test_tasks': args.test_tasks,
+        **({'compiler_flags': {arch: json.loads((output / arch / 'task-compiler.json').read_text())['flags']
+                              for arch in arches},
+            'task_sources': {arch: json.loads((output / arch / 'task-compiler.json').read_text())['sources']
+                             for arch in arches}} if args.test_tasks else {}),
         'artifacts': records
     }, indent=2) + '\n')
     print('BUILD PASS:', ', '.join(arches))
