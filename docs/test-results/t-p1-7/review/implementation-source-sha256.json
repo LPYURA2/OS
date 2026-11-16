@@ -1,0 +1,29 @@
+{
+  "base": "eb73fad3ed431e91ebe995be4b370c678210e2b8",
+  "sha256": {
+    "AGENTS.md": "c9152a7a23f77169dba86e0f0050bcfd791beb6801c2d9399393573f9922996c",
+    "arch/aarch64/user_processes.c": "5688219047b279a0d05f1c411b14c7df1d4ea46c3664bcd9a7104c4434fdadc6",
+    "arch/aarch64/user_processes_entry.S": "68706c08471c8d49c5d632126114f16a0e7e5d9fc430ef02e2db452971261efc",
+    "arch/x86_64/user_processes.c": "786a3174cbfd79d3966ed19704ffa03748ddcd9e65eb2917aff14a564d2a6d22",
+    "arch/x86_64/user_processes_entry.S": "4dd0842487cf46bd55b0a3089444253c85b59627369d7034fae29677a4452b9c",
+    "docs/LEARNING_RU.md": "66c1ea5aac36c7101faef160b62f4cb6312ad8d9a7d639c8d249f1f1a3a429f7",
+    "docs/TESTING.md": "fd6590537b55fcfc3c754ab4b1071508115b76eaf5329045710519c04054b742",
+    "docs/adr/0010-user-process-fault-isolation.md": "5427edc27cc3e946e72dfac8456d60d9de022b893a66fd75c457a401ac8f8520",
+    "include/styleos/user_processes.h": "2874269f87565cb210f92d3c530cf1b4e7d708978e99f7e25dcc82de786d7cd4",
+    "kernel/main.c": "19cbb8bd878e7e5d47fc5c3904a78ae6218fc226d0137fb99e94e83be977f63c",
+    "kernel/user_processes.c": "6384f6a59de1139f02e75efa35b5e9e38b2a9e003f176667d54e68c73119568b",
+    "kernel/user_processes_demo.c": "d73239463c3d3489cdaaa9ff9b67faa47fc5a8e2405ce5b00796e866170174a1",
+    "tests/test_build_modes.py": "f6dda331d0030d77d41dbb787d0827268cb846917751ef0d09f3b8379de6904a",
+    "tests/test_integer_code.py": "0f003379dacf45e8dfe828449075bba5c9e6f42fe54ab5647464042c9f9df7e2",
+    "tests/test_ownership_output.py": "17ec8a098f9aef544d2d20ff6a51153a4c4fdc8f7d07fd263421ea7c788bde71",
+    "tests/test_tasks_output.py": "63730c9721b8f0af2880debfd17d9fae1577167785a9811c561b6f752acff409",
+    "tests/test_user_processes.c": "e55d396a6fc8f264c6b803a4ce55adab5bd66da404dda05170307d4ee8019308",
+    "tests/test_user_processes_manifest.py": "54e10ed43f470270a7adf951cd7e26e0d0d58c3c6718bf1c0ba7c70c698a73b7",
+    "tests/test_user_processes_output.py": "e63ca92e8fb956f253a5619c243fe9e21e8c0eb99f9356e1df097dd61705646e",
+    "tests/test_user_processes_site.py": "eba009ad322c84155c893c8853a592fdb418768b7fde28cab6630f0dd60b413b",
+    "tools/build.py": "faf919c4a9bcc453d5ec31cfb8ad86a6ffa94e127da173ca0ef5fa05979a345e",
+    "tools/integer_code.py": "67667fb78b630c4a0601c37bbca0ced51d12423b2d930831a4172d181b46f606",
+    "tools/test.py": "7eeb0627146ce7a8a2ad4bd2494a347bab1ecb721d2f067b28184c42bbe8b702",
+    "tools/user_processes_site.py": "6dbd60bb77fb06929f9a1643ce18c3a9d814d8c12b903ef398d9733d9afe6c56"
+  }
+}

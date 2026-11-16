@@ -1,0 +1,16 @@
+{
+  "review": "T-P1.7 documentation/source reconciliation",
+  "status": "READY pending real-run report and implementation SHA pin",
+  "files": {
+    "docs/adr/0010-user-process-fault-isolation.md": "5427edc27cc3e946e72dfac8456d60d9de022b893a66fd75c457a401ac8f8520",
+    "docs/LEARNING_RU.md": "66c1ea5aac36c7101faef160b62f4cb6312ad8d9a7d639c8d249f1f1a3a429f7",
+    "docs/TESTING.md": "fd6590537b55fcfc3c754ab4b1071508115b76eaf5329045710519c04054b742"
+  },
+  "pending": [
+    "docs/test-results/t-p1-7/README.md supplied by root",
+    "__T_P1_7_SHA__ implementation pin in TESTING after code commit"
+  ],
+  "scope": "Only these three documentation files were edited",
+  "hardware_result_claimed": false,
+  "prior_owner_phone_result": "T-P1.6 39/39 exit0 at d8065f31ae292eccd2558ddc8dc2cd91b78b855f, screenshots; llvm21.1.8; QEMUversionnotshown; no rawUART/JSON"
+}

@@ -1,0 +1,24 @@
+{
+  "base": "eb73fad3ed431e91ebe995be4b370c678210e2b8",
+  "implementation_commit": "af898029ff71892d8e3c6a3308263624af722130",
+  "base_files": 781,
+  "identical_base_files": 770,
+  "changed_base_files": [
+    "AGENTS.md",
+    "docs/LEARNING_RU.md",
+    "docs/TESTING.md",
+    "kernel/main.c",
+    "tests/test_build_modes.py",
+    "tests/test_integer_code.py",
+    "tests/test_ownership_output.py",
+    "tests/test_tasks_output.py",
+    "tools/build.py",
+    "tools/integer_code.py",
+    "tools/test.py"
+  ],
+  "missing_base_files": [],
+  "historical_evidence_files": 681,
+  "historical_evidence_unchanged": true,
+  "root_readme_unchanged": true,
+  "test_source_count": 96
+}

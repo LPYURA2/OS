@@ -1,0 +1,14 @@
+{
+  "timestamp_utc": "2026-11-16T16:16:36.316755+00:00",
+  "conclusion": "PASS: no open ARM source acceptance blocker",
+  "scope": "read-only source audit; no QEMU or test runs",
+  "sha256": {
+    "arch/aarch64/user_processes.c": "5688219047b279a0d05f1c411b14c7df1d4ea46c3664bcd9a7104c4434fdadc6",
+    "arch/aarch64/user_processes_entry.S": "68706c08471c8d49c5d632126114f16a0e7e5d9fc430ef02e2db452971261efc",
+    "include/styleos/user_processes.h": "2874269f87565cb210f92d3c530cf1b4e7d708978e99f7e25dcc82de786d7cd4",
+    "kernel/user_processes_demo.c": "d73239463c3d3489cdaaa9ff9b67faa47fc5a8e2405ce5b00796e866170174a1"
+  },
+  "nonblocking_notes": [
+    "Vector-vs-new-storage disjointness is established by linked section/object proof rather than an explicit per-object vector exclusion in the ARM runtime loop."
+  ]
+}

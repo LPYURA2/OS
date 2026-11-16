@@ -414,7 +414,7 @@ CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/
 pkg install python clang lld llvm git qemu-system-aarch64-headless
 git clone --branch feature/styleos-t-p1-7 --single-branch https://github.com/LPYURA2/OS.git styleos-tp17
 cd styleos-tp17
-git checkout --detach __T_P1_7_SHA__
+git checkout --detach af898029ff71892d8e3c6a3308263624af722130
 git rev-parse HEAD
 python --version
 clang --version

@@ -1,0 +1,14 @@
+ref: refs/heads/main	HEAD
+dfc5be9c2f699928a42903e70066f1bd8b20f65a	HEAD
+916845a8f2b7691154f8bd2df004e771b8772492	refs/heads/docs/styleos-readme
+a197ddeaf6200c2d4ebc04f038ed7fe0fc032378	refs/heads/docs/styleos-termux-and-memory
+dfc5be9c2f699928a42903e70066f1bd8b20f65a	refs/heads/feature/styleos-t-p1-0
+e4823f2eaf1bfbdca6ea7a93768b76a3b289523b	refs/heads/feature/styleos-t-p1-1
+07fe425a0d4d5c0b9fbb65f8a37b30924523ec81	refs/heads/feature/styleos-t-p1-2
+877f5e2bb85d484852a627e3a76a4bb956b40d50	refs/heads/feature/styleos-t-p1-3
+8bc7e78592c1aef78429042658f9ae02f71637c5	refs/heads/feature/styleos-t-p1-4
+ea37e76abb0a1b6e75c050c43e357d8c89981537	refs/heads/feature/styleos-t-p1-5
+eb73fad3ed431e91ebe995be4b370c678210e2b8	refs/heads/feature/styleos-t-p1-6
+dfc5be9c2f699928a42903e70066f1bd8b20f65a	refs/heads/main
+4a5a8744c3024415940d2a78e16c234a0570084c	refs/tags/archive/matryoshka-v0.3.2
+c5b62a4b4fc19d6db25d53f52eebcfba89dae708	refs/tags/archive/matryoshka-v0.3.2^{}
