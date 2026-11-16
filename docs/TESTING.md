@@ -1,10 +1,12 @@
-# Проверка StyleOS T-P1.7
+# Проверка StyleOS T-P1.8A
 
-Проверка разделяет C-логику на хосте, сборку целевых машинных форматов, побайтную повторяемость, связанное бинарное доказательство и настоящее выполнение CPU в QEMU. PASS одного уровня не заменяет остальные. [Фактический прогон T-P1.7 и журналы](test-results/t-p1-7/README.md) публикуются отдельно. [T-P1.6](test-results/t-p1-6/README.md), [T-P1.5](test-results/t-p1-5/README.md), [T-P1.4](test-results/t-p1-4/README.md), [T-P1.3](test-results/t-p1-3/README.md), [T-P1.2](test-results/t-p1-2/README.md) и прежние этапы остаются историей базы. Новый профиль проверяет конкретный сбой EL0/CPL3-программы и продолжение второй программы после него; прежний опыт доверенных задач не заменяет этот результат.
+Проверка разделяет C-логику на хосте, сборку целевых машинных форматов, побайтную повторяемость, связанное бинарное доказательство и настоящее выполнение CPU в QEMU. PASS одного уровня не заменяет остальные. Новый отдельный ARM-профиль T-P1.8A проверяет сохранение `note.txt` между независимыми процессами QEMU и старую целую версию после остановки до commit. [Фактические результаты и журналы T-P1.8A](test-results/t-p1-8a/README.md) публикуются отдельно. [T-P1.7](test-results/t-p1-7/README.md), [T-P1.6](test-results/t-p1-6/README.md) и прежние отчёты остаются историей точной базы; они не доказывают новый дисковый сценарий.
 
 ## Требования и выбор инструментов
 
-Нужны Python 3, Clang, `lld-link`, `ld.lld`; для target smoke — `qemu-system-x86_64`, `qemu-system-aarch64` и внешняя firmware OVMF x86-64. Make необязателен. Пакетирование GPT/FAT16 выполняется Python standard library, без `mtools` и монтирования образа.
+Для полного прежнего набора нужны Python 3, Clang, `lld-link`, `ld.lld`; для target smoke — `qemu-system-x86_64`, `qemu-system-aarch64` и внешняя firmware OVMF x86-64. Make необязателен. Пакетирование GPT/FAT16 выполняется Python standard library, без `mtools` и монтирования образа.
+
+Отдельный storage runner требует Python, host C compiler, Clang/LLD и `qemu-system-aarch64`; он не использует OVMF, `lld-link`, x86 QEMU или LLVM objdump. `--test-storage` поддерживает только AArch64 и имеет отдельный выход. Весь тест работает с созданными runner обычными файлами, без root, графики и реальных дисков.
 
 Профили `--test-tasks` и `--test-user-processes` дополнительно требуют `llvm-objdump` с декодерами обеих выбранных ISA. Он проверяет весь связанный исполняемый код на отсутствие неподдержанного FP/SIMD, а не только флаги компилятора. Без этого инструмента связанное integer-only доказательство не создаётся. Старые профили не получают новую зависимость.
 
@@ -31,7 +33,7 @@ CODE и VARS должны подходить друг к другу по вар�
 ```sh
 export OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.fd
 export OVMF_VARS=/usr/share/OVMF/OVMF_VARS_4M.fd
-python3 tools/test.py --all --output build/t-p1-7
+python3 tools/test.py --all --output build/t-p1-8a-regressions
 ```
 
 ## Точные команды
@@ -44,10 +46,14 @@ python3 tools/test.py --host --output build
 python3 tools/test.py --repro --output build
 python3 tools/test.py --qemu --output build
 # Либо один полный прогон:
-python3 tools/test.py --all --output build/t-p1-7
+python3 tools/test.py --all --output build/t-p1-8a-regressions
 ```
 
 Код завершения test runner: **0** — все выбранные проверки прошли; **1** — есть FAIL; **2** — есть SKIPPED без FAIL. Отсутствующий обязательный QEMU/OVMF виден в сводке и не превращается в зелёный прогон. Если флаг набора не задан, запускается полный набор.
+
+Семь новых storage-VM запускает отдельная команда `tools/test_storage.py`,
+описанная ниже. Прогон прежних профилей через `tools/test.py --all` проверяется
+отдельно и не заменяет дисковые сценарии.
 
 Оболочки:
 
@@ -73,7 +79,7 @@ make test        # полный набор
 
 `tests/test_boot_memory.c` проверяет нормализацию, лимиты, несовместимые диапазоны, правила UEFI и поддерживаемые/повреждённые DTB.
 
-`tests/test_qemu_output.py` проверяет достоверность serial-доказательств: ошибка ранней загрузки не должна превращаться в PASS из-за последующего успешного маркера. Также проверяются отрицательный handoff, обязательный halt и различение начальных EL1/EL2. T-P1.2 добавляет `tests/test_exception.c` для причин/полей/first-entry guard, `test_exception_output.py` для UART-контракта, `test_fault_site.py` для связи symbol → исполняемые opcode-байты и `test_qemu_process.py` для жизненного цикла QEMU. В историческом T-P1.2 `host-python` дал **39/39 unittest PASS**, включая восемь проверок остановки процесса. Счётчик Python unittest отличается от количества этапов runner; актуальные числа T-P1.7 берутся из нового отчёта.
+`tests/test_qemu_output.py` проверяет достоверность serial-доказательств: ошибка ранней загрузки не должна превращаться в PASS из-за последующего успешного маркера. Также проверяются отрицательный handoff, обязательный halt и различение начальных EL1/EL2. T-P1.2 добавляет `tests/test_exception.c` для причин/полей/first-entry guard, `test_exception_output.py` для UART-контракта, `test_fault_site.py` для связи symbol → исполняемые opcode-байты и `test_qemu_process.py` для жизненного цикла QEMU. В историческом T-P1.2 `host-python` дал **39/39 unittest PASS**, включая восемь проверок остановки процесса. Счётчик Python unittest отличается от количества этапов runner; актуальные числа T-P1.8A берутся из нового отчёта.
 
 Исторический ARM ESR `0x96000061` host-декодер узнаёт как `alignment-fault` (Data Abort текущего EL). Это тест классификатора на сохранённом числе. Реальный Data Abort новым обработчиком в T-P1.2 не провоцировался и не объявляется проверенным.
 
@@ -339,6 +345,136 @@ Host lifecycle проверяет READY/RUNNING/FAULTED/EXITED, порядок A
 
 База повторяется тем же toolchain **до** правок. Сравниваются все её профили, включая T-P1.6 tasks, и четыре обычных reproducibility артефакта; фактическое число публикуется в [отчёте T-P1.7](test-results/t-p1-7/README.md), старое число 36 не переносится автоматически. Проверенные и непроверенные части сдерживания, аппаратные frames и GDT/TSS/vectors разобраны в [ADR-0010](adr/0010-user-process-fault-isolation.md).
 
+## Первый сохраняемый файл T-P1.8A
+
+Новый storage-профиль работает только на AArch64 QEMU `virt` с одним CPU и
+современным VirtIO Block MMIO. Загрузочный Image и диск данных раздельны.
+Guest сам создаёт `note.txt`, metadata, payload и commit; host создаёт только
+пустой обычный файл диска и управляет независимыми процессами VM.
+Формат и пределы — [ADR-0011](adr/0011-persistent-test-file-storage.md).
+
+Отдельная сборка для изучения исходников:
+
+```sh
+python3 tools/build.py --arch aarch64 --test-storage --output build/storage
+```
+
+Полный контрольный storage-прогон из корня закреплённого SHA — **одна команда**:
+
+```sh
+CC=clang python tools/test_storage.py --output build/termux-tp18a
+```
+
+Она сама выполняет host-проверки, собирает отдельный ARM boot image, создаёт два
+пустых тестовых диска, запускает семь независимых процессов QEMU без графики
+и сохраняет результаты. Ручное создание образа,
+форматирование, выбор фаз или перенос файлов между VM не требуются.
+Нет snapshot/restore: после завершения одного QEMU новый процесс открывает тот
+же файл данных. Нельзя подставить пользовательский диск как готовый источник.
+
+Каждый повтор создаёт новый `run-<UTC>-<random>` под указанным output.
+Диски `persist.img` и `crash.img` создаются исключительно внутри его `disks/`
+как новые regular files. Предыдущие run-каталоги, диски и свидетельства
+сохраняются. Symlink/non-directory output и ранее существующий файл вместо
+нового диска отвергаются; тест не открывает block devices хоста.
+
+| Цепочка VM | Что проверяется |
+|---|---|
+| `persist-init-a → persist-read-a` | Guest фиксирует A и подтверждает final FLUSH, первый QEMU полностью прекращает работу; другой процесс читает точные 15 байт A |
+| `persist-update-b → persist-read-b` | Guest фиксирует отличающиеся 24 байта B; следующий процесс читает именно B |
+| `crash-init-a → crash-prepare-b → crash-recover-a` | На отдельном диске есть A; старый commit неактивной области обнулён с FLUSH, затем B записан с data FLUSH; новая commit record ещё не записана, guest неподвижен на барьере, runner делает SIGKILL, новый процесс читает целую A |
+
+Каждый save выполняет три упорядоченных FLUSH: после обнуления commit sector
+неактивной области, после metadata/payload и после новой commit record.
+Предварительное обнуление с FLUSH исключает принятие оставшейся commit record
+при повторной подготовке того же поколения после fallback к старой версии.
+Явная инициализация дополнительно проверяет все 2048 нулевых секторов и
+подтверждает superblock отдельным FLUSH.
+
+Строгий UART parser требует следующие суммарные успешные операции за boot;
+READ/WRITE здесь означают один 512-байтный сектор, FLUSH — отдельный запрос:
+
+| Фаза | READ | WRITE | FLUSH | Всего запросов |
+|---|---:|---:|---:|---:|
+| `init-a` | 2053 | 6 | 4 | 2063 |
+| `read-a`, `read-b`, `recover-a` | 14 | 0 | 0 | 14 |
+| `update-b` | 19 | 5 | 3 | 27 |
+| `prepare-b` | 14 | 4 | 2 | 20 |
+
+Имя — `note.txt`, данные A — `StyleOS note A\n`, B —
+`StyleOS note B: updated\n`; завершающий LF входит в длину. Host не передаёт
+payload в guest и не исправляет файл диска между фазами. Guest проверяет имя,
+generation, длину и каждый байт, а runner связывает UART/JSON с SHA boot image,
+manifest, бинарным evidence и диска до/после. Read-only фазы не меняют SHA диска.
+
+Обычный PASS требует полного guest-контракта, штатного halt, 200-мс observation
+window и намеренной остановки VM через SIGTERM. Для прерывания разрешён только
+точный pre-commit barrier после обоих подготовительных FLUSH: guest уже не
+выполняет запись новой commit record и
+не выдаёт итоговый PASS. Timeout, reset, ошибка и одиночная строка PASS не
+засчитываются как ожидаемое отключение. После подтверждённого барьера и ещё
+200 мс без новых событий runner делает SIGKILL и требует return code -9.
+Прекращение QEMU не является проверкой
+отключения питания телефона, host или физического накопителя.
+
+Сохраняйте весь новый run-каталог: `run.json`, `provenance.json`,
+`test-results/results.json`, поэтапные `.log`, `.json`, `.uart`,
+`boot/manifest.json`, `boot/aarch64/storage-compiler.json` и
+`boot/aarch64/storage-site.json`. Для передачи
+свидетельств нужны точный `git rev-parse HEAD`, версии Python/Clang/LLD/QEMU,
+данные этапов и хеши. Бинарные boot image, data disks и firmware в Git не
+коммитятся.
+
+Host-модели формата отдельно проверяют signatures, bounds/length/checksum,
+fallback к годной старой версии, повторную подготовку после fallback с
+инвалидизацией старой commit record и отказ при отсутствии годной версии.
+Transport model отдельно имитирует negotiation, capacity/bounds, timeout и
+status errors. Это не настоящие отказы устройства. Реальные QEMU-прогоны
+подтверждают только фактически выполненные обмены и перезапуски VM.
+
+Фактические счётчики нового storage runner, полного regression runner,
+ARM64-only, Python tests и число сравниваемых базовых артефактов берутся из
+[отчёта T-P1.8A](test-results/t-p1-8a/README.md), а не из прежнего счётчика.
+Обычная воспроизводимость и все старые профили проверяются отдельно:
+
+```sh
+python3 tools/test.py --all --output build/t-p1-8a-regressions
+OVMF_CODE=/nonexistent/styleos-code.fd OVMF_VARS=/nonexistent/styleos-vars.fd \
+LLD_LINK=/nonexistent/lld-link QEMU_X86=/nonexistent/qemu-system-x86_64 \
+CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/arm-only-tp18a
+```
+
+Этот полный прежний набор по-прежнему требует LLVM objdump для task/user-processes
+proof, а storage runner обходится обычными Clang/LLD, Python и ARM QEMU.
+
+Для нового каталога **Android/Termux**, после установки инструментов:
+
+```sh
+pkg install git python clang lld qemu-system-aarch64-headless
+git clone --branch feature/styleos-t-p1-8a --single-branch https://github.com/LPYURA2/OS.git styleos-tp18a
+cd styleos-tp18a
+git checkout --detach __T_P1_8A_SHA__
+git rev-parse HEAD
+python --version
+clang --version
+ld.lld --version
+qemu-system-aarch64 --version
+CC=clang python tools/test_storage.py --output build/termux-tp18a
+echo $?
+```
+
+| Среда | Статус T-P1.8A | Граница |
+|---|---|---|
+| Linux, AArch64 QEMU virt/VirtIO MMIO | См. [фактический отчёт](test-results/t-p1-8a/README.md) | Реальные guest READ/WRITE/FLUSH и новые процессы с тем же файлом диска |
+| Android/Termux владельца | SKIPPED до контрольного прогона нового SHA | Не наследует подтверждение T-P1.7 |
+| VirtualBox, физическое оборудование | SKIPPED | Нового x86-драйвера и native disk испытаний нет |
+
+После публикации T-P1.7 владелец подтвердил **Android/Termux 43/43, exit 0,
+QEMU 11.1.3**, SHA `af898029ff71892d8e3c6a3308263624af722130`, оба ARM
+user-processes сценария PASS. Источник — три скриншота, сырые UART/JSON не
+приложены. Это отдельное owner-reported дополнение о предыдущем этапе;
+исторические отчёты/checksums не меняются, T-P1.8A Android PASS не присваивается.
+
 ## Ручной запуск x86-64
 
 Сначала соберите `build/x86_64/styleos.img`. Пример с подходящими OVMF CODE/VARS:
@@ -394,11 +530,11 @@ qemu-system-aarch64 -machine virt -cpu cortex-a57 -m 128M \
 |---|---|---|
 | Linux, QEMU/OVMF x86-64 и ARM64 initial EL1/EL2 | См. [фактический отчёт](test-results/t-p1-7/README.md) | Аппаратный user frame, отдельные roots/стеки, ожидаемый fault A и последующий выход B |
 | Linux, ARM64-only без OVMF/x86 tools | См. [фактический отчёт](test-results/t-p1-7/README.md) | Два новых ARM user-processes сценария и прежние ARM регрессии; это не Android |
-| Android/Termux владельца | SKIPPED до нового фактического прогона | Не наследует телефонный результат T-P1.6 |
+| Android/Termux владельца | PASS, owner-reported после публикации | T-P1.7: 43/43, exit 0, QEMU 11.1.3, SHA `af898029ff71892d8e3c6a3308263624af722130`; три скриншота, без сырых UART/JSON |
 | VirtualBox | SKIPPED до отдельного испытания | Linux QEMU не подтверждает эту платформу |
 | Физическое оборудование | SKIPPED до отдельного испытания | QEMU virt не является нативной аппаратурой телефона |
 
-База T-P1.7 — `eb73fad3ed431e91ebe995be4b370c678210e2b8`; проверенный код T-P1.6 — `d8065f31ae292eccd2558ddc8dc2cd91b78b855f`. В задании T-P1.7 владелец сообщил о **T-P1.6 Android/Termux: 39/39 PASS, код 0**, по скриншотам, оба ARM task-сценария PASS. Предварительная проверка `llvm-objdump` показала **21.1.8**; версия QEMU в этих скриншотах не показана. Сырые UART/JSON не приложены. Это отдельное owner-reported подтверждение T-P1.6; новый отчёт учитывает его без изменения исторических отчётов/checksums и без присвоения Android PASS этапу T-P1.7.
+База T-P1.7 — `eb73fad3ed431e91ebe995be4b370c678210e2b8`; проверенный код T-P1.6 — `d8065f31ae292eccd2558ddc8dc2cd91b78b855f`. В задании T-P1.7 владелец сообщил о **T-P1.6 Android/Termux: 39/39 PASS, код 0**, по скриншотам, оба ARM task-сценария PASS. Предварительная проверка `llvm-objdump` показала **21.1.8**; версия QEMU в этих скриншотах не показана. Сырые UART/JSON не приложены. Это отдельное owner-reported подтверждение T-P1.6; новый отчёт учитывает его без изменения исторических отчётов/checksums и без присвоения Android PASS более позднему этапу. После публикации владелец отдельно подтвердил **T-P1.7 Android/Termux: 43/43, exit 0, QEMU 11.1.3**, SHA `af898029ff71892d8e3c6a3308263624af722130`, оба ARM user-processes сценария PASS, по трём скриншотам; сырые UART/JSON не приложены. Это отдельное owner-reported дополнение, а не новый результат T-P1.8A.
 
 Для Linux-проверки независимости ARM64-only намеренно задайте отсутствующие x86-инструменты и OVMF:
 
@@ -408,7 +544,7 @@ LLD_LINK=/nonexistent/lld-link QEMU_X86=/nonexistent/qemu-system-x86_64 \
 CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/arm-only-tp17
 ```
 
-Этот маршрут не должен обращаться к выбранным отсутствующим средствам. Для нового каталога Termux:
+Этот маршрут не должен обращаться к выбранным отсутствующим средствам. Сохранённый контрольный маршрут **T-P1.7** для отдельного каталога Termux:
 
 ```sh
 pkg install python clang lld llvm git qemu-system-aarch64-headless
@@ -430,9 +566,9 @@ SHA команды закрепляется на опубликованной р
 
 ## Риски и откат
 
-T-P1.7 публикуется только в `feature/styleos-t-p1-7` от базы `eb73fad3ed431e91ebe995be4b370c678210e2b8`. `main`, старые refs, корневой README, `docs/styleos-readme`, Portable-os и исторические свидетельства сохраняются. Нет merge, force push или release. Новый профиль отдельно разрешает свои таблицы, векторы и необходимые x86 GDT/TSS; старые профили этих разрешений не получают.
+T-P1.8A публикуется только в `feature/styleos-t-p1-8a` от базы `2831e6a1c54562d1f37518913f07e648cc00cc2d`. `main`, старые refs, корневой README, `docs/styleos-readme`, Portable-os и исторические свидетельства сохраняются. Нет merge, force push или release. Только отдельный storage-профиль разрешает новый VirtIO MMIO драйвер и запись на созданный тестовый диск; старые профили этих разрешений не получают.
 
-Сдерживание одного проверенного пользовательского fault не означает восстановления после ошибки ядра, полной безопасности, стабильного process ABI или поддержки произвольных программ. Нет общего PMM/heap, выдачи CANDIDATE/REVIEW, reclaim, IRQ/таймера/вытеснения/SMP, общего FP/SIMD-контекста, IPC, GUI или Deep Drop. Следующий этап T-P1.8 этим заданием не начинается.
+Сдерживание одного проверенного пользовательского fault не означает восстановления после ошибки ядра, полной безопасности, стабильного process ABI или поддержки произвольных программ. Нет общего PMM/heap, выдачи CANDIDATE/REVIEW, reclaim, IRQ/таймера/вытеснения/SMP, общего FP/SIMD-контекста, IPC, GUI или Deep Drop. T-P1.8A добавляет только минимальное тестовое хранение. T-P1.8B, внешние программы, desktop/SDK, `.tea` и Deep Drop этим заданием не начинаются.
 
 Неподдержанная firmware, ошибка самого ядра, повреждённые kernel stack/table/UART либо отказ до готовности диагностического пути могут остановить boot. Неожиданное исключение ядра остаётся аварийным исходом; оно не засчитывается как успешное завершение A. Тесты используют выходные образы и отдельные копии firmware VARS, без личных дисков компьютера.
 

@@ -225,3 +225,43 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
 - No kernel-fault recovery, restart services, IRQ/timer/preemption/SMP, general
   FP/SIMD context, production process ABI, applications, GUI or Deep Drop.
   Stop after this task's factual report and task-branch publication.
+
+## Approved T-P1.8A task
+- Start `feature/styleos-t-p1-8a` from accepted
+  `2831e6a1c54562d1f37518913f07e648cc00cc2d`. Publish this task branch only;
+  preserve main, all previous refs, `docs/styleos-readme`, Portable-os,
+  presentation README, history and historical evidence. No merge, force push,
+  release, T-P1.8B or external-program/GUI/SDK/.tea/Deep Drop work.
+- Only `--test-storage` on AArch64 QEMU virt may include the new VirtIO MMIO
+  block driver and bounded file store. Separate outputs, no mixing with any
+  previous profile. Preserve boot_info v1, memory normalization, ordinary boot
+  and all old artifacts. No x86 storage driver or new MMU/IRQ path in this task.
+- One CPU, polling, one finite split queue and one data disk. Negotiate modern
+  VERSION_1 and FLUSH or refuse; validate capacity, request/status/bounds,
+  overflow, completion and timeout. Device MMIO comes from validated DTB in the
+  fixed ARM virt profile. Prove cache/MMU state, DMA ordering and the complete
+  RESERVED image-owned buffers before their initialization/use. No arbitrary
+  pointer-to-PA contract, PMM/heap, CANDIDATE/REVIEW, boot-pool use or reclaim;
+  GRANTED remains zero.
+- Persist a small named file with explicit versioned little-endian metadata,
+  generation/length/integrity and two inactive/active areas. Payload writes and
+  successful flush precede commit-record write and successful final flush.
+  Mount never reformats unknown/corrupt media. Explicit initialization may only
+  accept the runner-created fully blank disk. Invalid/new damaged versions
+  cannot hide a valid old commit or be accepted as a successful save.
+- The one-command runner owns fresh exclusive regular files in a fresh unique
+  subdirectory of its chosen output. Preserve prior output and user images;
+  never open host devices, reuse/format arbitrary existing disks or let the host
+  construct/repair stored file payloads. Separate boot image and data disk.
+- Require independent QEMU processes for persistence/update and a separate
+  crash test: data B flushed in inactive area, guest halts at before-commit
+  barrier, runner kills only there, new VM recovers whole A. Timeout/error/reset
+  never substitute for the barrier or verified read. This is not host/phone
+  power-loss or physical-device durability proof.
+- Record actual host/model and QEMU checks separately, preserve full/ARM-only
+  regressions, reproducibility and all base artifact comparisons. Record
+  owner-reported T-P1.7 Termux 43/43 exit0 QEMU11.1.3 at af89802 separately
+  (three screenshots, no raw UART/JSON); T-P1.8A Android remains SKIPPED until run.
+- Stop after factual ADR/report, evidence and task-branch publication pending
+  owner acceptance. Production FS, arbitrary devices, services and future
+  application/kernel architecture remain separate owner decisions.
