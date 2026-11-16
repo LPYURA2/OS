@@ -1,0 +1,35 @@
+{
+  "prototype": "StyleOS T-P1.6",
+  "compiler": "Debian clang version 19.1.7 (3+b1)",
+  "invalid_boot_info": false,
+  "invalid_memory_map": false,
+  "test_exception": false,
+  "test_bootpool": false,
+  "test_paging": true,
+  "test_paging_fault": false,
+  "test_ownership_plan": false,
+  "test_ownership_plan_invalid": false,
+  "test_tasks": false,
+  "artifacts": [
+    {
+      "path": "x86_64/BOOTX64.EFI",
+      "size": 40448,
+      "sha256": "ee9462ee3af5a28c3f636c8871e085cdab3a4f014f8f4260ab5f41d4c647b901"
+    },
+    {
+      "path": "x86_64/styleos.img",
+      "size": 71303168,
+      "sha256": "ad5151c1861c3037030176f4df2319f74ad3344869c1f6837ccdb7e61c9ea5ec"
+    },
+    {
+      "path": "aarch64/kernel.elf",
+      "size": 108112,
+      "sha256": "959dde612f9207846b168470ed0d627d2339cbe1cd15bbdb35983a736a8dcdf2"
+    },
+    {
+      "path": "aarch64/styleos.bin",
+      "size": 36864,
+      "sha256": "ad6a978508cb3df205cbac773716b69026e25e767a5789d6112638d109ee8884"
+    }
+  ]
+}

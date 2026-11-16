@@ -1,0 +1,17 @@
+# T-P1.8A guest/FDT audit
+
+Result: PASS, no blocking finding. Read-only repository audit; only scratch artifacts were written. No Git, remotes, QEMU, or repository edits.
+
+- `kernel/storage_demo.c:52` validates internal diagnostic evidence, EL1h, masked DAIF, aligned live stack, SCTLR M/C/I and endian state, fixed `0x40080000` Image identity/header/end, complete image reservation, vectors, five page-aligned complete storage buffers, pairwise disjointness, and exclusions for stack/handoff/DTB/diagnostics/pool/metadata/vectors. `admit` completes before `vb_open`, control initialization, storage workspace use, or storage DMA.
+- `boot/aarch64/storage_fdt.c:57` accepts exactly one recognized phase key from direct `/chosen/bootargs`. The bounded parser requires root 2/2 cells, direct `virtio,mmio` nodes with a 16-byte `reg`, active distinct spans of size/step `0x200` only inside `[0x0a000000,0x0a004000)`, and at most 32 candidates. Disabled candidates are omitted. Output is assigned only at final success. Discovery passes these candidates to the driver's bounded read-only device selection; there is no blind address scan.
+- `kernel/storage_demo.c:125` validates actual record generation, exact name length and `note.txt` name bytes, payload length, and payload bytes before printing the READ result. A and B are different compiled-in sequences with separately asserted lengths.
+- `kernel/storage_demo.c:147` requires three payload/metadata writes and a confirmed flush before PREPARED, then a commit-sector write plus final confirmed flush before COMMITTED. The PREPARE_B branch prints its barrier only after successful prepare and enters `_Noreturn arch_halt`; the inherited ARM halt masks exceptions and loops WFE forever, so there is no reachable commit/reset after the barrier. RECOVER_A mounts and must read generation 1/name/A bytes. Independent VM lifecycle remains a runner-level proof.
+- Eleven inherited boot/memory contract files are byte-identical to `baseline-source`; see `guest-audit-unchanged-paths.json`.
+
+Host verification: original FDT suite and scratch extended probes compiled with `cc -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=undefined,address -fno-omit-frame-pointer` and passed. Extended probes cover exact phase token/string boundaries, embedded NULs, missing/duplicate compatible fields, duplicate root cells, invalid status, all 32 bounded candidate spans, disabled filtering, and source/output overlap refusal. Scratch test source and logs are adjacent. The first attempted `clang` invocation failed because clang was not on PATH; host `cc` verification completed successfully.
+
+Limits: this storage parser runs after the existing full successful memory/DTB parse; its header checks are not a replacement for reservation-map validation. Existing boot BSS zeroing remains unchanged. This source/host audit does not establish actual DMA behavior, binary extent binding, process restart independence, or durability; integration QEMU and artifact verification supply those checks.
+
+## Protocol follow-up after format fix
+
+The earlier three-write/one-flush PREPARED observation above describes the initial audited draft. Final code now durably invalidates the inactive commit sector first: PREPARED requires four writes/two flushes; COMMITTED adds one write/one flush. Reviewed final source/header/demo and runner counters during documentation finalization. See `docs-finalization-audit.json`; the prior source hashes are the earlier audit snapshot.

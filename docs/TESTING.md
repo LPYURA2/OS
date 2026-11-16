@@ -453,7 +453,7 @@ proof, а storage runner обходится обычными Clang/LLD, Python �
 pkg install git python clang lld qemu-system-aarch64-headless
 git clone --branch feature/styleos-t-p1-8a --single-branch https://github.com/LPYURA2/OS.git styleos-tp18a
 cd styleos-tp18a
-git checkout --detach __T_P1_8A_SHA__
+git checkout --detach 6dfb61d49835c50d561ca2b4a509563e3c744e59
 git rev-parse HEAD
 python --version
 clang --version

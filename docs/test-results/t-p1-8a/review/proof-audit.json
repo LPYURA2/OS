@@ -1,0 +1,162 @@
+{
+  "audit": "PASS",
+  "scope": "actual artifact independent ELF/PT_LOAD/BSS/raw-Image/resource/metadata SHA audit",
+  "folder": "/workspace/OS/build/storage-integration",
+  "binary_sha256": "ced2b3c2c5d79fbc113cf85d0f7021313966c51c5e666a2445ba599d300f0e7c",
+  "raw_sha256": "16ff606a04897d44dc06e1952d7b5d7af40ab7f2807f0c6dc82f1b295fbb7e7d",
+  "image_start": 1074266112,
+  "image_end": 1074454528,
+  "image_size": 188416,
+  "bss_start": 1074315264,
+  "bss_end": 1074454528,
+  "zero_extent_bytes": 139264,
+  "raw_bytes": 48368,
+  "elf_bytes": 122136,
+  "entry": 1074266112,
+  "image_entry_branch": 335544336,
+  "image_entry_target": 1074266176,
+  "load_count": 3,
+  "loads": [
+    {
+      "flags": 5,
+      "offset": 65536,
+      "va": 1074266112,
+      "pa": 1074266112,
+      "filesz": 44428,
+      "memsz": 44428,
+      "align": 65536
+    },
+    {
+      "flags": 4,
+      "offset": 109968,
+      "va": 1074310544,
+      "pa": 1074310544,
+      "filesz": 3936,
+      "memsz": 3936,
+      "align": 65536
+    },
+    {
+      "flags": 6,
+      "offset": 114688,
+      "va": 1074315264,
+      "pa": 1074315264,
+      "filesz": 0,
+      "memsz": 139264,
+      "align": 65536
+    }
+  ],
+  "allocated_section_count": 3,
+  "objects": {
+    "vblk_control": {
+      "symbol": "styleos_vblk_control",
+      "start": 1074376704,
+      "end": 1074380800,
+      "bytes": 4096
+    },
+    "queue": {
+      "symbol": "styleos_vblk_queue",
+      "start": 1074380800,
+      "end": 1074384896,
+      "bytes": 4096
+    },
+    "request": {
+      "symbol": "styleos_vblk_request",
+      "start": 1074384896,
+      "end": 1074388992,
+      "bytes": 4096
+    },
+    "control": {
+      "symbol": "styleos_storage_control",
+      "start": 1074368512,
+      "end": 1074372608,
+      "bytes": 4096
+    },
+    "workspace": {
+      "symbol": "styleos_storage_workspace",
+      "start": 1074372608,
+      "end": 1074376704,
+      "bytes": 4096
+    },
+    "diagnostic": {
+      "symbol": "diagnostic",
+      "start": 1074315264,
+      "end": 1074327664,
+      "bytes": 12400
+    },
+    "stack": {
+      "symbol": "__stack_bottom",
+      "start": 1074388992,
+      "end": 1074454528,
+      "bytes": 65536
+    },
+    "vectors": {
+      "symbol": "aarch64_vectors",
+      "start": 1074268160,
+      "end": 1074270208,
+      "bytes": 2048
+    },
+    "pool": {
+      "symbol": "styleos_bootpool_storage",
+      "start": 1074331648,
+      "end": 1074364416,
+      "bytes": 32768
+    },
+    "pool_metadata": {
+      "symbol": "styleos_bootpool_metadata",
+      "start": 1074364416,
+      "end": 1074368512,
+      "bytes": 4096
+    }
+  },
+  "exact_sources": [
+    "kernel/main.c",
+    "kernel/boot_info.c",
+    "kernel/runtime.c",
+    "kernel/boot_memory.c",
+    "kernel/boot_memory_diagnostic.c",
+    "kernel/exception.c",
+    "kernel/boot_pool.c",
+    "kernel/storage.c",
+    "kernel/storage_demo.c",
+    "boot/aarch64/storage_fdt.c",
+    "arch/aarch64/virtio_block.c",
+    "boot/aarch64/platform.c",
+    "boot/aarch64/start.S",
+    "boot/aarch64/fdt_memory.c",
+    "arch/aarch64/console.c"
+  ],
+  "exact_flags": [
+    "--target=aarch64-none-elf",
+    "-O2",
+    "-g0",
+    "-ffreestanding",
+    "-fno-stack-protector",
+    "-fno-builtin",
+    "-fno-pic",
+    "-fno-pie",
+    "-fno-asynchronous-unwind-tables",
+    "-fno-unwind-tables",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-I",
+    "/workspace/OS/include",
+    "-I",
+    "/workspace/OS/boot/x86_64",
+    "-DSTYLEOS_EXPECT_ARCH=2",
+    "-ffile-prefix-map=/workspace/OS=.",
+    "-mgeneral-regs-only",
+    "-mno-outline-atomics",
+    "-mstrict-align",
+    "-DSTYLEOS_TEST_STORAGE=1"
+  ],
+  "binary_proof_external_processes": false,
+  "proof_sources_sha256": {
+    "tools/storage_site.py": "29319cf74863314f7e72488c1fe43df75eb864a08d571e24999f704f342dfc12",
+    "tests/test_storage_site.py": "6ec1ea5d492fab7e26361fdc0e970950eeabc07eb521a6c1732784b65a5b0cf7",
+    "tools/pool_site.py": "6e1adefc57eaa36bd01c89adac0265bf0dc172a5ae2b53184cf61e465153e8c4",
+    "tools/fault_site.py": "90587c8e2f9f03813c36142c4515b43690befc74b5a11900e34b8a92f87eb6b7",
+    "tools/build.py": "5de53996c16d0bfaa40e4f7158a266e7ebb97ada118bfb5fbdabafe40da48959",
+    "tools/test_storage.py": "382513f68ad71e98dbeb822197c5eace32649c14b3bb676c8c08915a7fd816a0"
+  }
+}

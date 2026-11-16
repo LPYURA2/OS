@@ -1,0 +1,9 @@
+$ cc -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_ownership.c kernel/ownership.c kernel/boot_memory.c -o /workspace/OS/build/t-p1-8a/host-tests/host-ownership
+
+$ /workspace/OS/build/t-p1-8a/host-tests/host-ownership
+Ownership plan: complete evidence, interval union, refusals, REVIEW and zero GRANTED PASS
+
+$ cc -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_ownership_x86.c -o /workspace/OS/build/t-p1-8a/host-tests/test-ownership-x86
+
+$ /workspace/OS/build/t-p1-8a/host-tests/test-ownership-x86
+x86 ownership mode/descriptor/read-admission/old-walk checks PASS (149)

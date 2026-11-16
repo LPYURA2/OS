@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_uefi.c boot/x86_64/exit_boot.c -o /workspace/OS/build/arm-only-tp18a/host-tests/host-uefi
+
+$ /workspace/OS/build/arm-only-tp18a/host-tests/host-uefi
+UEFI HOST TESTS PASS: map, stale key, growth, failures, bounded retries (14 cases)

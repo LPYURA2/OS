@@ -1,0 +1,50 @@
+{
+  "result": "PASS",
+  "owned_repo_files": [
+    "docs/adr/0011-persistent-test-file-storage.md",
+    "docs/LEARNING_RU.md",
+    "docs/TESTING.md"
+  ],
+  "rows": [
+    {
+      "path": "docs/adr/0011-persistent-test-file-storage.md",
+      "sha256": "f3e65f02df0918379ddbb15d299dd7776bbcc0f5a93afada74d1b042a35e9650",
+      "lines": 244,
+      "fences": "PASS",
+      "obsolete_two_flush_claims": "NONE",
+      "pending_root_report_links": [
+        "../test-results/t-p1-8a/README.md"
+      ]
+    },
+    {
+      "path": "docs/LEARNING_RU.md",
+      "sha256": "adef7b5da5db091faabf85c9e230824386869a70a3a4f019a286d659dab44616",
+      "lines": 429,
+      "fences": "PASS",
+      "obsolete_two_flush_claims": "NONE",
+      "pending_root_report_links": [
+        "test-results/t-p1-8a/README.md"
+      ]
+    },
+    {
+      "path": "docs/TESTING.md",
+      "sha256": "7a73b1f451fb1543539394f176e2ff5b759eefcbebc6579d591a2f4320c2f73e",
+      "lines": 575,
+      "fences": "PASS",
+      "obsolete_two_flush_claims": "NONE",
+      "pending_root_report_links": [
+        "test-results/t-p1-8a/README.md",
+        "test-results/t-p1-8a/README.md",
+        "test-results/t-p1-8a/README.md"
+      ]
+    }
+  ],
+  "checks": [
+    "Final code/header prepare invalidates inactive commit with separate flush, then writes metadata+payload and flushes; commit writes and flushes separately",
+    "Guest prepare asserts writes+4 and flushes+2",
+    "Exact phase operation table agrees with runner",
+    "One Termux SHA pin placeholder preserved",
+    "Android T18A SKIPPED and owner-reported T17 result separate"
+  ],
+  "scope": "Documentation consistency review only; no new runtime test claims. Final counts belong to root report."
+}

@@ -1,0 +1,4 @@
+$ cc -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_boot_pool.c kernel/boot_pool.c -o /workspace/OS/build/t-p1-8a/host-tests/host-pool
+
+$ /workspace/OS/build/t-p1-8a/host-tests/host-pool
+Boot pool: admission, full ranges, exclusions, refusals, allocation and reuse PASS

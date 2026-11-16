@@ -1,0 +1,26 @@
+{
+  "base": "2831e6a1c54562d1f37518913f07e648cc00cc2d",
+  "sha256": {
+    "AGENTS.md": "3d0884ac48d0816410a2a1ff5622c60ea665c31fd4c514d91e50ffa2bb5242e6",
+    "arch/aarch64/virtio_block.c": "42e8869f4d0e93ef8740c5569b72c301d5130f88615c4e2a6bce4e5b2c4f270d",
+    "boot/aarch64/storage_fdt.c": "894305b2279dbb6a08510eb8c195c7840d46f5f15bff6e5b5d516582ea4889ba",
+    "docs/LEARNING_RU.md": "adef7b5da5db091faabf85c9e230824386869a70a3a4f019a286d659dab44616",
+    "docs/TESTING.md": "7a73b1f451fb1543539394f176e2ff5b759eefcbebc6579d591a2f4320c2f73e",
+    "docs/adr/0011-persistent-test-file-storage.md": "f3e65f02df0918379ddbb15d299dd7776bbcc0f5a93afada74d1b042a35e9650",
+    "include/styleos/storage.h": "4dafc1cb4312406da787c6b4d1640bcb0d38fa25cf26a0c1416aeaa603f97cfb",
+    "include/styleos/storage_demo.h": "a64bfa9c5491aee88278373d8c262a8191eff441e779fd2fef1011ec02e843a8",
+    "include/styleos/virtio_block.h": "b26ef378ec0303cf5ca2e8759753168c14a38ebc430c91da6e2b88a47a327027",
+    "kernel/main.c": "73ef9a50f6ffe19c4e4ef5e0644dc89946939950451dccd70b523715f2d06006",
+    "kernel/storage.c": "8b6c920269d684e61357126988c0ca7416e3ddab125b0de248acc02ff2b60355",
+    "kernel/storage_demo.c": "5002befdbacf60d095a898792b9643818cbfd80c206d58fb0b283c7bdc0128de",
+    "tests/test_build_modes.py": "742cbf5545ae16a8b493c6cca96831998cc59799c4e8cef127af64b66f17a3fb",
+    "tests/test_storage.c": "32771abf85d4af1089cca67db95e60cde1d3e789236140a463da7a79fb28d540",
+    "tests/test_storage_fdt.c": "25d201c048f3c6e9d6bd5d02d3e96fdb87d00b233510ed0094eaf122a55a229f",
+    "tests/test_storage_runner.py": "9e3a568bca5f9c545a66b309cb89f77244e791031a05e067934dec2b212235dd",
+    "tests/test_storage_site.py": "6ec1ea5d492fab7e26361fdc0e970950eeabc07eb521a6c1732784b65a5b0cf7",
+    "tests/test_virtio_block.c": "8ab3df2d5500a03fa91277a44f79a7e4207e93ccf29949c0f5983da6789e1833",
+    "tools/build.py": "5de53996c16d0bfaa40e4f7158a266e7ebb97ada118bfb5fbdabafe40da48959",
+    "tools/storage_site.py": "29319cf74863314f7e72488c1fe43df75eb864a08d571e24999f704f342dfc12",
+    "tools/test_storage.py": "639abda774b9260cf99f2f7fb0c62275bf5c0580873e4a9547d7b7c6ec05b056"
+  }
+}

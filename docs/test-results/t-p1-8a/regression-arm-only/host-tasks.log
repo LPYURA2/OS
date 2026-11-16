@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_tasks.c kernel/tasks.c -o /workspace/OS/build/arm-only-tp18a/host-tests/host-tasks
+
+$ /workspace/OS/build/arm-only-tp18a/host-tests/host-tasks
+Tasks: transitions, empty/full, stacks, refusals, DONE exclusion and reuse PASS

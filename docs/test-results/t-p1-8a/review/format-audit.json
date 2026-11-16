@@ -1,0 +1,100 @@
+{
+  "audit": "T-P1.8A storage format",
+  "scope": [
+    "kernel/storage.c",
+    "include/styleos/storage.h",
+    "tests/test_storage.c"
+  ],
+  "initial_mode": "read-only audit",
+  "repair_authorized_by_parent": true,
+  "repository_edits_only": [
+    "kernel/storage.c",
+    "include/styleos/storage.h",
+    "tests/test_storage.c"
+  ],
+  "git_or_remote_operations": false,
+  "status": "PASS",
+  "frozen": true,
+  "source_sha256": {
+    "kernel/storage.c": "8b6c920269d684e61357126988c0ca7416e3ddab125b0de248acc02ff2b60355",
+    "include/styleos/storage.h": "4dafc1cb4312406da787c6b4d1640bcb0d38fa25cf26a0c1416aeaa603f97cfb",
+    "tests/test_storage.c": "32771abf85d4af1089cca67db95e60cde1d3e789236140a463da7a79fb28d540"
+  },
+  "findings": [
+    {
+      "severity": "blocker",
+      "status": "FIXED",
+      "original_location": "kernel/storage.c:202-213",
+      "issue": "fallback and identical reprepare can reuse existing valid commit record before commit",
+      "original_reproducer": "audit-stale-commit-repro.c",
+      "original_observed_generation": 2,
+      "expected_generation": 1,
+      "repair": "durably zero inactive commit before replacement metadata/payload writes"
+    },
+    {
+      "severity": "test-only",
+      "status": "FIXED_BY_PARENT",
+      "original_location": "tests/test_storage.c:78",
+      "issue": "NULL passed to memcmp for empty file",
+      "repair": "guard zero-length memcmp"
+    }
+  ],
+  "protocol": {
+    "prepare": [
+      "inactive commit zero write",
+      "confirmed flush",
+      "metadata write",
+      "payload sector 1 write",
+      "payload sector 2 write",
+      "confirmed flush",
+      "publish pending token"
+    ],
+    "commit": [
+      "commit record write",
+      "confirmed flush",
+      "publish generation"
+    ],
+    "prepare_writes": 4,
+    "prepare_flushes": 2,
+    "save_writes": 5,
+    "save_flushes": 3
+  },
+  "checks": [
+    {
+      "name": "gcc14-strict-host-final",
+      "status": "PASS",
+      "groups": 17,
+      "flags": "-std=c11 -Wall -Wextra -Werror -O2"
+    },
+    {
+      "name": "clang19-strict-host-final",
+      "status": "PASS",
+      "groups": 17,
+      "flags": "-std=c11 -Wall -Wextra -Werror -O2"
+    },
+    {
+      "name": "gcc14-asan-ubsan-final",
+      "status": "PASS",
+      "groups": 17,
+      "flags": "-std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer",
+      "runtime": "UBSAN_OPTIONS=halt_on_error=1 ASAN_OPTIONS=detect_leaks=1"
+    },
+    {
+      "name": "clang19-sanitizer-link",
+      "status": "UNAVAILABLE",
+      "reason": "toolchain lacks libclang_rt ASan archives; GCC14 sanitizer check passed"
+    },
+    {
+      "name": "missing-invalidation-flush-mutation",
+      "status": "EXPECTED_FAIL",
+      "detail": "isolated power-cut regression rejects mutation by recovering wrong generation"
+    }
+  ],
+  "new_regressions": {
+    "fallback_identical_reprepare": "PASS",
+    "operation_boundary_power_cuts": 6,
+    "prepare_failure_cases_with_durable_or_nondurable_failed_flush": 12,
+    "stale_token_refusal": "PASS"
+  },
+  "qemu": "NOT RUN in this audit; parent owns integration"
+}

@@ -1,0 +1,18 @@
+STORAGE RUN DIRECTORY: /workspace/OS/build/termux-tp18a/run-20261116T214900.022421Z-ois7fax0
+host-storage-format: PASS — exit 0
+host-storage-fdt: PASS — exit 0
+host-storage-transport: PASS — exit 0
+host-storage-python: PASS — exit 0
+build-storage: PASS — exit 0
+storage-binary-proof: PASS — independent ELF/Image/manifest/source-profile proof
+persist-init-a: PASS — validated guest halt, then intentional SIGTERM
+persist-read-a: PASS — validated guest halt, then intentional SIGTERM
+persist-update-b: PASS — validated guest halt, then intentional SIGTERM
+persist-read-b: PASS — validated guest halt, then intentional SIGTERM
+crash-init-a: PASS — validated guest halt, then intentional SIGTERM
+crash-prepare-b: PASS — validated pre-commit barrier, then intentional SIGKILL
+crash-recover-a: PASS — validated guest halt, then intentional SIGTERM
+storage-source-binding: PASS — source hashes unchanged across build and seven VM processes
+persistence-and-update: PASS — same runner-created disk, independent VM processes, unchanged host file between phases
+interrupted-update-recovery: PASS — same runner-created disk, independent VM processes, unchanged host file between phases
+RESULTS: /workspace/OS/build/termux-tp18a/run-20261116T214900.022421Z-ois7fax0/test-results/results.json

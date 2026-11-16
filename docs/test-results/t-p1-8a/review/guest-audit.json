@@ -1,0 +1,42 @@
+{
+  "scope": "READ-ONLY T-P1.8A guest demo/FDT audit",
+  "result": "PASS; no blocking findings",
+  "repository_mutations": false,
+  "git_commands": false,
+  "qemu_runs": false,
+  "files_sha256": {
+    "kernel/storage_demo.c": "0aec7b3119c7e0b60f92a381830709dcc5c944f7e5e8199eb7f0605ca58157fb",
+    "boot/aarch64/storage_fdt.c": "894305b2279dbb6a08510eb8c195c7840d46f5f15bff6e5b5d516582ea4889ba",
+    "include/styleos/storage_demo.h": "a64bfa9c5491aee88278373d8c262a8191eff441e779fd2fef1011ec02e843a8",
+    "tests/test_storage_fdt.c": "25d201c048f3c6e9d6bd5d02d3e96fdb87d00b233510ed0094eaf122a55a229f"
+  },
+  "host_compiler": "cc (Debian 14.2.0-19) 14.2.0",
+  "checks": [
+    {
+      "name": "original FDT C host suite under AddressSanitizer and UndefinedBehaviorSanitizer",
+      "status": "PASS",
+      "log": "/workspace/scratch/styleos-t-p1-8a/guest-audit-fdt.log"
+    },
+    {
+      "name": "scratch extended FDT probes under AddressSanitizer and UndefinedBehaviorSanitizer",
+      "status": "PASS",
+      "log": "/workspace/scratch/styleos-t-p1-8a/guest-audit-fdt-extended.log"
+    },
+    {
+      "name": "eleven preexisting boot/memory contract files byte-identical to supplied baseline-source",
+      "status": "PASS",
+      "evidence": "/workspace/scratch/styleos-t-p1-8a/guest-audit-unchanged-paths.json"
+    },
+    {
+      "name": "source review: complete owned ranges before post-handoff initialization, fixed Image/MMU/cache admission, exact file comparison, permanent pre-commit halt",
+      "status": "PASS"
+    }
+  ],
+  "findings": [],
+  "observations": [
+    "storage_fdt_parse is a bounded storage-profile parse called only after the existing successful full memory/DTB validation. It does not independently parse the reservation block; that is already validated by bm_fdt_parse.",
+    "Inherited start.S clears Image BSS before diagnostics, unchanged from the base; the new post-handoff storage initialization and DMA use occur only after whole-range admission.",
+    "The audit does not replace linked-image binary extent proof, QEMU execution, independent process lifecycle checks, or artifact reproducibility."
+  ],
+  "tool_setup": "Initial clang PATH lookup was unavailable (exit 127); sanitizer tests subsequently ran successfully using cc."
+}

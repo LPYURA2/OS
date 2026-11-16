@@ -1,0 +1,7 @@
+{
+  "run": "/workspace/OS/build/termux-tp18a/run-20261116T214900.022421Z-ois7fax0",
+  "status": "PASS",
+  "exit_code": 0,
+  "checks": 16,
+  "results": "test-results/results.json"
+}

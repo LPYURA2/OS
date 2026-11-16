@@ -1,0 +1,674 @@
+{
+  "status": "PASS",
+  "implementation_commit": "6dfb61d49835c50d561ca2b4a509563e3c744e59",
+  "source_snapshot_files": 110,
+  "all_current_and_both_run_source_hashes_match_commit": true,
+  "runs": [
+    {
+      "path": "/workspace/OS/build/termux-tp18a/run-20261116T214900.022421Z-ois7fax0",
+      "checks": 16,
+      "status": "PASS",
+      "git_dirty": false,
+      "source_files": 110,
+      "binary": {
+        "pool_site_sha256": "8baea87de583c656b831ce529e41bb445c5d30858ac611eea126da2a076d1b21",
+        "elf_bytes": 122136,
+        "raw_bytes": 48496,
+        "elf_sha256": "b730312193d84f8ce4d2795860c799e36c8211d645eb11f90126826baa4b2c25",
+        "raw_sha256": "756010c0fa3f41a5506f4d43233042141dab5d96ab67950aae111ceb1f8bbea8",
+        "load_count": 3,
+        "allocated_section_count": 3,
+        "image_start": 1074266112,
+        "image_end": 1074454528,
+        "image_bytes": 188416,
+        "bss_start": 1074315264,
+        "bss_end": 1074454528,
+        "zero_extent_bytes": 139264,
+        "entry_branch": 335544336,
+        "entry_target": 1074266176,
+        "objects": {
+          "vblk_control": {
+            "symbol": "styleos_vblk_control",
+            "start": 1074376704,
+            "end": 1074380800,
+            "bytes": 4096
+          },
+          "queue": {
+            "symbol": "styleos_vblk_queue",
+            "start": 1074380800,
+            "end": 1074384896,
+            "bytes": 4096
+          },
+          "request": {
+            "symbol": "styleos_vblk_request",
+            "start": 1074384896,
+            "end": 1074388992,
+            "bytes": 4096
+          },
+          "control": {
+            "symbol": "styleos_storage_control",
+            "start": 1074368512,
+            "end": 1074372608,
+            "bytes": 4096
+          },
+          "workspace": {
+            "symbol": "styleos_storage_workspace",
+            "start": 1074372608,
+            "end": 1074376704,
+            "bytes": 4096
+          },
+          "diagnostic": {
+            "symbol": "diagnostic",
+            "start": 1074315264,
+            "end": 1074327664,
+            "bytes": 12400
+          },
+          "stack": {
+            "symbol": "__stack_bottom",
+            "start": 1074388992,
+            "end": 1074454528,
+            "bytes": 65536
+          },
+          "vectors": {
+            "symbol": "aarch64_vectors",
+            "start": 1074268160,
+            "end": 1074270208,
+            "bytes": 2048
+          },
+          "pool": {
+            "symbol": "styleos_bootpool_storage",
+            "start": 1074331648,
+            "end": 1074364416,
+            "bytes": 32768
+          },
+          "pool_metadata": {
+            "symbol": "styleos_bootpool_metadata",
+            "start": 1074364416,
+            "end": 1074368512,
+            "bytes": 4096
+          }
+        },
+        "sources": [
+          "kernel/main.c",
+          "kernel/boot_info.c",
+          "kernel/runtime.c",
+          "kernel/boot_memory.c",
+          "kernel/boot_memory_diagnostic.c",
+          "kernel/exception.c",
+          "kernel/boot_pool.c",
+          "kernel/storage.c",
+          "kernel/storage_demo.c",
+          "boot/aarch64/storage_fdt.c",
+          "arch/aarch64/virtio_block.c",
+          "boot/aarch64/platform.c",
+          "boot/aarch64/start.S",
+          "boot/aarch64/fdt_memory.c",
+          "arch/aarch64/console.c"
+        ],
+        "flags": [
+          "--target=aarch64-none-elf",
+          "-O2",
+          "-g0",
+          "-ffreestanding",
+          "-fno-stack-protector",
+          "-fno-builtin",
+          "-fno-pic",
+          "-fno-pie",
+          "-fno-asynchronous-unwind-tables",
+          "-fno-unwind-tables",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-I",
+          "/workspace/OS/include",
+          "-I",
+          "/workspace/OS/boot/x86_64",
+          "-DSTYLEOS_EXPECT_ARCH=2",
+          "-ffile-prefix-map=/workspace/OS=.",
+          "-mgeneral-regs-only",
+          "-mno-outline-atomics",
+          "-mstrict-align",
+          "-DSTYLEOS_TEST_STORAGE=1"
+        ],
+        "proof_external_processes": false
+      },
+      "metadata_sha256": {
+        "manifest.json": "aa897ced1df6e46038b5d0f5d403f2d2ece6f30e3f35c99046e3e2c9a57b4287",
+        "aarch64/storage-compiler.json": "c6d7663bc6021f56b135f0eadc45ce0fbb002924278b1a1fcc8e9bf4589f4029",
+        "aarch64/storage-site.json": "36aa257ab9e4c4d069ed5bc8b13ebaed58d70c199da4d034393d925a8521d050"
+      },
+      "pids": [
+        13675,
+        13679,
+        13683,
+        13687,
+        13691,
+        13695,
+        13699
+      ],
+      "stages": [
+        {
+          "stage": "persist-init-a",
+          "phase": "init-a",
+          "pid": 13675,
+          "uart_bytes": 2978,
+          "uart_sha256": "019fcf41fd674c08a6198d16f313c0dc3d60cfb5beccc267553b7ca803f0da57",
+          "json_sha256": "b25983d4f674b95caaa59135b3a9895d1e199c473510f0854f85a69ba7aea79f",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 2053,
+            "writes": 6,
+            "flushes": 4,
+            "requests": 2063
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+          "disk_sha256_after": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc"
+        },
+        {
+          "stage": "persist-read-a",
+          "phase": "read-a",
+          "pid": 13679,
+          "uart_bytes": 2567,
+          "uart_sha256": "f6b4b723d93ebadaa012cd2ef8d9973429b3883838fa0b8893607d36181e61f5",
+          "json_sha256": "140919576cdb87059bbeb0f4a808bc286fceb177f5ccc467af58695da3ed96e0",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 14,
+            "writes": 0,
+            "flushes": 0,
+            "requests": 14
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc",
+          "disk_sha256_after": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc"
+        },
+        {
+          "stage": "persist-update-b",
+          "phase": "update-b",
+          "pid": 13683,
+          "uart_bytes": 3106,
+          "uart_sha256": "130d49777d49d3193003e3f4ea098ee1ae3fd5ed5ea43d6c8faf296980f99cec",
+          "json_sha256": "aa214547f599864932e4b9eef1ef003586067369d4b8804209e25ce01f80fb08",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 19,
+            "writes": 5,
+            "flushes": 3,
+            "requests": 27
+          },
+          "read_generations": [
+            1,
+            2
+          ],
+          "disk_sha256_before": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc",
+          "disk_sha256_after": "665ac732acc4a436ba8b54384678aad859082b941d64c9e410a4cc6b3a3588b9"
+        },
+        {
+          "stage": "persist-read-b",
+          "phase": "read-b",
+          "pid": 13687,
+          "uart_bytes": 2585,
+          "uart_sha256": "1bd412740ece8341acae73de457fc17efbf30cd9864e66280ad9eb90b7d47a40",
+          "json_sha256": "c40000ab80d508f805c430af80490db5c02293e49c6fb08023254c97e0cad5d7",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 14,
+            "writes": 0,
+            "flushes": 0,
+            "requests": 14
+          },
+          "read_generations": [
+            2
+          ],
+          "disk_sha256_before": "665ac732acc4a436ba8b54384678aad859082b941d64c9e410a4cc6b3a3588b9",
+          "disk_sha256_after": "665ac732acc4a436ba8b54384678aad859082b941d64c9e410a4cc6b3a3588b9"
+        },
+        {
+          "stage": "crash-init-a",
+          "phase": "init-a",
+          "pid": 13691,
+          "uart_bytes": 2978,
+          "uart_sha256": "019fcf41fd674c08a6198d16f313c0dc3d60cfb5beccc267553b7ca803f0da57",
+          "json_sha256": "51119fc8e9e77f607811c3588eb085cc0294084b8fd94fbb478f7d964f494510",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 2053,
+            "writes": 6,
+            "flushes": 4,
+            "requests": 2063
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+          "disk_sha256_after": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc"
+        },
+        {
+          "stage": "crash-prepare-b",
+          "phase": "prepare-b",
+          "pid": 13695,
+          "uart_bytes": 2686,
+          "uart_sha256": "fbd05d42e022f4d1761e9dcc69d695b0e628eaac3eed65a29df047d2efdb3133",
+          "json_sha256": "c2435cec9ff1322bcc363a95bac45798703a2b453ae6fa68fd758eec316ca3c0",
+          "stop_signal": 9,
+          "returncode": -9,
+          "io": {
+            "reads": 14,
+            "writes": 4,
+            "flushes": 2,
+            "requests": 20
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc",
+          "disk_sha256_after": "68e95e416ff960b26d4f87e206ec59ba65d02874f3756c55c6d0df8503f9ac04"
+        },
+        {
+          "stage": "crash-recover-a",
+          "phase": "recover-a",
+          "pid": 13699,
+          "uart_bytes": 2570,
+          "uart_sha256": "2dcb4021ad1888225e6bfdb7d71e446ac824c1e6eb416237f87828f5c9888f1a",
+          "json_sha256": "afc3d0b6815d5eb527b405ad65e377f0319fa000fce7071089520695ac4dfe0c",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 14,
+            "writes": 0,
+            "flushes": 0,
+            "requests": 14
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "68e95e416ff960b26d4f87e206ec59ba65d02874f3756c55c6d0df8503f9ac04",
+          "disk_sha256_after": "68e95e416ff960b26d4f87e206ec59ba65d02874f3756c55c6d0df8503f9ac04"
+        }
+      ],
+      "provenance_sha256": "b5a0f8fa02ef848cfabd34a97890c9b1de39010665494c725b5d49aefed789a6",
+      "run_json_sha256": "3dca750fcc65a23c973a93b5a3cd294c570a9f57c3d9ec57f6c1a429362c9519",
+      "results_sha256": "53eb71722b48d7c93c7011605f7935960bb5d9494eb464941d28814b266c0b67",
+      "tool_versions": {
+        "host_cc": {
+          "command": [
+            "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/clang",
+            "--version"
+          ],
+          "returncode": 0,
+          "output": "Debian clang version 19.1.7 (3+b1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin\n"
+        },
+        "clang": {
+          "command": [
+            "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/clang",
+            "--version"
+          ],
+          "returncode": 0,
+          "output": "Debian clang version 19.1.7 (3+b1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin\n"
+        },
+        "ld_lld": {
+          "command": [
+            "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/ld.lld",
+            "--version"
+          ],
+          "returncode": 0,
+          "output": "Debian LLD 19.1.7 (compatible with GNU linkers)\n"
+        }
+      },
+      "qemu_version": "QEMU emulator version 10.0.13 (Debian 1:10.0.13+ds-0+deb13u1)\nCopyright (c) 2003-2025 Fabrice Bellard and the QEMU Project developers\n"
+    },
+    {
+      "path": "/workspace/OS/build/termux-tp18a/run-20261116T214906.150496Z-rf5q4lxp",
+      "checks": 16,
+      "status": "PASS",
+      "git_dirty": false,
+      "source_files": 110,
+      "binary": {
+        "pool_site_sha256": "8baea87de583c656b831ce529e41bb445c5d30858ac611eea126da2a076d1b21",
+        "elf_bytes": 122136,
+        "raw_bytes": 48496,
+        "elf_sha256": "b730312193d84f8ce4d2795860c799e36c8211d645eb11f90126826baa4b2c25",
+        "raw_sha256": "756010c0fa3f41a5506f4d43233042141dab5d96ab67950aae111ceb1f8bbea8",
+        "load_count": 3,
+        "allocated_section_count": 3,
+        "image_start": 1074266112,
+        "image_end": 1074454528,
+        "image_bytes": 188416,
+        "bss_start": 1074315264,
+        "bss_end": 1074454528,
+        "zero_extent_bytes": 139264,
+        "entry_branch": 335544336,
+        "entry_target": 1074266176,
+        "objects": {
+          "vblk_control": {
+            "symbol": "styleos_vblk_control",
+            "start": 1074376704,
+            "end": 1074380800,
+            "bytes": 4096
+          },
+          "queue": {
+            "symbol": "styleos_vblk_queue",
+            "start": 1074380800,
+            "end": 1074384896,
+            "bytes": 4096
+          },
+          "request": {
+            "symbol": "styleos_vblk_request",
+            "start": 1074384896,
+            "end": 1074388992,
+            "bytes": 4096
+          },
+          "control": {
+            "symbol": "styleos_storage_control",
+            "start": 1074368512,
+            "end": 1074372608,
+            "bytes": 4096
+          },
+          "workspace": {
+            "symbol": "styleos_storage_workspace",
+            "start": 1074372608,
+            "end": 1074376704,
+            "bytes": 4096
+          },
+          "diagnostic": {
+            "symbol": "diagnostic",
+            "start": 1074315264,
+            "end": 1074327664,
+            "bytes": 12400
+          },
+          "stack": {
+            "symbol": "__stack_bottom",
+            "start": 1074388992,
+            "end": 1074454528,
+            "bytes": 65536
+          },
+          "vectors": {
+            "symbol": "aarch64_vectors",
+            "start": 1074268160,
+            "end": 1074270208,
+            "bytes": 2048
+          },
+          "pool": {
+            "symbol": "styleos_bootpool_storage",
+            "start": 1074331648,
+            "end": 1074364416,
+            "bytes": 32768
+          },
+          "pool_metadata": {
+            "symbol": "styleos_bootpool_metadata",
+            "start": 1074364416,
+            "end": 1074368512,
+            "bytes": 4096
+          }
+        },
+        "sources": [
+          "kernel/main.c",
+          "kernel/boot_info.c",
+          "kernel/runtime.c",
+          "kernel/boot_memory.c",
+          "kernel/boot_memory_diagnostic.c",
+          "kernel/exception.c",
+          "kernel/boot_pool.c",
+          "kernel/storage.c",
+          "kernel/storage_demo.c",
+          "boot/aarch64/storage_fdt.c",
+          "arch/aarch64/virtio_block.c",
+          "boot/aarch64/platform.c",
+          "boot/aarch64/start.S",
+          "boot/aarch64/fdt_memory.c",
+          "arch/aarch64/console.c"
+        ],
+        "flags": [
+          "--target=aarch64-none-elf",
+          "-O2",
+          "-g0",
+          "-ffreestanding",
+          "-fno-stack-protector",
+          "-fno-builtin",
+          "-fno-pic",
+          "-fno-pie",
+          "-fno-asynchronous-unwind-tables",
+          "-fno-unwind-tables",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-I",
+          "/workspace/OS/include",
+          "-I",
+          "/workspace/OS/boot/x86_64",
+          "-DSTYLEOS_EXPECT_ARCH=2",
+          "-ffile-prefix-map=/workspace/OS=.",
+          "-mgeneral-regs-only",
+          "-mno-outline-atomics",
+          "-mstrict-align",
+          "-DSTYLEOS_TEST_STORAGE=1"
+        ],
+        "proof_external_processes": false
+      },
+      "metadata_sha256": {
+        "manifest.json": "aa897ced1df6e46038b5d0f5d403f2d2ece6f30e3f35c99046e3e2c9a57b4287",
+        "aarch64/storage-compiler.json": "c6d7663bc6021f56b135f0eadc45ce0fbb002924278b1a1fcc8e9bf4589f4029",
+        "aarch64/storage-site.json": "36aa257ab9e4c4d069ed5bc8b13ebaed58d70c199da4d034393d925a8521d050"
+      },
+      "pids": [
+        13767,
+        13771,
+        13775,
+        13779,
+        13783,
+        13787,
+        13791
+      ],
+      "stages": [
+        {
+          "stage": "persist-init-a",
+          "phase": "init-a",
+          "pid": 13767,
+          "uart_bytes": 2978,
+          "uart_sha256": "07373fb9540e4b5a680e64b61716fc88002da6fdd0afd9354f9061eb0afa5fa1",
+          "json_sha256": "8754432b199f55bf9b98129e22f3224f6e5ad14ab2942e34482890c8891df18a",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 2053,
+            "writes": 6,
+            "flushes": 4,
+            "requests": 2063
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+          "disk_sha256_after": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc"
+        },
+        {
+          "stage": "persist-read-a",
+          "phase": "read-a",
+          "pid": 13771,
+          "uart_bytes": 2567,
+          "uart_sha256": "42330aa5d99154b504146bec2bc3fe31d7dad9f5f934890b5bbcc0b4e4a1b17a",
+          "json_sha256": "6c194d9585801a774cd604fb78b03335757df4153247dfe9b36aa642c3c85107",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 14,
+            "writes": 0,
+            "flushes": 0,
+            "requests": 14
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc",
+          "disk_sha256_after": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc"
+        },
+        {
+          "stage": "persist-update-b",
+          "phase": "update-b",
+          "pid": 13775,
+          "uart_bytes": 3106,
+          "uart_sha256": "bfaa8a248cd2621b8db7e221c8087aaea99f489d1236228417b6be05d8c7c4f0",
+          "json_sha256": "52c766f4345cb6f5d12ff435aae0dbe7a6a953774f060a2975bf8c161256920c",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 19,
+            "writes": 5,
+            "flushes": 3,
+            "requests": 27
+          },
+          "read_generations": [
+            1,
+            2
+          ],
+          "disk_sha256_before": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc",
+          "disk_sha256_after": "665ac732acc4a436ba8b54384678aad859082b941d64c9e410a4cc6b3a3588b9"
+        },
+        {
+          "stage": "persist-read-b",
+          "phase": "read-b",
+          "pid": 13779,
+          "uart_bytes": 2585,
+          "uart_sha256": "5f418943d3d99044cd0266a92f967780cfe6787ab71b959c620682bd4cf95bed",
+          "json_sha256": "7620d87cd0b800bfaee4385e9b97bbde960ebdd61f142359118412395ea5859c",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 14,
+            "writes": 0,
+            "flushes": 0,
+            "requests": 14
+          },
+          "read_generations": [
+            2
+          ],
+          "disk_sha256_before": "665ac732acc4a436ba8b54384678aad859082b941d64c9e410a4cc6b3a3588b9",
+          "disk_sha256_after": "665ac732acc4a436ba8b54384678aad859082b941d64c9e410a4cc6b3a3588b9"
+        },
+        {
+          "stage": "crash-init-a",
+          "phase": "init-a",
+          "pid": 13783,
+          "uart_bytes": 2978,
+          "uart_sha256": "07373fb9540e4b5a680e64b61716fc88002da6fdd0afd9354f9061eb0afa5fa1",
+          "json_sha256": "c7e3159c8d11eca91b76d92516071a4e65ad1809508d1f3acb80b44d8e837e87",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 2053,
+            "writes": 6,
+            "flushes": 4,
+            "requests": 2063
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58",
+          "disk_sha256_after": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc"
+        },
+        {
+          "stage": "crash-prepare-b",
+          "phase": "prepare-b",
+          "pid": 13787,
+          "uart_bytes": 2686,
+          "uart_sha256": "fbd05d42e022f4d1761e9dcc69d695b0e628eaac3eed65a29df047d2efdb3133",
+          "json_sha256": "ca1c40f74cd7d8f25d04127a69959a652d58c4200bf284dd1d4a6809f2f4b1d9",
+          "stop_signal": 9,
+          "returncode": -9,
+          "io": {
+            "reads": 14,
+            "writes": 4,
+            "flushes": 2,
+            "requests": 20
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc",
+          "disk_sha256_after": "68e95e416ff960b26d4f87e206ec59ba65d02874f3756c55c6d0df8503f9ac04"
+        },
+        {
+          "stage": "crash-recover-a",
+          "phase": "recover-a",
+          "pid": 13791,
+          "uart_bytes": 2570,
+          "uart_sha256": "3127f233d78aaead5a7aaeca429bd45766519f175b90ddeda1a76bd8826b6db6",
+          "json_sha256": "1b547853f2a4a71e33d6ee8c69a0752accc28b36a93f51e769aea285261650bc",
+          "stop_signal": 15,
+          "returncode": 0,
+          "io": {
+            "reads": 14,
+            "writes": 0,
+            "flushes": 0,
+            "requests": 14
+          },
+          "read_generations": [
+            1
+          ],
+          "disk_sha256_before": "68e95e416ff960b26d4f87e206ec59ba65d02874f3756c55c6d0df8503f9ac04",
+          "disk_sha256_after": "68e95e416ff960b26d4f87e206ec59ba65d02874f3756c55c6d0df8503f9ac04"
+        }
+      ],
+      "provenance_sha256": "8d29b65fdfd954175ae1b8cba096e51af717138a5e16bbc58787f528f87f19ba",
+      "run_json_sha256": "84e7349c4e9dad0554e0f28da340746a6b26ea177d49feccc67eaf97026f784e",
+      "results_sha256": "53eb71722b48d7c93c7011605f7935960bb5d9494eb464941d28814b266c0b67",
+      "tool_versions": {
+        "host_cc": {
+          "command": [
+            "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/clang",
+            "--version"
+          ],
+          "returncode": 0,
+          "output": "Debian clang version 19.1.7 (3+b1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin\n"
+        },
+        "clang": {
+          "command": [
+            "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/clang",
+            "--version"
+          ],
+          "returncode": 0,
+          "output": "Debian clang version 19.1.7 (3+b1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin\n"
+        },
+        "ld_lld": {
+          "command": [
+            "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/ld.lld",
+            "--version"
+          ],
+          "returncode": 0,
+          "output": "Debian LLD 19.1.7 (compatible with GNU linkers)\n"
+        }
+      },
+      "qemu_version": "QEMU emulator version 10.0.13 (Debian 1:10.0.13+ds-0+deb13u1)\nCopyright (c) 2003-2025 Fabrice Bellard and the QEMU Project developers\n"
+    }
+  ],
+  "limits": "Linux QEMU virt process interruption; no Android/phone/host power-loss or physical-device durability claim",
+  "old_artifacts_independently_hashed_and_byte_compared": 44,
+  "first_run_preserved_files_rehashed": 59,
+  "regression_result_counts": {
+    "t-p1-8a": {
+      "pass_count": 57,
+      "python_tests": 261
+    },
+    "arm-only-tp18a": {
+      "pass_count": 43,
+      "python_tests": 261
+    }
+  },
+  "ordinary_attached_disk_guard": "PASS; unchanged fully blank disk and no storage UART marker",
+  "host_disk_write_review": "Runner creates only two fresh O_EXCL/O_NOFOLLOW regular zero files; subsequent host disk_state opens O_RDONLY; guest builds every format/metadata/payload/commit. Full per-disk identity/SHA chains agree at every VM boundary.",
+  "protocol": "Per save: zero inactive commit + FLUSH; metadata and two payload sectors + FLUSH; commit record + final FLUSH. Prepare barrier stops after two FLUSHes; commit produces third. Explicit initial superblock format has one additional FLUSH.",
+  "raw_uart_traces_checked": 14,
+  "unique_vm_pids": 14,
+  "artifact_instances_hashed": 4,
+  "distinct_new_artifact_hashes": 2
+}

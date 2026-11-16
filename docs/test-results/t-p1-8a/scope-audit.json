@@ -1,0 +1,19 @@
+{
+  "base": "2831e6a1c54562d1f37518913f07e648cc00cc2d",
+  "implementation_commit": "6dfb61d49835c50d561ca2b4a509563e3c744e59",
+  "base_files": 1009,
+  "identical_base_files": 1003,
+  "changed_base_files": [
+    "AGENTS.md",
+    "docs/LEARNING_RU.md",
+    "docs/TESTING.md",
+    "kernel/main.c",
+    "tests/test_build_modes.py",
+    "tools/build.py"
+  ],
+  "missing_base_files": [],
+  "historical_evidence_files": 896,
+  "historical_evidence_unchanged": true,
+  "root_readme_unchanged": true,
+  "tested_source_count": 110
+}

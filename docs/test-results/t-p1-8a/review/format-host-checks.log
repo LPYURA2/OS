@@ -1,0 +1,16 @@
+GCC 14.2.0 strict:
+cc -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/test_storage.c kernel/storage.c -o /workspace/scratch/styleos-t-p1-8a/audit-host-storage
+storage format host PASS: 17 groups; CRC, whole-file versions, ordered invalidation/data/commit flushes, crash barrier, refusals and transport failures
+
+Clang 19.1.7 strict:
+source /workspace/scratch/styleos-toolchain/env.sh
+clang -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/test_storage.c kernel/storage.c -o /workspace/scratch/styleos-t-p1-8a/audit-host-storage-clang
+storage format host PASS: 17 groups; CRC, whole-file versions, ordered invalidation/data/commit flushes, crash barrier, refusals and transport failures
+
+GCC14 ASan+UBSan:
+cc -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Iinclude tests/test_storage.c kernel/storage.c -o /workspace/scratch/styleos-t-p1-8a/audit-host-storage-sanitized
+UBSAN_OPTIONS=halt_on_error=1 ASAN_OPTIONS=detect_leaks=1 /workspace/scratch/styleos-t-p1-8a/audit-host-storage-sanitized
+storage format host PASS: 17 groups; CRC, whole-file versions, ordered invalidation/data/commit flushes, crash barrier, refusals and transport failures
+
+Scratch mutation omitting invalidation flush: EXPECTED FAILURE
+storage test failed line 90: record.generation==generation && record.name_length==sizeof name-1

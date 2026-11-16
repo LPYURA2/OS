@@ -1,0 +1,107 @@
+{
+  "audit": "T-P1.8A read-only VirtIO block driver audit",
+  "branch_reported_by_parent": "feature/styleos-t-p1-8a",
+  "base_reported_by_parent": "2831e6a1c54562d1f37518913f07e648cc00cc2d",
+  "files_sha256": {
+    "arch/aarch64/virtio_block.c": "42e8869f4d0e93ef8740c5569b72c301d5130f88615c4e2a6bce4e5b2c4f270d",
+    "include/styleos/virtio_block.h": "b26ef378ec0303cf5ca2e8759753168c14a38ebc430c91da6e2b88a47a327027",
+    "tests/test_virtio_block.c": "8ab3df2d5500a03fa91277a44f79a7e4207e93ccf29949c0f5983da6789e1833",
+    "kernel/storage_demo.c": "0aec7b3119c7e0b60f92a381830709dcc5c944f7e5e8199eb7f0605ca58157fb",
+    "kernel/storage.c": "b1080eb26ec27545f5c11ff796b34767d46d3041f59a700f96525f14e92197c0",
+    "tools/test_storage.py": "7fcf8b261fac6efd941c6d551130dfec9d8ccf65f3cde92bd2d7d8acd2df9cdd"
+  },
+  "verdict": "No driver correctness blocker found in the bounded, fixed ARM QEMU virt contract. Runner macro mismatch independently reproduced and reported; parent assigned its fix.",
+  "findings": [
+    {
+      "id": "driver-audit-001",
+      "severity": "blocker",
+      "file": "tools/test_storage.py",
+      "original_line": 327,
+      "description": "Host runner passed -DSTYLEOS_VBLK_MODEL=1 while the driver/header expose the model only under STYLEOS_VBLK_HOST_TEST. Original invocation fails under -Werror with incomplete vb_model_bus and implicit model functions. Correct define passes.",
+      "status": "Reported to parent; runner owner fixing concurrently; runner input is mutable and final hash may differ."
+    }
+  ],
+  "checks": [
+    {
+      "name": "gcc-model",
+      "status": "PASS",
+      "exit_code": 0,
+      "command": [
+        "/workspace/scratch/styleos-t-p1-8a/driver-audit/test-virtio-block"
+      ],
+      "output": "virtio block MODEL PASS: negotiation, DMA bounce/queue8, wrap, sector bounds, flush, status/timeout/config failures\n"
+    },
+    {
+      "name": "clang-model",
+      "status": "PASS",
+      "exit_code": 0,
+      "command": [
+        "/workspace/scratch/styleos-t-p1-8a/driver-audit/test-virtio-block-clang"
+      ],
+      "output": "virtio block MODEL PASS: negotiation, DMA bounce/queue8, wrap, sector bounds, flush, status/timeout/config failures\n"
+    },
+    {
+      "name": "gcc-sanitized-model",
+      "status": "PASS",
+      "exit_code": 0,
+      "command": [
+        "/workspace/scratch/styleos-t-p1-8a/driver-audit/test-virtio-block-sanitized"
+      ],
+      "output": "virtio block MODEL PASS: negotiation, DMA bounce/queue8, wrap, sector bounds, flush, status/timeout/config failures\n"
+    },
+    {
+      "name": "extended-model",
+      "status": "PASS",
+      "exit_code": 0,
+      "command": [
+        "/workspace/scratch/styleos-t-p1-8a/driver-audit/extended-model"
+      ],
+      "output": "virtio block MODEL PASS: negotiation, DMA bounce/queue8, wrap, sector bounds, flush, status/timeout/config failures\nextended transport MODEL PASS: real 8192 cap, unchanged cap refusal, extra-feature mask, max bounded capacity, unstable config refusal\n"
+    }
+  ],
+  "expected_real_phase_counters_by_static_analysis": {
+    "init-a": {
+      "reads": 2053,
+      "writes": 5,
+      "flushes": 3,
+      "requests": 2061
+    },
+    "read-a": {
+      "reads": 14,
+      "writes": 0,
+      "flushes": 0,
+      "requests": 14
+    },
+    "read-b": {
+      "reads": 14,
+      "writes": 0,
+      "flushes": 0,
+      "requests": 14
+    },
+    "recover-a": {
+      "reads": 14,
+      "writes": 0,
+      "flushes": 0,
+      "requests": 14
+    },
+    "update-b": {
+      "reads": 19,
+      "writes": 4,
+      "flushes": 2,
+      "requests": 25
+    },
+    "prepare-b": {
+      "reads": 14,
+      "writes": 3,
+      "flushes": 1,
+      "requests": 18
+    }
+  },
+  "limits": [
+    "No QEMU was run by this auditor, per parent instruction. These are host/model results and source analysis, not hardware/DMA or persistence evidence.",
+    "Host adapter intentionally bypasses ARM physical placement and cache/MMU admission.",
+    "Existing ring wrap test exercises modulo-8 ring slots; 16-bit index wrap is unreachable within the 8192-request cap. Extended harness exercises 1024 full ring rotations.",
+    "Generic caller buffers are never passed to DMA. They are copied via the admitted bounce page and must fit completely in the fixed reserved Image; this is not an arbitrary pointer-to-physical contract.",
+    "Runtime admission follows inherited loader-cleared BSS startup. Binary proof must bind the complete Image/BSS load and clear extents."
+  ]
+}

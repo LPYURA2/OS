@@ -1,0 +1,22 @@
+{
+  "pool_start": 1074307072,
+  "pool_end": 1074339840,
+  "metadata_start": 1074339840,
+  "metadata_end": 1074343936,
+  "pool_bytes": 32768,
+  "metadata_bytes": 4096,
+  "page_size": 4096,
+  "arch": "aarch64",
+  "address_space": "identity-image-address",
+  "image_start": 1074266112,
+  "image_end": 1074409472,
+  "bss_start": 1074290688,
+  "bss_end": 1074409472,
+  "image_size": 143360,
+  "sections": {
+    "styleos_bootpool_storage": ".bss",
+    "styleos_bootpool_metadata": ".bss"
+  },
+  "raw_sha256": "6d3651b99498e4108efb99d5eedd498feff858536a35ff168492ed972a420b70",
+  "binary_sha256": "08f220a0c62a0d9eebec6c109c6852b9a20ec3772e40cdf104cab74f0042c215"
+}

@@ -1,0 +1,22 @@
+$ /workspace/scratch/styleos-toolchain/bin/qemu-system-aarch64 -machine virt -cpu cortex-a57 -smp 1 -m 128M -accel tcg,thread=single -display none -serial stdio -monitor none -net none -no-reboot -global virtio-mmio.force-legacy=false -kernel /workspace/OS/build/t-p1-8a/aarch64/styleos.bin -append styleos.storage=init-a -blockdev {"driver":"file","filename":"/workspace/OS/build/ordinary-disk-guard/run-20261116T214932.377677Z-m_r47zrb/disks/persist.img","node-name":"storage-file","cache":{"direct":false,"no-flush":false}} -blockdev {"driver":"raw","file":"storage-file","node-name":"storage","read-only":false} -device virtio-blk-device,drive=storage,id=storage0
+STYLEOS AARCH64: initial EL1
+STYLEOS AARCH64: current EL1
+STYLEOS AARCH64: DTB header OK
+STYLEOS kernel_main entered
+STYLEOS boot_info validated v1
+STYLEOS HANDOFF PASS aarch64
+STYLEOS MEMMAP DIAGNOSTIC ONLY
+STYLEOS MEMMAP IMAGE 0x0000000040080000 0x00000000400a3000
+STYLEOS MEMMAP STACK 0x0000000040093000 0x00000000400a3000
+STYLEOS MEMMAP HANDOFF 0x00000000400a2f40 0x00000000400a2fa0
+STYLEOS MEMMAP SOURCE 0x0000000044000000 0x0000000044100000
+STYLEOS MEMMAP RAM 0x0000000040000000 0x0000000048000000
+STYLEOS MEMMAP RESERVED 0x0000000009000000 0x0000000009001000
+STYLEOS MEMMAP RESERVED 0x0000000040080000 0x00000000400a3000
+STYLEOS MEMMAP RESERVED 0x0000000044000000 0x0000000044100000
+STYLEOS MEMMAP CANDIDATE 0x0000000040000000 0x0000000040080000
+STYLEOS MEMMAP CANDIDATE 0x00000000400a3000 0x0000000044000000
+STYLEOS MEMMAP CANDIDATE 0x0000000044100000 0x0000000048000000
+STYLEOS MEMMAP PASS
+STYLEOS KERNEL HALT
+qemu-system-aarch64: terminating on signal 15 from pid 13798 (python3)

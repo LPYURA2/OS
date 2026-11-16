@@ -1,0 +1,2 @@
+virtio block MODEL PASS: negotiation, DMA bounce/queue8, wrap, sector bounds, flush, status/timeout/config failures
+extended transport MODEL PASS: real 8192 cap, unchanged cap refusal, extra-feature mask, max bounded capacity, unstable config refusal
