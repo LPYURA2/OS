@@ -191,3 +191,37 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
   devices remain SKIPPED until actually run. Stop after report and publication.
   User-process fault containment belongs to the separate future T-P1.7; these
   cooperative kernel tasks do not establish it or implement Deep Drop.
+
+## Approved T-P1.7 task
+- Start `feature/styleos-t-p1-7` from accepted
+  `eb73fad3ed431e91ebe995be4b370c678210e2b8`. Publish this task branch only;
+  preserve main, every previous ref, `docs/styleos-readme`, Portable-os,
+  presentation README, history and historical evidence. No merge, force push,
+  release or T-P1.8 work.
+- Only `--test-user-processes` may add two CPL3/EL0 programs and the necessary
+  image-owned roots, user pages, entry stack, control, vectors and x86 GDT/TSS.
+  This permission is confined to the new profile. Preserve every older profile,
+  boot_info v1, memory normalization and all previous artifact bytes.
+- One CPU, four explicit dispatches: A yield, B private-data write/yield,
+  resumed A real user-read fault, then resumed B private-data check/write/exit.
+  Preserve full exception-observed integer contexts; the T-P1.6 call-boundary
+  context is insufficient. Prove actual hardware origin, active roots, SP/PC,
+  exact fault instruction/VA/syndrome and B execution after A's terminal fault.
+- Use only finite admitted RESERVED image resources; exclude all other live
+  intervals before writes. No CANDIDATE/REVIEW, boot-pool allocation, general
+  PMM/heap, RAM grant or reclaim; GRANTED remains zero. Require supervisor-only
+  kernel mappings, own RX user code and RW/NX private data/stack with no foreign
+  user aliases. Software declarations alone do not establish hardware rights.
+- Switch to a trusted safe root and original dispatcher stack before clearing
+  terminal slot bookkeeping. Never resume faulted A. Unexpected kernel faults
+  remain diagnostic terminal failures, not successful user termination.
+- Bind PE/ELF/Image, live finite tables, complete trace and manifest SHA to real
+  QEMU x86/OVMF and ARM initial EL1/EL2 runs. Preserve all regressions, ordinary
+  reproducibility and compare all base artifacts including T-P1.6. Keep the
+  OVMF/x86-independent ARM route and strict negative parser/host tests.
+- Record owner-reported T-P1.6 Android/Termux 39/39 exit 0 at d8065f3 separately:
+  screenshots, LLVM objdump 21.1.8, QEMU version not shown, no raw UART/JSON.
+  This is not T-P1.7. New Android/VirtualBox/physical runs stay SKIPPED until run.
+- No kernel-fault recovery, restart services, IRQ/timer/preemption/SMP, general
+  FP/SIMD context, production process ABI, applications, GUI or Deep Drop.
+  Stop after this task's factual report and task-branch publication.

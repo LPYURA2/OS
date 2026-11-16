@@ -34,7 +34,7 @@ def run(args):
 def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_bootpool=False, test_paging=False, test_paging_fault=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
-          test_tasks=False):
+          test_tasks=False, test_user_processes=False):
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     folder = output / arch
     folder.mkdir(parents=True, exist_ok=True)
@@ -46,6 +46,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_tasks:
         common += ['kernel/tasks.c','kernel/tasks_demo.c',
                    f'arch/{arch}/tasks.c',f'arch/{arch}/tasks_context.S']
+    if test_user_processes:
+        common += ['kernel/user_processes.c', 'kernel/user_processes_demo.c',
+                   f'arch/{arch}/user_processes.c', f'arch/{arch}/user_processes_entry.S']
     ownership = test_ownership_plan or test_ownership_plan_invalid
     if ownership:
         common += ['kernel/ownership.c', 'kernel/ownership_plan.c',
@@ -99,6 +102,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_OWNERSHIP_INVALID=1')
     if test_tasks:
         flags.append('-DSTYLEOS_TEST_TASKS=1')
+    if test_user_processes:
+        flags.append('-DSTYLEOS_TEST_USER_PROCESSES=1')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -142,6 +147,18 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
             site['disk_sha256'] = hashlib.sha256(
                 (folder / 'styleos.img').read_bytes()).hexdigest()
         (folder / 'tasks-site.json').write_text(json.dumps(site,indent=2)+'\n')
+    if test_user_processes:
+        from user_processes_site import describe_user_processes
+        (folder / 'user-processes-compiler.json').write_text(json.dumps({
+            'flags': flags, 'sources': sources}, indent=2) + '\n')
+        site = describe_user_processes(arch, artifacts[0],
+            folder / 'kernel.map' if arch == 'x86_64' else None,
+            folder / 'styleos.bin' if arch == 'aarch64' else None,
+            compiler_flags=flags)
+        if arch == 'x86_64':
+            site['disk_sha256'] = hashlib.sha256(
+                (folder / 'styleos.img').read_bytes()).hexdigest()
+        (folder / 'user-processes-site.json').write_text(json.dumps(site, indent=2) + '\n')
     if ownership:
         from ownership_site import describe_ownership
         site = describe_ownership(arch, artifacts[0],
@@ -204,6 +221,8 @@ def main():
                           help='Dedicated image only: refuse an unproven mandatory claim')
     negative.add_argument('--test-tasks', action='store_true',
                           help='Dedicated image only: two cooperative integer kernel tasks')
+    negative.add_argument('--test-user-processes', action='store_true',
+                          help='Dedicated image only: CPL3/EL0 fault containment experiment')
     args = parser.parse_args()
     output = (args.output or ROOT / 'build' /
               ('exception' if args.test_exception else
@@ -212,10 +231,12 @@ def main():
                'paging-fault' if args.test_paging_fault else
                'ownership' if args.test_ownership_plan else
                'ownership-invalid' if args.test_ownership_plan_invalid else
-               'tasks' if args.test_tasks else '')).resolve()
+               'tasks' if args.test_tasks else
+               'user-processes' if args.test_user_processes else '')).resolve()
     if (args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_ownership_plan or
-            args.test_ownership_plan_invalid or args.test_tasks) and output == (ROOT / 'build').resolve():
+            args.test_ownership_plan_invalid or args.test_tasks or
+            args.test_user_processes) and output == (ROOT / 'build').resolve():
         parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
     records = []
@@ -224,11 +245,13 @@ def main():
                              args.invalid_memory_map, args.test_exception,
                              args.test_bootpool, args.test_paging,
                              args.test_paging_fault, args.test_ownership_plan,
-                             args.test_ownership_plan_invalid,args.test_tasks))
+                             args.test_ownership_plan_invalid, args.test_tasks,
+                             args.test_user_processes))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS T-P1.6', 'compiler': version,
+        'prototype': 'StyleOS T-P1.7' if args.test_user_processes else 'StyleOS T-P1.6',
+        'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,
         'invalid_memory_map': args.invalid_memory_map,
         'test_exception': args.test_exception,
@@ -237,6 +260,11 @@ def main():
         'test_ownership_plan': args.test_ownership_plan,
         'test_ownership_plan_invalid': args.test_ownership_plan_invalid,
         'test_tasks': args.test_tasks,
+        **({'test_user_processes': True,
+            'compiler_flags': {arch: json.loads((output / arch / 'user-processes-compiler.json').read_text())['flags']
+                               for arch in arches},
+            'user_processes_sources': {arch: json.loads((output / arch / 'user-processes-compiler.json').read_text())['sources']
+                                      for arch in arches}} if args.test_user_processes else {}),
         **({'compiler_flags': {arch: json.loads((output / arch / 'task-compiler.json').read_text())['flags']
                               for arch in arches},
             'task_sources': {arch: json.loads((output / arch / 'task-compiler.json').read_text())['sources']

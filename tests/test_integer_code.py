@@ -53,6 +53,12 @@ class IntegerCodeTests(unittest.TestCase):
                 self.assertEqual(proof['decoded_bytes'], 8)
                 self.assertEqual(instructions[0x1000]['bytes'], '1f2003d5')
 
+    def test_x86_far_return_decoder_alias_is_integer_only(self):
+        proof, instructions = self.prove('x86_64', bytes.fromhex('48cb'),
+                                          '1000: 48 cb lretq\n')
+        self.assertEqual(proof['instruction_count'], 1)
+        self.assertEqual(instructions[0x1000]['bytes'], '48cb')
+
     def test_arm_declared_zero_words_are_recorded_as_padding(self):
         proof, instructions = self.prove('aarch64', bytes(4),
                                           '1000: 00000000 .word 0x00000000')

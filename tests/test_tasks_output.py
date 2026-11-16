@@ -394,19 +394,24 @@ class TaskInventoryTests(unittest.TestCase):
     def test_full_inventory_keeps_old_27_qemu_jobs_and_adds_three_tasks_jobs(self):
         runner, jobs, builds, _firmware = self.inspect_inventory(('x86_64', 'aarch64'))
         added = [job for job in jobs if job[5] == 'tasks']
-        self.assertEqual(len(jobs), 30)
-        self.assertEqual(len(jobs)-len(added), 27)
+        self.assertEqual(len(jobs), 33)
+        previous = [job for job in jobs if job[5] != 'user-processes']
+        self.assertEqual(len(previous), 30)
+        self.assertEqual(len(previous)-len(added), 27)
         self.assertEqual({(j[1], j[6], j[7]) for j in added}, {
             ('x86_64', False, 128), ('aarch64', False, 128), ('aarch64', True, 128)})
-        self.assertEqual(builds.call_count, 10)
+        self.assertEqual(builds.call_count, 11)
         self.assertTrue(all(job[3] == runner.output/'tasks' for job in added))
-        self.assertEqual(builds.call_args_list[-1].args,
+        task_build = [call for call in builds.call_args_list if call.args[1] == 'tasks']
+        self.assertEqual(len(task_build), 1)
+        self.assertEqual(task_build[0].args,
                          (runner.output/'tasks', 'tasks', 'build-tasks', 'all'))
 
     def test_arm_only_inventory_has_two_tasks_jobs_and_no_x86_or_firmware(self):
         _runner, jobs, builds, firmware = self.inspect_inventory(('aarch64',))
         firmware.assert_not_called()
-        self.assertEqual(len(jobs), 20)
+        self.assertEqual(len(jobs), 22)
+        self.assertEqual(len([job for job in jobs if job[5] != 'user-processes']), 20)
         self.assertEqual(len([job for job in jobs if job[5] == 'tasks']), 2)
         self.assertTrue(all(call.args[3] == 'aarch64' for call in builds.call_args_list))
         self.assertTrue(all(job[1] == 'aarch64' and job[4] is None for job in jobs))
@@ -416,7 +421,9 @@ class TaskInventoryTests(unittest.TestCase):
             runner = Checks(Path(temporary))
             with patch.object(runner, 'command', return_value=True) as commands:
                 runner.host()
-            self.assertEqual(commands.call_count, 9)
+            self.assertEqual(commands.call_count, 10)
+            self.assertEqual(len([call for call in commands.call_args_list
+                                  if call.args[0] != 'host-user-processes']), 9)
             task = [call for call in commands.call_args_list if call.args[0] == 'host-tasks']
             self.assertEqual(len(task), 1)
             self.assertIn('tests/test_tasks.c', task[0].args[1][0])

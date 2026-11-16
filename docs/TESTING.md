@@ -1,12 +1,12 @@
-# Проверка StyleOS T-P1.6
+# Проверка StyleOS T-P1.7
 
-Проверка разделяет четыре разных доказательства: C-логика на хосте, сборка целевых машинных форматов, побайтная повторяемость и прохождение загрузки в QEMU. PASS одного уровня не заменяет остальные. [Фактический прогон T-P1.6 и журналы](test-results/t-p1-6/README.md) публикуются отдельно; [T-P1.5](test-results/t-p1-5/README.md), [T-P1.4](test-results/t-p1-4/README.md), [T-P1.3](test-results/t-p1-3/README.md), [T-P1.2](test-results/t-p1-2/README.md) и прежние этапы сохраняются как история базы. Ниже описан воспроизводимый протокол текущего этапа.
+Проверка разделяет C-логику на хосте, сборку целевых машинных форматов, побайтную повторяемость, связанное бинарное доказательство и настоящее выполнение CPU в QEMU. PASS одного уровня не заменяет остальные. [Фактический прогон T-P1.7 и журналы](test-results/t-p1-7/README.md) публикуются отдельно. [T-P1.6](test-results/t-p1-6/README.md), [T-P1.5](test-results/t-p1-5/README.md), [T-P1.4](test-results/t-p1-4/README.md), [T-P1.3](test-results/t-p1-3/README.md), [T-P1.2](test-results/t-p1-2/README.md) и прежние этапы остаются историей базы. Новый профиль проверяет конкретный сбой EL0/CPL3-программы и продолжение второй программы после него; прежний опыт доверенных задач не заменяет этот результат.
 
 ## Требования и выбор инструментов
 
 Нужны Python 3, Clang, `lld-link`, `ld.lld`; для target smoke — `qemu-system-x86_64`, `qemu-system-aarch64` и внешняя firmware OVMF x86-64. Make необязателен. Пакетирование GPT/FAT16 выполняется Python standard library, без `mtools` и монтирования образа.
 
-Новый профиль `--test-tasks` дополнительно требует `llvm-objdump` с декодерами обеих выбранных ISA. Он проверяет весь связанный исполняемый код на отсутствие неподдержанного FP/SIMD, а не только флаги компилятора. Без этого инструмента task proof не создаётся. Старые профили не получают новую зависимость.
+Профили `--test-tasks` и `--test-user-processes` дополнительно требуют `llvm-objdump` с декодерами обеих выбранных ISA. Он проверяет весь связанный исполняемый код на отсутствие неподдержанного FP/SIMD, а не только флаги компилятора. Без этого инструмента связанное integer-only доказательство не создаётся. Старые профили не получают новую зависимость.
 
 В Debian/Ubuntu инструменты предоставляют `python3 clang lld llvm make qemu-system-x86 qemu-system-arm ovmf`. Обычная установка выполняется владельцем или администратором окружения; сама сборка StyleOS не запрашивает root и не загружает пакеты.
 
@@ -18,7 +18,7 @@
 | `CC` | C-компилятор host-тестов, по умолчанию `cc` |
 | `LLD_LINK` | LLD PE/COFF linker |
 | `LD_LLD` | LLD ELF linker |
-| `LLVM_OBJDUMP` | LLVM objdump для полного integer-only proof только task-профиля |
+| `LLVM_OBJDUMP` | LLVM objdump для полного integer-only proof task/user-processes профилей |
 | `QEMU_X86` | `qemu-system-x86_64` |
 | `QEMU_AARCH64` | `qemu-system-aarch64` |
 | `OVMF_CODE` | read-only OVMF CODE firmware для x86-64 |
@@ -31,7 +31,7 @@ CODE и VARS должны подходить друг к другу по вар�
 ```sh
 export OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.fd
 export OVMF_VARS=/usr/share/OVMF/OVMF_VARS_4M.fd
-python3 tools/test.py --all --output build/t-p1-6
+python3 tools/test.py --all --output build/t-p1-7
 ```
 
 ## Точные команды
@@ -44,7 +44,7 @@ python3 tools/test.py --host --output build
 python3 tools/test.py --repro --output build
 python3 tools/test.py --qemu --output build
 # Либо один полный прогон:
-python3 tools/test.py --all --output build/t-p1-6
+python3 tools/test.py --all --output build/t-p1-7
 ```
 
 Код завершения test runner: **0** — все выбранные проверки прошли; **1** — есть FAIL; **2** — есть SKIPPED без FAIL. Отсутствующий обязательный QEMU/OVMF виден в сводке и не превращается в зелёный прогон. Если флаг набора не задан, запускается полный набор.
@@ -73,7 +73,7 @@ make test        # полный набор
 
 `tests/test_boot_memory.c` проверяет нормализацию, лимиты, несовместимые диапазоны, правила UEFI и поддерживаемые/повреждённые DTB.
 
-`tests/test_qemu_output.py` проверяет достоверность serial-доказательств: ошибка ранней загрузки не должна превращаться в PASS из-за последующего успешного маркера. Также проверяются отрицательный handoff, обязательный halt и различение начальных EL1/EL2. T-P1.2 добавляет `tests/test_exception.c` для причин/полей/first-entry guard, `test_exception_output.py` для UART-контракта, `test_fault_site.py` для связи symbol → исполняемые opcode-байты и `test_qemu_process.py` для жизненного цикла QEMU. В историческом T-P1.2 `host-python` дал **39/39 unittest PASS**, включая восемь проверок остановки процесса. Счётчик Python unittest отличается от количества этапов runner; актуальные числа T-P1.6 берутся из нового отчёта.
+`tests/test_qemu_output.py` проверяет достоверность serial-доказательств: ошибка ранней загрузки не должна превращаться в PASS из-за последующего успешного маркера. Также проверяются отрицательный handoff, обязательный halt и различение начальных EL1/EL2. T-P1.2 добавляет `tests/test_exception.c` для причин/полей/first-entry guard, `test_exception_output.py` для UART-контракта, `test_fault_site.py` для связи symbol → исполняемые opcode-байты и `test_qemu_process.py` для жизненного цикла QEMU. В историческом T-P1.2 `host-python` дал **39/39 unittest PASS**, включая восемь проверок остановки процесса. Счётчик Python unittest отличается от количества этапов runner; актуальные числа T-P1.7 берутся из нового отчёта.
 
 Исторический ARM ESR `0x96000061` host-декодер узнаёт как `alignment-fault` (Data Abort текущего EL). Это тест классификатора на сохранённом числе. Реальный Data Abort новым обработчиком в T-P1.2 не провоцировался и не объявляется проверенным.
 
@@ -177,7 +177,7 @@ python3 tools/build.py --arch all --test-paging-fault
 # Отдельный build/paging-fault.
 ```
 
-Все девять тестовых флагов взаимоисключающие, включая оба ownership-профиля T-P1.5 и task-профиль T-P1.6. Новые образы нельзя явно записать в обычный корневой `build`. Paging-код, 32-страничный table reserve, control/data и fault site не включаются в обычные, старые, ownership- или task-варианты; positive paging image также не содержит fault site. Отдельные binary/source-list проверки подтверждают разделение профилей, а не просто разные имена каталогов.
+Все десять тестовых флагов взаимоисключающие, включая оба ownership-профиля T-P1.5, task-профиль T-P1.6 и user-processes-профиль T-P1.7. Новые образы нельзя явно записать в обычный корневой `build`. Paging-код, 32-страничный table reserve, control/data и fault site не включаются в обычные, старые, ownership-, task- или user-processes-варианты; positive paging image также не содержит fault site. Отдельные binary/source-list проверки подтверждают разделение профилей, а не просто разные имена каталогов.
 
 Host-набор добавляет `test_paging.c` для построителя/реального descriptor lookup, `test_paging_admission.c` для полных резервов/исключений и `test_paging_x86.c` для чистой модели режима/унаследованного walker. Проверяются края, переполнение, PA-ширина, конфликт VA и alias rights/type, finite capacity, missing leaf/probe, неподходящий режим и `root=0` на отказе. `test_paging_site.py` повреждает PE/ELF/Image/initializer/fault proofs; `test_paging_output.py` проверяет строгий UART-контракт. Эти host fixtures не являются аппаратными запусками.
 
@@ -308,7 +308,36 @@ A:START → B:START → A:RESUME → B:RESUME → A:EXIT → B:EXIT
 
 UART parser отвергает PASS-only, пропущенное/повторное resume, неверный порядок, SP вне своего стека, изменённый cookie/register pattern, несовпадающий PC и повторный вход после exit. Для каждого job нужны UART `.log`, проверенный `.json`, `tasks-site.json` и manifest, связанные SHA. Прежнее наблюдение живого QEMU в течение 200 мс после terminal marker и штатное прекращение harness сохраняются: timeout, reset, естественный exit или тишина не означают PASS. Итоговое число выполненных проверок и статусы берутся только из [отчёта T-P1.6](test-results/t-p1-6/README.md).
 
-Регрессия включает прежние сценарии, воспроизводимость четырёх ordinary artifacts и сравнение 28 прежних profile artifacts с базой при том же toolchain. Обновлять ожидаемые хеши вместо разбора различия нельзя. Результат T-P1.6 доказывает смену стека, продолжения и указанного integer-состояния доверенных функций. Software canaries не останавливают overflow и не создают изоляцию. Нет user mode, защиты задач друг от друга, recovery, IRQ/таймера, вытеснения, SMP, heap, syscalls, IPC или Deep Drop. Проверка сбоя пользовательского процесса относится к отдельному будущему T-P1.7.
+Регрессия включает прежние сценарии, воспроизводимость четырёх ordinary artifacts и сравнение 28 прежних profile artifacts с базой при том же toolchain. Обновлять ожидаемые хеши вместо разбора различия нельзя. Результат T-P1.6 доказывает смену стека, продолжения и указанного integer-состояния доверенных функций. Software canaries не останавливают overflow и не создают изоляцию. Нет user mode, защиты задач друг от друга, recovery, IRQ/таймера, вытеснения, SMP, heap, syscalls, IPC или Deep Drop. Сам результат T-P1.6 не доказывает сдерживание сбоя пользовательского процесса; для этого нужен отдельный профиль T-P1.7.
+
+## Пользовательские программы и сдерживание fault T-P1.7
+
+```sh
+python3 tools/build.py --arch all --test-user-processes
+# Отдельный build/user-processes; иной отдельный выход разрешён явно:
+python3 tools/build.py --arch aarch64 --test-user-processes --output build/user-arm64
+```
+
+Новый флаг несовместим со всеми девятью прежними режимами. Только этот профиль включает CPL3/EL0-программы, три отдельных корня SAFE/A/B, конечные image-owned страницы и собственный аппаратный вход. Старые профили сохраняют свои источники, таблицы, векторы, GDT/IDT и артефакты; обычная загрузка не получает user-код. Разрешение новой GDT/TSS на x86 и MMU/user vectors на ARM не меняет исторические правила других профилей.
+
+После handoff/MEMMAP проверяются полные интервалы таблиц, control, привилегированного стека входа, двух пользовательских стеков, data и code pages, а также x86 GDT/TSS/IDT. Требуются целый RESERVED image extent, правильные выравнивание/размеры/арифметика и непересечение других живых объектов. Общая RAM, CANDIDATE/REVIEW, boot pool, PMM/heap и reclaim не используются. Корни A/B имеют ровно свои user code RX, stack RW/NX и data RW/NX; SAFE user leaves не имеет. Kernel image aliases доступны только привилегированному режиму, включая таблицы и metadata. Отдельно доказываются отсутствие чужих приватных отображений и отсутствие user-алиаса, обходящего права.
+
+`user-processes-site.json` и `user-processes-compiler.json` связаны с manifest и фактическими SHA конечных PE/ELF/Image/диска. Проверяются весь extent каждого объекта, code pages и точные offset/opcode тестового чтения и переходов. Пользовательский fault PC равен фиксированному code VA плюс offset инструкции внутри встроенной программы; физический адрес символа в PE после relocation — отдельное число. Приведение произвольного C-указателя не является переводом в PA. Полное integer-only декодирование и реальные compiler flags ограничивают область сохраняемого контекста; общей FP/SIMD-смены нет.
+
+Host lifecycle проверяет READY/RUNNING/FAULTED/EXITED, порядок A yield → B yield → A fault → B exit, запрет повторного выбора терминального A и release только после аппаратно подтверждённого SAFE-root. Отказы по argument/state/overlap/capacity/overflow не должны частично изменять живые слоты. Отдельные бинарные и parser-тесты повреждают происхождение exception, PC/VA, слот fault, права/таблицы, порядок завершения и continuation. Host-код не выполняет IRETQ/ERET и не доказывает user mode.
+
+В трёх новых QEMU-сценариях требуется аппаратное доказательство:
+
+1. A входит в CPL3/EL0 на своём стеке и уступает через INT/SVC. Аппаратный frame содержит user CS/SS либо SPSR EL0t, PC/SP, все integer registers и фактический active root.
+2. B на другом root записывает `0x123456789abcdef0` в собственную data page и уступает. Запоминаются его продолжение, private data и stack value.
+3. A возобновляется и выполняет известное чтение `0x12010000` — B-private VA, отсутствующего под root A. На x86 требуется #PF vector 14, hardware error `0x4`, CPL3, CR2 и точный RIP. На ARM — lower-EL Data Abort EC `0x24`, EL0t, read translation DFSC `0x7`, валидный FAR и точный ELR.
+4. Только A становится FAULTED; аппаратный adapter возвращается под SAFE-root на исходный dispatcher stack. Аварийный PC не выбирается вновь.
+5. B возобновляется **после fault**, сохраняет своё состояние, проверяет прежние данные, меняет их на `0xfedcba9876543210` и штатно выходит через аппаратный вход.
+6. Под SAFE-root ядро исключает терминальные контексты из употребления, освобождает только учёт, проверяет dispatcher cookie/данные/порядок и лишь затем выводит итоговый PASS и штатный KERNEL HALT. Физические страницы остаются в image reserve.
+
+Нужны полные UART/JSON и manifest/sites каждого x86/ARM initial EL1/ARM initial EL2→EL1 запуска. Проверяется идентичность действительных roots и полного набора user mappings, а не только числа, напечатанные до активации. Runtime сканирует конечные резервы таблиц и публикует все ненулевые дескрипторы; runner независимо восстанавливает дерево, эффективные права и точный набор leaves, отклоняя лишний user alias, чужую приватную PA или неизвестную table page. Привилегированный стек входа не зависит от user SP. Исключение ядра, #GP вместо ожидаемого #PF, другой VA/PC, fault не A, завершение B до fault или повторный выбор A — FAIL. Одна строка PASS, reset, timeout, тишина или естественный exit QEMU недостаточны. Сохраняется наблюдение живого эмулятора после терминального маркера и намеренная остановка harness.
+
+База повторяется тем же toolchain **до** правок. Сравниваются все её профили, включая T-P1.6 tasks, и четыре обычных reproducibility артефакта; фактическое число публикуется в [отчёте T-P1.7](test-results/t-p1-7/README.md), старое число 36 не переносится автоматически. Проверенные и непроверенные части сдерживания, аппаратные frames и GDT/TSS/vectors разобраны в [ADR-0010](adr/0010-user-process-fault-isolation.md).
 
 ## Ручной запуск x86-64
 
@@ -355,58 +384,56 @@ qemu-system-aarch64 -machine virt -cpu cortex-a57 -m 128M \
 
 ## Матрица сред и честные статусы
 
-- **PASS:** команда фактически выполнена, завершилась согласно контракту, нужные проверки/маркеры присутствуют.
-- **FAIL:** команда выполнена и выявила несоответствие; причина и журнал сохраняются.
-- **SKIPPED:** команда/платформа не проверена; указывается отсутствующий инструмент, доступ или устройство. SKIPPED не повышается до PASS по аналогии.
+- **PASS:** команда действительно выполнена и весь контракт проверен по фактическим файлам и журналу.
+- **FAIL:** выполненная проверка выявила несоответствие; причина и журнал сохраняются.
+- **SKIPPED:** проверка не выполнена; отсутствующий инструмент, доступ или устройство указаны явно.
 
-Фактические числа T-P1.6, команды, версии, SHA и журналы находятся в [отчёте](test-results/t-p1-6/README.md). Количество этапов считают по `results.json`, Python unittest — по `host-python.log`. Ожидаемый счётчик не является результатом.
+Числа T-P1.7, версии, команды, базовый/проверенный/отчётный SHA и журналы находятся в [отчёте](test-results/t-p1-7/README.md). Число этапов считают по `results.json`, Python unittest — по `host-python.log`. Ожидаемый счётчик не является фактическим результатом.
 
-Полный набор сохраняет normal/negative handoff/negative map, реальные UD2/BRK с PC/opcode proof, boot pool, ARM initial EL1/EL2, 128/256 МиБ, шесть paging jobs, ownership host/binary/UART проверки, семь QEMU ownership jobs и четыре обычных reproducibility artifacts. T-P1.6 добавляет host-tasks, task binary/integer/UART проверки и три QEMU task jobs; прежние 28 profile artifacts сравниваются с базой тем же toolchain. Новый результат не выводится из успешной базы.
-
-| Среда | Статус T-P1.6 | Граница результата |
+| Среда | Статус T-P1.7 | Что может подтвердить |
 |---|---|---|
-| Linux, QEMU/OVMF x86-64 и AArch64 | См. [фактический отчёт](test-results/t-p1-6/README.md) | Два реальных task contexts, нулевая передача RAM и прежние сценарии |
-| Linux, ARM64-only без OVMF/x86 tools | См. [фактический отчёт](test-results/t-p1-6/README.md) | Task EL1/EL2 и старые ARM-сценарии; не телефон |
-| Новый Android/Termux владельца | SKIPPED до фактического прогона | Не наследует прежний телефонный или Linux ARM64-only PASS |
-| VirtualBox, физические устройства | SKIPPED до отдельного испытания | Исторические ручные испытания учитываются отдельно |
+| Linux, QEMU/OVMF x86-64 и ARM64 initial EL1/EL2 | См. [фактический отчёт](test-results/t-p1-7/README.md) | Аппаратный user frame, отдельные roots/стеки, ожидаемый fault A и последующий выход B |
+| Linux, ARM64-only без OVMF/x86 tools | См. [фактический отчёт](test-results/t-p1-7/README.md) | Два новых ARM user-processes сценария и прежние ARM регрессии; это не Android |
+| Android/Termux владельца | SKIPPED до нового фактического прогона | Не наследует телефонный результат T-P1.6 |
+| VirtualBox | SKIPPED до отдельного испытания | Linux QEMU не подтверждает эту платформу |
+| Физическое оборудование | SKIPPED до отдельного испытания | QEMU virt не является нативной аппаратурой телефона |
 
-База T-P1.6 — `ea37e76abb0a1b6e75c050c43e357d8c89981537`, вершина `feature/styleos-t-p1-5`; проверенный код T-P1.5 — `a284c30abbea2999eeaef721e0bd380c582c6dd0`. Его Linux-отчёт содержит 47/47 этапов, Linux ARM64-only — 35/35, Python — 138/138. Владелец сообщил в задании T-P1.6 отдельный Android/Termux-прогон **T-P1.5**: 35/35, exit 0, QEMU 11.1.3 по скриншоту. UART/JSON этого запуска к заданию не приложены; источник и предел подтверждения фиксируются новым дополнением в [отчёте T-P1.6](test-results/t-p1-6/README.md), без изменения исторического отчёта и его checksums. Это owner-reported T-P1.5, не результат T-P1.6. Прежние [T-P1.3 Android/Termux](test-results/t-p1-3/termux/README.md) и [T-P1.4 Linux](test-results/t-p1-4/README.md) сохраняют собственные свидетельства.
+База T-P1.7 — `eb73fad3ed431e91ebe995be4b370c678210e2b8`; проверенный код T-P1.6 — `d8065f31ae292eccd2558ddc8dc2cd91b78b855f`. В задании T-P1.7 владелец сообщил о **T-P1.6 Android/Termux: 39/39 PASS, код 0**, по скриншотам, оба ARM task-сценария PASS. Предварительная проверка `llvm-objdump` показала **21.1.8**; версия QEMU в этих скриншотах не показана. Сырые UART/JSON не приложены. Это отдельное owner-reported подтверждение T-P1.6; новый отчёт учитывает его без изменения исторических отчётов/checksums и без присвоения Android PASS этапу T-P1.7.
 
-Для проверки ARM64-only маршрута в Linux намеренно задайте отсутствующие x86-инструменты и OVMF:
+Для Linux-проверки независимости ARM64-only намеренно задайте отсутствующие x86-инструменты и OVMF:
 
 ```sh
 OVMF_CODE=/nonexistent/styleos-code.fd OVMF_VARS=/nonexistent/styleos-vars.fd \
 LLD_LINK=/nonexistent/lld-link QEMU_X86=/nonexistent/qemu-system-x86_64 \
-CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/arm-only-tp16
+CC=clang python3 tools/test.py --host --qemu --qemu-arch aarch64 --output build/arm-only-tp17
 ```
 
-Этот эксперимент должен завершаться без обращения к выбранным отсутствующим средствам. Он остаётся Linux-проверкой.
-
-Для нового Termux-прогона используйте новую папку и точный опубликованный SHA:
+Этот маршрут не должен обращаться к выбранным отсутствующим средствам. Для нового каталога Termux:
 
 ```sh
 pkg install python clang lld llvm git qemu-system-aarch64-headless
-git clone --branch feature/styleos-t-p1-6 --single-branch https://github.com/LPYURA2/OS.git styleos-tp16
-cd styleos-tp16
-git checkout --detach d8065f31ae292eccd2558ddc8dc2cd91b78b855f
+git clone --branch feature/styleos-t-p1-7 --single-branch https://github.com/LPYURA2/OS.git styleos-tp17
+cd styleos-tp17
+git checkout --detach __T_P1_7_SHA__
 git rev-parse HEAD
-qemu-system-aarch64 --version
+python --version
+clang --version
+ld.lld --version
 llvm-objdump --version
-CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp16
+qemu-system-aarch64 --version
+CC=clang python tools/test.py --host --qemu --qemu-arch aarch64 --output build/termux-tp17
+echo $?
+cat build/termux-tp17/test-results/results.json
 ```
 
-Команда закреплена на SHA реализации из [отчёта T-P1.6](test-results/t-p1-6/README.md). Пакет `llvm` нужен, если `llvm-objdump` не входит в установленный набор; путь можно явно задать через `LLVM_OBJDUMP`. Runner сам завершает QEMU и не требует Ctrl+A. Сводку получите командой:
-
-```sh
-cat build/termux-tp16/test-results/results.json
-```
-
-Сохраните все `build/termux-tp16/test-results/*.log` и `*.json`: особенно `host-tasks.log`, `host-python.log`, `build-tasks.log`, UART/JSON `qemu-aarch64-tasks`, `qemu-aarch64-tasks-el2`; также все прежние ownership/paging/pool/exception логи. Нужны `tasks/aarch64/tasks-site.json`, `tasks/manifest.json`, прежние `ownership-site.json`/`paging-site.json` и соответствующие manifest, точный `git rev-parse HEAD` и версии Python/Clang/LLD/LLVM objdump/QEMU. Бинарники и firmware в отчёт не добавляются. Этот маршрут не запускает x86 и reproducibility. Он доказывает только фактически проверенные ARM-сценарии; до выполнения T-P1.6 телефон остаётся SKIPPED.
+SHA команды закрепляется на опубликованной реализации из [отчёта T-P1.7](test-results/t-p1-7/README.md). `llvm-objdump` можно выбрать через `LLVM_OBJDUMP`. Runner сам останавливает QEMU; Ctrl+A не нужен. Сохраните все `build/termux-tp17/test-results/*.log` и `*.json`, особенно host lifecycle/Python, build user-processes и оба ARM user-processes UART/JSON; также соответствующие `manifest.json`, binary sites/compiler flags, старые task/paging/ownership sites и версии инструментов. Бинарные образы и firmware в текстовый отчёт не добавляются. ARM64-only не запускает x86 или reproducibility.
 
 ## Риски и откат
 
-Работа T-P1.6 остаётся в `feature/styleos-t-p1-6` от базы `ea37e76abb0a1b6e75c050c43e357d8c89981537`. Обновление `main`, прежних refs, merge, force push, release и изменения Portable-os или `docs/styleos-readme` запрещены этой задачей. После отчёта этап останавливается. Первый пул из общей RAM, reclaim, собственная GDT и модель ядра требуют отдельных решений; user-process fault containment относится к будущему T-P1.7. Кооперативные доверенные kernel tasks не обеспечивают изоляцию.
+T-P1.7 публикуется только в `feature/styleos-t-p1-7` от базы `eb73fad3ed431e91ebe995be4b370c678210e2b8`. `main`, старые refs, корневой README, `docs/styleos-readme`, Portable-os и исторические свидетельства сохраняются. Нет merge, force push или release. Новый профиль отдельно разрешает свои таблицы, векторы и необходимые x86 GDT/TSS; старые профили этих разрешений не получают.
 
-Ошибки UEFI handoff, неправильный стек, неверные physical pointers и неподходящая firmware могут остановить boot до диагностики. Отсутствующий UART может скрыть результат, даже если CPU выполняется. Тесты должны фиксировать конфигурацию и отделять отсутствие вывода от ожидаемого halt.
+Сдерживание одного проверенного пользовательского fault не означает восстановления после ошибки ядра, полной безопасности, стабильного process ABI или поддержки произвольных программ. Нет общего PMM/heap, выдачи CANDIDATE/REVIEW, reclaim, IRQ/таймера/вытеснения/SMP, общего FP/SIMD-контекста, IPC, GUI или Deep Drop. Следующий этап T-P1.8 этим заданием не начинается.
 
-Проверки работают с выходными образами и временными копиями firmware VARS. Личные диски/разделы компьютера не нужны. Для исследования старого состояния создаётся отдельная ветка/копия из согласованного коммита; откат опубликованного изменения выполняется новым `git revert` после решения владельца. История `main` не переписывается. Старый проект доступен по исходному SHA, архивной метке и в независимом Portable-os.
+Неподдержанная firmware, ошибка самого ядра, повреждённые kernel stack/table/UART либо отказ до готовности диагностического пути могут остановить boot. Неожиданное исключение ядра остаётся аварийным исходом; оно не засчитывается как успешное завершение A. Тесты используют выходные образы и отдельные копии firmware VARS, без личных дисков компьютера.
+
+Для исследования прошлого состояния создаётся отдельная копия согласованного SHA; опубликованный откат выполняется новым revert после решения владельца. История не переписывается. После отчёта и публикации ветки работа останавливается.

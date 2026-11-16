@@ -3,6 +3,9 @@
 #include "styleos/boot_memory.h"
 #include "styleos/boot_pool.h"
 #include "styleos/exception.h"
+#ifdef STYLEOS_TEST_USER_PROCESSES
+#include "styleos/user_processes.h"
+#endif
 #ifdef STYLEOS_TEST_TASKS
 #include "styleos/tasks.h"
 #endif
@@ -36,6 +39,9 @@ _Noreturn void kernel_main(const struct boot_info *info)
 #error Unsupported StyleOS target
 #endif
     const struct boot_memory_evidence *evidence = boot_memory_diagnose(info);
+#ifdef STYLEOS_TEST_USER_PROCESSES
+    up_demo_run(evidence);
+#endif
 #ifdef STYLEOS_TEST_TASKS
     tasks_demo_run(evidence);
 #endif

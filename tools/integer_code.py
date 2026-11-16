@@ -21,7 +21,7 @@ X86_INTEGER = frozenset('''
 adc add and bsf bsr bswap bt btc btr bts call clc cld cli clts cmc cmp
 cmpxchg cpuid cqo cqto cwd cwde cdq cdqe dec div endbr64 enter hlt idiv imul
 in inc ins int int3 invlpg iret iretq jmp jecxz jrcxz lahf lea leave lgdt lidt lldt lmsw lock
-lods loop loope loopne ltr mov movabs movs movsx movsxd movzx mul neg nop not
+lods loop loope loopne lret ltr mov movabs movs movsx movsxd movzx mul neg nop not
 or out outs pause pop popf popfq push pushf pushfq rcl rcr rdmsr rdtsc rdtscp
 ret retf rol ror sahf sal sar sbb scas sgdt shl shld shr shrd sidt sldt smsw
 stc std sti stos str sub syscall sysret test ud2 verr verw xadd xchg xlat

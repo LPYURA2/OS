@@ -375,7 +375,7 @@ class OwnershipInventoryTests(unittest.TestCase):
                 ('aarch64', 'ownership', False, 128), ('aarch64', 'ownership', True, 128),
                 ('aarch64', 'ownership', False, 256), ('aarch64', 'ownership-invalid', False, 128),
                 ('aarch64', 'ownership-invalid', True, 128)})
-            self.assertEqual(builds.call_count, 10)
+            self.assertEqual(builds.call_count, 11)
             for job in added:
                 self.assertEqual(job[3], runner.output / job[5])
 
