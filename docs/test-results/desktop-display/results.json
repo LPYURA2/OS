@@ -1,0 +1,12 @@
+{
+  "display": {
+    "result": "PASS",
+    "width": 1280,
+    "height": 800,
+    "sha256": "a2ca7329be53b68dd969ea3f2b86925e8927cd49b2aa196fe945ecda702116c3"
+  },
+  "no-display": {
+    "result": "PASS",
+    "check": "unsupported display refused"
+  }
+}

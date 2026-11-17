@@ -18,7 +18,7 @@ from tools import build
 MODES = ('--invalid-boot-info', '--invalid-memory-map',
          '--test-exception', '--test-bootpool', '--test-paging', '--test-paging-fault',
          '--test-ownership-plan', '--test-ownership-plan-invalid', '--test-tasks',
-         '--test-user-processes', '--test-storage', '--test-disk-app')
+         '--test-user-processes', '--test-storage', '--test-disk-app', '--test-desktop-display')
 
 
 class BuildModeTests(unittest.TestCase):
@@ -28,7 +28,7 @@ class BuildModeTests(unittest.TestCase):
         self.root = Path(temporary.name)
 
     def invoke(self, arguments):
-        def fake_build(_arch, output, *_modes):
+        def fake_build(_arch, output, *_modes, **_options):
             output.mkdir(parents=True, exist_ok=True)
             if any(_modes[-4:]):
                 folder = output / _arch
@@ -53,7 +53,7 @@ class BuildModeTests(unittest.TestCase):
                 status = error.code
         return status, compile_image, tool
 
-    def test_all_twelve_test_modes_are_pairwise_exclusive(self):
+    def test_dedicated_test_modes_are_pairwise_exclusive(self):
         for pair in combinations(MODES, 2):
             with self.subTest(pair=pair):
                 status, compile_image, tool = self.invoke(list(pair))
@@ -105,13 +105,15 @@ class BuildModeTests(unittest.TestCase):
                     arguments = [flag, '--output', str(output)]
                     if flag in ('--test-storage', '--test-disk-app'):
                         arguments += ['--arch', 'aarch64']
+                    if flag == '--test-desktop-display':
+                        arguments += ['--arch', 'x86_64']
                     status, compile_image, tool = self.invoke(arguments)
                     self.assertEqual(status, 2)
                     compile_image.assert_not_called()
                     tool.assert_not_called()
 
     def test_custom_dedicated_output_preserves_requested_arch_and_mode(self):
-        for flag in MODES[2:]:
+        for flag in (m for m in MODES[2:] if m != '--test-desktop-display'):
             with self.subTest(flag=flag):
                 output = self.root / ('custom-' + flag.removeprefix('--'))
                 status, compile_image, _ = self.invoke([
@@ -553,6 +555,18 @@ class BuildModeTests(unittest.TestCase):
                             self.assertNotIn(Path(cmd[cmd.index('-c') + 1]),
                                              [ROOT / name for name in forbidden])
                             self.assertNotIn('-DSTYLEOS_TEST_DISK_APP=1', cmd)
+    def test_desktop_display_requires_x86_and_has_a_separate_build_profile(self):
+        for arch in ('all', 'aarch64'):
+            status, compile_image, tool = self.invoke(['--arch', arch, '--test-desktop-display'])
+            self.assertEqual(status, 2)
+            compile_image.assert_not_called()
+            tool.assert_not_called()
+        status, compile_image, _ = self.invoke(['--arch', 'x86_64', '--test-desktop-display'])
+        self.assertEqual(status, 0)
+        output = self.root / 'build' / 'desktop-display'
+        self.assertEqual(compile_image.call_args.args[:2], ('x86_64', output))
+        self.assertEqual(compile_image.call_args.kwargs, {'test_desktop_display': True})
+        self.assertTrue(json.loads((output / 'manifest.json').read_text())['test_desktop_display'])
 
 
 if __name__ == '__main__':
