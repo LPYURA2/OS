@@ -1,0 +1,1535 @@
+{
+  "arch": "x86_64",
+  "mode": "tasks",
+  "initial_el2": false,
+  "ram_mib": 128,
+  "status": "PASS",
+  "uart_sha256": "7a94bf36eac60aed93699cea8068dfa43656d481b6f28f08f3313b53f5cfc23b",
+  "manifest_sha256": "e85168c2b7773311e35f96d7cd4c1ee26c90e86b86412647d5e7cf57f95deb80",
+  "tasks_site": {
+    "arch": "x86_64",
+    "address_space": "image-rva",
+    "image_start": 0,
+    "image_end": 212992,
+    "image_size": 212992,
+    "preferred_image_base": 5368709120,
+    "binary_sha256": "6c210259094d0e7fed9cf3e0d7a0279b521386326be71e762888f30d2c9e22c2",
+    "map_sha256": "173df9b9ff04988a8a8df9dfbe92e01339323076c84f322afd826c0e31f19b2d",
+    "objects": {
+      "stack_a": {
+        "symbol": "styleos_tasks_stack_a",
+        "start": 102400,
+        "end": 118784,
+        "bytes": 16384
+      },
+      "stack_b": {
+        "symbol": "styleos_tasks_stack_b",
+        "start": 118784,
+        "end": 135168,
+        "bytes": 16384
+      },
+      "control": {
+        "symbol": "styleos_tasks_control",
+        "start": 98304,
+        "end": 102400,
+        "bytes": 4096
+      },
+      "diagnostic": {
+        "symbol": "diagnostic",
+        "start": 45152,
+        "end": 57552,
+        "bytes": 12400
+      },
+      "stack": {
+        "symbol": "styleos_stack_bottom",
+        "start": 135184,
+        "end": 200720,
+        "bytes": 65536
+      },
+      "idt": {
+        "symbol": "early_idt",
+        "start": 200720,
+        "end": 204816,
+        "bytes": 4096
+      },
+      "handoff": {
+        "symbol": "handoff",
+        "start": 45056,
+        "end": 45152,
+        "bytes": 96
+      },
+      "pool": {
+        "symbol": "styleos_bootpool_storage",
+        "start": 61440,
+        "end": 94208,
+        "bytes": 32768
+      },
+      "pool_metadata": {
+        "symbol": "styleos_bootpool_metadata",
+        "start": 94208,
+        "end": 98304,
+        "bytes": 4096
+      }
+    },
+    "page_size": 4096,
+    "code_sites": {
+      "styleos_tasks_bootstrap": {
+        "symbol": "styleos_tasks_bootstrap",
+        "start": 16816,
+        "end": 16817,
+        "bytes": 1,
+        "raw_offset": 13744,
+        "raw_hex": "56",
+        "instruction_hex": "56",
+        "sha256": "de5a6f78116eca62d7fc5ce159d23ae6b889b365a1739ad2cf36f925a140d0cc",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "56",
+            "instruction": "pushq %rsi"
+          }
+        ],
+        "rva": 16816
+      },
+      "styleos_tasks_a": {
+        "symbol": "styleos_tasks_a",
+        "start": 16592,
+        "end": 16594,
+        "bytes": 2,
+        "raw_offset": 13520,
+        "raw_hex": "31c9",
+        "instruction_hex": "31c9",
+        "sha256": "07da0b176e80afd9779a094eb848879d2a9616427d8b594a261bcad1c56bb18d",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "31c9",
+            "instruction": "xorl %ecx, %ecx"
+          }
+        ],
+        "rva": 16592
+      },
+      "styleos_tasks_b": {
+        "symbol": "styleos_tasks_b",
+        "start": 16736,
+        "end": 16741,
+        "bytes": 5,
+        "raw_offset": 13664,
+        "raw_hex": "b901000000",
+        "instruction_hex": "b901000000",
+        "sha256": "08bc125513338de3457d890ff8a3e73333341ff267b2380a5615ed160af1ca1d",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "b901000000",
+            "instruction": "movl $0x1, %ecx"
+          }
+        ],
+        "rva": 16736
+      },
+      "tasks_arch_switch": {
+        "symbol": "tasks_arch_switch",
+        "start": 29760,
+        "end": 29870,
+        "bytes": 110,
+        "raw_offset": 26688,
+        "raw_hex": "4889194889690848897910488971184c8961204c8969284c8971304c89793831c048894140488941484889415048894158488d44240848894160488b042448894168488b42684c8b4260488b1a488b6a08488b7a10488b72184c8b62204c8b6a284c8b72304c8b7a384c89c4ffe0",
+        "instruction_hex": "488919",
+        "sha256": "a31f57b603bb1eb80d43b3e665f4d8d1963fa5111dcd830ff0adca84ece74f78",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "488919",
+            "instruction": "movq %rbx, (%rcx)"
+          },
+          {
+            "offset": 3,
+            "bytes": "48896908",
+            "instruction": "movq %rbp, 0x8(%rcx)"
+          },
+          {
+            "offset": 7,
+            "bytes": "48897910",
+            "instruction": "movq %rdi, 0x10(%rcx)"
+          },
+          {
+            "offset": 11,
+            "bytes": "48897118",
+            "instruction": "movq %rsi, 0x18(%rcx)"
+          },
+          {
+            "offset": 15,
+            "bytes": "4c896120",
+            "instruction": "movq %r12, 0x20(%rcx)"
+          },
+          {
+            "offset": 19,
+            "bytes": "4c896928",
+            "instruction": "movq %r13, 0x28(%rcx)"
+          },
+          {
+            "offset": 23,
+            "bytes": "4c897130",
+            "instruction": "movq %r14, 0x30(%rcx)"
+          },
+          {
+            "offset": 27,
+            "bytes": "4c897938",
+            "instruction": "movq %r15, 0x38(%rcx)"
+          },
+          {
+            "offset": 31,
+            "bytes": "31c0",
+            "instruction": "xorl %eax, %eax"
+          },
+          {
+            "offset": 33,
+            "bytes": "48894140",
+            "instruction": "movq %rax, 0x40(%rcx)"
+          },
+          {
+            "offset": 37,
+            "bytes": "48894148",
+            "instruction": "movq %rax, 0x48(%rcx)"
+          },
+          {
+            "offset": 41,
+            "bytes": "48894150",
+            "instruction": "movq %rax, 0x50(%rcx)"
+          },
+          {
+            "offset": 45,
+            "bytes": "48894158",
+            "instruction": "movq %rax, 0x58(%rcx)"
+          },
+          {
+            "offset": 49,
+            "bytes": "488d442408",
+            "instruction": "leaq 0x8(%rsp), %rax"
+          },
+          {
+            "offset": 54,
+            "bytes": "48894160",
+            "instruction": "movq %rax, 0x60(%rcx)"
+          },
+          {
+            "offset": 58,
+            "bytes": "488b0424",
+            "instruction": "movq (%rsp), %rax"
+          },
+          {
+            "offset": 62,
+            "bytes": "48894168",
+            "instruction": "movq %rax, 0x68(%rcx)"
+          },
+          {
+            "offset": 66,
+            "bytes": "488b4268",
+            "instruction": "movq 0x68(%rdx), %rax"
+          },
+          {
+            "offset": 70,
+            "bytes": "4c8b4260",
+            "instruction": "movq 0x60(%rdx), %r8"
+          },
+          {
+            "offset": 74,
+            "bytes": "488b1a",
+            "instruction": "movq (%rdx), %rbx"
+          },
+          {
+            "offset": 77,
+            "bytes": "488b6a08",
+            "instruction": "movq 0x8(%rdx), %rbp"
+          },
+          {
+            "offset": 81,
+            "bytes": "488b7a10",
+            "instruction": "movq 0x10(%rdx), %rdi"
+          },
+          {
+            "offset": 85,
+            "bytes": "488b7218",
+            "instruction": "movq 0x18(%rdx), %rsi"
+          },
+          {
+            "offset": 89,
+            "bytes": "4c8b6220",
+            "instruction": "movq 0x20(%rdx), %r12"
+          },
+          {
+            "offset": 93,
+            "bytes": "4c8b6a28",
+            "instruction": "movq 0x28(%rdx), %r13"
+          },
+          {
+            "offset": 97,
+            "bytes": "4c8b7230",
+            "instruction": "movq 0x30(%rdx), %r14"
+          },
+          {
+            "offset": 101,
+            "bytes": "4c8b7a38",
+            "instruction": "movq 0x38(%rdx), %r15"
+          },
+          {
+            "offset": 105,
+            "bytes": "4c89c4",
+            "instruction": "movq %r8, %rsp"
+          },
+          {
+            "offset": 108,
+            "bytes": "ffe0",
+            "instruction": "jmpq *%rax"
+          }
+        ],
+        "rva": 29760
+      },
+      "styleos_tasks_probe_resume": {
+        "symbol": "styleos_tasks_probe_resume",
+        "start": 30002,
+        "end": 30004,
+        "bytes": 2,
+        "raw_offset": 26930,
+        "raw_hex": "31c0",
+        "instruction_hex": "31c0",
+        "sha256": "8359c8f2ab7af5c7569d43a68ce42c771d8e5c6e1349821ed39c1c0234f3785d",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "31c0",
+            "instruction": "xorl %eax, %eax"
+          }
+        ],
+        "rva": 30002,
+        "call_site": {
+          "start": 29997,
+          "end": 30002,
+          "bytes": 5,
+          "raw_hex": "e80effffff",
+          "target": 29760
+        }
+      },
+      "styleos_tasks_exit_resume": {
+        "symbol": "styleos_tasks_exit_resume",
+        "start": 30153,
+        "end": 30158,
+        "bytes": 5,
+        "raw_offset": 27081,
+        "raw_hex": "e8a2cbffff",
+        "instruction_hex": "e8a2cbffff",
+        "sha256": "76d5b973472ccfb783921a0cf824f4fcf6a904b35e4ed824a5df3fdfd4633d69",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "e8a2cbffff",
+            "instruction": "callq 0x140004170 <.text+0x3170>"
+          }
+        ],
+        "rva": 30153,
+        "call_site": {
+          "start": 30148,
+          "end": 30153,
+          "bytes": 5,
+          "raw_hex": "e877feffff",
+          "target": 29760
+        }
+      },
+      "styleos_tasks_trap_return": {
+        "symbol": "styleos_tasks_trap_return",
+        "start": 30176,
+        "end": 30189,
+        "bytes": 13,
+        "raw_offset": 27104,
+        "raw_hex": "4883ec20e887cbfffffaf4ebfc",
+        "instruction_hex": "4883ec20",
+        "sha256": "2994f6b226ab3437cdd30f6df50fb110ff185d79dd7cef8e25e4ae75cc76a151",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "4883ec20",
+            "instruction": "subq $0x20, %rsp"
+          },
+          {
+            "offset": 4,
+            "bytes": "e887cbffff",
+            "instruction": "callq 0x140004170 <.text+0x3170>"
+          },
+          {
+            "offset": 9,
+            "bytes": "fa",
+            "instruction": "cli"
+          },
+          {
+            "offset": 10,
+            "bytes": "f4",
+            "instruction": "hlt"
+          },
+          {
+            "offset": 11,
+            "bytes": "ebfc",
+            "instruction": "jmp 0x1400075e9 <.text+0x65e9>"
+          }
+        ],
+        "rva": 30176
+      },
+      "styleos_tasks_dispatch_resume": {
+        "symbol": "styleos_tasks_dispatch_resume",
+        "start": 29881,
+        "end": 29885,
+        "bytes": 4,
+        "raw_offset": 26809,
+        "raw_hex": "4883c428",
+        "instruction_hex": "4883c428",
+        "sha256": "805846e33946315f80ef7200aa691c8ff16a680b10aa378956bb8baedf388bce",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "4883c428",
+            "instruction": "addq $0x28, %rsp"
+          }
+        ],
+        "rva": 29881,
+        "call_site": {
+          "start": 29876,
+          "end": 29881,
+          "bytes": 5,
+          "raw_hex": "e887ffffff",
+          "target": 29760
+        }
+      },
+      "tasks_arch_dispatch": {
+        "symbol": "tasks_arch_dispatch",
+        "start": 29872,
+        "end": 29886,
+        "bytes": 14,
+        "raw_offset": 26800,
+        "raw_hex": "4883ec28e887ffffff4883c428c3",
+        "instruction_hex": "4883ec28",
+        "sha256": "db8590a99b739306f9e5da8d688e55f3e35739893962ada9d8dc3632b6dd14c6",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "4883ec28",
+            "instruction": "subq $0x28, %rsp"
+          },
+          {
+            "offset": 4,
+            "bytes": "e887ffffff",
+            "instruction": "callq 0x140007440 <.text+0x6440>"
+          },
+          {
+            "offset": 9,
+            "bytes": "4883c428",
+            "instruction": "addq $0x28, %rsp"
+          },
+          {
+            "offset": 13,
+            "bytes": "c3",
+            "instruction": "retq"
+          }
+        ],
+        "rva": 29872
+      },
+      "tasks_arch_probe": {
+        "symbol": "tasks_arch_probe",
+        "start": 29888,
+        "end": 30141,
+        "bytes": 253,
+        "raw_offset": 26816,
+        "raw_hex": "5355575641544155415641574883ec4848894c242048895424284c8944243048b800000000000022114c01c049b900000000010000004889c34c01c84889c54c01c84889c74c01c84889c64c01c84989c44c01c84989c54c01c84989c64c01c84989c7488b4c2420488b542428e80effffff31c049ba00000000000022114c0354243049b900000000010000004c39d375044883c8014d01ca4c39d575044883c8024d01ca4c39d775044883c8044d01ca4c39d675044883c8084d01ca4d39d475044883c8104d01ca4d39d575044883c8204d01ca4d39d675044883c8404d01ca4d39d77506480d800000004883c448415f415e415d415c5e5f5d5bc3",
+        "instruction_hex": "53",
+        "sha256": "5f95cb1b6c15604b71c7ee9ba3c1fd7fc16d88a4b8c0ef0c0f3ec9e6ca484c48",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "53",
+            "instruction": "pushq %rbx"
+          },
+          {
+            "offset": 1,
+            "bytes": "55",
+            "instruction": "pushq %rbp"
+          },
+          {
+            "offset": 2,
+            "bytes": "57",
+            "instruction": "pushq %rdi"
+          },
+          {
+            "offset": 3,
+            "bytes": "56",
+            "instruction": "pushq %rsi"
+          },
+          {
+            "offset": 4,
+            "bytes": "4154",
+            "instruction": "pushq %r12"
+          },
+          {
+            "offset": 6,
+            "bytes": "4155",
+            "instruction": "pushq %r13"
+          },
+          {
+            "offset": 8,
+            "bytes": "4156",
+            "instruction": "pushq %r14"
+          },
+          {
+            "offset": 10,
+            "bytes": "4157",
+            "instruction": "pushq %r15"
+          },
+          {
+            "offset": 12,
+            "bytes": "4883ec48",
+            "instruction": "subq $0x48, %rsp"
+          },
+          {
+            "offset": 16,
+            "bytes": "48894c2420",
+            "instruction": "movq %rcx, 0x20(%rsp)"
+          },
+          {
+            "offset": 21,
+            "bytes": "4889542428",
+            "instruction": "movq %rdx, 0x28(%rsp)"
+          },
+          {
+            "offset": 26,
+            "bytes": "4c89442430",
+            "instruction": "movq %r8, 0x30(%rsp)"
+          },
+          {
+            "offset": 31,
+            "bytes": "48b80000000000002211",
+            "instruction": "movabsq $0x1122000000000000, %rax # imm = 0x1122000000000000"
+          },
+          {
+            "offset": 41,
+            "bytes": "4c01c0",
+            "instruction": "addq %r8, %rax"
+          },
+          {
+            "offset": 44,
+            "bytes": "49b90000000001000000",
+            "instruction": "movabsq $0x100000000, %r9 # imm = 0x100000000"
+          },
+          {
+            "offset": 54,
+            "bytes": "4889c3",
+            "instruction": "movq %rax, %rbx"
+          },
+          {
+            "offset": 57,
+            "bytes": "4c01c8",
+            "instruction": "addq %r9, %rax"
+          },
+          {
+            "offset": 60,
+            "bytes": "4889c5",
+            "instruction": "movq %rax, %rbp"
+          },
+          {
+            "offset": 63,
+            "bytes": "4c01c8",
+            "instruction": "addq %r9, %rax"
+          },
+          {
+            "offset": 66,
+            "bytes": "4889c7",
+            "instruction": "movq %rax, %rdi"
+          },
+          {
+            "offset": 69,
+            "bytes": "4c01c8",
+            "instruction": "addq %r9, %rax"
+          },
+          {
+            "offset": 72,
+            "bytes": "4889c6",
+            "instruction": "movq %rax, %rsi"
+          },
+          {
+            "offset": 75,
+            "bytes": "4c01c8",
+            "instruction": "addq %r9, %rax"
+          },
+          {
+            "offset": 78,
+            "bytes": "4989c4",
+            "instruction": "movq %rax, %r12"
+          },
+          {
+            "offset": 81,
+            "bytes": "4c01c8",
+            "instruction": "addq %r9, %rax"
+          },
+          {
+            "offset": 84,
+            "bytes": "4989c5",
+            "instruction": "movq %rax, %r13"
+          },
+          {
+            "offset": 87,
+            "bytes": "4c01c8",
+            "instruction": "addq %r9, %rax"
+          },
+          {
+            "offset": 90,
+            "bytes": "4989c6",
+            "instruction": "movq %rax, %r14"
+          },
+          {
+            "offset": 93,
+            "bytes": "4c01c8",
+            "instruction": "addq %r9, %rax"
+          },
+          {
+            "offset": 96,
+            "bytes": "4989c7",
+            "instruction": "movq %rax, %r15"
+          },
+          {
+            "offset": 99,
+            "bytes": "488b4c2420",
+            "instruction": "movq 0x20(%rsp), %rcx"
+          },
+          {
+            "offset": 104,
+            "bytes": "488b542428",
+            "instruction": "movq 0x28(%rsp), %rdx"
+          },
+          {
+            "offset": 109,
+            "bytes": "e80effffff",
+            "instruction": "callq 0x140007440 <.text+0x6440>"
+          },
+          {
+            "offset": 114,
+            "bytes": "31c0",
+            "instruction": "xorl %eax, %eax"
+          },
+          {
+            "offset": 116,
+            "bytes": "49ba0000000000002211",
+            "instruction": "movabsq $0x1122000000000000, %r10 # imm = 0x1122000000000000"
+          },
+          {
+            "offset": 126,
+            "bytes": "4c03542430",
+            "instruction": "addq 0x30(%rsp), %r10"
+          },
+          {
+            "offset": 131,
+            "bytes": "49b90000000001000000",
+            "instruction": "movabsq $0x100000000, %r9 # imm = 0x100000000"
+          },
+          {
+            "offset": 141,
+            "bytes": "4c39d3",
+            "instruction": "cmpq %r10, %rbx"
+          },
+          {
+            "offset": 144,
+            "bytes": "7504",
+            "instruction": "jne 0x140007556 <.text+0x6556>"
+          },
+          {
+            "offset": 146,
+            "bytes": "4883c801",
+            "instruction": "orq $0x1, %rax"
+          },
+          {
+            "offset": 150,
+            "bytes": "4d01ca",
+            "instruction": "addq %r9, %r10"
+          },
+          {
+            "offset": 153,
+            "bytes": "4c39d5",
+            "instruction": "cmpq %r10, %rbp"
+          },
+          {
+            "offset": 156,
+            "bytes": "7504",
+            "instruction": "jne 0x140007562 <.text+0x6562>"
+          },
+          {
+            "offset": 158,
+            "bytes": "4883c802",
+            "instruction": "orq $0x2, %rax"
+          },
+          {
+            "offset": 162,
+            "bytes": "4d01ca",
+            "instruction": "addq %r9, %r10"
+          },
+          {
+            "offset": 165,
+            "bytes": "4c39d7",
+            "instruction": "cmpq %r10, %rdi"
+          },
+          {
+            "offset": 168,
+            "bytes": "7504",
+            "instruction": "jne 0x14000756e <.text+0x656e>"
+          },
+          {
+            "offset": 170,
+            "bytes": "4883c804",
+            "instruction": "orq $0x4, %rax"
+          },
+          {
+            "offset": 174,
+            "bytes": "4d01ca",
+            "instruction": "addq %r9, %r10"
+          },
+          {
+            "offset": 177,
+            "bytes": "4c39d6",
+            "instruction": "cmpq %r10, %rsi"
+          },
+          {
+            "offset": 180,
+            "bytes": "7504",
+            "instruction": "jne 0x14000757a <.text+0x657a>"
+          },
+          {
+            "offset": 182,
+            "bytes": "4883c808",
+            "instruction": "orq $0x8, %rax"
+          },
+          {
+            "offset": 186,
+            "bytes": "4d01ca",
+            "instruction": "addq %r9, %r10"
+          },
+          {
+            "offset": 189,
+            "bytes": "4d39d4",
+            "instruction": "cmpq %r10, %r12"
+          },
+          {
+            "offset": 192,
+            "bytes": "7504",
+            "instruction": "jne 0x140007586 <.text+0x6586>"
+          },
+          {
+            "offset": 194,
+            "bytes": "4883c810",
+            "instruction": "orq $0x10, %rax"
+          },
+          {
+            "offset": 198,
+            "bytes": "4d01ca",
+            "instruction": "addq %r9, %r10"
+          },
+          {
+            "offset": 201,
+            "bytes": "4d39d5",
+            "instruction": "cmpq %r10, %r13"
+          },
+          {
+            "offset": 204,
+            "bytes": "7504",
+            "instruction": "jne 0x140007592 <.text+0x6592>"
+          },
+          {
+            "offset": 206,
+            "bytes": "4883c820",
+            "instruction": "orq $0x20, %rax"
+          },
+          {
+            "offset": 210,
+            "bytes": "4d01ca",
+            "instruction": "addq %r9, %r10"
+          },
+          {
+            "offset": 213,
+            "bytes": "4d39d6",
+            "instruction": "cmpq %r10, %r14"
+          },
+          {
+            "offset": 216,
+            "bytes": "7504",
+            "instruction": "jne 0x14000759e <.text+0x659e>"
+          },
+          {
+            "offset": 218,
+            "bytes": "4883c840",
+            "instruction": "orq $0x40, %rax"
+          },
+          {
+            "offset": 222,
+            "bytes": "4d01ca",
+            "instruction": "addq %r9, %r10"
+          },
+          {
+            "offset": 225,
+            "bytes": "4d39d7",
+            "instruction": "cmpq %r10, %r15"
+          },
+          {
+            "offset": 228,
+            "bytes": "7506",
+            "instruction": "jne 0x1400075ac <.text+0x65ac>"
+          },
+          {
+            "offset": 230,
+            "bytes": "480d80000000",
+            "instruction": "orq $0x80, %rax"
+          },
+          {
+            "offset": 236,
+            "bytes": "4883c448",
+            "instruction": "addq $0x48, %rsp"
+          },
+          {
+            "offset": 240,
+            "bytes": "415f",
+            "instruction": "popq %r15"
+          },
+          {
+            "offset": 242,
+            "bytes": "415e",
+            "instruction": "popq %r14"
+          },
+          {
+            "offset": 244,
+            "bytes": "415d",
+            "instruction": "popq %r13"
+          },
+          {
+            "offset": 246,
+            "bytes": "415c",
+            "instruction": "popq %r12"
+          },
+          {
+            "offset": 248,
+            "bytes": "5e",
+            "instruction": "popq %rsi"
+          },
+          {
+            "offset": 249,
+            "bytes": "5f",
+            "instruction": "popq %rdi"
+          },
+          {
+            "offset": 250,
+            "bytes": "5d",
+            "instruction": "popq %rbp"
+          },
+          {
+            "offset": 251,
+            "bytes": "5b",
+            "instruction": "popq %rbx"
+          },
+          {
+            "offset": 252,
+            "bytes": "c3",
+            "instruction": "retq"
+          }
+        ],
+        "rva": 29888
+      },
+      "tasks_arch_finish": {
+        "symbol": "tasks_arch_finish",
+        "start": 30144,
+        "end": 30162,
+        "bytes": 18,
+        "raw_offset": 27072,
+        "raw_hex": "4883ec28e877feffffe8a2cbfffffaf4ebfc",
+        "instruction_hex": "4883ec28",
+        "sha256": "ce754d05cb3908aafc5d1fb7235bacd89c09207163d74be0d23e9c3075a2a0c0",
+        "instructions": [
+          {
+            "offset": 0,
+            "bytes": "4883ec28",
+            "instruction": "subq $0x28, %rsp"
+          },
+          {
+            "offset": 4,
+            "bytes": "e877feffff",
+            "instruction": "callq 0x140007440 <.text+0x6440>"
+          },
+          {
+            "offset": 9,
+            "bytes": "e8a2cbffff",
+            "instruction": "callq 0x140004170 <.text+0x3170>"
+          },
+          {
+            "offset": 14,
+            "bytes": "fa",
+            "instruction": "cli"
+          },
+          {
+            "offset": 15,
+            "bytes": "f4",
+            "instruction": "hlt"
+          },
+          {
+            "offset": 16,
+            "bytes": "ebfc",
+            "instruction": "jmp 0x1400075ce <.text+0x65ce>"
+          }
+        ],
+        "rva": 30144
+      }
+    },
+    "integer_only": {
+      "compiler_flags": [
+        "--target=x86_64-pc-win32-coff",
+        "-O2",
+        "-g0",
+        "-ffreestanding",
+        "-fno-stack-protector",
+        "-fno-builtin",
+        "-fno-pic",
+        "-fno-pie",
+        "-fno-asynchronous-unwind-tables",
+        "-fno-unwind-tables",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I",
+        "/workspace/scratch/styleos-t-p1-8b/baseline-source/include",
+        "-I",
+        "/workspace/scratch/styleos-t-p1-8b/baseline-source/boot/x86_64",
+        "-DSTYLEOS_EXPECT_ARCH=1",
+        "-ffile-prefix-map=/workspace/scratch/styleos-t-p1-8b/baseline-source=.",
+        "-mno-red-zone",
+        "-mno-sse",
+        "-mno-mmx",
+        "-msoft-float",
+        "-DSTYLEOS_TEST_TASKS=1"
+      ],
+      "decoder_version": "Debian LLVM version 19.1.7\n  Optimized build.\n\n\n  Registered Targets:\n    aarch64     - AArch64 (little endian)\n    aarch64_32  - AArch64 (little endian ILP32)\n    aarch64_be  - AArch64 (big endian)\n    amdgcn      - AMD GCN GPUs\n    arm         - ARM\n    arm64       - ARM64 (little endian)\n    arm64_32    - ARM64 (little endian ILP32)\n    armeb       - ARM (big endian)\n    avr         - Atmel AVR Microcontroller\n    bpf         - BPF (host endian)\n    bpfeb       - BPF (big endian)\n    bpfel       - BPF (little endian)\n    hexagon     - Hexagon\n    lanai       - Lanai\n    loongarch32 - 32-bit LoongArch\n    loongarch64 - 64-bit LoongArch\n    m68k        - Motorola 68000 family\n    mips        - MIPS (32-bit big endian)\n    mips64      - MIPS (64-bit big endian)\n    mips64el    - MIPS (64-bit little endian)\n    mipsel      - MIPS (32-bit little endian)\n    msp430      - MSP430 [experimental]\n    nvptx       - NVIDIA PTX 32-bit\n    nvptx64     - NVIDIA PTX 64-bit\n    ppc32       - PowerPC 32\n    ppc32le     - PowerPC 32 LE\n    ppc64       - PowerPC 64\n    ppc64le     - PowerPC 64 LE\n    r600        - AMD GPUs HD2XXX-HD6XXX\n    riscv32     - 32-bit RISC-V\n    riscv64     - 64-bit RISC-V\n    sparc       - Sparc\n    sparcel     - Sparc LE\n    sparcv9     - Sparc V9\n    systemz     - SystemZ\n    thumb       - Thumb\n    thumbeb     - Thumb (big endian)\n    ve          - VE\n    wasm32      - WebAssembly 32-bit\n    wasm64      - WebAssembly 64-bit\n    x86         - 32-bit X86: Pentium-Pro and above\n    x86-64      - 64-bit X86: EM64T and AMD64\n    xcore       - XCore\n    xtensa      - Xtensa 32",
+      "decoder_commands": [
+        [
+          "llvm-objdump",
+          "-D",
+          "--disassemble-zeroes",
+          "--section=.text",
+          "--start-address=5368713216",
+          "--stop-address=5368745382",
+          "BOOTX64.EFI"
+        ]
+      ],
+      "executable_spans": [
+        {
+          "start": 5368713216,
+          "end": 5368745382,
+          "offset": 1024,
+          "section": ".text",
+          "bytes": 32166,
+          "sha256": "77c6c72bbe4334820a791c6c895771420396fb60f0227d2022cce8bfab46e633"
+        }
+      ],
+      "executable_sha256": "77c6c72bbe4334820a791c6c895771420396fb60f0227d2022cce8bfab46e633",
+      "decoded_bytes": 32166,
+      "zero_padding_bytes": 0,
+      "instruction_count": 8340
+    },
+    "disk_sha256": "f44b2a99efd8743bea92227d5b3a94ebbb57d6713313ff2b1ca515763c0ecb53"
+  },
+  "tasks_trace": {
+    "arch": "x86_64",
+    "created": [
+      {
+        "id": "A",
+        "state": "READY",
+        "sp": 100835272,
+        "pc": 100733360,
+        "entry": 100733136
+      },
+      {
+        "id": "B",
+        "state": "READY",
+        "sp": 100851656,
+        "pc": 100733360,
+        "entry": 100733280
+      }
+    ],
+    "schedule": [
+      {
+        "id": "A",
+        "kind": "START",
+        "count": 1,
+        "event": {
+          "local": 100835184,
+          "value": 11609406114469533304,
+          "regs": 0
+        },
+        "yielded": {
+          "seq": 1,
+          "tag": 257
+        },
+        "returned": false,
+        "saved": {
+          "state": "READY",
+          "sp": 100834928,
+          "pc": 100746546,
+          "seq": 1,
+          "mask": 255
+        },
+        "registers": [
+          {
+            "seq": 1,
+            "index": 0,
+            "value": 1234549247852937473
+          },
+          {
+            "seq": 1,
+            "index": 1,
+            "value": 1234549252147904769
+          },
+          {
+            "seq": 1,
+            "index": 2,
+            "value": 1234549256442872065
+          },
+          {
+            "seq": 1,
+            "index": 3,
+            "value": 1234549260737839361
+          },
+          {
+            "seq": 1,
+            "index": 4,
+            "value": 1234549265032806657
+          },
+          {
+            "seq": 1,
+            "index": 5,
+            "value": 1234549269327773953
+          },
+          {
+            "seq": 1,
+            "index": 6,
+            "value": 1234549273622741249
+          },
+          {
+            "seq": 1,
+            "index": 7,
+            "value": 1234549277917708545
+          }
+        ],
+        "dispatcher": {
+          "local": 100916768,
+          "value": 15086109993720895096,
+          "sp": 100916640,
+          "pc": 100746425
+        }
+      },
+      {
+        "id": "B",
+        "kind": "START",
+        "count": 2,
+        "event": {
+          "local": 100851568,
+          "value": 12733183205627478817,
+          "regs": 0
+        },
+        "yielded": {
+          "seq": 1,
+          "tag": 513
+        },
+        "returned": false,
+        "saved": {
+          "state": "READY",
+          "sp": 100851312,
+          "pc": 100746546,
+          "seq": 1,
+          "mask": 255
+        },
+        "registers": [
+          {
+            "seq": 1,
+            "index": 0,
+            "value": 1234549247852937729
+          },
+          {
+            "seq": 1,
+            "index": 1,
+            "value": 1234549252147905025
+          },
+          {
+            "seq": 1,
+            "index": 2,
+            "value": 1234549256442872321
+          },
+          {
+            "seq": 1,
+            "index": 3,
+            "value": 1234549260737839617
+          },
+          {
+            "seq": 1,
+            "index": 4,
+            "value": 1234549265032806913
+          },
+          {
+            "seq": 1,
+            "index": 5,
+            "value": 1234549269327774209
+          },
+          {
+            "seq": 1,
+            "index": 6,
+            "value": 1234549273622741505
+          },
+          {
+            "seq": 1,
+            "index": 7,
+            "value": 1234549277917708801
+          }
+        ],
+        "dispatcher": {
+          "local": 100916768,
+          "value": 15086109993720895096,
+          "sp": 100916640,
+          "pc": 100746425
+        }
+      },
+      {
+        "id": "A",
+        "kind": "RESUME",
+        "count": 3,
+        "event": {
+          "local": 100835184,
+          "value": 11609406114469533304,
+          "regs": 255
+        },
+        "yielded": {
+          "seq": 2,
+          "tag": 258
+        },
+        "returned": false,
+        "saved": {
+          "state": "READY",
+          "sp": 100834928,
+          "pc": 100746546,
+          "seq": 2,
+          "mask": 255
+        },
+        "registers": [
+          {
+            "seq": 2,
+            "index": 0,
+            "value": 1234549247852937474
+          },
+          {
+            "seq": 2,
+            "index": 1,
+            "value": 1234549252147904770
+          },
+          {
+            "seq": 2,
+            "index": 2,
+            "value": 1234549256442872066
+          },
+          {
+            "seq": 2,
+            "index": 3,
+            "value": 1234549260737839362
+          },
+          {
+            "seq": 2,
+            "index": 4,
+            "value": 1234549265032806658
+          },
+          {
+            "seq": 2,
+            "index": 5,
+            "value": 1234549269327773954
+          },
+          {
+            "seq": 2,
+            "index": 6,
+            "value": 1234549273622741250
+          },
+          {
+            "seq": 2,
+            "index": 7,
+            "value": 1234549277917708546
+          }
+        ],
+        "dispatcher": {
+          "local": 100916768,
+          "value": 15086109993720895096,
+          "sp": 100916640,
+          "pc": 100746425
+        }
+      },
+      {
+        "id": "B",
+        "kind": "RESUME",
+        "count": 4,
+        "event": {
+          "local": 100851568,
+          "value": 12733183205627478817,
+          "regs": 255
+        },
+        "yielded": {
+          "seq": 2,
+          "tag": 514
+        },
+        "returned": false,
+        "saved": {
+          "state": "READY",
+          "sp": 100851312,
+          "pc": 100746546,
+          "seq": 2,
+          "mask": 255
+        },
+        "registers": [
+          {
+            "seq": 2,
+            "index": 0,
+            "value": 1234549247852937730
+          },
+          {
+            "seq": 2,
+            "index": 1,
+            "value": 1234549252147905026
+          },
+          {
+            "seq": 2,
+            "index": 2,
+            "value": 1234549256442872322
+          },
+          {
+            "seq": 2,
+            "index": 3,
+            "value": 1234549260737839618
+          },
+          {
+            "seq": 2,
+            "index": 4,
+            "value": 1234549265032806914
+          },
+          {
+            "seq": 2,
+            "index": 5,
+            "value": 1234549269327774210
+          },
+          {
+            "seq": 2,
+            "index": 6,
+            "value": 1234549273622741506
+          },
+          {
+            "seq": 2,
+            "index": 7,
+            "value": 1234549277917708802
+          }
+        ],
+        "dispatcher": {
+          "local": 100916768,
+          "value": 15086109993720895096,
+          "sp": 100916640,
+          "pc": 100746425
+        }
+      },
+      {
+        "id": "A",
+        "kind": "EXIT",
+        "count": 5,
+        "event": {
+          "local": 100835184,
+          "value": 11609406114469533304,
+          "regs": 255
+        },
+        "yielded": null,
+        "returned": true,
+        "saved": {
+          "state": "DONE",
+          "sp": 100835168,
+          "pc": 100746697,
+          "seq": 2,
+          "mask": 0
+        },
+        "registers": [],
+        "dispatcher": {
+          "local": 100916768,
+          "value": 15086109993720895096,
+          "sp": 100916640,
+          "pc": 100746425
+        }
+      },
+      {
+        "id": "B",
+        "kind": "EXIT",
+        "count": 6,
+        "event": {
+          "local": 100851568,
+          "value": 12733183205627478817,
+          "regs": 255
+        },
+        "yielded": null,
+        "returned": true,
+        "saved": {
+          "state": "DONE",
+          "sp": 100851552,
+          "pc": 100746697,
+          "seq": 2,
+          "mask": 0
+        },
+        "registers": [],
+        "dispatcher": {
+          "local": 100916768,
+          "value": 15086109993720895096,
+          "sp": 100916640,
+          "pc": 100746425
+        }
+      }
+    ],
+    "objects": {
+      "stack_a": {
+        "start": 100818944,
+        "end": 100835328,
+        "bytes": 16384
+      },
+      "stack_b": {
+        "start": 100835328,
+        "end": 100851712,
+        "bytes": 16384
+      },
+      "control": {
+        "start": 100814848,
+        "end": 100818944,
+        "bytes": 4096
+      },
+      "diagnostic": {
+        "start": 100761696,
+        "end": 100774096,
+        "bytes": 12400
+      },
+      "stack": {
+        "start": 100851728,
+        "end": 100917264,
+        "bytes": 65536
+      },
+      "pool": {
+        "start": 100777984,
+        "end": 100810752,
+        "bytes": 32768
+      },
+      "pool_metadata": {
+        "start": 100810752,
+        "end": 100814848,
+        "bytes": 4096
+      },
+      "idt": {
+        "start": 100917264,
+        "end": 100921360,
+        "bytes": 4096
+      },
+      "handoff": {
+        "start": 100761600,
+        "end": 100761696,
+        "bytes": 96
+      }
+    },
+    "state_before": {
+      "mode": 2147549235,
+      "root": 125833216,
+      "control0": 1640,
+      "control1": 3328,
+      "flags": 6,
+      "cs": 56,
+      "idt_base": 100917264,
+      "idt_bytes": 4096,
+      "gdt_base": 123584512,
+      "gdt_bytes": 72,
+      "pat": 1974748653749254,
+      "pa_bits": 40,
+      "gdt_pages": 1,
+      "gdt_pa0": 123584512,
+      "gdt_pa1": 0
+    },
+    "state_after": {
+      "mode": 2147549235,
+      "root": 125833216,
+      "control0": 1640,
+      "control1": 3328,
+      "flags": 6,
+      "cs": 56,
+      "idt_base": 100917264,
+      "idt_bytes": 4096,
+      "gdt_base": 123584512,
+      "gdt_bytes": 72,
+      "pat": 1974748653749254,
+      "pa_bits": 40,
+      "gdt_pages": 1,
+      "gdt_pa0": 123584512,
+      "gdt_pa1": 0
+    },
+    "completed": 2,
+    "dispatches": 6,
+    "canaries": [
+      {
+        "id": "A",
+        "low0": 7740398493674204011,
+        "low1": 7740398493674204011,
+        "high0": 11936128518282651045,
+        "high1": 11936128518282651045
+      },
+      {
+        "id": "B",
+        "low0": 7740398493674204011,
+        "low1": 7740398493674204011,
+        "high0": 11936128518282651045,
+        "high1": 11936128518282651045
+      }
+    ],
+    "memory_map": {
+      "image": [
+        {
+          "start": 100716544,
+          "end": 100929536
+        }
+      ],
+      "stack": [
+        {
+          "start": 100851728,
+          "end": 100917264
+        }
+      ],
+      "handoff": [
+        {
+          "start": 100761600,
+          "end": 100761696
+        }
+      ],
+      "source": [
+        {
+          "start": 108720152,
+          "end": 108725528
+        }
+      ],
+      "ram": [
+        {
+          "start": 0,
+          "end": 655360
+        },
+        {
+          "start": 1048576,
+          "end": 8388608
+        },
+        {
+          "start": 8421376,
+          "end": 8433664
+        },
+        {
+          "start": 8437760,
+          "end": 8458240
+        },
+        {
+          "start": 24641536,
+          "end": 62308352
+        },
+        {
+          "start": 62439424,
+          "end": 100716544
+        },
+        {
+          "start": 100929536,
+          "end": 100974592
+        },
+        {
+          "start": 132120576,
+          "end": 132575232
+        }
+      ],
+      "reserved": [
+        {
+          "start": 8388608,
+          "end": 8421376
+        },
+        {
+          "start": 8433664,
+          "end": 8437760
+        },
+        {
+          "start": 8458240,
+          "end": 24641536
+        },
+        {
+          "start": 62308352,
+          "end": 62439424
+        },
+        {
+          "start": 100716544,
+          "end": 100929536
+        },
+        {
+          "start": 100974592,
+          "end": 132120576
+        },
+        {
+          "start": 132575232,
+          "end": 134217728
+        },
+        {
+          "start": 3758096384,
+          "end": 4026531840
+        },
+        {
+          "start": 4290772992,
+          "end": 4294967296
+        },
+        {
+          "start": 1086626725888,
+          "end": 1099511627776
+        }
+      ],
+      "candidate": [
+        {
+          "start": 0,
+          "end": 655360
+        },
+        {
+          "start": 1048576,
+          "end": 8388608
+        },
+        {
+          "start": 8421376,
+          "end": 8433664
+        },
+        {
+          "start": 8437760,
+          "end": 8458240
+        },
+        {
+          "start": 24641536,
+          "end": 62308352
+        },
+        {
+          "start": 62439424,
+          "end": 100716544
+        },
+        {
+          "start": 100929536,
+          "end": 100974592
+        },
+        {
+          "start": 132120576,
+          "end": 132575232
+        }
+      ]
+    },
+    "dispatcher_local": 100916768,
+    "released": [
+      "A",
+      "B"
+    ]
+  },
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "settled": true,
+  "returncode": 0
+}

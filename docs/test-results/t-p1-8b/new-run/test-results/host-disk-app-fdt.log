@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude tests/test_disk_app_fdt.c boot/aarch64/disk_app_fdt.c -o /workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/host-tests/host-disk-app-fdt
+
+$ /workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/host-tests/host-disk-app-fdt
+disk-app FDT host PASS: scenarios, fixed MMIO, malformed bounds/profile, unchanged refusals

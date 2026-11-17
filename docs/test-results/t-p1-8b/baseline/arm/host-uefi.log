@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_uefi.c boot/x86_64/exit_boot.c -o /workspace/scratch/styleos-t-p1-8b/baseline-arm/host-tests/host-uefi
+
+$ /workspace/scratch/styleos-t-p1-8b/baseline-arm/host-tests/host-uefi
+UEFI HOST TESTS PASS: map, stale key, growth, failures, bounded retries (14 cases)

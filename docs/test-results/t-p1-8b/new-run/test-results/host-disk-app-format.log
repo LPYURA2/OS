@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude tests/test_disk_app.c kernel/disk_app.c -o /workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/host-tests/host-disk-app-format
+
+$ /workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/host-tests/host-disk-app-format
+disk-app host loader: 3 groups PASS (header/bounds, all opcode bits, atomic copy)

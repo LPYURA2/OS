@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude tests/test_storage_fdt.c boot/aarch64/storage_fdt.c -o /workspace/scratch/styleos-t-p1-8b/baseline-storage-runs/run-20261117T075718.804329Z-c0i_biix/host-tests/host-storage-fdt
+
+$ /workspace/scratch/styleos-t-p1-8b/baseline-storage-runs/run-20261117T075718.804329Z-c0i_biix/host-tests/host-storage-fdt
+storage FDT host PASS: phases, fixed MMIO, malformed bounds/profile, unchanged refusals

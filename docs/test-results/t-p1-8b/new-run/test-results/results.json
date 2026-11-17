@@ -1,0 +1,98 @@
+[
+  {
+    "name": "host-storage-format",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-storage-format.log"
+  },
+  {
+    "name": "host-storage-fdt",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-storage-fdt.log"
+  },
+  {
+    "name": "host-storage-transport",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-storage-transport.log"
+  },
+  {
+    "name": "host-disk-app-format",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-disk-app-format.log"
+  },
+  {
+    "name": "host-disk-app-fdt",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-disk-app-fdt.log"
+  },
+  {
+    "name": "host-storage-python",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-storage-python.log"
+  },
+  {
+    "name": "host-disk-app-python",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-disk-app-python.log"
+  },
+  {
+    "name": "build-disk-app-boot",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-disk-app-boot.log"
+  },
+  {
+    "name": "disk-app-binary-proof",
+    "status": "PASS",
+    "detail": "independent ELF/Image/manifest/source-profile proof",
+    "log": "disk-app-binary-proof.log"
+  },
+  {
+    "name": "build-app-a",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-app-a.log"
+  },
+  {
+    "name": "build-app-b",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-app-b.log"
+  },
+  {
+    "name": "build-fixture-packer",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-fixture-packer.log"
+  },
+  {
+    "name": "variant-a",
+    "status": "PASS",
+    "detail": "validated complete guest halt, then intentional SIGTERM",
+    "log": "variant-a.log"
+  },
+  {
+    "name": "variant-b",
+    "status": "PASS",
+    "detail": "validated complete guest halt, then intentional SIGTERM",
+    "log": "variant-b.log"
+  },
+  {
+    "name": "reject",
+    "status": "PASS",
+    "detail": "validated complete guest halt, then intentional SIGTERM",
+    "log": "reject.log"
+  },
+  {
+    "name": "disk-app-replacement",
+    "status": "PASS",
+    "detail": "different external artifacts, three independent VMs, byte-identical boot artifacts and unchanged source hashes",
+    "log": "disk-app-replacement.log"
+  }
+]

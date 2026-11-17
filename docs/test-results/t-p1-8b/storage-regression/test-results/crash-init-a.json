@@ -1,0 +1,231 @@
+{
+  "status": "PASS",
+  "detail": "validated guest halt, then intentional SIGTERM",
+  "command": [
+    "/workspace/scratch/styleos-toolchain/bin/qemu-system-aarch64",
+    "-machine",
+    "virt",
+    "-cpu",
+    "cortex-a57",
+    "-smp",
+    "1",
+    "-m",
+    "128M",
+    "-accel",
+    "tcg,thread=single",
+    "-display",
+    "none",
+    "-serial",
+    "stdio",
+    "-monitor",
+    "none",
+    "-net",
+    "none",
+    "-no-reboot",
+    "-global",
+    "virtio-mmio.force-legacy=false",
+    "-kernel",
+    "/workspace/OS/build/storage-regression-tp18b/run-20261117T132210.752747Z-clj3gy19/boot/aarch64/styleos.bin",
+    "-append",
+    "styleos.storage=init-a",
+    "-blockdev",
+    "{\"driver\":\"file\",\"filename\":\"/workspace/OS/build/storage-regression-tp18b/run-20261117T132210.752747Z-clj3gy19/disks/crash.img\",\"node-name\":\"storage-file\",\"cache\":{\"direct\":false,\"no-flush\":false}}",
+    "-blockdev",
+    "{\"driver\":\"raw\",\"file\":\"storage-file\",\"node-name\":\"storage\",\"read-only\":false}",
+    "-device",
+    "virtio-blk-device,drive=storage,id=storage0"
+  ],
+  "pid": 6130,
+  "phase": "init-a",
+  "uart_sha256": "8c008e7b89d0f388fcda750f22b5ea134fad71079859052bc0ee778a25c6d855",
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "settled": true,
+  "barrier_validated": false,
+  "stop_signal": 15,
+  "returncode": 0,
+  "trace": {
+    "phase": "init-a",
+    "granted": 0,
+    "image_start": 1074266112,
+    "image_end": 1074454528,
+    "objects": {
+      "control": {
+        "start": 1074368512,
+        "end": 1074372608
+      },
+      "workspace": {
+        "start": 1074372608,
+        "end": 1074376704
+      },
+      "queue": {
+        "start": 1074380800,
+        "end": 1074384896
+      },
+      "request": {
+        "start": 1074384896,
+        "end": 1074388992
+      },
+      "vblk_control": {
+        "start": 1074376704,
+        "end": 1074380800
+      },
+      "stack": {
+        "start": 1074388992,
+        "end": 1074454528
+      },
+      "diagnostic": {
+        "start": 1074315264,
+        "end": 1074327664
+      },
+      "pool": {
+        "start": 1074331648,
+        "end": 1074364416
+      },
+      "pool_metadata": {
+        "start": 1074364416,
+        "end": 1074368512
+      },
+      "vectors": {
+        "start": 1074268160,
+        "end": 1074270208
+      }
+    },
+    "memory": {
+      "image": [
+        [
+          1074266112,
+          1074454528
+        ]
+      ],
+      "stack": [
+        [
+          1074388992,
+          1074454528
+        ]
+      ],
+      "handoff": [
+        [
+          1074454336,
+          1074454432
+        ]
+      ],
+      "source": [
+        [
+          1140850688,
+          1141899264
+        ]
+      ],
+      "ram": [
+        [
+          1073741824,
+          1207959552
+        ]
+      ],
+      "reserved": [
+        [
+          150994944,
+          150999040
+        ],
+        [
+          1074266112,
+          1074454528
+        ],
+        [
+          1140850688,
+          1141899264
+        ]
+      ],
+      "candidate": [
+        [
+          1073741824,
+          1074266112
+        ],
+        [
+          1074454528,
+          1140850688
+        ],
+        [
+          1141899264,
+          1207959552
+        ]
+      ]
+    },
+    "machine": {
+      "el": 4,
+      "sctlr": 12912696,
+      "daif": 960,
+      "sp": 1074453040,
+      "vectors": 1074268160
+    },
+    "fdt": {
+      "source": 1140850688,
+      "bytes": 1048576,
+      "candidates": 32
+    },
+    "device": {
+      "base": 167788032,
+      "bytes": 512,
+      "version": 2,
+      "id": 2,
+      "features": 1104611929684,
+      "negotiated": 4294967808,
+      "sectors": 2048,
+      "queue": 8
+    },
+    "reads": [
+      {
+        "generation": 1,
+        "name_hex": "6e6f74652e747874",
+        "length": 15,
+        "data_hex": "5374796c654f53206e6f746520410a"
+      }
+    ],
+    "progress": [
+      {
+        "operation": "prepared",
+        "generation": 1,
+        "length": 15,
+        "payload_crc": 3403554422,
+        "reads": 2048,
+        "writes": 5,
+        "flushes": 3
+      },
+      {
+        "operation": "committed",
+        "generation": 1,
+        "length": 15,
+        "payload_crc": 3403554422,
+        "reads": 2048,
+        "writes": 6,
+        "flushes": 4
+      }
+    ],
+    "io": {
+      "reads": 2053,
+      "writes": 6,
+      "flushes": 4,
+      "requests": 2063
+    },
+    "barrier": false
+  },
+  "stage": "crash-init-a",
+  "disk_before": {
+    "path": "/workspace/OS/build/storage-regression-tp18b/run-20261117T132210.752747Z-clj3gy19/disks/crash.img",
+    "device": 27,
+    "inode": 1338620,
+    "bytes": 1048576,
+    "sha256": "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58"
+  },
+  "disk_after": {
+    "path": "/workspace/OS/build/storage-regression-tp18b/run-20261117T132210.752747Z-clj3gy19/disks/crash.img",
+    "device": 27,
+    "inode": 1338620,
+    "bytes": 1048576,
+    "sha256": "6898d1ce3f9093a258257738fd925dd5db4cf416845a9d326dc617703bd683fc"
+  },
+  "binary_sha256": "b730312193d84f8ce4d2795860c799e36c8211d645eb11f90126826baa4b2c25",
+  "raw_sha256": "756010c0fa3f41a5506f4d43233042141dab5d96ab67950aae111ceb1f8bbea8",
+  "manifest_sha256": "aa897ced1df6e46038b5d0f5d403f2d2ece6f30e3f35c99046e3e2c9a57b4287"
+}

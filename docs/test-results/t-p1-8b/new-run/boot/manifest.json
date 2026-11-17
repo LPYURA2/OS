@@ -1,0 +1,77 @@
+{
+  "prototype": "StyleOS T-P1.8B",
+  "compiler": "Debian clang version 19.1.7 (3+b1)",
+  "invalid_boot_info": false,
+  "invalid_memory_map": false,
+  "test_exception": false,
+  "test_bootpool": false,
+  "test_paging": false,
+  "test_paging_fault": false,
+  "test_ownership_plan": false,
+  "test_ownership_plan_invalid": false,
+  "test_tasks": false,
+  "test_disk_app": true,
+  "test_storage": false,
+  "test_user_processes": false,
+  "compiler_flags": {
+    "aarch64": [
+      "--target=aarch64-none-elf",
+      "-O2",
+      "-g0",
+      "-ffreestanding",
+      "-fno-stack-protector",
+      "-fno-builtin",
+      "-fno-pic",
+      "-fno-pie",
+      "-fno-asynchronous-unwind-tables",
+      "-fno-unwind-tables",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-I",
+      "/workspace/OS/include",
+      "-I",
+      "/workspace/OS/boot/x86_64",
+      "-DSTYLEOS_EXPECT_ARCH=2",
+      "-ffile-prefix-map=/workspace/OS=.",
+      "-mgeneral-regs-only",
+      "-mno-outline-atomics",
+      "-mstrict-align",
+      "-DSTYLEOS_TEST_DISK_APP=1"
+    ]
+  },
+  "disk_app_sources": {
+    "aarch64": [
+      "kernel/main.c",
+      "kernel/boot_info.c",
+      "kernel/runtime.c",
+      "kernel/boot_memory.c",
+      "kernel/boot_memory_diagnostic.c",
+      "kernel/exception.c",
+      "kernel/boot_pool.c",
+      "kernel/storage.c",
+      "arch/aarch64/virtio_block.c",
+      "kernel/disk_app.c",
+      "kernel/disk_app_demo.c",
+      "boot/aarch64/disk_app_fdt.c",
+      "arch/aarch64/disk_app.c",
+      "arch/aarch64/disk_app_entry.S",
+      "boot/aarch64/platform.c",
+      "boot/aarch64/start.S",
+      "boot/aarch64/fdt_memory.c",
+      "arch/aarch64/console.c"
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "aarch64/kernel.elf",
+      "size": 139792,
+      "sha256": "f65312e68d97689405c0074e58902bc116544e53805efe3a9656936ac0ed2ce3"
+    },
+    {
+      "path": "aarch64/styleos.bin",
+      "size": 64304,
+      "sha256": "924a6e934d5b564e9e4a587e3698254185cec7cb3a00cb4071a112ce857b29b6"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+STORAGE RUN DIRECTORY: /workspace/scratch/styleos-t-p1-8b/baseline-storage-runs/run-20261117T075718.804329Z-c0i_biix
+fatal: not a git repository (or any of the parent directories): .git
+host-storage-format: PASS — exit 0
+host-storage-fdt: PASS — exit 0
+host-storage-transport: PASS — exit 0
+host-storage-python: PASS — exit 0
+build-storage: PASS — exit 0
+storage-binary-proof: PASS — independent ELF/Image/manifest/source-profile proof
+persist-init-a: PASS — validated guest halt, then intentional SIGTERM
+persist-read-a: PASS — validated guest halt, then intentional SIGTERM
+persist-update-b: PASS — validated guest halt, then intentional SIGTERM
+persist-read-b: PASS — validated guest halt, then intentional SIGTERM
+crash-init-a: PASS — validated guest halt, then intentional SIGTERM
+crash-prepare-b: PASS — validated pre-commit barrier, then intentional SIGKILL
+crash-recover-a: PASS — validated guest halt, then intentional SIGTERM
+storage-source-binding: PASS — source hashes unchanged across build and seven VM processes
+persistence-and-update: PASS — same runner-created disk, independent VM processes, unchanged host file between phases
+interrupted-update-recovery: PASS — same runner-created disk, independent VM processes, unchanged host file between phases
+RESULTS: /workspace/scratch/styleos-t-p1-8b/baseline-storage-runs/run-20261117T075718.804329Z-c0i_biix/test-results/results.json

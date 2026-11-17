@@ -1,0 +1,4 @@
+$ cc -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_boot_memory.c kernel/boot_memory.c boot/x86_64/memory_map.c boot/aarch64/fdt_memory.c -o /workspace/OS/build/t-p1-8b/host-tests/host-memory
+
+$ /workspace/OS/build/t-p1-8b/host-tests/host-memory
+Boot memory: normalization, limits, UEFI and FDT PASS

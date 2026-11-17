@@ -625,7 +625,7 @@ objdump для своих task/user-processes proofs.
 pkg install git python clang lld qemu-system-aarch64-headless
 git clone --branch feature/styleos-t-p1-8b --single-branch https://github.com/LPYURA2/OS.git styleos-tp18b
 cd styleos-tp18b
-git checkout --detach __T_P1_8B_SHA__
+git checkout --detach 0ef43423de1fc4820c7efece9c3da286879d7b49
 git rev-parse HEAD
 python --version
 clang --version

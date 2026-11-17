@@ -1,0 +1,98 @@
+[
+  {
+    "name": "host-storage-format",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-storage-format.log"
+  },
+  {
+    "name": "host-storage-fdt",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-storage-fdt.log"
+  },
+  {
+    "name": "host-storage-transport",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-storage-transport.log"
+  },
+  {
+    "name": "host-storage-python",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "host-storage-python.log"
+  },
+  {
+    "name": "build-storage",
+    "status": "PASS",
+    "detail": "exit 0",
+    "log": "build-storage.log"
+  },
+  {
+    "name": "storage-binary-proof",
+    "status": "PASS",
+    "detail": "independent ELF/Image/manifest/source-profile proof",
+    "log": "storage-binary-proof.log"
+  },
+  {
+    "name": "persist-init-a",
+    "status": "PASS",
+    "detail": "validated guest halt, then intentional SIGTERM",
+    "log": "persist-init-a.log"
+  },
+  {
+    "name": "persist-read-a",
+    "status": "PASS",
+    "detail": "validated guest halt, then intentional SIGTERM",
+    "log": "persist-read-a.log"
+  },
+  {
+    "name": "persist-update-b",
+    "status": "PASS",
+    "detail": "validated guest halt, then intentional SIGTERM",
+    "log": "persist-update-b.log"
+  },
+  {
+    "name": "persist-read-b",
+    "status": "PASS",
+    "detail": "validated guest halt, then intentional SIGTERM",
+    "log": "persist-read-b.log"
+  },
+  {
+    "name": "crash-init-a",
+    "status": "PASS",
+    "detail": "validated guest halt, then intentional SIGTERM",
+    "log": "crash-init-a.log"
+  },
+  {
+    "name": "crash-prepare-b",
+    "status": "PASS",
+    "detail": "validated pre-commit barrier, then intentional SIGKILL",
+    "log": "crash-prepare-b.log"
+  },
+  {
+    "name": "crash-recover-a",
+    "status": "PASS",
+    "detail": "validated guest halt, then intentional SIGTERM",
+    "log": "crash-recover-a.log"
+  },
+  {
+    "name": "storage-source-binding",
+    "status": "PASS",
+    "detail": "source hashes unchanged across build and seven VM processes",
+    "log": "storage-source-binding.log"
+  },
+  {
+    "name": "persistence-and-update",
+    "status": "PASS",
+    "detail": "same runner-created disk, independent VM processes, unchanged host file between phases",
+    "log": "persistence-and-update.log"
+  },
+  {
+    "name": "interrupted-update-recovery",
+    "status": "PASS",
+    "detail": "same runner-created disk, independent VM processes, unchanged host file between phases",
+    "log": "interrupted-update-recovery.log"
+  }
+]

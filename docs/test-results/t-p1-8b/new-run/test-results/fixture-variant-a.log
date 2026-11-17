@@ -1,0 +1,2 @@
+$ /workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/host-tests/pack-disk-app /workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/a/app.bin /workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/disks/variant-a.img
+{"file":"app.bin","file_length":60,"generation":1,"disk_bytes":1048576,"reads":2062,"writes":6,"flushes":4}

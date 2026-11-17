@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "checks": [
+    "fresh new disk",
+    "existing regular file refused unchanged",
+    "symlink leaf refused unchanged",
+    "symlink parent refused",
+    "existing hardlink refused unchanged",
+    "symlink application input refused",
+    "directory application input refused"
+  ]
+}

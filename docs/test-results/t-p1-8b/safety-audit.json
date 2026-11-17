@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "task": "T-P1.8B independent safety audit",
+  "utc": "2026-11-17T08:06:24.925247+00:00",
+  "result": "PASS_NO_BLOCKERS_FOUND",
+  "blocking_findings": [],
+  "base_supplied_by_parent": "1ea8d090cd12c4a5d20f628c927fcba787aede98",
+  "mode": "read-only source audit with scratch host sanitizer executables",
+  "repository_edits": false,
+  "git_commands": false,
+  "qemu_runs": false,
+  "source_sha256": {
+    "kernel/disk_app.c": "627005f3188b2a60eb59d1d70b0b1296ea4b7cb82e882db2870dcfab64b1045c",
+    "kernel/disk_app_demo.c": "fbdb9f735e45f755b056ce9298302fed1f73780b56850b689cf1885748497ddf",
+    "arch/aarch64/disk_app.c": "cc85bb781614cd3f78958d7a66299a1499805ab2644c99a29d1dabf128309e9e",
+    "arch/aarch64/disk_app_entry.S": "d78c2257160340d3db346f86a46e8d32f9974fccb61e5178f729c288a9056468",
+    "include/styleos/disk_app.h": "859f8cc0c89997174f6a6fddf663ae6e2c6af7c3355c0e6db3b25556d38e509e",
+    "include/styleos/disk_app_arch.h": "5666996013e08c245a4d3752565b9a68c98ed069d5d2e6cf4b074828e8bcd300",
+    "include/styleos/disk_app_demo.h": "16a6db9995742d05430bf5a983b3e822b067194eee01912f84d4c3f8b55b3587",
+    "boot/aarch64/disk_app_fdt.c": "a26da5841460008b46bfb2070f9384379ebf0b26290d956a3d942a5d86b039f9",
+    "arch/aarch64/virtio_block.c": "42e8869f4d0e93ef8740c5569b72c301d5130f88615c4e2a6bce4e5b2c4f270d",
+    "kernel/storage.c": "8b6c920269d684e61357126988c0ca7416e3ddab125b0de248acc02ff2b60355",
+    "include/styleos/storage.h": "4dafc1cb4312406da787c6b4d1640bcb0d38fa25cf26a0c1416aeaa603f97cfb",
+    "include/styleos/virtio_block.h": "b26ef378ec0303cf5ca2e8759753168c14a38ebc430c91da6e2b88a47a327027"
+  },
+  "tests": [
+    {
+      "name": "loader C suite",
+      "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+      "sources": [
+        "tests/test_disk_app.c",
+        "kernel/disk_app.c"
+      ],
+      "flags": "-std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -g",
+      "result": "PASS",
+      "exit_code": 0,
+      "stdout": "disk-app host loader: 3 groups PASS (header/bounds, all opcode bits, atomic copy)",
+      "sanitizer_diagnostics": []
+    },
+    {
+      "name": "FDT C suite",
+      "compiler": "gcc (Debian 14.2.0-19) 14.2.0",
+      "sources": [
+        "tests/test_disk_app_fdt.c",
+        "boot/aarch64/disk_app_fdt.c"
+      ],
+      "flags": "-std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -g",
+      "result": "PASS",
+      "exit_code": 0,
+      "stdout": "disk-app FDT host PASS: scenarios, fixed MMIO, malformed bounds/profile, unchanged refusals",
+      "sanitizer_diagnostics": []
+    }
+  ],
+  "tooling_note": "Sourced /workspace/scratch/styleos-toolchain/env.sh. Clang ASan link unavailable because its packaged libclang_rt.asan_static.a/libclang_rt.asan.a were absent; successful sanitizer checks used system GCC.",
+  "limitations": [
+    "No independent VM or binary decode result",
+    "No independent baseline Git/source/artifact comparison",
+    "Requires integration live frame/table/disk-SHA evidence",
+    "Retirement assumes supported VirtIO completion semantics, single CPU and no IRQ/SMP concurrency"
+  ]
+}

@@ -1,0 +1,192 @@
+{
+  "base": "1ea8d090cd12c4a5d20f628c927fcba787aede98",
+  "storage_run": "/workspace/scratch/styleos-t-p1-8b/baseline-storage-runs/run-20261117T075718.804329Z-c0i_biix",
+  "artifacts": [
+    {
+      "path": "x86_64/BOOTX64.EFI",
+      "baseline_sha256": "1bd026d3406b7670d0e2cac1bacae20e2fe58e735afe7c6f8d8798d83500f7f2"
+    },
+    {
+      "path": "x86_64/styleos.img",
+      "baseline_sha256": "0d49846a842336938a851f94eff3b64b8b0795c325dd58e8a5a42a6569d45c76"
+    },
+    {
+      "path": "aarch64/kernel.elf",
+      "baseline_sha256": "08f220a0c62a0d9eebec6c109c6852b9a20ec3772e40cdf104cab74f0042c215"
+    },
+    {
+      "path": "aarch64/styleos.bin",
+      "baseline_sha256": "6d3651b99498e4108efb99d5eedd498feff858536a35ff168492ed972a420b70"
+    },
+    {
+      "path": "negative/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "fbf4257ae12ddfbf9661fd3e4fd44a6a42efdcb76c3206b80b8d7d9b123f8a3e"
+    },
+    {
+      "path": "negative/x86_64/styleos.img",
+      "baseline_sha256": "6be1578f40f37aea46afcfbaae571ecf497b7b7928558fa5316be9e3b1935a2e"
+    },
+    {
+      "path": "negative/aarch64/kernel.elf",
+      "baseline_sha256": "1d9410a906bd8635c19574e0b37c0060f9eac98bf2c0137cbc3a01073092d599"
+    },
+    {
+      "path": "negative/aarch64/styleos.bin",
+      "baseline_sha256": "682ac2e299748d702ad6aa90264be1a8edaf26e44ac37b4c8d64b89212553357"
+    },
+    {
+      "path": "negative-memory/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "159a9d2a1d270b93b0244d7ee54140750e829a13c2ca6c672f4cb3b44ce1c131"
+    },
+    {
+      "path": "negative-memory/x86_64/styleos.img",
+      "baseline_sha256": "8ac1395a8c7c21fc16e4214646938b18028f778fc645e8233fe4b36fe5e7949d"
+    },
+    {
+      "path": "negative-memory/aarch64/kernel.elf",
+      "baseline_sha256": "e1fb399a7e11ad1f7be90398bb5139ce2a2404ebeb62b22d370c8213a4b6ed3e"
+    },
+    {
+      "path": "negative-memory/aarch64/styleos.bin",
+      "baseline_sha256": "b5630a2f1cfb25bb236a3b680ff23578c1d1b0450edeba4762e6df99c4086168"
+    },
+    {
+      "path": "exception/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "a43b1f319b2fa1b8ae40c8674eb7553b4235613ff1fa211b23325733f7e53393"
+    },
+    {
+      "path": "exception/x86_64/styleos.img",
+      "baseline_sha256": "b863663cc9c72163fcb22e89bb450c60cf91692bf590b6d35fa5dbb813616a71"
+    },
+    {
+      "path": "exception/aarch64/kernel.elf",
+      "baseline_sha256": "9bc1ecac76d27f66369a00cc7c276cb053cf7a7bae11f02be643310a4b4b7562"
+    },
+    {
+      "path": "exception/aarch64/styleos.bin",
+      "baseline_sha256": "48ea255cd8cb2cd69d93c19e599b4dee74d2df76efae923ad8e0d5d130971dd9"
+    },
+    {
+      "path": "bootpool/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "3ed9cca65deecd2854c34ff4503ed4c9926435c9589b59a221221cd17229a16d"
+    },
+    {
+      "path": "bootpool/x86_64/styleos.img",
+      "baseline_sha256": "cfed6df7cebb2cb6e49ada6b131c74a5d9c5eb8517c5e6a468a53e0dd2c63aed"
+    },
+    {
+      "path": "bootpool/aarch64/kernel.elf",
+      "baseline_sha256": "142629c97f6538f360fc49be144b1cd70605006d6cf0de959dbb0d0d250c4397"
+    },
+    {
+      "path": "bootpool/aarch64/styleos.bin",
+      "baseline_sha256": "843811a619f4f046dec62aea0a717cfcbbbb65f43338e8afc5237d80e04d7e40"
+    },
+    {
+      "path": "paging/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "ee9462ee3af5a28c3f636c8871e085cdab3a4f014f8f4260ab5f41d4c647b901"
+    },
+    {
+      "path": "paging/x86_64/styleos.img",
+      "baseline_sha256": "ad5151c1861c3037030176f4df2319f74ad3344869c1f6837ccdb7e61c9ea5ec"
+    },
+    {
+      "path": "paging/aarch64/kernel.elf",
+      "baseline_sha256": "959dde612f9207846b168470ed0d627d2339cbe1cd15bbdb35983a736a8dcdf2"
+    },
+    {
+      "path": "paging/aarch64/styleos.bin",
+      "baseline_sha256": "ad6a978508cb3df205cbac773716b69026e25e767a5789d6112638d109ee8884"
+    },
+    {
+      "path": "paging-fault/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "221b6af5c4ee309fb6d07eb1fb282758a6be625e37ba5d823cf7d4ce28ecab5f"
+    },
+    {
+      "path": "paging-fault/x86_64/styleos.img",
+      "baseline_sha256": "d4c2f614b4fddd391e3405390c5980981b0bbcf1a54ad484fde7a7f3c7d3388e"
+    },
+    {
+      "path": "paging-fault/aarch64/kernel.elf",
+      "baseline_sha256": "644071456be356497bfddd2ea90f2b7a96de6c5a171d6fe4764f6d3e0e3a5238"
+    },
+    {
+      "path": "paging-fault/aarch64/styleos.bin",
+      "baseline_sha256": "8d1cb595ecb24da9b8c98ea607ac32381de0295e1d701a1b46867fee8bae5f12"
+    },
+    {
+      "path": "ownership/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "9708d5cfc606340cdf342bd292a19cf57a79c492359a6247159cf0cf38e145ba"
+    },
+    {
+      "path": "ownership/x86_64/styleos.img",
+      "baseline_sha256": "d1d4c3e7c12edad944de9de4ab5e1dbc78b819449ab0f8b0fa13110a6848f482"
+    },
+    {
+      "path": "ownership/aarch64/kernel.elf",
+      "baseline_sha256": "bf453fe723e72a3f45252ddb41df23204937b2a738181cc89b4cd5ac3a46d9cd"
+    },
+    {
+      "path": "ownership/aarch64/styleos.bin",
+      "baseline_sha256": "360ffefa51a5a454f506194e92cab6c5e7cbfa311c0444217dac1452a3853d38"
+    },
+    {
+      "path": "ownership-invalid/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "d85f6365b61ce8f0556145a3c6d0a302a3774440b51c8121d186fcfd725ddcab"
+    },
+    {
+      "path": "ownership-invalid/x86_64/styleos.img",
+      "baseline_sha256": "0c2c9a8a0e92a354c9baf32bac0f97a9eb4bc4050e486fd0e0d007a9f470917e"
+    },
+    {
+      "path": "ownership-invalid/aarch64/kernel.elf",
+      "baseline_sha256": "172ed21a9b4fbbc9cdbc2cc6f4137247b145dc988feb0e29fef68954e5c49cc2"
+    },
+    {
+      "path": "ownership-invalid/aarch64/styleos.bin",
+      "baseline_sha256": "46d01a410a71c4eaed7fc29eb2a659dbfb8262f07b4c5f0ced045c4ca1e295cb"
+    },
+    {
+      "path": "tasks/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "6c210259094d0e7fed9cf3e0d7a0279b521386326be71e762888f30d2c9e22c2"
+    },
+    {
+      "path": "tasks/x86_64/styleos.img",
+      "baseline_sha256": "f44b2a99efd8743bea92227d5b3a94ebbb57d6713313ff2b1ca515763c0ecb53"
+    },
+    {
+      "path": "tasks/aarch64/kernel.elf",
+      "baseline_sha256": "94d4799334a502dab06ec87ddbe495e7011fc2f75dd9f0d7e378f2c78452bd58"
+    },
+    {
+      "path": "tasks/aarch64/styleos.bin",
+      "baseline_sha256": "3d919bfe1f29492d1ab9930bb60e3666db9b8c2c7134967d4f63bfdfe10974c4"
+    },
+    {
+      "path": "user-processes/x86_64/BOOTX64.EFI",
+      "baseline_sha256": "c324b8ba25a5807ee2f4fac802632b22d88614b5e331932efb0b5150c5438c19"
+    },
+    {
+      "path": "user-processes/x86_64/styleos.img",
+      "baseline_sha256": "492349ea8d8c0d6e711233f884d6bd00ca1116bc07d467b2d47dba13e64434af"
+    },
+    {
+      "path": "user-processes/aarch64/kernel.elf",
+      "baseline_sha256": "9aadf0742d560023ae9fd704955b6a8500afb3e91f3bbb807d6aa0be358a386b"
+    },
+    {
+      "path": "user-processes/aarch64/styleos.bin",
+      "baseline_sha256": "e5141a63255fe2d4dc7417b048b1f24711a1facde3df2b73e9b09691e3f96338"
+    },
+    {
+      "path": "storage/aarch64/kernel.elf",
+      "baseline_file": "/workspace/scratch/styleos-t-p1-8b/baseline-storage-runs/run-20261117T075718.804329Z-c0i_biix/boot/aarch64/kernel.elf",
+      "baseline_sha256": "b730312193d84f8ce4d2795860c799e36c8211d645eb11f90126826baa4b2c25"
+    },
+    {
+      "path": "storage/aarch64/styleos.bin",
+      "baseline_file": "/workspace/scratch/styleos-t-p1-8b/baseline-storage-runs/run-20261117T075718.804329Z-c0i_biix/boot/aarch64/styleos.bin",
+      "baseline_sha256": "756010c0fa3f41a5506f4d43233042141dab5d96ab67950aae111ceb1f8bbea8"
+    }
+  ]
+}

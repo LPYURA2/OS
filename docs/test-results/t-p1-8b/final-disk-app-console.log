@@ -1,0 +1,18 @@
+DISK APP RUN DIRECTORY: /workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj
+host-storage-format: PASS — exit 0
+host-storage-fdt: PASS — exit 0
+host-storage-transport: PASS — exit 0
+host-disk-app-format: PASS — exit 0
+host-disk-app-fdt: PASS — exit 0
+host-storage-python: PASS — exit 0
+host-disk-app-python: PASS — exit 0
+build-disk-app-boot: PASS — exit 0
+disk-app-binary-proof: PASS — independent ELF/Image/manifest/source-profile proof
+build-app-a: PASS — exit 0
+build-app-b: PASS — exit 0
+build-fixture-packer: PASS — exit 0
+variant-a: PASS — validated complete guest halt, then intentional SIGTERM
+variant-b: PASS — validated complete guest halt, then intentional SIGTERM
+reject: PASS — validated complete guest halt, then intentional SIGTERM
+disk-app-replacement: PASS — different external artifacts, three independent VMs, byte-identical boot artifacts and unchanged source hashes
+DISK APP RESULTS: 16/16 PASS

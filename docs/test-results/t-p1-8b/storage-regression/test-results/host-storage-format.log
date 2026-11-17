@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude tests/test_storage.c kernel/storage.c -o /workspace/OS/build/storage-regression-tp18b/run-20261117T132210.752747Z-clj3gy19/host-tests/host-storage-format
+
+$ /workspace/OS/build/storage-regression-tp18b/run-20261117T132210.752747Z-clj3gy19/host-tests/host-storage-format
+storage format host PASS: 17 groups; CRC, whole-file versions, ordered invalidation/data/commit flushes, crash barrier, refusals and transport failures

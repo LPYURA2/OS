@@ -1,0 +1,69 @@
+{
+  "arch": "x86_64",
+  "mode": "paging",
+  "initial_el2": false,
+  "ram_mib": 128,
+  "status": "PASS",
+  "uart_sha256": "3a117cf71a84c0571dec6cbca75c3f4877f7978c6218d6cc92063915d23b5fc4",
+  "manifest_sha256": "d4b6ec52095c8613ffc5ec944f8eba657f63112bcb27ce402c40e6771e70c550",
+  "paging_site": {
+    "objects": {
+      "tables": {
+        "symbol": "styleos_paging_tables",
+        "start": 98304,
+        "end": 229376,
+        "bytes": 131072,
+        "section": ".data"
+      },
+      "control": {
+        "symbol": "styleos_paging_control",
+        "start": 229376,
+        "end": 233472,
+        "bytes": 4096,
+        "section": ".data"
+      },
+      "data": {
+        "symbol": "styleos_paging_data",
+        "start": 40960,
+        "end": 45056,
+        "bytes": 4096,
+        "section": ".data"
+      }
+    },
+    "boot_pool": {
+      "pool": {
+        "symbol": "styleos_bootpool_storage",
+        "start": 61440,
+        "end": 94208,
+        "bytes": 32768,
+        "section": ".data"
+      },
+      "pool_metadata": {
+        "symbol": "styleos_bootpool_metadata",
+        "start": 94208,
+        "end": 98304,
+        "bytes": 4096,
+        "section": ".data"
+      }
+    },
+    "page_size": 4096,
+    "table_pages": 32,
+    "alias": 70368744177664,
+    "probe": 70368744181760,
+    "arch": "x86_64",
+    "address_space": "image-rva",
+    "fault": false,
+    "preferred_image_base": 5368709120,
+    "image_start": 0,
+    "image_end": 311296,
+    "image_size": 311296,
+    "map_sha256": "57da7bfd196b2f67758ce88d1ef3a788f1e20e313d01f72e84aed526454add3c",
+    "binary_sha256": "ee9462ee3af5a28c3f636c8871e085cdab3a4f014f8f4260ab5f41d4c647b901",
+    "disk_sha256": "ad5151c1861c3037030176f4df2319f74ad3344869c1f6837ccdb7e61c9ea5ec"
+  },
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "returncode": 0,
+  "settled": true
+}

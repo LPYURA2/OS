@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "blocking_findings": [],
+  "report_files_checked": [
+    "README.md",
+    "REPORT_RU.md",
+    "environment.json"
+  ],
+  "textfiles_excluding_sums": 403,
+  "checksum_entries": 403,
+  "all_json_valid": true,
+  "no_binary_or_disk_files": true,
+  "local_report_links_exist": true,
+  "all_new_run_copies_byte_identical_to_audited_run": true,
+  "counts_match_saved_results": true,
+  "code_pin": "0ef43423de1fc4820c7efece9c3da286879d7b49",
+  "source_count": 128,
+  "scope": "Remote publication pending root actual push/final verification; report commit SHA intentionally supplied after commit",
+  "minor_wording": [
+    "REPORT_RU.md learning paragraph says GO/EXIT and FAULT; actual labels are RUN and EVENT kind=fault/exit. Optional wording precision, not a factual acceptance blocker."
+  ]
+}

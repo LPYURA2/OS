@@ -1,0 +1,102 @@
+{
+  "arch": "aarch64",
+  "address_space": "identity-image-address",
+  "image_start": 1074266112,
+  "image_end": 1074454528,
+  "image_size": 188416,
+  "bss_start": 1074315264,
+  "bss_end": 1074454528,
+  "binary_sha256": "b730312193d84f8ce4d2795860c799e36c8211d645eb11f90126826baa4b2c25",
+  "raw_sha256": "756010c0fa3f41a5506f4d43233042141dab5d96ab67950aae111ceb1f8bbea8",
+  "objects": {
+    "vblk_control": {
+      "symbol": "styleos_vblk_control",
+      "start": 1074376704,
+      "end": 1074380800,
+      "bytes": 4096
+    },
+    "queue": {
+      "symbol": "styleos_vblk_queue",
+      "start": 1074380800,
+      "end": 1074384896,
+      "bytes": 4096
+    },
+    "request": {
+      "symbol": "styleos_vblk_request",
+      "start": 1074384896,
+      "end": 1074388992,
+      "bytes": 4096
+    },
+    "control": {
+      "symbol": "styleos_storage_control",
+      "start": 1074368512,
+      "end": 1074372608,
+      "bytes": 4096
+    },
+    "workspace": {
+      "symbol": "styleos_storage_workspace",
+      "start": 1074372608,
+      "end": 1074376704,
+      "bytes": 4096
+    },
+    "diagnostic": {
+      "symbol": "diagnostic",
+      "start": 1074315264,
+      "end": 1074327664,
+      "bytes": 12400
+    },
+    "stack": {
+      "symbol": "__stack_bottom",
+      "start": 1074388992,
+      "end": 1074454528,
+      "bytes": 65536
+    },
+    "vectors": {
+      "symbol": "aarch64_vectors",
+      "start": 1074268160,
+      "end": 1074270208,
+      "bytes": 2048
+    },
+    "pool": {
+      "symbol": "styleos_bootpool_storage",
+      "start": 1074331648,
+      "end": 1074364416,
+      "bytes": 32768
+    },
+    "pool_metadata": {
+      "symbol": "styleos_bootpool_metadata",
+      "start": 1074364416,
+      "end": 1074368512,
+      "bytes": 4096
+    }
+  },
+  "page_size": 4096,
+  "compiler_flags": [
+    "--target=aarch64-none-elf",
+    "-O2",
+    "-g0",
+    "-ffreestanding",
+    "-fno-stack-protector",
+    "-fno-builtin",
+    "-fno-pic",
+    "-fno-pie",
+    "-fno-asynchronous-unwind-tables",
+    "-fno-unwind-tables",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-I",
+    "/workspace/scratch/styleos-t-p1-8b/baseline-source/include",
+    "-I",
+    "/workspace/scratch/styleos-t-p1-8b/baseline-source/boot/x86_64",
+    "-DSTYLEOS_EXPECT_ARCH=2",
+    "-ffile-prefix-map=/workspace/scratch/styleos-t-p1-8b/baseline-source=.",
+    "-mgeneral-regs-only",
+    "-mno-outline-atomics",
+    "-mstrict-align",
+    "-DSTYLEOS_TEST_STORAGE=1"
+  ],
+  "image_entry_branch": 335544336,
+  "image_entry_target": 1074266176,
+  "runtime_contract": "fixed ARM Image; EL1h; MMU, data and instruction caches off"
+}

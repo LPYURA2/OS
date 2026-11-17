@@ -1,0 +1,7 @@
+{
+  "run": "/workspace/scratch/styleos-t-p1-8b/baseline-storage-runs/run-20261117T075718.804329Z-c0i_biix",
+  "status": "PASS",
+  "exit_code": 0,
+  "checks": 16,
+  "results": "test-results/results.json"
+}

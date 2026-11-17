@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_user_processes.c kernel/user_processes.c -o /workspace/OS/build/arm-only-tp18b/host-tests/host-user-processes
+
+$ /workspace/OS/build/arm-only-tp18b/host-tests/host-user-processes
+user-processes host PASS: lifecycle, four-event order, safe-root release, refusals unchanged

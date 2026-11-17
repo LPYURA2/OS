@@ -1,0 +1,7 @@
+{
+  "run": "/workspace/OS/build/storage-regression-tp18b/run-20261117T132210.752747Z-clj3gy19",
+  "status": "PASS",
+  "exit_code": 0,
+  "checks": 16,
+  "results": "test-results/results.json"
+}

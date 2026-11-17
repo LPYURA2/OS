@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude -Iboot/x86_64 tests/test_boot_info.c kernel/boot_info.c -o /workspace/OS/build/arm-only-tp18b/host-tests/host-boot-info
+
+$ /workspace/OS/build/arm-only-tp18b/host-tests/host-boot-info
+boot_info host tests: PASS

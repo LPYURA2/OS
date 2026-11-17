@@ -1,0 +1,152 @@
+{
+  "artifacts": {
+    "app.bin": "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/app.bin",
+    "app.json": "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/app.json",
+    "disk_demo.elf": "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.elf",
+    "disk_demo.map": "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.map",
+    "disk_demo.o": "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.o",
+    "disk_demo.raw": "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.raw"
+  },
+  "binary_sha256": "049e357823aaff22ae4268f403978a440cca4774d27fff5088454ccc44ef03b7",
+  "checksum": 3758482776,
+  "code_bytes": 28,
+  "code_hex": "600000b52140a2d2220040f9530096d21303a3f2200980d2410000d4",
+  "code_length": 28,
+  "code_sha256": "f58285bd80ccdbb7246fce1b1609423b5ed1c709c37119bb931b3a3a08c02dfe",
+  "code_symbols": {
+    "disk_app_end": 28,
+    "disk_app_entry": 0,
+    "disk_app_exit": 24,
+    "disk_app_fault": 8,
+    "disk_app_normal": 12
+  },
+  "commands": [
+    [
+      "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/clang",
+      "--target=aarch64-none-elf",
+      "-c",
+      "-mgeneral-regs-only",
+      "-DAPP_MARKER=404271106",
+      "-DAPP_EXIT=73",
+      "/workspace/OS/apps/disk_demo.S",
+      "-o",
+      "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.o"
+    ],
+    [
+      "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/ld.lld",
+      "-T",
+      "/workspace/OS/apps/disk_demo.ld",
+      "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.o",
+      "-Map=/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.map",
+      "-o",
+      "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.elf"
+    ],
+    [
+      "/workspace/scratch/styleos-toolchain/root/usr/lib/llvm-19/bin/ld.lld",
+      "-T",
+      "/workspace/OS/apps/disk_demo.ld",
+      "--oformat=binary",
+      "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.o",
+      "-o",
+      "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/apps/b/disk_demo.raw"
+    ]
+  ],
+  "compiler_version": "Debian clang version 19.1.7 (3+b1)",
+  "container_hex": "535459415050310001000000b70020001c000000000000000000000058e505e0600000b52140a2d2220040f9530096d21303a3f2200980d2410000d4",
+  "container_sha256": "a4a88ccded6d8c2fd3e17b14b4c535735f62b5ed449e54cc37563e97a44dfd8f",
+  "elf_sha256": "049e357823aaff22ae4268f403978a440cca4774d27fff5088454ccc44ef03b7",
+  "entry_offset": 0,
+  "exit_code": 73,
+  "exit_offset": 24,
+  "exit_resume_offset": 28,
+  "fault_offset": 8,
+  "fault_va": 302055424,
+  "file_bytes": 60,
+  "file_hex": "535459415050310001000000b70020001c000000000000000000000058e505e0600000b52140a2d2220040f9530096d21303a3f2200980d2410000d4",
+  "file_length": 60,
+  "file_sha256": "a4a88ccded6d8c2fd3e17b14b4c535735f62b5ed449e54cc37563e97a44dfd8f",
+  "format": "StyleOS T-P1.8B closed test container v1",
+  "header_bytes": 32,
+  "header_length": 32,
+  "instruction_proof": "all 28 executable bytes match the closed seven-instruction integer grammar",
+  "instructions": [
+    {
+      "bytes": "600000b5",
+      "instruction": "cbnz x0, +12",
+      "offset": 0
+    },
+    {
+      "bytes": "2140a2d2",
+      "instruction": "movz x1, #0x1201, lsl #16",
+      "offset": 4
+    },
+    {
+      "bytes": "220040f9",
+      "instruction": "ldr x2, [x1]",
+      "offset": 8
+    },
+    {
+      "bytes": "530096d2",
+      "instruction": "movz x19, marker_low",
+      "offset": 12
+    },
+    {
+      "bytes": "1303a3f2",
+      "instruction": "movk x19, marker_high, lsl #16",
+      "offset": 16
+    },
+    {
+      "bytes": "200980d2",
+      "instruction": "movz x0, exit_code",
+      "offset": 20
+    },
+    {
+      "bytes": "410000d4",
+      "instruction": "svc #2",
+      "offset": 24
+    }
+  ],
+  "integer_only": true,
+  "isa": "aarch64",
+  "labels": {
+    "disk_app_end": 28,
+    "disk_app_entry": 0,
+    "disk_app_exit": 24,
+    "disk_app_fault": 8,
+    "disk_app_normal": 12
+  },
+  "linker_script": "/workspace/OS/apps/disk_demo.ld",
+  "linker_sha256": "867fbc1836c8d9d01fd0be50ee3c657799abff55332068057114dfac9f210bee",
+  "linker_version": "Debian LLD 19.1.7 (compatible with GNU linkers)",
+  "map_sha256": "1acfa56c4ebf0dab673f8fa7f2f38a5f60df2b5668a8c02f89baabed3a723328",
+  "marker": 404271106,
+  "normal_offset": 12,
+  "payload_crc32": 3371417472,
+  "raw_sha256": "f58285bd80ccdbb7246fce1b1609423b5ed1c709c37119bb931b3a3a08c02dfe",
+  "sites": {
+    "entry": {
+      "bytes": "600000b5",
+      "offset": 0,
+      "user_pc": 268435456
+    },
+    "exit": {
+      "bytes": "410000d4",
+      "offset": 24,
+      "saved_pc": 268435484,
+      "user_pc": 268435480
+    },
+    "fault": {
+      "bytes": "220040f9",
+      "offset": 8,
+      "user_pc": 268435464
+    },
+    "normal": {
+      "bytes": "530096d2",
+      "offset": 12,
+      "user_pc": 268435468
+    }
+  },
+  "source": "/workspace/OS/apps/disk_demo.S",
+  "source_sha256": "39f14c52fecdb33a3ab04a2ea619dca0a5e91b23cc7226cb18c404b42729529c",
+  "user_code_va": 268435456
+}

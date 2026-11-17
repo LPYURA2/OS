@@ -1,0 +1,90 @@
+{
+  "format": "StyleOS T-P1.8B closed test container v1",
+  "isa": "aarch64",
+  "file_bytes": 60,
+  "file_hex": "525459415050310001000000b70020001c000000000000000000000006c68aff600000b52140a2d2220040f9330094d21303a3f2200580d2410000d4",
+  "file_sha256": "13f36e5a73cc5adf124da66590b5d302a3936317eb6b0dda54c0d665fa96ea73",
+  "checksum": 4287284742,
+  "header_bytes": 32,
+  "code_bytes": 28,
+  "code_hex": "600000b52140a2d2220040f9330094d21303a3f2200580d2410000d4",
+  "code_sha256": "2e99cbde72a3fdef4c4d1b00420bd331f65252c2f4542c160eb656d41addbfe5",
+  "entry_offset": 0,
+  "fault_offset": 8,
+  "exit_offset": 24,
+  "marker": 404267009,
+  "exit_code": 41,
+  "fault_va": 302055424,
+  "user_code_va": 268435456,
+  "sites": {
+    "entry": {
+      "offset": 0,
+      "user_pc": 268435456,
+      "bytes": "600000b5"
+    },
+    "fault": {
+      "offset": 8,
+      "user_pc": 268435464,
+      "bytes": "220040f9"
+    },
+    "normal": {
+      "offset": 12,
+      "user_pc": 268435468,
+      "bytes": "330094d2"
+    },
+    "exit": {
+      "offset": 24,
+      "user_pc": 268435480,
+      "bytes": "410000d4",
+      "saved_pc": 268435484
+    }
+  },
+  "instructions": [
+    {
+      "offset": 0,
+      "bytes": "600000b5",
+      "instruction": "cbnz x0, +12"
+    },
+    {
+      "offset": 4,
+      "bytes": "2140a2d2",
+      "instruction": "movz x1, #0x1201, lsl #16"
+    },
+    {
+      "offset": 8,
+      "bytes": "220040f9",
+      "instruction": "ldr x2, [x1]"
+    },
+    {
+      "offset": 12,
+      "bytes": "330094d2",
+      "instruction": "movz x19, marker_low"
+    },
+    {
+      "offset": 16,
+      "bytes": "1303a3f2",
+      "instruction": "movk x19, marker_high, lsl #16"
+    },
+    {
+      "offset": 20,
+      "bytes": "200580d2",
+      "instruction": "movz x0, exit_code"
+    },
+    {
+      "offset": 24,
+      "bytes": "410000d4",
+      "instruction": "svc #2"
+    }
+  ],
+  "integer_only": true,
+  "binary_sha256": "1cf609051224280ff00f4c52bdf3d17aaa1866e9a58c2dcd7549796e61d383a6",
+  "source_sha256": "39f14c52fecdb33a3ab04a2ea619dca0a5e91b23cc7226cb18c404b42729529c",
+  "code_symbols": {
+    "disk_app_entry": 0,
+    "disk_app_fault": 8,
+    "disk_app_normal": 12,
+    "disk_app_exit": 24,
+    "disk_app_end": 28
+  },
+  "reject_reason": "MAGIC"
+}

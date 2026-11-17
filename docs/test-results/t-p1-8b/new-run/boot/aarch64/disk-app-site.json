@@ -1,0 +1,139 @@
+{
+  "arch": "aarch64",
+  "address_space": "identity-image-address",
+  "image_start": 1074266112,
+  "image_end": 1074769920,
+  "image_size": 503808,
+  "bss_start": 1074331648,
+  "bss_end": 1074769920,
+  "binary_sha256": "f65312e68d97689405c0074e58902bc116544e53805efe3a9656936ac0ed2ce3",
+  "raw_sha256": "924a6e934d5b564e9e4a587e3698254185cec7cb3a00cb4071a112ce857b29b6",
+  "objects": {
+    "vblk_control": {
+      "symbol": "styleos_vblk_control",
+      "start": 1074384896,
+      "end": 1074388992,
+      "bytes": 4096
+    },
+    "queue": {
+      "symbol": "styleos_vblk_queue",
+      "start": 1074388992,
+      "end": 1074393088,
+      "bytes": 4096
+    },
+    "request": {
+      "symbol": "styleos_vblk_request",
+      "start": 1074393088,
+      "end": 1074397184,
+      "bytes": 4096
+    },
+    "control": {
+      "symbol": "styleos_disk_app_control",
+      "start": 1074397184,
+      "end": 1074413568,
+      "bytes": 16384
+    },
+    "workspace": {
+      "symbol": "styleos_disk_app_storage_workspace",
+      "start": 1074413568,
+      "end": 1074417664,
+      "bytes": 4096
+    },
+    "tables": {
+      "symbol": "styleos_disk_app_tables",
+      "start": 1074421760,
+      "end": 1074683904,
+      "bytes": 262144
+    },
+    "entry_stack": {
+      "symbol": "styleos_disk_app_entry_stack",
+      "start": 1074683904,
+      "end": 1074700288,
+      "bytes": 16384
+    },
+    "code": {
+      "symbol": "styleos_disk_app_code",
+      "start": 1074417664,
+      "end": 1074421760,
+      "bytes": 4096
+    },
+    "user_stack": {
+      "symbol": "styleos_disk_app_user_stack",
+      "start": 1074700288,
+      "end": 1074704384,
+      "bytes": 4096
+    },
+    "diagnostic": {
+      "symbol": "diagnostic",
+      "start": 1074331648,
+      "end": 1074344048,
+      "bytes": 12400
+    },
+    "stack": {
+      "symbol": "__stack_bottom",
+      "start": 1074704384,
+      "end": 1074769920,
+      "bytes": 65536
+    },
+    "vectors": {
+      "symbol": "aarch64_vectors",
+      "start": 1074268160,
+      "end": 1074270208,
+      "bytes": 2048
+    },
+    "disk_app_vectors": {
+      "symbol": "styleos_disk_app_vectors",
+      "start": 1074317312,
+      "end": 1074319360,
+      "bytes": 2048
+    },
+    "pool": {
+      "symbol": "styleos_bootpool_storage",
+      "start": 1074348032,
+      "end": 1074380800,
+      "bytes": 32768
+    },
+    "pool_metadata": {
+      "symbol": "styleos_bootpool_metadata",
+      "start": 1074380800,
+      "end": 1074384896,
+      "bytes": 4096
+    }
+  },
+  "page_size": 4096,
+  "compiler_flags": [
+    "--target=aarch64-none-elf",
+    "-O2",
+    "-g0",
+    "-ffreestanding",
+    "-fno-stack-protector",
+    "-fno-builtin",
+    "-fno-pic",
+    "-fno-pie",
+    "-fno-asynchronous-unwind-tables",
+    "-fno-unwind-tables",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-I",
+    "/workspace/OS/include",
+    "-I",
+    "/workspace/OS/boot/x86_64",
+    "-DSTYLEOS_EXPECT_ARCH=2",
+    "-ffile-prefix-map=/workspace/OS=.",
+    "-mgeneral-regs-only",
+    "-mno-outline-atomics",
+    "-mstrict-align",
+    "-DSTYLEOS_TEST_DISK_APP=1"
+  ],
+  "image_entry_branch": 335544336,
+  "image_entry_target": 1074266176,
+  "runtime_contract": "fixed ARM Image; EL1h; storage MMU/cache off; I/O drained before own roots",
+  "roots": 2,
+  "table_pages_per_root": 32,
+  "user_code_va": 268435456,
+  "user_stack_va": 285212672,
+  "fault_va": 302055424,
+  "code_destination": "zero-filled BSS; copied only after complete app validation",
+  "instruction_proof": "external payload only; boot compiler integer-only flags, no complete boot decode claim"
+}

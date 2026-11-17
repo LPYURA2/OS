@@ -1,0 +1,325 @@
+{
+  "status": "PASS",
+  "detail": "validated complete guest halt, then intentional SIGTERM",
+  "command": [
+    "/workspace/scratch/styleos-toolchain/bin/qemu-system-aarch64",
+    "-machine",
+    "virt",
+    "-cpu",
+    "cortex-a57",
+    "-smp",
+    "1",
+    "-m",
+    "128M",
+    "-accel",
+    "tcg,thread=single",
+    "-display",
+    "none",
+    "-serial",
+    "stdio",
+    "-monitor",
+    "none",
+    "-net",
+    "none",
+    "-no-reboot",
+    "-global",
+    "virtio-mmio.force-legacy=false",
+    "-kernel",
+    "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/boot/aarch64/styleos.bin",
+    "-append",
+    "styleos.diskapp=reject",
+    "-blockdev",
+    "{\"driver\":\"file\",\"filename\":\"/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/disks/reject.img\",\"node-name\":\"app-file\",\"cache\":{\"direct\":false,\"no-flush\":false}}",
+    "-blockdev",
+    "{\"driver\":\"raw\",\"file\":\"app-file\",\"node-name\":\"app\",\"read-only\":false}",
+    "-device",
+    "virtio-blk-device,drive=app,id=app0"
+  ],
+  "pid": 7809,
+  "phase": "reject",
+  "uart_sha256": "fdf28f586788bcc8a97ff2076e1027b6934722dbda0f7d58ddf77642c7397d24",
+  "requested_stop": true,
+  "forced_stop": false,
+  "natural_exit": false,
+  "settled": true,
+  "stop_signal": 15,
+  "returncode": 0,
+  "trace": {
+    "phase": "reject",
+    "granted": 0,
+    "image_start": 1074266112,
+    "image_end": 1074769920,
+    "objects": {
+      "control": {
+        "start": 1074397184,
+        "end": 1074413568
+      },
+      "workspace": {
+        "start": 1074413568,
+        "end": 1074417664
+      },
+      "tables": {
+        "start": 1074421760,
+        "end": 1074683904
+      },
+      "code": {
+        "start": 1074417664,
+        "end": 1074421760
+      },
+      "user_stack": {
+        "start": 1074700288,
+        "end": 1074704384
+      },
+      "entry_stack": {
+        "start": 1074683904,
+        "end": 1074700288
+      },
+      "vblk_control": {
+        "start": 1074384896,
+        "end": 1074388992
+      },
+      "queue": {
+        "start": 1074388992,
+        "end": 1074393088
+      },
+      "request": {
+        "start": 1074393088,
+        "end": 1074397184
+      },
+      "diagnostic": {
+        "start": 1074331648,
+        "end": 1074344048
+      },
+      "stack": {
+        "start": 1074704384,
+        "end": 1074769920
+      },
+      "vectors": {
+        "start": 1074268160,
+        "end": 1074270208
+      },
+      "disk_app_vectors": {
+        "start": 1074317312,
+        "end": 1074319360
+      },
+      "pool": {
+        "start": 1074348032,
+        "end": 1074380800
+      },
+      "pool_metadata": {
+        "start": 1074380800,
+        "end": 1074384896
+      }
+    },
+    "memory": {
+      "image": [
+        [
+          1074266112,
+          1074769920
+        ]
+      ],
+      "stack": [
+        [
+          1074704384,
+          1074769920
+        ]
+      ],
+      "handoff": [
+        [
+          1074769728,
+          1074769824
+        ]
+      ],
+      "source": [
+        [
+          1140850688,
+          1141899264
+        ]
+      ],
+      "ram": [
+        [
+          1073741824,
+          1207959552
+        ]
+      ],
+      "reserved": [
+        [
+          150994944,
+          150999040
+        ],
+        [
+          1074266112,
+          1074769920
+        ],
+        [
+          1140850688,
+          1141899264
+        ]
+      ],
+      "candidate": [
+        [
+          1073741824,
+          1074266112
+        ],
+        [
+          1074769920,
+          1140850688
+        ],
+        [
+          1141899264,
+          1207959552
+        ]
+      ]
+    },
+    "io_machine": {
+      "root": 0,
+      "mode": 12912696,
+      "control0": 0,
+      "control1": 0,
+      "control2": 4,
+      "control3": 960,
+      "vectors": 1074268160,
+      "upper_root": 0,
+      "active": 18446744073709551615,
+      "dispatcher_sp": 0,
+      "context_live": 0,
+      "sp": 1074768240
+    },
+    "fdt": {
+      "source": 1140850688,
+      "bytes": 1048576,
+      "candidates": 32
+    },
+    "device": {
+      "base": 167788032,
+      "bytes": 512,
+      "version": 2,
+      "id": 2,
+      "features": 1104611929684,
+      "negotiated": 4294967808,
+      "sectors": 2048,
+      "queue": 8
+    },
+    "io": {
+      "reads": 14,
+      "writes": 0,
+      "flushes": 0,
+      "requests": 14,
+      "avail": 14,
+      "used": 14
+    },
+    "file_sha256": "13f36e5a73cc5adf124da66590b5d302a3936317eb6b0dda54c0d665fa96ea73",
+    "file_hex": "525459415050310001000000b70020001c000000000000000000000006c68aff600000b52140a2d2220040f9330094d21303a3f2200580d2410000d4",
+    "file_payload_crc": 373265183,
+    "rejected": true,
+    "launches": []
+  },
+  "stage": "reject",
+  "disk_before": {
+    "path": "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/disks/reject.img",
+    "device": 27,
+    "inode": 1339933,
+    "bytes": 1048576,
+    "sha256": "e440ace92c912a3d8b39ecff51331a220e8a38360f6e6fcb11bff9d5186fc90c"
+  },
+  "disk_after": {
+    "path": "/workspace/OS/build/termux-tp18b/run-20261117T132537.438436Z-7mv31hdj/disks/reject.img",
+    "device": 27,
+    "inode": 1339933,
+    "bytes": 1048576,
+    "sha256": "e440ace92c912a3d8b39ecff51331a220e8a38360f6e6fcb11bff9d5186fc90c"
+  },
+  "binary_sha256": "f65312e68d97689405c0074e58902bc116544e53805efe3a9656936ac0ed2ce3",
+  "raw_sha256": "924a6e934d5b564e9e4a587e3698254185cec7cb3a00cb4071a112ce857b29b6",
+  "manifest_sha256": "e190865f0584f92ba38293352d01fe3b2b01b1dbe18d1033513bc6bf07b5916c",
+  "app": {
+    "format": "StyleOS T-P1.8B closed test container v1",
+    "isa": "aarch64",
+    "file_bytes": 60,
+    "file_hex": "525459415050310001000000b70020001c000000000000000000000006c68aff600000b52140a2d2220040f9330094d21303a3f2200580d2410000d4",
+    "file_sha256": "13f36e5a73cc5adf124da66590b5d302a3936317eb6b0dda54c0d665fa96ea73",
+    "checksum": 4287284742,
+    "header_bytes": 32,
+    "code_bytes": 28,
+    "code_hex": "600000b52140a2d2220040f9330094d21303a3f2200580d2410000d4",
+    "code_sha256": "2e99cbde72a3fdef4c4d1b00420bd331f65252c2f4542c160eb656d41addbfe5",
+    "entry_offset": 0,
+    "fault_offset": 8,
+    "exit_offset": 24,
+    "marker": 404267009,
+    "exit_code": 41,
+    "fault_va": 302055424,
+    "user_code_va": 268435456,
+    "sites": {
+      "entry": {
+        "offset": 0,
+        "user_pc": 268435456,
+        "bytes": "600000b5"
+      },
+      "fault": {
+        "offset": 8,
+        "user_pc": 268435464,
+        "bytes": "220040f9"
+      },
+      "normal": {
+        "offset": 12,
+        "user_pc": 268435468,
+        "bytes": "330094d2"
+      },
+      "exit": {
+        "offset": 24,
+        "user_pc": 268435480,
+        "bytes": "410000d4",
+        "saved_pc": 268435484
+      }
+    },
+    "instructions": [
+      {
+        "offset": 0,
+        "bytes": "600000b5",
+        "instruction": "cbnz x0, +12"
+      },
+      {
+        "offset": 4,
+        "bytes": "2140a2d2",
+        "instruction": "movz x1, #0x1201, lsl #16"
+      },
+      {
+        "offset": 8,
+        "bytes": "220040f9",
+        "instruction": "ldr x2, [x1]"
+      },
+      {
+        "offset": 12,
+        "bytes": "330094d2",
+        "instruction": "movz x19, marker_low"
+      },
+      {
+        "offset": 16,
+        "bytes": "1303a3f2",
+        "instruction": "movk x19, marker_high, lsl #16"
+      },
+      {
+        "offset": 20,
+        "bytes": "200580d2",
+        "instruction": "movz x0, exit_code"
+      },
+      {
+        "offset": 24,
+        "bytes": "410000d4",
+        "instruction": "svc #2"
+      }
+    ],
+    "integer_only": true,
+    "binary_sha256": "1cf609051224280ff00f4c52bdf3d17aaa1866e9a58c2dcd7549796e61d383a6",
+    "source_sha256": "39f14c52fecdb33a3ab04a2ea619dca0a5e91b23cc7226cb18c404b42729529c",
+    "code_symbols": {
+      "disk_app_entry": 0,
+      "disk_app_fault": 8,
+      "disk_app_normal": 12,
+      "disk_app_exit": 24,
+      "disk_app_end": 28
+    },
+    "reject_reason": "MAGIC"
+  }
+}
