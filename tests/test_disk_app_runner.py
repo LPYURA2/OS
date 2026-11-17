@@ -219,7 +219,12 @@ class DiskAppTraceTests(unittest.TestCase):
 
 class DiskAppFileTests(unittest.TestCase):
     def test_unique_directories_exclusive_evidence_and_no_os_link_dependency(self):
-        with tempfile.TemporaryDirectory() as temporary, patch.object(os,'link',None):
+        # Android Python can omit os.link entirely. Exercise that same state
+        # on hosts that do expose it and restore their attribute after the test.
+        if hasattr(os, 'link'):
+            self.addCleanup(setattr, os, 'link', os.link)
+            del os.link
+        with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
             old=runner.new_run_directory(root/'output')
             runner.write_new(old/'test-results/keep.log',b'evidence')
