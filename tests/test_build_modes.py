@@ -18,7 +18,7 @@ from tools import build
 MODES = ('--invalid-boot-info', '--invalid-memory-map',
          '--test-exception', '--test-bootpool', '--test-paging', '--test-paging-fault',
          '--test-ownership-plan', '--test-ownership-plan-invalid', '--test-tasks',
-         '--test-user-processes', '--test-storage')
+         '--test-user-processes', '--test-storage', '--test-disk-app')
 
 
 class BuildModeTests(unittest.TestCase):
@@ -30,11 +30,12 @@ class BuildModeTests(unittest.TestCase):
     def invoke(self, arguments):
         def fake_build(_arch, output, *_modes):
             output.mkdir(parents=True, exist_ok=True)
-            if any(_modes[-3:]):
+            if any(_modes[-4:]):
                 folder = output / _arch
                 folder.mkdir(exist_ok=True)
-                sidecar = ('storage-compiler.json' if _modes[-1] else
-                           'user-processes-compiler.json' if _modes[-2] else 'task-compiler.json')
+                sidecar = ('disk-app-compiler.json' if _modes[-1] else
+                           'storage-compiler.json' if _modes[-2] else
+                           'user-processes-compiler.json' if _modes[-3] else 'task-compiler.json')
                 (folder / sidecar).write_text(json.dumps({
                     'flags': ['fixture-flags'], 'sources': ['fixture-sources']}))
             return []
@@ -52,7 +53,7 @@ class BuildModeTests(unittest.TestCase):
                 status = error.code
         return status, compile_image, tool
 
-    def test_all_eleven_test_modes_are_pairwise_exclusive(self):
+    def test_all_twelve_test_modes_are_pairwise_exclusive(self):
         for pair in combinations(MODES, 2):
             with self.subTest(pair=pair):
                 status, compile_image, tool = self.invoke(list(pair))
@@ -84,7 +85,7 @@ class BuildModeTests(unittest.TestCase):
                                       flag == '--test-ownership-plan',
                                       flag == '--test-ownership-plan-invalid',
                                       flag == '--test-tasks',
-                                      flag == '--test-user-processes', False))
+                                      flag == '--test-user-processes', False, False))
                 manifest = json.loads((output / 'manifest.json').read_text())
                 self.assertEqual(manifest['test_exception'], flag == '--test-exception')
                 self.assertEqual(manifest['test_bootpool'], flag == '--test-bootpool')
@@ -102,7 +103,7 @@ class BuildModeTests(unittest.TestCase):
             for output in (self.root / 'build', self.root / 'build/../build'):
                 with self.subTest(flag=flag, output=output):
                     arguments = [flag, '--output', str(output)]
-                    if flag == '--test-storage':
+                    if flag in ('--test-storage', '--test-disk-app'):
                         arguments += ['--arch', 'aarch64']
                     status, compile_image, tool = self.invoke(arguments)
                     self.assertEqual(status, 2)
@@ -121,7 +122,7 @@ class BuildModeTests(unittest.TestCase):
                     flag == '--test-paging', flag == '--test-paging-fault',
                     flag == '--test-ownership-plan', flag == '--test-ownership-plan-invalid',
                     flag == '--test-tasks', flag == '--test-user-processes',
-                    flag == '--test-storage')
+                    flag == '--test-storage', flag == '--test-disk-app')
 
     def test_page_writes_and_test_define_only_enter_bootpool_images(self):
         for arch in ('x86_64', 'aarch64'):
@@ -393,7 +394,7 @@ class BuildModeTests(unittest.TestCase):
         status, compile_image, _ = self.invoke(['--test-storage', '--arch', 'aarch64'])
         self.assertEqual(status, 0)
         output = (self.root / 'build/storage').resolve()
-        compile_image.assert_called_once_with('aarch64', output, *([False] * 10), True)
+        compile_image.assert_called_once_with('aarch64', output, *([False] * 10), True, False)
         manifest = json.loads((output / 'manifest.json').read_text())
         self.assertTrue(manifest['test_storage'])
         self.assertFalse(manifest['test_user_processes'])
@@ -464,6 +465,94 @@ class BuildModeTests(unittest.TestCase):
                             'kernel/storage.c', 'kernel/storage_demo.c',
                             'boot/aarch64/storage_fdt.c', 'arch/aarch64/virtio_block.c')])
                         self.assertNotIn('-DSTYLEOS_TEST_STORAGE=1', cmd)
+
+
+    def test_disk_app_requires_arm_and_has_an_isolated_default_directory(self):
+        for arch in ('all', 'x86_64'):
+            status, compiler, tools = self.invoke(['--test-disk-app', '--arch', arch])
+            self.assertEqual(status, 2)
+            compiler.assert_not_called()
+            tools.assert_not_called()
+        status, compiler, _ = self.invoke(['--test-disk-app', '--arch', 'aarch64'])
+        self.assertEqual(status, 0)
+        output = (self.root / 'build/disk-app').resolve()
+        compiler.assert_called_once_with('aarch64', output, *([False] * 11), True)
+        manifest = json.loads((output / 'manifest.json').read_text())
+        self.assertTrue(manifest['test_disk_app'])
+        self.assertFalse(manifest['test_storage'])
+        self.assertFalse(manifest['test_user_processes'])
+        self.assertIn('disk_app_sources', manifest)
+        with patch.object(build, 'tool') as tools:
+            with self.assertRaisesRegex(ValueError, 'only AArch64'):
+                build.build('x86_64', self.root / 'refused-app', test_disk_app=True)
+            tools.assert_not_called()
+        self.assertFalse((self.root / 'refused-app').exists())
+
+    def test_disk_app_sources_and_payload_separation(self):
+        expected = ('kernel/disk_app.c', 'kernel/disk_app_demo.c',
+                    'boot/aarch64/disk_app_fdt.c', 'arch/aarch64/disk_app.c',
+                    'arch/aarch64/disk_app_entry.S')
+        for active in (False, True):
+            output = self.root / f'disk-app-{active}'
+            folder = output / 'aarch64'
+            folder.mkdir(parents=True)
+            for name in ('kernel.elf', 'styleos.bin'):
+                (folder / name).write_bytes(b'fixture external app isolation')
+            with (patch.object(build, 'tool', return_value='/fake/tool'),
+                  patch.object(build, 'run') as commands,
+                  patch.dict(sys.modules, {
+                      'pool_site': types.SimpleNamespace(describe_pool=Mock(return_value={})),
+                      'disk_app_site': types.SimpleNamespace(describe_disk_app=Mock(return_value={}))})):
+                build.build('aarch64', output, test_disk_app=active)
+            compiles = [call.args[0] for call in commands.call_args_list if '-c' in call.args[0]]
+            sources = [Path(cmd[cmd.index('-c') + 1]) for cmd in compiles]
+            for name in expected:
+                self.assertEqual(ROOT / name in sources, active)
+            for name in ('kernel/storage.c', 'arch/aarch64/virtio_block.c'):
+                self.assertEqual(ROOT / name in sources, active)
+            self.assertNotIn(ROOT / 'kernel/storage_demo.c', sources)
+            self.assertNotIn(ROOT / 'boot/aarch64/storage_fdt.c', sources)
+            self.assertFalse(any(source.is_relative_to(ROOT / 'apps') for source in sources))
+            for cmd in compiles:
+                self.assertEqual('-DSTYLEOS_TEST_DISK_APP=1' in cmd, active)
+                self.assertFalse(any(isinstance(arg, str) and arg.startswith('-DSTYLEOS_TEST_') and
+                                     arg != '-DSTYLEOS_TEST_DISK_APP=1' for arg in cmd))
+
+    def test_every_prior_profile_excludes_the_new_loader(self):
+        forbidden = ('kernel/disk_app.c', 'kernel/disk_app_demo.c',
+                     'boot/aarch64/disk_app_fdt.c', 'arch/aarch64/disk_app.c',
+                     'arch/aarch64/disk_app_entry.S')
+        for arch in ('x86_64', 'aarch64'):
+            for index in range(12 if arch == 'aarch64' else 11):
+                with self.subTest(arch=arch, old_mode=index):
+                    output = self.root / f'base-app-{arch}-{index}'
+                    folder = output / arch
+                    folder.mkdir(parents=True)
+                    data = b'fixture base external app isolation'
+                    for name in (('BOOTX64.EFI', 'styleos.img') if arch == 'x86_64'
+                                 else ('kernel.elf', 'styleos.bin')):
+                        (folder / name).write_bytes(data)
+                    modes = [False] * 11
+                    if index:
+                        modes[index - 1] = True
+                    with (patch.object(build, 'tool', return_value='/fake/tool'),
+                          patch.object(build, 'run') as commands,
+                          patch.dict(sys.modules, {
+                              'pool_site': types.SimpleNamespace(describe_pool=Mock(return_value={})),
+                              'paging_site': types.SimpleNamespace(describe_paging=Mock(return_value={})),
+                              'ownership_site': types.SimpleNamespace(describe_ownership=Mock(return_value={})),
+                              'tasks_site': types.SimpleNamespace(describe_tasks=Mock(return_value={})),
+                              'storage_site': types.SimpleNamespace(describe_storage=Mock(return_value={})),
+                              'user_processes_site': types.SimpleNamespace(describe_user_processes=Mock(return_value={})),
+                              'fault_site': types.SimpleNamespace(describe_fault=Mock(return_value={
+                                  'image_offset': 0, 'instruction_hex': data[:4].hex()}))})):
+                        build.build(arch, output, *modes)
+                    for call in commands.call_args_list:
+                        cmd = call.args[0]
+                        if '-c' in cmd:
+                            self.assertNotIn(Path(cmd[cmd.index('-c') + 1]),
+                                             [ROOT / name for name in forbidden])
+                            self.assertNotIn('-DSTYLEOS_TEST_DISK_APP=1', cmd)
 
 
 if __name__ == '__main__':

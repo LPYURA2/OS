@@ -34,9 +34,12 @@ def run(args):
 def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_bootpool=False, test_paging=False, test_paging_fault=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
-          test_tasks=False, test_user_processes=False, test_storage=False):
+          test_tasks=False, test_user_processes=False, test_storage=False,
+          test_disk_app=False):
     if test_storage and arch != 'aarch64':
         raise ValueError('storage test supports only AArch64 QEMU virt')
+    if test_disk_app and arch != 'aarch64':
+        raise ValueError('disk app test supports only AArch64 QEMU virt')
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     folder = output / arch
     folder.mkdir(parents=True, exist_ok=True)
@@ -54,6 +57,11 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_storage:
         common += ['kernel/storage.c', 'kernel/storage_demo.c',
                    'boot/aarch64/storage_fdt.c', 'arch/aarch64/virtio_block.c']
+    if test_disk_app:
+        common += ['kernel/storage.c', 'arch/aarch64/virtio_block.c',
+                   'kernel/disk_app.c', 'kernel/disk_app_demo.c',
+                   'boot/aarch64/disk_app_fdt.c', 'arch/aarch64/disk_app.c',
+                   'arch/aarch64/disk_app_entry.S']
     ownership = test_ownership_plan or test_ownership_plan_invalid
     if ownership:
         common += ['kernel/ownership.c', 'kernel/ownership_plan.c',
@@ -111,6 +119,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_USER_PROCESSES=1')
     if test_storage:
         flags.append('-DSTYLEOS_TEST_STORAGE=1')
+    if test_disk_app:
+        flags.append('-DSTYLEOS_TEST_DISK_APP=1')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -161,6 +171,13 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         site = describe_storage(arch, artifacts[0], raw_path=folder / 'styleos.bin',
                                 compiler_flags=flags)
         (folder / 'storage-site.json').write_text(json.dumps(site, indent=2) + '\n')
+    if test_disk_app:
+        from disk_app_site import describe_disk_app
+        (folder / 'disk-app-compiler.json').write_text(json.dumps({
+            'flags': flags, 'sources': sources}, indent=2) + '\n')
+        site = describe_disk_app(arch, artifacts[0], raw_path=folder / 'styleos.bin',
+                                compiler_flags=flags)
+        (folder / 'disk-app-site.json').write_text(json.dumps(site, indent=2) + '\n')
     if test_user_processes:
         from user_processes_site import describe_user_processes
         (folder / 'user-processes-compiler.json').write_text(json.dumps({
@@ -239,9 +256,13 @@ def main():
                           help='Dedicated image only: CPL3/EL0 fault containment experiment')
     negative.add_argument('--test-storage', action='store_true',
                           help='Dedicated AArch64 image only: persistent test file on VirtIO MMIO')
+    negative.add_argument('--test-disk-app', action='store_true',
+                          help='Dedicated AArch64 image only: load external disk app and execute EL0')
     args = parser.parse_args()
     if args.test_storage and args.arch != 'aarch64':
         parser.error('--test-storage requires --arch aarch64')
+    if args.test_disk_app and args.arch != 'aarch64':
+        parser.error('--test-disk-app requires --arch aarch64')
     output = (args.output or ROOT / 'build' /
               ('exception' if args.test_exception else
                'bootpool' if args.test_bootpool else
@@ -251,11 +272,12 @@ def main():
                'ownership-invalid' if args.test_ownership_plan_invalid else
                'tasks' if args.test_tasks else
                'user-processes' if args.test_user_processes else
-               'storage' if args.test_storage else '')).resolve()
+               'storage' if args.test_storage else
+               'disk-app' if args.test_disk_app else '')).resolve()
     if (args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
-            args.test_user_processes or args.test_storage) and output == (ROOT / 'build').resolve():
+            args.test_user_processes or args.test_storage or args.test_disk_app) and output == (ROOT / 'build').resolve():
         parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
     records = []
@@ -265,11 +287,13 @@ def main():
                              args.test_bootpool, args.test_paging,
                              args.test_paging_fault, args.test_ownership_plan,
                              args.test_ownership_plan_invalid, args.test_tasks,
-                             args.test_user_processes, args.test_storage))
+                             args.test_user_processes, args.test_storage,
+                             args.test_disk_app))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS T-P1.8A' if args.test_storage else
+        'prototype': 'StyleOS T-P1.8B' if args.test_disk_app else
+                     'StyleOS T-P1.8A' if args.test_storage else
                      'StyleOS T-P1.7' if args.test_user_processes else 'StyleOS T-P1.6',
         'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,
@@ -280,6 +304,11 @@ def main():
         'test_ownership_plan': args.test_ownership_plan,
         'test_ownership_plan_invalid': args.test_ownership_plan_invalid,
         'test_tasks': args.test_tasks,
+        **({'test_disk_app': True, 'test_storage': False, 'test_user_processes': False,
+            'compiler_flags': {arch: json.loads((output / arch / 'disk-app-compiler.json').read_text())['flags']
+                               for arch in arches},
+            'disk_app_sources': {arch: json.loads((output / arch / 'disk-app-compiler.json').read_text())['sources']
+                                 for arch in arches}} if args.test_disk_app else {}),
         **({'test_storage': True, 'test_user_processes': False,
             'compiler_flags': {arch: json.loads((output / arch / 'storage-compiler.json').read_text())['flags']
                                for arch in arches},

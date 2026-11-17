@@ -265,3 +265,46 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
 - Stop after factual ADR/report, evidence and task-branch publication pending
   owner acceptance. Production FS, arbitrary devices, services and future
   application/kernel architecture remain separate owner decisions.
+
+## Approved T-P1.8B task
+- Start `feature/styleos-t-p1-8b` from accepted
+  `1ea8d090cd12c4a5d20f628c927fcba787aede98`. Publish this branch only;
+  preserve main, old refs, `docs/styleos-readme`, root README, Portable-os,
+  history and historical evidence. No merge, force push, release or next stage.
+- Only `--test-disk-app` on AArch64 QEMU virt may combine read-only existing
+  VirtIO/storage with external code loading and EL0 execution. Separate output,
+  no mixed profiles. Preserve boot_info v1, old paths and all old artifact bytes,
+  including storage ELF/Image and its unchanged 1.8A on-disk format.
+- Build the tiny integer-only program separately from the kernel. Never link
+  its payload into boot image or deliver code via bootargs/UART/shared memory.
+  A clearly marked host fixture packer may seed only fresh exclusive test disks
+  in this new runner's unique output directory, using the existing store format.
+  This permission does not change the 1.8A host-zero-only persistence runner.
+- The guest mounts and reads app.bin through the existing device, validates
+  every header/length/ISA/entry/code boundary before copying into fixed image
+  storage, and refuses unsupported files without partial execution. The test
+  container is not a production format or .tea. No arbitrary header-chosen PA/VA.
+- Keep the old transport's modern VERSION_1/FLUSH/RO contract. In this new guest
+  path reject WRITE/FLUSH calls; complete and prove all outstanding DMA before
+  the MMU/cache transition. No device access after IO retirement. Prove copied
+  instruction visibility, finite RESERVED buffers, user RX code and RW/NX stack,
+  supervisor-only kernel mapping and original privileged dispatcher stack.
+- Require real lower-EL frames: arg0 executes the external known read fault;
+  terminate/release only that fixed slot under SAFE and then enter EL0 anew
+  with arg1, returning the payload's integer code/marker. Unexpected kernel
+  exceptions remain terminal failures. No resumed fault PC or substitute program.
+- A second separately built payload on a new disk must produce its different
+  result with byte-identical boot image. A valid store containing a bad executable
+  must be rejected before EL0. Bind full file/code bytes, SHA, roots, frames,
+  fault PC/VA/syndrome, exit, disk identities and unchanged disk SHA to actual VMs.
+- Retain Python3.14 compatibility and isolated unavailable-hardlink skip. Run
+  full old/ARM-only/storage regressions, reproducibility and all baseline binary
+  comparisons. New one-command runner must need no GUI, network, root, manual
+  fixture creation, OVMF or x86 tools. Keep finite resources; no PMM/heap, reclaim,
+  CANDIDATE/REVIEW, general scheduler/IRQ/SMP/FP-SIMD, FS/process ABI, network,
+  applications platform, SDK/GUI/.tea or Deep Drop work beyond this experiment.
+- Record owner-reported 1.8A phone16/16 exit0 at60c9a18 separately: two screenshots,
+  all seven VM phases, no raw UART/JSON or QEMU version in successful screenshots.
+  QEMU11.1.3 belongs to an earlier failed host-test attempt. New Android/Termux,
+  VirtualBox and native hardware remain SKIPPED until actually run. Stop after
+  report/publication; desktop and x86-64 UEFI/VirtualBox are separate discussions.
