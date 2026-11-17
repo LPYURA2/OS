@@ -3,6 +3,7 @@
  * regular file is created; existing disks and host devices cannot be opened.
  * Usage: pack_disk_app APP_FILE NEW_DISK (parent directory must already exist).
  * Deliberately accepts malformed executable bytes for loader-refusal fixtures. */
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include "styleos/storage.h"
 #include <errno.h>
@@ -45,9 +46,16 @@ static int flush(void *opaque)
 
 /* Walk all parent components with descriptor-relative O_NOFOLLOW opens.
  * O_EXCL protects the leaf as well: symlink parents cannot redirect creation.
+ * Linux/Android directory descriptors don't need to list entries: O_PATH
+ * permits traversal of searchable but unreadable ancestors (e.g. Termux).
  * The fixture runner supplies its fresh run/disks directory as this parent. */
 static int parent_directory(const char *path,char *leaf,size_t capacity)
 {
+#if defined(O_PATH)
+    const int directory_flags=O_PATH|O_DIRECTORY|O_NOFOLLOW;
+#else
+    const int directory_flags=O_RDONLY|O_DIRECTORY|O_NOFOLLOW;
+#endif
     char copy[4096];size_t n=strlen(path);
     if(!n || n>=sizeof copy){errno=EINVAL;return -1;}
     memcpy(copy,path,n+1);char *last=strrchr(copy,'/'),*name=last?last+1:copy;
@@ -55,14 +63,14 @@ static int parent_directory(const char *path,char *leaf,size_t capacity)
         errno=EINVAL;return -1;
     }
     memcpy(leaf,name,strlen(name)+1);
-    int current=open(path[0]=='/'?"/":".",O_RDONLY|O_DIRECTORY|O_NOFOLLOW);
+    int current=open(path[0]=='/'?"/":".",directory_flags);
     if(current<0)return -1;
     if(!last)return current;
     *last=0;char *save=NULL;
     for(char *part=strtok_r(copy,"/",&save);part;part=strtok_r(NULL,"/",&save)){
         if(!strcmp(part,"."))continue;
         if(!strcmp(part,"..")){close(current);errno=EINVAL;return -1;}
-        int next=openat(current,part,O_RDONLY|O_DIRECTORY|O_NOFOLLOW);
+        int next=openat(current,part,directory_flags);
         if(next<0){int error=errno;close(current);errno=error;return -1;}
         close(current);current=next;
     }
