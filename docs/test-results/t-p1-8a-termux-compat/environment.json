@@ -1,0 +1,23 @@
+{
+  "recorded_utc": "2026-11-16T22:20:12.123557+00:00",
+  "python314": "Python 3.14.10",
+  "python314_location": "External user runtime installed with uv python install 3.14 --no-bin; no runtime committed",
+  "runtime_install_log": "Downloading cpython-3.14.10-linux-x86_64-gnu (download) (35.1MiB)\n Downloaded cpython-3.14.10-linux-x86_64-gnu (download)\nInstalled Python 3.14.10 in 1.40s\n + cpython-3.14.10-linux-x86_64-gnu\n",
+  "python313": "Python 3.13.5",
+  "storage_provenance": "storage/provenance.json",
+  "regression_commands": {
+    "full": "python3.14 tools/test.py --all --output build/tp18a-termux-compat",
+    "arm": "CC=clang python3.14 tools/test.py --host --qemu --qemu-arch aarch64 --output build/arm-only-tp18a-compat",
+    "storage": "CC=clang python3.14 tools/test_storage.py --output build/storage-tp18a-compat"
+  },
+  "external_setup": "source /workspace/scratch/styleos-toolchain/env.sh; LLVM_OBJDUMP real LLVM19 for old regressions, absent for storage",
+  "exit_codes": {
+    "full": 0,
+    "arm": 0,
+    "storage": 0,
+    "storage_python313": 0,
+    "storage_python314": 0,
+    "storage_python314_without_os_link": 0
+  },
+  "android_termux_retest": "SKIPPED; owner will rerun Python3.14/QEMU11.1.3"
+}

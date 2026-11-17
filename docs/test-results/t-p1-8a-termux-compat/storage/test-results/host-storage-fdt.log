@@ -1,0 +1,4 @@
+$ clang -std=c11 -O2 -Wall -Wextra -Werror -Iinclude tests/test_storage_fdt.c boot/aarch64/storage_fdt.c -o /workspace/OS/build/storage-tp18a-compat/run-20261116T221755.145233Z-kyrm6zl1/host-tests/host-storage-fdt
+
+$ /workspace/OS/build/storage-tp18a-compat/run-20261116T221755.145233Z-kyrm6zl1/host-tests/host-storage-fdt
+storage FDT host PASS: phases, fixed MMIO, malformed bounds/profile, unchanged refusals

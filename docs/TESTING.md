@@ -453,7 +453,7 @@ proof, а storage runner обходится обычными Clang/LLD, Python �
 pkg install git python clang lld qemu-system-aarch64-headless
 git clone --branch feature/styleos-t-p1-8a --single-branch https://github.com/LPYURA2/OS.git styleos-tp18a
 cd styleos-tp18a
-git checkout --detach 6dfb61d49835c50d561ca2b4a509563e3c744e59
+git checkout --detach 60c9a18fd6b3c23865d64ca5e544faf3a23c6bbf
 git rev-parse HEAD
 python --version
 clang --version
@@ -573,3 +573,7 @@ T-P1.8A публикуется только в `feature/styleos-t-p1-8a` от б
 Неподдержанная firmware, ошибка самого ядра, повреждённые kernel stack/table/UART либо отказ до готовности диагностического пути могут остановить boot. Неожиданное исключение ядра остаётся аварийным исходом; оно не засчитывается как успешное завершение A. Тесты используют выходные образы и отдельные копии firmware VARS, без личных дисков компьютера.
 
 Для исследования прошлого состояния создаётся отдельная копия согласованного SHA; опубликованный откат выполняется новым revert после решения владельца. История не переписывается. После отчёта и публикации ветки работа останавливается.
+
+## Совместимость host-тестов с Python 3.14 / Termux
+
+Исправление `60c9a18fd6b3c23865d64ca5e544faf3a23c6bbf` меняет только `tests/test_storage_runner.py`: подмены Git/QEMU не затрагивают системные вызовы `platform`, а hardlink-проверка выделена отдельно. Если `os.link` отсутствует либо явно не поддерживается, SKIPPED получает только этот тест; проверки inode, размера, regular-file и symlink остаются обязательными. Ядро, драйвер и формат диска сохранены. [Результаты регрессий и повторный запуск](test-results/t-p1-8a-termux-compat/README.md). Новый Android-прогон остаётся SKIPPED до подтверждения владельца.

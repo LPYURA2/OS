@@ -1,0 +1,69 @@
+Forced platform._syscmd_file path
+test_execute_opens_two_runner_disks_and_records_seven_distinct_processes (test_storage_runner.StorageInventoryTests.test_execute_opens_two_runner_disks_and_records_seven_distinct_processes) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.110s
+
+OK
+
+Missing os.link: every other output-ownership test remains enabled
+test_disk_hardlinks_are_rejected_when_supported (test_storage_runner.StorageOutputOwnershipTests.test_disk_hardlinks_are_rejected_when_supported) ... skipped 'os.link is unavailable on this platform'
+test_disk_identity_size_regular_type_and_symlinks_are_checked (test_storage_runner.StorageOutputOwnershipTests.test_disk_identity_size_regular_type_and_symlinks_are_checked) ... ok
+test_existing_evidence_and_symlink_destinations_are_never_overwritten (test_storage_runner.StorageOutputOwnershipTests.test_existing_evidence_and_symlink_destinations_are_never_overwritten) ... ok
+test_qemu_uses_json_blockdev_for_untrusted_filename_punctuation (test_storage_runner.StorageOutputOwnershipTests.test_qemu_uses_json_blockdev_for_untrusted_filename_punctuation) ... ok
+test_repeated_invocation_preserves_old_disk_and_creates_new_exclusive_run (test_storage_runner.StorageOutputOwnershipTests.test_repeated_invocation_preserves_old_disk_and_creates_new_exclusive_run) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.016s
+
+OK (skipped=1)
+
+Hardlink creation errno 38
+test_disk_hardlinks_are_rejected_when_supported (test_storage_runner.StorageOutputOwnershipTests.test_disk_hardlinks_are_rejected_when_supported) ... skipped 'hard links are unsupported or prohibited: [Errno 38] controlled hardlink refusal'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.003s
+
+OK (skipped=1)
+
+Hardlink creation errno 95
+test_disk_hardlinks_are_rejected_when_supported (test_storage_runner.StorageOutputOwnershipTests.test_disk_hardlinks_are_rejected_when_supported) ... skipped 'hard links are unsupported or prohibited: [Errno 95] controlled hardlink refusal'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.003s
+
+OK (skipped=1)
+
+Hardlink creation errno 1
+test_disk_hardlinks_are_rejected_when_supported (test_storage_runner.StorageOutputOwnershipTests.test_disk_hardlinks_are_rejected_when_supported) ... skipped 'hard links are unsupported or prohibited: [Errno 1] controlled hardlink refusal'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.003s
+
+OK (skipped=1)
+
+Hardlink creation errno 5
+test_disk_hardlinks_are_rejected_when_supported (test_storage_runner.StorageOutputOwnershipTests.test_disk_hardlinks_are_rejected_when_supported) ... ERROR
+
+======================================================================
+ERROR: test_disk_hardlinks_are_rejected_when_supported (test_storage_runner.StorageOutputOwnershipTests.test_disk_hardlinks_are_rejected_when_supported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/OS/tests/test_storage_runner.py", line 310, in test_disk_hardlinks_are_rejected_when_supported
+    link(disk, hardlink)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1139, in __call__
+    return self._mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1143, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1198, in _execute_mock_call
+    raise effect
+OSError: [Errno 5] controlled hardlink refusal
+
+----------------------------------------------------------------------
+Ran 1 test in 0.004s
+
+FAILED (errors=1)
+
+SIMULATION PASS: forced platform path works; missing/unsupported hardlink alone skips; deliberate EIO remains an ERROR and is not hidden.

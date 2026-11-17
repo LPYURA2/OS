@@ -1,0 +1,50 @@
+
+REPRODUCTION: platform._syscmd_file under broad subprocess mocks
+test_execute_opens_two_runner_disks_and_records_seven_distinct_processes (test_storage_runner.StorageInventoryTests.test_execute_opens_two_runner_disks_and_records_seven_distinct_processes) ... ERROR
+
+======================================================================
+ERROR: test_execute_opens_two_runner_disks_and_records_seven_distinct_processes (test_storage_runner.StorageInventoryTests.test_execute_opens_two_runner_disks_and_records_seven_distinct_processes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/OS/tests/test_storage_runner.py", line 500, in test_execute_opens_two_runner_disks_and_records_seven_distinct_processes
+    checks, provenance = runner.execute(run, 1.5)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/OS/tools/test_storage.py", line 609, in execute
+    'host_platform': platform.platform(), 'python_version': sys.version,
+                     ^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1139, in __call__
+    return self._mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1143, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 1204, in _execute_mock_call
+    result = effect(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "<stdin>", line 9, in <lambda>
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/platform.py", line 680, in _syscmd_file
+    return output.decode('latin-1')
+           ^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'decode'. Did you mean: 'encode'?
+
+----------------------------------------------------------------------
+Ran 1 test in 0.005s
+
+FAILED (errors=1)
+
+REPRODUCTION: os.link unavailable
+test_disk_identity_size_regular_type_hardlinks_and_symlinks_are_checked (test_storage_runner.StorageOutputOwnershipTests.test_disk_identity_size_regular_type_hardlinks_and_symlinks_are_checked) ... ERROR
+
+======================================================================
+ERROR: test_disk_identity_size_regular_type_hardlinks_and_symlinks_are_checked (test_storage_runner.StorageOutputOwnershipTests.test_disk_identity_size_regular_type_hardlinks_and_symlinks_are_checked)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/OS/tests/test_storage_runner.py", line 293, in test_disk_identity_size_regular_type_hardlinks_and_symlinks_are_checked
+    hardlink = root/'hardlink'; os.link(disk, hardlink)
+                                ^^^^^^^
+AttributeError: module 'os' has no attribute 'link'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.010s
+
+FAILED (errors=1)

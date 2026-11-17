@@ -1,0 +1,15 @@
+{
+  "platform_syscmd_file_under_scoped_mocks": "PASS",
+  "missing_os_link": {
+    "status": "PASS",
+    "ownership_tests": 5,
+    "skipped": 1,
+    "remaining_checks_pass": true
+  },
+  "unsupported_hardlink_errnos": {
+    "ENOSYS": "SKIPPED as expected",
+    "EOPNOTSUPP": "SKIPPED as expected",
+    "EPERM": "SKIPPED as expected"
+  },
+  "unexpected_EIO": "ERROR as expected; not skipped"
+}

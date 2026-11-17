@@ -1,0 +1,7 @@
+{
+  "run": "/workspace/OS/build/storage-tp18a-compat/run-20261116T221755.145233Z-kyrm6zl1",
+  "status": "PASS",
+  "exit_code": 0,
+  "checks": 16,
+  "results": "test-results/results.json"
+}
