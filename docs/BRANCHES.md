@@ -6,8 +6,9 @@
 
 | Ветка и SHA | Что менялось | Проверки и материалы |
 |---|---|---|
-| `docs/styleos-project` | Текущая документационная ветка, основана на `c162995`. | [README ветки](../README.md). Проверка ссылок и отсутствия изменения исходников. |
-| `main` · [`dfc5be9`](https://github.com/LPYURA2/OS/tree/dfc5be9c2f699928a42903e70066f1bd8b20f65a) | Историческая ветка по умолчанию. T‑P1.0, не текущая линия разработки. | Начальный x86 UEFI и AArch64 QEMU. [Отчёт или README](https://github.com/LPYURA2/OS/blob/dfc5be9c2f699928a42903e70066f1bd8b20f65a/docs/test-results/t-p1-0/README.md). |
+| [`main`](https://github.com/LPYURA2/OS/tree/main) | Ветка по умолчанию. Кодовая база `c162995` и актуальная документация. | [Точка входа](PROJECT.md). Перенос не меняет статус VirtualBox и других проверок. |
+| `docs/styleos-project` · [`f2886c3`](https://github.com/LPYURA2/OS/tree/f2886c38c78b31cd7abfd9524bde5e44496fdfa7) | Снимок первого упорядочивания документации от `c162995`. | [README ветки](https://github.com/LPYURA2/OS/blob/f2886c38c78b31cd7abfd9524bde5e44496fdfa7/README.md). Проверялись ссылки и неизменность кода. |
+| [`legacy/styleos-t-p1-0`](https://github.com/LPYURA2/OS/tree/legacy/styleos-t-p1-0) · [`dfc5be9`](https://github.com/LPYURA2/OS/tree/dfc5be9c2f699928a42903e70066f1bd8b20f65a) | Точная прежняя вершина `main`. Историческая T‑P1.0, не текущая линия разработки. | Начальный x86 UEFI и AArch64 QEMU. [Отчёт](https://github.com/LPYURA2/OS/blob/dfc5be9c2f699928a42903e70066f1bd8b20f65a/docs/test-results/t-p1-0/README.md). |
 | `feature/styleos-desktop-first-image` · [`c162995`](https://github.com/LPYURA2/OS/tree/c162995c4390686bda54468f68f40164b3c4f3bc) | Диагностический x86‑64 framebuffer после UEFI. Обычный образ и ARM-профили без изменений. | 57/57, графика 2/2 в QEMU, оба VDI PASS в Termux по COM1. [Отчёт или README](https://github.com/LPYURA2/OS/blob/c162995c4390686bda54468f68f40164b3c4f3bc/docs/test-results/desktop-display/README.md). |
 | `fix/styleos-t-p1-8b-termux-packer` · [`40c3987`](https://github.com/LPYURA2/OS/tree/40c3987d4b78e0f67888db8d6baa24c7af4a35d0) | Оба исправления Termux. Упаковщик проходит доступные для поиска, но не для чтения каталоги. | Termux 16/16, exit 0. Принятая база. [Отчёт владельца](test-results/owner-2026-11-17.md). |
 | `fix/styleos-t-p1-8b-termux` · [`f81bb5c`](https://github.com/LPYURA2/OS/tree/f81bb5c2a2bd9a737ee9eed4adfbc1cee35f52e5) | Хостовый тест не ломается при отсутствии os.link. | Termux: Python PASS, затем 12/13 перед исправлением упаковщика. [Отчёт владельца](test-results/owner-2026-11-17.md). |
@@ -29,5 +30,5 @@
 ## Архив
 
 - [MATRYOSHKA v0.3.2](https://github.com/LPYURA2/OS/tree/archive/matryoshka-v0.3.2) остаётся под исходным архивным тегом. Не переименовывать и не подменять его новой веткой. Рабочая история MATRYOSHKA — в [Portable-os](https://github.com/LPYURA2/Portable-os).
-- `main` не переключена. Возможную дополнительную ветку `legacy/styleos-t-p1-0` создаём отдельно только при утверждённом переходе ветки по умолчанию. Никакие существующие refs не удаляются.
+- Перед переводом `main` на актуальный код сохранена прежняя вершина в `legacy/styleos-t-p1-0`. Это дополнительная ссылка на тот же коммит, а не перенос или удаление файлов. Прежняя `feature/styleos-t-p1-0` также сохранена.
 - Прежний [README T‑P1.5 в исходном контексте](https://github.com/LPYURA2/OS/blob/c162995c4390686bda54468f68f40164b3c4f3bc/README.md) также хранится [побайтной копией](archive/README-T-P1.5.md). В копии ссылки оставлены такими, какими они были в корне. Для перехода по ним открой исходную версию.
