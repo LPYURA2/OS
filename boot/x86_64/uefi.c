@@ -1,7 +1,7 @@
 #include "exit_boot.h"
 #include <styleos/arch.h>
 #include <styleos/boot_memory.h>
-#ifdef STYLEOS_TEST_DESKTOP_DISPLAY
+#if defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0)
 #include "desktop_display.h"
 #endif
 
@@ -63,7 +63,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
         arch_puts("STYLEOS BOOT_ERROR invalid Loaded Image extent\n");
         return EFI_INVALID_PARAMETER;
     }
-#ifdef STYLEOS_TEST_DESKTOP_DISPLAY
+#if defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0)
     desktop_capture_uefi_mode(table->boot_services);
 #endif
     arch_puts("STYLEOS x86_64 acquiring memory map\n");

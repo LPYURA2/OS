@@ -21,3 +21,7 @@ StyleOS — самостоятельная операционная систем
 ## Ветки и история
 
 В `main` находится проверенная кодовая база [`c162995`](https://github.com/LPYURA2/OS/tree/c162995c4390686bda54468f68f40164b3c4f3bc) с последующей документацией. Исходная T‑P1.0 сохранена точно на [`legacy/styleos-t-p1-0`](https://github.com/LPYURA2/OS/tree/legacy/styleos-t-p1-0). Ветка `docs/styleos-project` остаётся снимком упорядочивания документации. Прежний [README T‑P1.5](https://github.com/LPYURA2/OS/blob/c162995c4390686bda54468f68f40164b3c4f3bc/README.md) сохранён и в оригинале, и [побайтной копией](docs/archive/README-T-P1.5.md). Тестовые и исторические ветки перечислены в [указателе](docs/BRANCHES.md).
+
+## StyleOS Desktop v0
+
+В ветке `feature/styleos-desktop-v0` отдельный интерактивный образ x86‑64 UEFI. Мышь, окна, «Файлы», редактор и сохранение на втором виртуальном диске проверены в QEMU. Подтверждения в VirtualBox ещё нет. Deep Drop в этот образ не включён. [Установка, функции и проверки Desktop v0](docs/test-results/desktop-v0/README.md)

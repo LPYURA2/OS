@@ -1,0 +1,535 @@
+#include <styleos/arch.h>
+#include <styleos/desktop_v0.h>
+
+enum { FILES, NOTES, TASKS, ABOUT, WINDOWS };
+enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
+       WINDOW = 0x171f2c, STROKE = 0x586272, PANEL = 0x101822, CELL = 11,
+       LINE = 24, TITLE = 42, ROW = 45 };
+
+static const char *const names[WINDOWS] = {"Файлы", "Заметки", "Задачи", "О системе"};
+static const char *const folders[] = {"Файлы", "Документы", "Проекты"};
+static const char *const files[] = {"Заметки.txt", "Заметки 2.txt", "Заметки 3.txt", "Заметки 4.txt"};
+static const uint8_t icons[] = {DESK_FOLDER, DESK_PAPER, DESK_TASK, DESK_INFO};
+
+static struct window {
+    struct desk_box box, previous;
+    bool open, minimized, maximized;
+} win[WINDOWS];
+static struct desk_store store;
+static int width, height, mx, my, order[WINDOWS] = {ABOUT, TASKS, NOTES, FILES};
+static int drag = -1, drag_x, drag_y;
+static bool mouse_down, menu, drag_moved;
+static unsigned current_folder, doc_folder, input_flags;
+static int document = -1;
+static char content[DESK_TEXT_LIMIT], incoming[DESK_TEXT_LIMIT];
+static size_t length, caret;
+static int scroll;
+static bool dirty, russian;
+static const char *notice = "";
+static char clock_text[] = "--:--";
+
+static int max(int a, int b) { return a > b ? a : b; }
+static int min(int a, int b) { return a < b ? a : b; }
+static int clamp(int a, int l, int h) { return min(max(a, l), max(l, h)); }
+static bool contains(struct desk_box b, int x, int y)
+{ return x >= b.x && y >= b.y && x < b.x + b.w && y < b.y + b.h; }
+
+/* The panel and work area meet at one layout boundary. The initial edge is
+ * bottom, but windows use work_area(), not their own panel coordinates. */
+static struct desk_box panel_box(void) { return (struct desk_box){0, height - 54, width, 54}; }
+static struct desk_box work_area(void) { return (struct desk_box){0, 0, width, panel_box().y}; }
+static struct desk_box start_box(void) { return (struct desk_box){9, panel_box().y + 1, 153, 51}; }
+static struct desk_box menu_box(void) { return (struct desk_box){9, panel_box().y - 273, 313, 260}; }
+static struct desk_box task_button(int number)
+{ return (struct desk_box){164 + number * min(160, (width - 252) / WINDOWS), panel_box().y + 2,
+                           min(156, (width - 252) / WINDOWS - 4), 48}; }
+
+static int active(void)
+{
+    for (int i = WINDOWS - 1; i >= 0; --i)
+        if (win[order[i]].open && !win[order[i]].minimized) return order[i];
+    return -1;
+}
+static void front(int id)
+{
+    unsigned i = 0;
+    while (order[i] != id) ++i;
+    for (; i + 1 < WINDOWS; ++i) order[i] = order[i + 1];
+    order[WINDOWS - 1] = id;
+}
+static void open_window(int id)
+{
+    bool restore = win[id].minimized, opening = !win[id].open;
+    win[id].open = true;
+    win[id].minimized = false;
+    front(id);
+    if (restore) arch_puts("STYLEOS DESKTOP WINDOW RESTORE\n");
+    else if (opening) arch_puts("STYLEOS DESKTOP WINDOW OPEN\n");
+}
+
+static void new_document(void)
+{
+    open_window(NOTES);
+    if (dirty) { notice = "Сначала сохраните текущий текст"; return; }
+    document = -1;
+    doc_folder = current_folder;
+    length = caret = 0;
+    scroll = 0;
+    notice = "Новая заметка";
+}
+
+static void open_document(unsigned slot)
+{
+    open_window(NOTES);
+    if ((int)slot == document) return;
+    if (dirty) { notice = "Сначала сохраните текущий текст"; return; }
+    size_t bytes;
+    if (!desk_store_load(&store, slot, incoming, &bytes)) { notice = "Ошибка чтения"; return; }
+    for (size_t i = 0; i < bytes; ++i) content[i] = incoming[i];
+    document = (int)slot;
+    doc_folder = store.file[slot].folder;
+    length = bytes;
+    caret = 0;
+    scroll = 0;
+    notice = "Открыто с диска";
+    arch_puts("STYLEOS DESKTOP DOCUMENT OPEN\n");
+}
+
+static void save(void)
+{
+    if (!store.writable) { notice = "Диск данных недоступен для записи"; return; }
+    int slot = document;
+    if (slot < 0) for (int i = 0; i < DESK_DOCS; ++i)
+        if (!store.file[i].generation && !store.file[i].blocked) { slot = i; break; }
+    if (slot < 0) { notice = "Нет свободных слотов для заметок"; return; }
+    if (!desk_store_save(&store, (unsigned)slot, doc_folder, content, length)) {
+        notice = "Не удалось сохранить";
+        arch_puts("STYLEOS DESKTOP DOCUMENT SAVE ERROR\n");
+        return;
+    }
+    document = slot;
+    dirty = false;
+    notice = "Сохранено на диске";
+    arch_puts("STYLEOS DESKTOP DOCUMENT SAVE\n");
+}
+
+static int text_columns(struct desk_box b) { return max(1, (b.w - 42) / CELL); }
+static int text_rows(struct desk_box b) { return max(1, (b.h - 124) / LINE); }
+static void advance(uint32_t cp, int cols, int *row, int *col)
+{
+    if (cp == '\n') { ++*row; *col = 0; }
+    else if (++*col == cols) { ++*row; *col = 0; }
+}
+
+static void position(size_t offset, int cols, int *row, int *col)
+{
+    *row = *col = 0;
+    for (size_t n, off = 0; off < offset; off += n)
+        advance(desk_utf8(content + off, offset - off, &n), cols, row, col);
+}
+
+static size_t offset_at(int row, int col, int cols)
+{
+    int r = 0, c = 0;
+    size_t off = 0;
+    while (off < length) {
+        if (r > row || (r == row && c >= col)) break;
+        size_t n;
+        uint32_t cp = desk_utf8(content + off, length - off, &n);
+        if (r == row && (cp == '\n' || c + 1 == cols)) break;
+        advance(cp, cols, &r, &c);
+        off += n;
+    }
+    return off;
+}
+
+static void edit_scroll(void)
+{
+    int row, col, visible = text_rows(win[NOTES].box);
+    position(caret, text_columns(win[NOTES].box), &row, &col);
+    if (row < scroll) scroll = row;
+    if (row >= scroll + visible) scroll = row - visible + 1;
+}
+
+static void replace(size_t lo, size_t hi, uint32_t cp)
+{
+    char bytes[2];
+    size_t n = 0;
+    if (cp && cp < 0x80) bytes[n++] = (char)cp;
+    else if (cp >= 0x80 && cp < 0x800) {
+        bytes[n++] = (char)(0xc0 | (cp >> 6));
+        bytes[n++] = (char)(0x80 | (cp & 0x3f));
+    }
+    if (hi == lo && !n) return;
+    if (length - (hi - lo) + n > DESK_TEXT_LIMIT) { notice = "Лимит заметки 4096 байт"; return; }
+    if (lo + n > hi) for (size_t p = length; p > hi; --p) content[p - 1 - hi + lo + n] = content[p - 1];
+    else for (size_t p = hi; p < length; ++p) content[p - hi + lo + n] = content[p];
+    for (size_t i = 0; i < n; ++i) content[lo + i] = bytes[i];
+    length = length - (hi - lo) + n;
+    caret = lo + n;
+    dirty = true;
+    notice = "Есть несохранённые изменения";
+}
+
+static size_t before(size_t p)
+{
+    if (p) while (--p && ((uint8_t)content[p] & 0xc0) == 0x80) {}
+    return p;
+}
+static size_t after(size_t p)
+{
+    size_t n;
+    (void)desk_utf8(content + p, length - p, &n);
+    return p + n;
+}
+
+static uint32_t character(unsigned key, bool shift)
+{
+    static const char normal[] = "\0\0" "1234567890-=\0\0" "qwertyuiop[]\0\0" "asdfghjkl;'`\0\\" "zxcvbnm,./\0\0\0 ";
+    static const char upper[] = "\0\0" "!@#$%^&*()_+\0\0" "QWERTYUIOP{}\0\0" "ASDFGHJKL:\"~\0|" "ZXCVBNM<>?\0\0\0 ";
+    static const uint16_t ru[0x3a] = {
+        [0x10]=0x439,0x446,0x443,0x43a,0x435,0x43d,0x433,0x448,0x449,0x437,0x445,0x44a,
+        [0x1e]=0x444,0x44b,0x432,0x430,0x43f,0x440,0x43e,0x43b,0x434,0x436,0x44d,0x451,
+        [0x2c]=0x44f,0x447,0x441,0x43c,0x438,0x442,0x44c,0x431,0x44e,
+    };
+    if (russian && key < sizeof(ru) / sizeof(*ru) && ru[key])
+        return shift ? (ru[key] == 0x451 ? 0x401 : ru[key] - 32u) : ru[key];
+    if (russian && key == 0x35) return shift ? ',' : '.';
+    return key < sizeof(normal) - 1 ? (uint8_t)(shift ? upper[key] : normal[key]) : 0;
+}
+
+static bool keyboard(unsigned key, unsigned mods)
+{
+    if (key == 0x40) { russian = !russian; return true; } /* F6 */
+    if (key == 0x01 && menu) { menu = false; return true; }
+    if (key == 0x15b || key == 0x3e) { menu = !menu; return true; } /* Super or F4 */
+    if (key == 0x3c) { open_window(FILES); return true; }
+    if (key == 0x3d) { open_window(NOTES); return true; }
+    if (active() != NOTES) return false;
+    if (mods & DESK_CTRL) {
+        if (key == 0x1f) save();
+        else if (key == 0x31) new_document();
+        else return false;
+    } else if (mods & DESK_ALT) return false;
+    else if (key == 0x0e) replace(before(caret), caret, 0);
+    else if (key == 0x153) replace(caret, after(caret), 0);
+    else if (key == 0x14b) caret = before(caret);
+    else if (key == 0x14d) caret = after(caret);
+    else if (key == 0x148 || key == 0x150 || key == 0x147 || key == 0x14f) {
+        int r, c, cols = text_columns(win[NOTES].box);
+        position(caret, cols, &r, &c);
+        if (key == 0x148) { if (r) caret = offset_at(r - 1, c, cols); }
+        else if (key == 0x150) caret = offset_at(r + 1, c, cols);
+        else caret = offset_at(r, key == 0x147 ? 0 : cols, cols);
+    } else {
+        uint32_t cp = key == 0x1c || key == 0x11c ? '\n' : character(key, (mods & DESK_SHIFT) != 0);
+        if (!cp) return false;
+        replace(caret, caret, cp);
+    }
+    edit_scroll();
+    return true;
+}
+
+/* Directories are real locations in the bounded data format. Document rows
+ * come from the mounted store, not a screenshot or a fixed item list. */
+enum { BACK = -3, DIR_DOCUMENTS = -2, DIR_PROJECTS = -1 };
+static unsigned file_rows(int *items)
+{
+    unsigned count = 0;
+    if (current_folder == DESK_ROOT) { items[count++] = DIR_DOCUMENTS; items[count++] = DIR_PROJECTS; }
+    else items[count++] = BACK;
+    for (unsigned n = 0; n < DESK_DOCS; ++n)
+        if (store.file[n].generation && store.file[n].folder == current_folder) items[count++] = (int)n;
+    return count;
+}
+static void show_folder(unsigned where) { current_folder = where; open_window(FILES); }
+static void pick_file(int item)
+{
+    if (item == BACK) show_folder(DESK_ROOT);
+    else if (item == DIR_DOCUMENTS) show_folder(DESK_DOCUMENTS);
+    else if (item == DIR_PROJECTS) show_folder(DESK_PROJECTS);
+    else open_document((unsigned)item);
+}
+
+static const struct desk_box desktop_shortcuts[] = {{28,38,80,84}, {28,142,80,84}, {28,246,80,84}};
+static void maximize(int id)
+{
+    struct window *w = &win[id];
+    if (w->maximized) w->box = w->previous;
+    else { w->previous = w->box; w->box = work_area(); }
+    w->maximized = !w->maximized;
+    if (id == NOTES) edit_scroll();
+}
+
+static void click(int x, int y)
+{
+    if (contains(start_box(), x, y)) { menu = !menu; return; }
+    if (menu) {
+        struct desk_box m = menu_box();
+        menu = false;
+        if (contains(m, x, y)) {
+            int d = y - m.y;
+            if (d >= 13 && d < 58) show_folder(DESK_ROOT);
+            else if (d < 98 && d >= 58) open_window(ABOUT);
+            else if (d < 140 && d >= 98) open_window(TASKS);
+            else if (d >= 156 && d < 201) {
+                if (dirty) { open_window(NOTES); notice = "Перед перезагрузкой сохраните текст"; }
+                else { arch_puts("STYLEOS DESKTOP REBOOT\n"); desk_reboot(); }
+            }
+            return;
+        }
+    }
+    if (contains(panel_box(), x, y)) {
+        int n = 0;
+        for (int i = 0; i < WINDOWS; ++i) if (win[i].open) {
+            if (contains(task_button(n++), x, y)) {
+                if (active() == i) { win[i].minimized = true; arch_puts("STYLEOS DESKTOP WINDOW MINIMIZE\n"); }
+                else open_window(i);
+                break;
+            }
+        }
+        return;
+    }
+    for (int n = WINDOWS - 1; n >= 0; --n) {
+        int id = order[n];
+        struct window *w = &win[id];
+        struct desk_box b = w->box;
+        if (!w->open || w->minimized || !contains(b, x, y)) continue;
+        front(id);
+        int dx = x - b.x, dy = y - b.y, right = b.w - dx;
+        if (dy < TITLE) {
+            if (right < 42) {
+                if (id == NOTES && dirty) notice = "Перед закрытием сохраните текст";
+                else { w->open = false; arch_puts("STYLEOS DESKTOP WINDOW CLOSE\n"); }
+            } else if (right < 84) maximize(id);
+            else if (right < 126) {
+                w->minimized = true;
+                arch_puts("STYLEOS DESKTOP WINDOW MINIMIZE\n");
+            } else if (!w->maximized) { drag = id; drag_x = dx; drag_y = dy; drag_moved = false; }
+        } else if (id == FILES && dy >= TITLE + 12 && dy < b.h - 25) {
+            int items[DESK_DOCS + 2];
+            unsigned count = file_rows(items), at = (unsigned)(dy - TITLE - 12) / ROW;
+            if (at < count) pick_file(items[at]);
+        } else if (id == NOTES) {
+            if (dy >= 52 && dy < 83 && dx >= 12 && dx < 88) new_document();
+            else if (dy >= 52 && dy < 83 && dx >= 94 && dx < 195) save();
+            else if (dy >= 96 && dy < b.h - 29 && dx >= 18) {
+                caret = offset_at(scroll + (dy - 96) / LINE, (dx - 18) / CELL, text_columns(b));
+                edit_scroll();
+            }
+        }
+        return;
+    }
+    if (contains(desktop_shortcuts[0], x, y)) show_folder(DESK_ROOT);
+    else if (contains(desktop_shortcuts[1], x, y)) open_window(NOTES);
+    else if (contains(desktop_shortcuts[2], x, y)) show_folder(DESK_PROJECTS);
+}
+
+static void accent(struct desk_box b)
+{
+    desk_fill(b.x + 5, b.y, b.w - 10, 2, GOLD);
+    desk_fill(b.x + 2, b.y + 2, b.w - 4, 1, GOLD);
+}
+
+static void draw_window(int id, int top)
+{
+    struct desk_box b = win[id].box;
+    desk_round(b, WINDOW);
+    desk_outline(b, STROKE);
+    if (id == top) accent(b);
+    desk_text(b.x + 16, b.y + 11, b.x + b.w - 128, names[id], LIGHT);
+    int r = b.x + b.w, y = b.y + 19;
+    desk_fill(b.x + 8, b.y + TITLE, b.w - 16, 1, STROKE);
+    desk_fill(r - 115, y + 4, 13, 2, LIGHT);
+    desk_fill(r - 73, y - 4, 13, 2, LIGHT);
+    desk_fill(r - 73, y + 7, 13, 2, LIGHT);
+    desk_fill(r - 73, y - 4, 2, 12, LIGHT);
+    desk_fill(r - 62, y - 4, 2, 12, LIGHT);
+    desk_line(r - 31, y - 3, r - 20, y + 8, LIGHT);
+    desk_line(r - 20, y - 3, r - 31, y + 8, LIGHT);
+
+    if (id == FILES) {
+        int items[DESK_DOCS + 2];
+        unsigned count = file_rows(items);
+        for (unsigned i = 0; i < count; ++i) {
+            int at = items[i], row = b.y + TITLE + 12 + (int)i * ROW;
+            if (row + 42 > b.y + b.h - 20) break;
+            bool hover = id == top && contains((struct desk_box){b.x + 12, row, b.w - 24, ROW}, mx, my);
+            if (hover) desk_round((struct desk_box){b.x + 12, row + 1, b.w - 24, ROW - 2}, 0x253143);
+            desk_icon(b.x + 26, row + 1, 38, at < 0 ? DESK_FOLDER : DESK_PAPER, at < 0 ? FOLDER : LIGHT);
+            const char *label = at == BACK ? "Назад" : at == DIR_DOCUMENTS ? folders[DESK_DOCUMENTS] :
+                                at == DIR_PROJECTS ? folders[DESK_PROJECTS] : files[at];
+            desk_text(b.x + 84, row + 11, r - 16, label, LIGHT);
+        }
+        int foot = b.y + b.h - 24;
+        if (!store.writable) desk_text(b.x + 18, foot, r - 10, "Диск данных не доступен для записи", MUTED);
+        else if (current_folder != DESK_ROOT) desk_text(b.x + 18, foot, r - 10, folders[current_folder], MUTED);
+    } else if (id == NOTES) {
+        desk_round((struct desk_box){b.x + 12, b.y + 52, 76, 31}, 0x253143);
+        desk_round((struct desk_box){b.x + 94, b.y + 52, 101, 31}, 0x4e3c2a);
+        desk_text(b.x + 22, b.y + 58, b.x + 84, "Новый", LIGHT);
+        desk_text(b.x + 102, b.y + 58, b.x + 194, "Сохранить", LIGHT);
+        desk_text(b.x + 210, b.y + 58, r - 15, document < 0 ? "Без имени" : files[document], MUTED);
+        desk_round((struct desk_box){b.x + 12, b.y + 90, b.w - 24, b.h - 120}, 0x111a25);
+        int tr = 0, tc = 0, ncols = text_columns(b), nrows = text_rows(b);
+        for (size_t off = 0; off < length;) {
+            size_t n;
+            uint32_t cp = desk_utf8(content + off, length - off, &n);
+            if (tr >= scroll + nrows) break;
+            if (tr >= scroll && cp >= 32)
+                (void)desk_glyph(b.x + 18 + tc * CELL, b.y + 96 + (tr - scroll) * LINE, r - 15, cp, LIGHT);
+            advance(cp, ncols, &tr, &tc);
+            off += n;
+        }
+        if (id == top) {
+            position(caret, ncols, &tr, &tc);
+            if (tr >= scroll && tr < scroll + nrows)
+                desk_fill(b.x + 18 + tc * CELL, b.y + 98 + (tr - scroll) * LINE, 1, 17, GOLD);
+        }
+        desk_text(b.x + 14, b.y + b.h - 24, r - 12, notice, MUTED);
+    } else if (id == TASKS) {
+        desk_text(b.x + 18, b.y + 55, r - 15, "Открытые окна оболочки", GOLD);
+        unsigned row = 0;
+        for (int i = 0; i < WINDOWS; ++i) if (win[i].open) {
+            desk_text(b.x + 18, b.y + 86 + (int)row * 25, b.x + 163, names[i], LIGHT);
+            desk_text(b.x + 171, b.y + 86 + (int)row++ * 25, r - 15,
+                      win[i].minimized ? "Свёрнуто" : "Открыто", MUTED);
+        }
+        desk_text(b.x + 18, b.y + b.h - 46, r - 15, "Приложения пока не отдельные процессы.", MUTED);
+    } else {
+        desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0", LIGHT);
+        desk_text(b.x + 18, b.y + 90, r - 15, "x86-64 UEFI", MUTED);
+        desk_text(b.x + 18, b.y + 120, r - 15, (input_flags & 1) ? "Клавиатура PS/2 готова" : "Нет клавиатуры PS/2", MUTED);
+        desk_text(b.x + 18, b.y + 149, r - 15, (input_flags & 2) ? "Мышь PS/2 готова" : "Нет мыши PS/2", MUTED);
+        desk_text(b.x + 18, b.y + 178, r - 15, store.writable ? "Диск данных подключён" : "Нет диска данных для записи", MUTED);
+    }
+}
+
+static void draw(void)
+{
+    desk_wallpaper();
+    for (unsigned i = 0; i < 3; ++i) {
+        struct desk_box b = desktop_shortcuts[i];
+        if (contains(b, mx, my)) desk_round(b, 0x2b374b);
+        desk_icon(b.x + 15, b.y + 3, 50, i == 1 ? DESK_PAPER : DESK_FOLDER, i == 1 ? LIGHT : FOLDER);
+        desk_text(b.x + 9, b.y + 57, b.x + b.w, i == 2 ? folders[DESK_PROJECTS] : names[i], LIGHT);
+    }
+    int top = active();
+    for (unsigned i = 0; i < WINDOWS; ++i)
+        if (win[order[i]].open && !win[order[i]].minimized) draw_window(order[i], top);
+
+    struct desk_box panel = panel_box(), start = start_box();
+    desk_fill(panel.x, panel.y, panel.w, panel.h, PANEL);
+    desk_fill(panel.x, panel.y, panel.w, 1, 0x2c394d);
+    if (menu || contains(start, mx, my)) { desk_round(start, 0x1a2638); desk_outline(start, 0x414e61); }
+    desk_icon(24, panel.y + 8, 32, DESK_LOGO, LIGHT);
+    desk_text(66, panel.y + 16, 163, "StyleOS", LIGHT);
+    int n = 0;
+    for (int i = 0; i < WINDOWS; ++i) if (win[i].open) {
+        struct desk_box b = task_button(n++);
+        desk_round(b, i == top ? 0x202c3e : 0x172231);
+        if (i == top) accent(b);
+        desk_icon(b.x + 12, b.y + 12, 23, icons[i], LIGHT);
+        desk_text(b.x + 45, b.y + 14, b.x + b.w - 3, names[i], LIGHT);
+    }
+    desk_text(width - 93, panel.y + 16, width - 61, russian ? "RU" : "EN", MUTED);
+    desk_text(width - 59, panel.y + 16, width - 4, clock_text, LIGHT);
+    if (menu) {
+        struct desk_box m = menu_box();
+        desk_round(m, 0x1d2838);
+        desk_outline(m, STROKE);
+        static const int rows[] = {18, 62, 103, 163, 209};
+        static const uint8_t symbols[] = {DESK_FOLDER, DESK_INFO, DESK_TASK, DESK_RESTART, DESK_POWER};
+        static const char *const labels[] = {"Файлы", "О системе", "Задачи", "Перезагрузить", "Выключить"};
+        desk_fill(m.x + 17, m.y + 147, m.w - 34, 1, STROKE);
+        for (int i = 0; i < 5; ++i) {
+            int y = m.y + rows[i];
+            struct desk_box b = {m.x + 10, y - 1, m.w - 20, 38};
+            if (i == 0 || (i != 4 && contains(b, mx, my))) desk_round(b, 0x76572f);
+            desk_icon(m.x + 27, y + 6, 24, symbols[i], i == 4 ? 0x7b8595 : LIGHT);
+            desk_text(m.x + 76, y + 8, m.x + m.w - 10, labels[i], i == 4 ? 0x7b8595 : LIGHT);
+        }
+    }
+    /* Draw a visible cursor last without using any firmware callbacks. */
+    for (int i = 0; i < 14; ++i) desk_fill(mx, my + i, i / 2 + 2, 1, 0x0b1018);
+    for (int i = 1; i < 12; ++i) desk_fill(mx + 1, my + i, i / 2 + 1, 1, 0xf3f0e9);
+    desk_line(mx + 4, my + 10, mx + 8, my + 16, LIGHT);
+}
+
+static bool mouse(const struct desk_event *event)
+{
+    mx = clamp(mx + event->dx, 0, width - 1);
+    my = clamp(my + event->dy, 0, height - 1);
+    bool down = (event->buttons & 1) != 0;
+    if (down && !mouse_down) click(mx, my);
+    else if (down && drag >= 0) {
+        struct desk_box *b = &win[drag].box;
+        struct desk_box a = work_area();
+        int x = clamp(mx - drag_x, a.x, a.x + a.w - b->w);
+        int y = clamp(my - drag_y, a.y, a.y + a.h - b->h);
+        if (x != b->x || y != b->y) drag_moved = true;
+        b->x = x;
+        b->y = y;
+    } else if (!down && drag >= 0) {
+        if (drag_moved) arch_puts("STYLEOS DESKTOP WINDOW DRAG\n");
+        drag = -1;
+    }
+    bool refresh = down != mouse_down || event->dx || event->dy;
+    mouse_down = down;
+    return refresh;
+}
+
+static void initial_windows(void)
+{
+    int h = work_area().h;
+    win[FILES].box = (struct desk_box){width * 688 / 1536, h * 128 / 804, width * 756 / 1536, max(350, h * 419 / 804)};
+    win[NOTES].box = (struct desk_box){width * 405 / 1536, h * 175 / 804, width * 900 / 1536, h * 488 / 804};
+    win[TASKS].box = (struct desk_box){width / 3, h / 6, min(width / 2, 510), min(h * 4 / 5, 316)};
+    win[ABOUT].box = (struct desk_box){width / 3, h / 5, min(width / 2, 490), min(h * 4 / 5, 238)};
+    win[FILES].open = true;
+}
+
+static bool update_clock(void)
+{
+    unsigned h, m;
+    if (!desk_clock(&h, &m)) return false;
+    char values[5] = {(char)('0' + h / 10), (char)('0' + h % 10), ':', (char)('0' + m / 10), (char)('0' + m % 10)};
+    bool change = false;
+    for (unsigned i = 0; i < sizeof(values); ++i) {
+        if (clock_text[i] != values[i]) change = true;
+        clock_text[i] = values[i];
+    }
+    return change;
+}
+
+_Noreturn void desktop_v0_run(const struct desktop_surface *surface)
+{
+    width = (int)surface->width;
+    height = (int)surface->height;
+    if (width < 800 || height < 600) {
+        arch_puts("STYLEOS DESKTOP ERROR mode smaller than 800x600\n");
+        arch_halt();
+    }
+    mx = width / 2;
+    my = height * 3 / 4;
+    desk_draw_init(surface);
+    desk_store_mount(&store);
+    arch_puts(store.writable ? "STYLEOS DESKTOP DATA MOUNT\n" : "STYLEOS DESKTOP DATA UNAVAILABLE\n");
+    input_flags = desk_input_init();
+    arch_puts(input_flags & 1 ? "STYLEOS DESKTOP KEYBOARD PASS\n" : "STYLEOS DESKTOP KEYBOARD UNAVAILABLE\n");
+    arch_puts(input_flags & 2 ? "STYLEOS DESKTOP MOUSE PASS\n" : "STYLEOS DESKTOP MOUSE UNAVAILABLE\n");
+    initial_windows();
+    (void)update_clock();
+    draw();
+    arch_puts("STYLEOS DESKTOP READY\n");
+    unsigned tick = 0;
+    for (;;) {
+        struct desk_event e;
+        bool refresh = false;
+        for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i)
+            refresh |= e.mouse ? mouse(&e) : keyboard(e.key, e.modifiers);
+        if (++tick == 20000) { tick = 0; refresh |= update_clock(); }
+        if (refresh) draw();
+        for (unsigned i = 0; i < 64; ++i) __asm__ volatile("pause");
+    }
+}

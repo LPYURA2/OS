@@ -35,7 +35,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_bootpool=False, test_paging=False, test_paging_fault=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
-          test_disk_app=False, test_desktop_display=False):
+          test_disk_app=False, test_desktop_display=False, desktop_v0=False):
+    if desktop_v0 and arch != 'x86_64':
+        raise ValueError('desktop v0 requires x86-64 UEFI')
     if test_desktop_display and arch != 'x86_64':
         raise ValueError('desktop display check supports only x86-64 UEFI')
     if test_storage and arch != 'aarch64':
@@ -64,8 +66,11 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
                    'kernel/disk_app.c', 'kernel/disk_app_demo.c',
                    'boot/aarch64/disk_app_fdt.c', 'arch/aarch64/disk_app.c',
                    'arch/aarch64/disk_app_entry.S']
-    if test_desktop_display:
+    if test_desktop_display or desktop_v0:
         common += ['kernel/desktop_display.c', 'boot/x86_64/desktop_display.c']
+    if desktop_v0:
+        common += ['kernel/desktop_shell.c', 'kernel/desktop_draw.c',
+                   'kernel/desktop_store.c', 'arch/x86_64/desktop_io.c']
     ownership = test_ownership_plan or test_ownership_plan_invalid
     if ownership:
         common += ['kernel/ownership.c', 'kernel/ownership_plan.c',
@@ -127,6 +132,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_DISK_APP=1')
     if test_desktop_display:
         flags.append('-DSTYLEOS_TEST_DESKTOP_DISPLAY=1')
+    if desktop_v0:
+        flags.append('-DSTYLEOS_DESKTOP_V0=1')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -266,6 +273,8 @@ def main():
                           help='Dedicated AArch64 image only: load external disk app and execute EL0')
     negative.add_argument('--test-desktop-display', action='store_true',
                           help='Dedicated x86-64 UEFI image: framebuffer proof only')
+    negative.add_argument('--desktop-v0', action='store_true',
+                          help='Experimental interactive x86-64 UEFI desktop image')
     args = parser.parse_args()
     if args.test_storage and args.arch != 'aarch64':
         parser.error('--test-storage requires --arch aarch64')
@@ -273,6 +282,8 @@ def main():
         parser.error('--test-disk-app requires --arch aarch64')
     if args.test_desktop_display and args.arch != 'x86_64':
         parser.error('--test-desktop-display requires --arch x86_64')
+    if args.desktop_v0 and args.arch != 'x86_64':
+        parser.error('--desktop-v0 requires --arch x86_64')
     output = (args.output or ROOT / 'build' /
               ('exception' if args.test_exception else
                'bootpool' if args.test_bootpool else
@@ -284,12 +295,13 @@ def main():
                'user-processes' if args.test_user_processes else
                'storage' if args.test_storage else
                'disk-app' if args.test_disk_app else
+               'desktop-v0' if args.desktop_v0 else
                'desktop-display' if args.test_desktop_display else '')).resolve()
     if (args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
             args.test_user_processes or args.test_storage or args.test_disk_app or
-            args.test_desktop_display) and output == (ROOT / 'build').resolve():
+            args.test_desktop_display or args.desktop_v0) and output == (ROOT / 'build').resolve():
         parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
     records = []
@@ -301,11 +313,13 @@ def main():
                              args.test_ownership_plan_invalid, args.test_tasks,
                              args.test_user_processes, args.test_storage,
                              args.test_disk_app, **({'test_desktop_display': True}
-                                                   if args.test_desktop_display else {})))
+                                                   if args.test_desktop_display else {}),
+                             **({'desktop_v0': True} if args.desktop_v0 else {})))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS desktop display check' if args.test_desktop_display else
+        'prototype': 'StyleOS desktop v0' if args.desktop_v0 else
+                     'StyleOS desktop display check' if args.test_desktop_display else
                      'StyleOS T-P1.8B' if args.test_disk_app else
                      'StyleOS T-P1.8A' if args.test_storage else
                      'StyleOS T-P1.7' if args.test_user_processes else 'StyleOS T-P1.6',
@@ -319,6 +333,7 @@ def main():
         'test_ownership_plan_invalid': args.test_ownership_plan_invalid,
         'test_tasks': args.test_tasks,
         **({'test_desktop_display': True} if args.test_desktop_display else {}),
+        **({'desktop_v0': True} if args.desktop_v0 else {}),
         **({'test_disk_app': True, 'test_storage': False, 'test_user_processes': False,
             'compiler_flags': {arch: json.loads((output / arch / 'disk-app-compiler.json').read_text())['flags']
                                for arch in arches},
