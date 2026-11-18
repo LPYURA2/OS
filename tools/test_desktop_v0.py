@@ -49,6 +49,20 @@ class Frame:
         if actual != color:
             raise RuntimeError(f'guest pixel {(x, y)} is {actual}, not {color}')
 
+    def expect_changes_in(self, other, rectangles):
+        if (self.w, self.h) != (other.w, other.h) or self.pixels == other.pixels:
+            raise RuntimeError('expected actual local changes in the same display mode')
+        for y in range(self.h):
+            base = y * self.w * 3
+            same = [(max(0, x), min(self.w, x + w)) for x, top, w, h in rectangles
+                    if top <= y < top + h]
+            left = 0
+            for a, b in sorted(same) + [(self.w, self.w)]:
+                s, e = base + left * 3, base + a * 3
+                if e > s and self.pixels[s:e] != other.pixels[s:e]:
+                    raise RuntimeError(f'unexpected change outside damage on scanline {y}')
+                left = max(left, b)
+
 
 class Desktop:
     def __init__(self, proc, uart, out):
@@ -127,6 +141,7 @@ def vm(out, image, data, qemu, firmware, *, image_format, data_format):
     nvram, uart = out / 'vars.fd', out / 'COM1.log'
     shutil.copyfile(firmware[1], nvram)
     cmd = [qemu, '-M', 'pc', '-accel', 'tcg,thread=single', '-m', '256', '-smp', '1',
+           '-rtc', 'base=2026-11-18T12:00:00,clock=vm',
            '-net', 'none', '-display', 'none', '-vga', 'std', '-monitor', 'none', '-qmp', 'stdio',
            '-serial', f'file:{uart}', '-drive', f'if=pflash,format=raw,readonly=on,file={firmware[0]}',
            '-drive', f'if=pflash,format=raw,file={nvram}',
@@ -192,6 +207,22 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
         bw = w * 756 // 1536
         first.check(bx + 12, by, 'e6ad63')
         first.check(w // 2, h - 11, '101822')
+        before_x, before_y = q.x, q.y
+        q.move(before_x + 25, before_y + 15)
+        q.wait_uart('CURSOR DAMAGE PASS')
+        moved = q.screen('cursor-only')
+        boxes = [(before_x, before_y, 10, 17), (q.x, q.y, 10, 17)]
+        first.expect_changes_in(moved, boxes)
+        old = q.x, q.y
+        q.move(bx + 150, by + 71)
+        hover = q.screen('cursor-hover')
+        moved.expect_changes_in(hover, [(*old, 10, 17), (q.x, q.y, 10, 17),
+                                       (bx + 12, by + 54, bw - 24, 45)])
+        hover.check(bx + 20, by + 65, '253143')
+        q.move(before_x, before_y)
+        restored = q.screen('cursor-return')
+        if restored.pixels != first.pixels:
+            raise RuntimeError('moving out did not restore the exact original scene')
         q.click(70, h - 27)
         q.screen('menu').check(37, h - 54 - 273 + 19, '76572f')
         q.click(70, h - 27)
@@ -262,7 +293,9 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
         raise RuntimeError('unrecognized disk was written')
     return {'status': 'PASS', 'boot_format': boot_format, 'data_format': data_format,
             'boot_sha256': old_boot, 'resolution': [w, h], 'persisted_utf8': EXPECTED.decode(),
-            'checks': ['live VGA and Start menu pixels', 'PS/2 mouse move/minimize/restore/maximize',
+            'checks': ['live VGA and Start menu pixels', 'real PS/2 cursor changes only two small regions',
+                       'hover repaints only its row and cursor; no stale highlight or pointer',
+                       'PS/2 mouse move/minimize/restore/maximize',
                        'keyboard English/Cyrillic and backspace', 'save to separate IDE disk',
                        'restart from guest menu', 'reopen in fresh VM', 'disk bytes and UTF-8',
                        'unchanged system disk', 'foreign disk refusal without writes']}

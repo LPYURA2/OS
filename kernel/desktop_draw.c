@@ -3,12 +3,72 @@
 
 static const struct desktop_surface *fb;
 static int width, height;
+/* One offscreen strip instead of allocating a second full-size framebuffer.
+ * Even a small cursor box is painted completely before GOP writes begin. */
+enum { DESK_MAX_WIDTH = 4096, STRIP_HEIGHT = 32 };
+static uint32_t strip[DESK_MAX_WIDTH * STRIP_HEIGHT];
+static struct desk_box clip;
+
+static int lo(int a, int b) { return a < b ? a : b; }
+static int hi(int a, int b) { return a > b ? a : b; }
+static bool intersects(struct desk_box a, struct desk_box b)
+{
+    return a.w > 0 && a.h > 0 && b.w > 0 && b.h > 0 &&
+           a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+bool desk_box_equal(struct desk_box a, struct desk_box b)
+{
+    return a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h;
+}
+bool desk_clip_visible(struct desk_box b) { return intersects(clip, b); }
+
+void desk_damage_add(struct desk_damage *d, struct desk_box b)
+{
+    if (d->all || b.w <= 0 || b.h <= 0) return;
+    for (unsigned i = 0; i < d->count;) {
+        struct desk_box a = d->boxes[i];
+        if (!intersects(a, b)) { ++i; continue; }
+        int x = lo(a.x, b.x), y = lo(a.y, b.y);
+        struct desk_box u = {x, y, hi(a.x + a.w, b.x + b.w) - x, hi(a.y + a.h, b.y + b.h) - y};
+        /* Do not turn a diagonal or distant pointer move into a large update. */
+        if (u.w * u.h > a.w * a.h + b.w * b.h) { ++i; continue; }
+        b = u;
+        d->boxes[i] = d->boxes[--d->count];
+        i = 0;
+    }
+    if (d->count == DESK_DAMAGE_CAPACITY) d->all = true;
+    else d->boxes[d->count++] = b;
+}
 
 void desk_draw_init(const struct desktop_surface *surface)
 {
     fb = surface;
     width = (int)surface->width;
     height = (int)surface->height;
+}
+
+size_t desk_present(const struct desk_damage *damage, void (*draw_scene)(void))
+{
+    size_t writes = 0;
+    if (width > DESK_MAX_WIDTH) return 0;
+    for (unsigned at = 0; at < (damage->all ? 1u : damage->count); ++at) {
+        struct desk_box b = damage->all ? (struct desk_box){0, 0, width, height} : damage->boxes[at];
+        int x = hi(0, b.x), end = lo(width, b.x + b.w);
+        if (x >= end) continue;
+        int bottom = lo(height, b.y + b.h);
+        for (int y = hi(0, b.y); y < bottom; y += STRIP_HEIGHT) {
+            clip = (struct desk_box){x, y, end - x, lo(STRIP_HEIGHT, bottom - y)};
+            draw_scene();
+            for (int row = 0; row < clip.h; ++row) {
+                volatile uint32_t *to = (volatile uint32_t *)fb->base + (size_t)(y + row) * fb->stride + x;
+                const uint32_t *from = strip + (size_t)row * clip.w;
+                for (int col = 0; col < clip.w; ++col) to[col] = from[col];
+            }
+            writes += (size_t)clip.w * clip.h;
+        }
+    }
+    clip = (struct desk_box){0};
+    return writes;
 }
 
 static uint32_t native(uint32_t c)
@@ -20,14 +80,14 @@ static uint32_t native(uint32_t c)
 void desk_fill(int x, int y, int w, int h, uint32_t rgb)
 {
     int x1 = x + w, y1 = y + h;
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x1 > width) x1 = width;
-    if (y1 > height) y1 = height;
+    x = hi(x, clip.x);
+    y = hi(y, clip.y);
+    x1 = lo(x1, clip.x + clip.w);
+    y1 = lo(y1, clip.y + clip.h);
     if (x >= x1 || y >= y1) return;
     uint32_t color = native(rgb);
-    volatile uint32_t *line = (volatile uint32_t *)fb->base + (size_t)y * fb->stride + x;
-    for (int row = y; row < y1; ++row, line += fb->stride)
+    uint32_t *line = strip + (size_t)(y - clip.y) * clip.w + (x - clip.x);
+    for (int row = y; row < y1; ++row, line += clip.w)
         for (int col = 0; col < x1 - x; ++col) line[col] = color;
 }
 
@@ -42,7 +102,7 @@ static uint32_t mix(uint32_t a, uint32_t b, unsigned t, unsigned max)
 void desk_wallpaper(void)
 {
     /* Navy background and two low angular folds from the reference. */
-    for (int row = 0; row < height; ++row) {
+    for (int row = clip.y; row < clip.y + clip.h; ++row) {
         int t = row * 864 / height;
         uint32_t ground = t < 480 ? mix(0x192332, 0x1d2a3e, (unsigned)t, 480) :
                          mix(0x1d2a3e, 0x162031, (unsigned)(t - 480), 384);
@@ -122,17 +182,20 @@ int desk_glyph(int x, int y, int right, uint32_t cp, uint32_t rgb)
                  cp == 0x401 ? 95 : cp >= 0x410 && cp <= 0x44f ? 96 + cp - 0x410 :
                  cp == 0x451 ? 160 : '?' - 32;
     const struct desk_font_glyph *f = &desk_font[g];
+    if (!desk_clip_visible((struct desk_box){x, y, 16, 20})) return f->step;
     uint32_t color = native(rgb);
     for (int row = 0; row < 20; ++row) {
         int yy = y + row;
-        if (yy < 0 || yy >= height) continue;
+        if (yy < clip.y || yy >= clip.y + clip.h) continue;
         uint32_t mask = f->rows[row];
-        volatile uint32_t *line = (volatile uint32_t *)fb->base + (size_t)yy * fb->stride;
+        uint32_t *line = strip + (size_t)(yy - clip.y) * clip.w;
         for (int col = 0; mask && x + col < right; ++col, mask >>= 2) {
             int xx = x + col;
             unsigned alpha = mask & 3;
-            if (alpha && xx >= 0 && xx < width)
-                line[xx] = alpha == 3 ? color : mix(line[xx], color, alpha, 3);
+            if (alpha && xx >= clip.x && xx < clip.x + clip.w) {
+                int i = xx - clip.x;
+                line[i] = alpha == 3 ? color : mix(line[i], color, alpha, 3);
+            }
         }
     }
     return f->step;

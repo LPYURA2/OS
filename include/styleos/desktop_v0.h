@@ -7,8 +7,19 @@
 #include <stdint.h>
 
 struct desk_box { int x, y, w, h; };
+enum { DESK_DAMAGE_CAPACITY = 24 };
+struct desk_damage {
+    struct desk_box boxes[DESK_DAMAGE_CAPACITY];
+    unsigned count;
+    bool all;
+};
 
 void desk_draw_init(const struct desktop_surface *surface);
+bool desk_box_equal(struct desk_box a, struct desk_box b);
+bool desk_clip_visible(struct desk_box box);
+void desk_damage_add(struct desk_damage *damage, struct desk_box box);
+/* Complete each affected strip in RAM before writing that strip to GOP. */
+size_t desk_present(const struct desk_damage *damage, void (*draw_scene)(void));
 void desk_wallpaper(void);
 void desk_fill(int x, int y, int w, int h, uint32_t rgb);
 void desk_round(struct desk_box b, uint32_t rgb);

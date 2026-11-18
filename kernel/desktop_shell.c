@@ -4,7 +4,7 @@
 enum { FILES, NOTES, TASKS, ABOUT, WINDOWS };
 enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
        WINDOW = 0x171f2c, STROKE = 0x586272, PANEL = 0x101822, CELL = 11,
-       LINE = 24, TITLE = 42, ROW = 45 };
+       LINE = 24, TITLE = 42, ROW = 45, CURSOR_W = 10, CURSOR_H = 17 };
 
 static const char *const names[WINDOWS] = {"Файлы", "Заметки", "Задачи", "О системе"};
 static const char *const folders[] = {"Файлы", "Документы", "Проекты"};
@@ -50,6 +50,8 @@ static int active(void)
         if (win[order[i]].open && !win[order[i]].minimized) return order[i];
     return -1;
 }
+
+static bool visible(int id) { return win[id].open && !win[id].minimized; }
 static void front(int id)
 {
     unsigned i = 0;
@@ -252,6 +254,95 @@ static void pick_file(int item)
 }
 
 static const struct desk_box desktop_shortcuts[] = {{28,38,80,84}, {28,142,80,84}, {28,246,80,84}};
+static const int menu_rows[] = {18, 62, 103, 163, 209};
+
+static struct desk_box file_highlight(struct desk_box b, unsigned row)
+{
+    return (struct desk_box){b.x + 12, b.y + TITLE + 12 + (int)row * ROW, b.w - 24, ROW};
+}
+
+static struct desk_box menu_highlight(struct desk_box menu, unsigned row)
+{
+    return (struct desk_box){menu.x + 10, menu.y + menu_rows[row] - 1, menu.w - 20, 38};
+}
+
+struct visual {
+    struct desk_box boxes[WINDOWS], hot[4];
+    bool shown[WINDOWS], open[WINDOWS];
+    int z[WINDOWS], top, x, y;
+    bool menu, russian, writable;
+    unsigned folder;
+    uint32_t generations[DESK_DOCS];
+};
+
+static void take_visual(struct visual *v)
+{
+    *v = (struct visual){.top = active(), .x = mx, .y = my, .menu = menu,
+                        .russian = russian, .folder = current_folder, .writable = store.writable};
+    for (int id = 0; id < WINDOWS; ++id) {
+        v->boxes[id] = win[id].box;
+        v->shown[id] = visible(id);
+        v->open[id] = win[id].open;
+        v->z[order[id]] = id;
+    }
+    for (unsigned i = 0; i < DESK_DOCS; ++i) v->generations[i] = store.file[i].generation;
+
+    for (unsigned i = 0; i < sizeof(desktop_shortcuts) / sizeof(*desktop_shortcuts); ++i)
+        if (contains(desktop_shortcuts[i], mx, my)) v->hot[0] = desktop_shortcuts[i];
+    if (!menu && contains(start_box(), mx, my)) v->hot[1] = start_box();
+    if (v->top == FILES) {
+        const struct desk_box b = win[FILES].box;
+        int items[DESK_DOCS + 2];
+        unsigned n = file_rows(items);
+        for (unsigned i = 0; i < n; ++i) {
+            const struct desk_box row = file_highlight(b, i);
+            if (row.y + 42 > b.y + b.h - 20) break;
+            if (contains(row, mx, my)) { v->hot[2] = row; break; }
+        }
+    }
+    if (menu) for (unsigned i = 1; i < 4; ++i) {
+        struct desk_box row = menu_highlight(menu_box(), i);
+        if (contains(row, mx, my)) v->hot[3] = row;
+    }
+}
+
+static void invalidate(struct desk_damage *d, const struct visual *old,
+                       const struct visual *next, bool editor, bool clock)
+{
+    bool task_state = false, panel = old->top != next->top;
+    for (int id = 0; id < WINDOWS; ++id) {
+        bool visibility = old->shown[id] != next->shown[id];
+        if (visibility || old->open[id] != next->open[id]) task_state = true;
+        if (old->open[id] != next->open[id]) panel = true;
+        bool focus = old->top != next->top && (old->top == id || next->top == id);
+        if (visibility || focus || old->z[id] != next->z[id] ||
+            !desk_box_equal(old->boxes[id], next->boxes[id])) {
+            if (old->shown[id]) desk_damage_add(d, old->boxes[id]);
+            if (next->shown[id]) desk_damage_add(d, next->boxes[id]);
+        }
+    }
+    bool files = old->folder != next->folder || old->writable != next->writable;
+    for (unsigned i = 0; i < DESK_DOCS; ++i)
+        if (old->generations[i] != next->generations[i]) files = true;
+    if (files && next->shown[FILES]) desk_damage_add(d, next->boxes[FILES]);
+    if (editor && next->shown[NOTES]) desk_damage_add(d, next->boxes[NOTES]);
+    if (task_state && next->shown[TASKS]) desk_damage_add(d, next->boxes[TASKS]);
+    if (old->writable != next->writable && next->shown[ABOUT]) desk_damage_add(d, next->boxes[ABOUT]);
+
+    if (panel) desk_damage_add(d, panel_box());
+    else if (clock || old->russian != next->russian)
+        desk_damage_add(d, (struct desk_box){width - 96, panel_box().y + 14, 96, 24});
+    if (old->menu != next->menu) {
+        desk_damage_add(d, start_box());
+        desk_damage_add(d, menu_box());
+    }
+    for (unsigned i = 0; i < sizeof(old->hot) / sizeof(*old->hot); ++i) {
+        if (!desk_box_equal(old->hot[i], next->hot[i])) {
+            desk_damage_add(d, old->hot[i]);
+            desk_damage_add(d, next->hot[i]);
+        }
+    }
+}
 static void maximize(int id)
 {
     struct window *w = &win[id];
@@ -354,7 +445,7 @@ static void draw_window(int id, int top)
         for (unsigned i = 0; i < count; ++i) {
             int at = items[i], row = b.y + TITLE + 12 + (int)i * ROW;
             if (row + 42 > b.y + b.h - 20) break;
-            bool hover = id == top && contains((struct desk_box){b.x + 12, row, b.w - 24, ROW}, mx, my);
+            bool hover = id == top && contains(file_highlight(b, i), mx, my);
             if (hover) desk_round((struct desk_box){b.x + 12, row + 1, b.w - 24, ROW - 2}, 0x253143);
             desk_icon(b.x + 26, row + 1, 38, at < 0 ? DESK_FOLDER : DESK_PAPER, at < 0 ? FOLDER : LIGHT);
             const char *label = at == BACK ? "Назад" : at == DIR_DOCUMENTS ? folders[DESK_DOCUMENTS] :
@@ -410,13 +501,14 @@ static void draw(void)
     desk_wallpaper();
     for (unsigned i = 0; i < 3; ++i) {
         struct desk_box b = desktop_shortcuts[i];
+        if (!desk_clip_visible(b)) continue;
         if (contains(b, mx, my)) desk_round(b, 0x2b374b);
         desk_icon(b.x + 15, b.y + 3, 50, i == 1 ? DESK_PAPER : DESK_FOLDER, i == 1 ? LIGHT : FOLDER);
         desk_text(b.x + 9, b.y + 57, b.x + b.w, i == 2 ? folders[DESK_PROJECTS] : names[i], LIGHT);
     }
     int top = active();
     for (unsigned i = 0; i < WINDOWS; ++i)
-        if (win[order[i]].open && !win[order[i]].minimized) draw_window(order[i], top);
+        if (visible(order[i]) && desk_clip_visible(win[order[i]].box)) draw_window(order[i], top);
 
     struct desk_box panel = panel_box(), start = start_box();
     desk_fill(panel.x, panel.y, panel.w, panel.h, PANEL);
@@ -434,17 +526,16 @@ static void draw(void)
     }
     desk_text(width - 93, panel.y + 16, width - 61, russian ? "RU" : "EN", MUTED);
     desk_text(width - 59, panel.y + 16, width - 4, clock_text, LIGHT);
-    if (menu) {
+    if (menu && desk_clip_visible(menu_box())) {
         struct desk_box m = menu_box();
         desk_round(m, 0x1d2838);
         desk_outline(m, STROKE);
-        static const int rows[] = {18, 62, 103, 163, 209};
         static const uint8_t symbols[] = {DESK_FOLDER, DESK_INFO, DESK_TASK, DESK_RESTART, DESK_POWER};
         static const char *const labels[] = {"Файлы", "О системе", "Задачи", "Перезагрузить", "Выключить"};
         desk_fill(m.x + 17, m.y + 147, m.w - 34, 1, STROKE);
         for (int i = 0; i < 5; ++i) {
-            int y = m.y + rows[i];
-            struct desk_box b = {m.x + 10, y - 1, m.w - 20, 38};
+            int y = m.y + menu_rows[i];
+            struct desk_box b = menu_highlight(m, (unsigned)i);
             if (i == 0 || (i != 4 && contains(b, mx, my))) desk_round(b, 0x76572f);
             desk_icon(m.x + 27, y + 6, 24, symbols[i], i == 4 ? 0x7b8595 : LIGHT);
             desk_text(m.x + 76, y + 8, m.x + m.w - 10, labels[i], i == 4 ? 0x7b8595 : LIGHT);
@@ -461,7 +552,8 @@ static bool mouse(const struct desk_event *event)
     mx = clamp(mx + event->dx, 0, width - 1);
     my = clamp(my + event->dy, 0, height - 1);
     bool down = (event->buttons & 1) != 0;
-    if (down && !mouse_down) click(mx, my);
+    bool pressed = down && !mouse_down;
+    if (pressed) click(mx, my);
     else if (down && drag >= 0) {
         struct desk_box *b = &win[drag].box;
         struct desk_box a = work_area();
@@ -474,9 +566,8 @@ static bool mouse(const struct desk_event *event)
         if (drag_moved) arch_puts("STYLEOS DESKTOP WINDOW DRAG\n");
         drag = -1;
     }
-    bool refresh = down != mouse_down || event->dx || event->dy;
     mouse_down = down;
-    return refresh;
+    return pressed;
 }
 
 static void initial_windows(void)
@@ -520,16 +611,38 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     arch_puts(input_flags & 2 ? "STYLEOS DESKTOP MOUSE PASS\n" : "STYLEOS DESKTOP MOUSE UNAVAILABLE\n");
     initial_windows();
     (void)update_clock();
-    draw();
+    (void)desk_present(&(struct desk_damage){.all = true}, draw);
     arch_puts("STYLEOS DESKTOP READY\n");
     unsigned tick = 0;
+    bool cursor_proven = false;
     for (;;) {
         struct desk_event e;
-        bool refresh = false;
-        for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i)
-            refresh |= e.mouse ? mouse(&e) : keyboard(e.key, e.modifiers);
-        if (++tick == 20000) { tick = 0; refresh |= update_clock(); }
-        if (refresh) draw();
+        struct visual old, next;
+        bool captured = false, editor = false, clock = false;
+        for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i) {
+            if (!captured) { take_visual(&old); captured = true; }
+            if (e.mouse) editor |= mouse(&e) && active() == NOTES;
+            else editor |= keyboard(e.key, e.modifiers) && active() == NOTES;
+        }
+        if (++tick == 20000) { tick = 0; clock = update_clock(); }
+        if (captured || clock) {
+            struct desk_damage damage = {0};
+            bool cursor_only = false;
+            if (captured) {
+                take_visual(&next);
+                invalidate(&damage, &old, &next, editor, clock);
+                if (old.x != next.x || old.y != next.y) {
+                    cursor_only = !damage.all && !damage.count;
+                    desk_damage_add(&damage, (struct desk_box){old.x, old.y, CURSOR_W, CURSOR_H});
+                    desk_damage_add(&damage, (struct desk_box){next.x, next.y, CURSOR_W, CURSOR_H});
+                }
+            } else desk_damage_add(&damage, (struct desk_box){width - 96, panel_box().y + 14, 96, 24});
+            size_t writes = desk_present(&damage, draw);
+            if (!cursor_proven && cursor_only && writes && writes <= 2u * CURSOR_W * CURSOR_H) {
+                arch_puts("STYLEOS DESKTOP CURSOR DAMAGE PASS\n");
+                cursor_proven = true;
+            }
+        }
         for (unsigned i = 0; i < 64; ++i) __asm__ volatile("pause");
     }
 }
