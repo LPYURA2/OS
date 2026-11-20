@@ -1,0 +1,144 @@
+================ 756 application regression ==================
+TEA PREVIEW BUILD PASS: build/755/Documents.tea bytes 30384
+grammar 8 checks PASS
+tracked changes insert/delete/accept/reject UTF-8 PASS
+review private serialization roundtrip + corruption PASS
+empty, pending insert deletion, accepted deletion PASS
+review UI spans, accept all / reject all PASS
+reject embedded NUL in serialized text PASS
+StyleOS Documents review engine: ALL PASS
+40 deterministic edit/reload scenarios PASS
+StyleOS documents model: tests PASS
+C11 DOCX export: PASS
+gateway PASS
+import boundary/fuzz PASS (1200 cases)
+UI 14 views, 8 tabs, UTF8 edits PASS
+grammar 8 checks PASS
+tracked changes insert/delete/accept/reject UTF-8 PASS
+review private serialization roundtrip + corruption PASS
+empty, pending insert deletion, accepted deletion PASS
+review UI spans, accept all / reject all PASS
+reject embedded NUL in serialized text PASS
+StyleOS Documents review engine: ALL PASS
+40 deterministic edit/reload scenarios PASS
+StyleOS documents model: tests PASS
+C11 DOCX export: PASS
+gateway PASS
+import boundary/fuzz PASS (1200 cases)
+UI 14 views, 8 tabs, UTF8 edits PASS
+test_original_iso_when_present (test_audit_744.Audits.test_original_iso_when_present) ... skipped 'original 744 ISO not provided here'
+test_rejects_empty_input (test_audit_744.Audits.test_rejects_empty_input) ... ok
+test_rejects_invalid_fat (test_audit_744.Audits.test_rejects_invalid_fat) ... ok
+test_sha256 (test_audit_744.Audits.test_sha256) ... ok
+test_document_xml_roundtrip_using_python_docx_if_available (test_documents_docx.OpenXmlTests.test_document_xml_roundtrip_using_python_docx_if_available) ... C11 DOCX export: PASS
+ok
+test_modified_bytes_rejected (test_documents_package.PackageTests.test_modified_bytes_rejected) ... ok
+test_rebuild_identical (test_documents_package.PackageTests.test_rebuild_identical) ... ok
+test_truncation_rejected (test_documents_package.PackageTests.test_truncation_rejected) ... ok
+test_valid (test_documents_package.PackageTests.test_valid) ... ok
+test_embedded_744_when_available (test_embedded_tea_catalog.TeaAuditTests.test_embedded_744_when_available) ... skipped '744 is not mounted; synthetic tests still run'
+test_limit (test_embedded_tea_catalog.TeaAuditTests.test_limit) ... ok
+test_modification_detected (test_embedded_tea_catalog.TeaAuditTests.test_modification_detected) ... ok
+test_truncated_and_invalid_manifest (test_embedded_tea_catalog.TeaAuditTests.test_truncated_and_invalid_manifest) ... ok
+test_valid_fixture (test_embedded_tea_catalog.TeaAuditTests.test_valid_fixture) ... ok
+test_binary_tamper_refused (test_preinstall_bundle.BundleTests.test_binary_tamper_refused) ... ok
+test_installer_consumes_bundle_without_shell_dependency (test_preinstall_bundle.BundleTests.test_installer_consumes_bundle_without_shell_dependency) ... ok
+test_not_bootable_and_requires_guest_loader (test_preinstall_bundle.BundleTests.test_not_bootable_and_requires_guest_loader) ... ok
+test_repro_and_validation (test_preinstall_bundle.BundleTests.test_repro_and_validation) ... ok
+test_bad_zip_rejected_without_mutation (test_system_apps.PreinstallTests.test_bad_zip_rejected_without_mutation) ... ok
+test_corrupted_payload_does_not_replace_current (test_system_apps.PreinstallTests.test_corrupted_payload_does_not_replace_current) ... ok
+test_duplicate_json_key_rejected (test_system_apps.PreinstallTests.test_duplicate_json_key_rejected) ... ok
+test_future_gui_is_separate_from_installation (test_system_apps.PreinstallTests.test_future_gui_is_separate_from_installation) ... ok
+test_initial_preinstall_registers_separate_process (test_system_apps.PreinstallTests.test_initial_preinstall_registers_separate_process) ... ok
+test_not_declared_installable_in_744 (test_system_apps.PreinstallTests.test_not_declared_installable_in_744) ... ok
+test_package_bigger_than_limit_rejected (test_system_apps.PreinstallTests.test_package_bigger_than_limit_rejected) ... ok
+test_pointer_tampering_denied (test_system_apps.PreinstallTests.test_pointer_tampering_denied) ... ok
+test_production_refused_without_mutation (test_system_apps.PreinstallTests.test_production_refused_without_mutation) ... ok
+test_reinstall_preserves_user_data (test_system_apps.PreinstallTests.test_reinstall_preserves_user_data) ... ok
+test_release_tampering_denied (test_system_apps.PreinstallTests.test_release_tampering_denied) ... ok
+test_stage_is_idempotent (test_system_apps.PreinstallTests.test_stage_is_idempotent) ... ok
+test_symlink_in_system_path_denied (test_system_apps.PreinstallTests.test_symlink_in_system_path_denied) ... ok
+test_symlink_package_denied (test_system_apps.PreinstallTests.test_symlink_package_denied) ... ok
+test_symlink_pointer_denied (test_system_apps.PreinstallTests.test_symlink_pointer_denied) ... ok
+test_unknown_rollback_refused (test_system_apps.PreinstallTests.test_unknown_rollback_refused) ... ok
+test_update_and_rollback_keep_prior_generation (test_system_apps.PreinstallTests.test_update_and_rollback_keep_prior_generation) ... ok
+test_wrong_app_id_rejected (test_system_apps.PreinstallTests.test_wrong_app_id_rejected) ... ok
+test_wrong_interface_rejected (test_system_apps.PreinstallTests.test_wrong_interface_rejected) ... ok
+test_dynamic_interpreter_rejected (test_tea_package.ElfBoundaryTests.test_dynamic_interpreter_rejected) ... ok
+test_entry_not_executable (test_tea_package.ElfBoundaryTests.test_entry_not_executable) ... ok
+test_genuine_freestanding_elf (test_tea_package.ElfBoundaryTests.test_genuine_freestanding_elf) ... ok
+test_malformed_magic (test_tea_package.ElfBoundaryTests.test_malformed_magic) ... ok
+test_writable_code_rejected (test_tea_package.ElfBoundaryTests.test_writable_code_rejected) ... ok
+test_wrong_cpu (test_tea_package.ElfBoundaryTests.test_wrong_cpu) ... ok
+
+----------------------------------------------------------------------
+Ran 43 tests in 1.051s
+
+OK (skipped=2)
+TEA PREVIEW BUILD PASS: /tmp/tmp3wvrpy3x/repeat.tea bytes 30384
+DOCUMENTS EDIT: UTF-8 search/replace, transactional capacity, comments, undo/redo PASS
+DOCUMENTS EDIT RUNTIME: find, replace one/all, undo/redo, select all, save/open PASS
+DOCS RUNTIME HOST PASS: scoped IO, two windows, UTF-8, deny, save, load, rendering, shortcuts
+DOCUMENTS EDIT: UTF-8 search/replace, transactional capacity, comments, undo/redo PASS
+DOCUMENTS EDIT RUNTIME: find, replace one/all, undo/redo, select all, save/open PASS
+DOCS RUNTIME HOST PASS: scoped IO, two windows, UTF-8, deny, save, load, rendering, shortcuts
+DOCUMENTS EDIT RUNTIME: find, replace one/all, undo/redo, select all, save/open PASS
+TEA PREVIEW BUILD PASS: build/756/Documents.tea bytes 30384
+Import binary direct 0 bytes 46
+ELF HOST EXECUTION PASS: real x86-64 ELF entry/event/draw, TXT+DOCX save/open, grammar API, isolated broker
+test_modified_bytes_rejected (test_documents_package.PackageTests.test_modified_bytes_rejected) ... ok
+test_rebuild_identical (test_documents_package.PackageTests.test_rebuild_identical) ... ok
+test_truncation_rejected (test_documents_package.PackageTests.test_truncation_rejected) ... ok
+test_valid (test_documents_package.PackageTests.test_valid) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.777s
+
+OK
+TEA PREVIEW BUILD PASS: /tmp/tmp3c20iziq/repeat.tea bytes 30384
+TEA PREVIEW BUILD PASS: build/756/rebuilt.tea bytes 30384
+756 .tea REPRODUCIBLE PASS
+756 HOST TESTS PASS; STYLEOS GUEST, QEMU AND VIRTUALBOX NOT RUN
+================ 757 provisioning regression ================
+test_dynamic_interpreter_rejected (tests.test_tea_package.ElfBoundaryTests.test_dynamic_interpreter_rejected) ... ok
+test_entry_not_executable (tests.test_tea_package.ElfBoundaryTests.test_entry_not_executable) ... ok
+test_genuine_freestanding_elf (tests.test_tea_package.ElfBoundaryTests.test_genuine_freestanding_elf) ... ok
+test_malformed_magic (tests.test_tea_package.ElfBoundaryTests.test_malformed_magic) ... ok
+test_writable_code_rejected (tests.test_tea_package.ElfBoundaryTests.test_writable_code_rejected) ... ok
+test_wrong_cpu (tests.test_tea_package.ElfBoundaryTests.test_wrong_cpu) ... ok
+test_bad_zip_rejected_without_mutation (tests.test_system_apps.PreinstallTests.test_bad_zip_rejected_without_mutation) ... ok
+test_corrupted_payload_does_not_replace_current (tests.test_system_apps.PreinstallTests.test_corrupted_payload_does_not_replace_current) ... ok
+test_duplicate_json_key_rejected (tests.test_system_apps.PreinstallTests.test_duplicate_json_key_rejected) ... ok
+test_future_gui_is_separate_from_installation (tests.test_system_apps.PreinstallTests.test_future_gui_is_separate_from_installation) ... ok
+test_initial_preinstall_registers_separate_process (tests.test_system_apps.PreinstallTests.test_initial_preinstall_registers_separate_process) ... ok
+test_not_declared_installable_in_744 (tests.test_system_apps.PreinstallTests.test_not_declared_installable_in_744) ... ok
+test_package_bigger_than_limit_rejected (tests.test_system_apps.PreinstallTests.test_package_bigger_than_limit_rejected) ... ok
+test_pointer_tampering_denied (tests.test_system_apps.PreinstallTests.test_pointer_tampering_denied) ... ok
+test_production_refused_without_mutation (tests.test_system_apps.PreinstallTests.test_production_refused_without_mutation) ... ok
+test_reinstall_preserves_user_data (tests.test_system_apps.PreinstallTests.test_reinstall_preserves_user_data) ... ok
+test_release_tampering_denied (tests.test_system_apps.PreinstallTests.test_release_tampering_denied) ... ok
+test_stage_is_idempotent (tests.test_system_apps.PreinstallTests.test_stage_is_idempotent) ... ok
+test_symlink_in_system_path_denied (tests.test_system_apps.PreinstallTests.test_symlink_in_system_path_denied) ... ok
+test_symlink_package_denied (tests.test_system_apps.PreinstallTests.test_symlink_package_denied) ... ok
+test_symlink_pointer_denied (tests.test_system_apps.PreinstallTests.test_symlink_pointer_denied) ... ok
+test_unknown_rollback_refused (tests.test_system_apps.PreinstallTests.test_unknown_rollback_refused) ... ok
+test_update_and_rollback_keep_prior_generation (tests.test_system_apps.PreinstallTests.test_update_and_rollback_keep_prior_generation) ... ok
+test_wrong_app_id_rejected (tests.test_system_apps.PreinstallTests.test_wrong_app_id_rejected) ... ok
+test_wrong_interface_rejected (tests.test_system_apps.PreinstallTests.test_wrong_interface_rejected) ... ok
+test_binary_tamper_refused (tests.test_preinstall_bundle.BundleTests.test_binary_tamper_refused) ... ok
+test_installer_consumes_bundle_without_shell_dependency (tests.test_preinstall_bundle.BundleTests.test_installer_consumes_bundle_without_shell_dependency) ... ok
+test_not_bootable_and_requires_guest_loader (tests.test_preinstall_bundle.BundleTests.test_not_bootable_and_requires_guest_loader) ... ok
+test_repro_and_validation (tests.test_preinstall_bundle.BundleTests.test_repro_and_validation) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 0.098s
+
+OK
+DEVELOPMENT PREINSTALL BUNDLE PASS, NOT BOOTABLE: build/757/StyleOS-Documents-System-Preinstall-DEV.zip
+PREINSTALL BUNDLE VERIFY PASS: 418afa0de7aeabf2896ad4de80971b07e060571b918ce06beb0df8cca117d80a
+PREINSTALL BUILD REPRODUCIBILITY PASS
+HOST INSTALLER STAGE PASS, NOT 744: 418afa0de7aeabf2896ad4de80971b07e060571b918ce06beb0df8cca117d80a
+VERIFY PASS (HOST ONLY): 418afa0de7aeabf2896ad4de80971b07e060571b918ce06beb0df8cca117d80a
+PRODUCTION POLICY REFUSAL PASS
+/mnt/data/styleos-work/control-744/StyleOS-Install-x64.iso: OK
+757 HOST PREINSTALL CONTRACT PASS; 744 GUEST, QEMU, VIRTUALBOX NOT RUN

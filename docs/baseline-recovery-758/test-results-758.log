@@ -1,0 +1,22 @@
+test_accept_native (test_baseline_730.ContractTests.test_accept_native) ... ok
+test_reject_absent_documents (test_baseline_730.ContractTests.test_reject_absent_documents) ... ok
+test_reject_arbitrary_path (test_baseline_730.ContractTests.test_reject_arbitrary_path) ... ok
+test_reject_dll (test_baseline_730.ContractTests.test_reject_dll) ... ok
+test_reject_duplicate_id (test_baseline_730.ContractTests.test_reject_duplicate_id) ... ok
+test_reject_empty_apps (test_baseline_730.ContractTests.test_reject_empty_apps) ... ok
+test_reject_exe (test_baseline_730.ContractTests.test_reject_exe) ... ok
+test_reject_missing_args (test_baseline_730.ContractTests.test_reject_missing_args) ... usage: python3 -m unittest [-h] [--730 ZIP730] [--744 ZIP744]
+                           [--catalog CATALOG] [--output OUTPUT]
+python3 -m unittest: error: provide an archive or catalog
+ok
+test_reject_modified_binary (test_baseline_730.ContractTests.test_reject_modified_binary) ... ok
+test_reject_no_preinstall (test_baseline_730.ContractTests.test_reject_no_preinstall) ... ok
+test_reject_sapp (test_baseline_730.ContractTests.test_reject_sapp) ... ok
+test_reject_shell_embedded_app (test_baseline_730.ContractTests.test_reject_shell_embedded_app) ... ok
+test_reject_unsupported_baseline (test_baseline_730.ContractTests.test_reject_unsupported_baseline) ... ok
+test_reject_user_volume (test_baseline_730.ContractTests.test_reject_user_volume) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.003s
+
+OK

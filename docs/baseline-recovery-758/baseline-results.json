@@ -1,0 +1,34 @@
+{
+  "baseline_730": {
+    "baseline": "730",
+    "efi_sha256": "e84740348fbfd32ce5808258614c072c673db806003ae26b632b115fee317e7e",
+    "iso_efi_matches_esp": true,
+    "iso_sha256": "175db7b0d8ec777a2b2da0c69b3b41b94ac5e837f49a7da25dcb49243da7ce91",
+    "native_source_code_in_archive": false,
+    "standalone_documents_tea_in_iso": false,
+    "unchanged": true,
+    "verified_by": "read-only binary+checksum audit, not a VM boot",
+    "zip_sha256": "ae9641da573bc8618dcde06b6effa30fb8fb058adae35a7e00df4a2cafd1f407"
+  },
+  "baseline_744": {
+    "baseline": "744",
+    "efi_sha256": "be89054aaae7efd10f83b10b07f3bd2c50bad113b61374b00f8d9dcc8c219f24",
+    "iso_efi_matches_esp": true,
+    "iso_sha256": "011dd3560e8d232b00201623443d9a09b0c67e03227b66504312a31f75e285ae",
+    "native_source_code_in_archive": false,
+    "standalone_documents_tea_in_iso": false,
+    "unchanged": true,
+    "verified_by": "read-only binary+checksum audit, not a VM boot",
+    "zip_sha256": "22e87caca314d43bd8832fe35b8838dc18179105e32c59a204e3e18d43c825af"
+  },
+  "catalog": {
+    "documents_preinstall": true,
+    "native_format": ".tea",
+    "note": "catalog policy only; no native guest application launch was tested",
+    "registered_system_apps": 1,
+    "separate_process_contract": true
+  },
+  "check_kind": "read_only_baseline_and_contract",
+  "not_a_guest_runtime_test": true,
+  "not_a_system_build": true
+}
