@@ -1,23 +1,22 @@
-# StyleOS «Документы» — восстановление исходников
+# StyleOS Documents — recovery source checkpoint 754
 
-**Не установочный образ StyleOS.** Контрольная версия пользователя — 744.
-Не выдавать код этого репозитория за полное приложение.
+**This is host-tested recovery source, not a StyleOS installer image or a runnable Documents.tea.** Immutable system control: 744.
 
-## Восстановленное на этапе 753
+Contents:
+- `modules/documents/model.c` — bounded UTF-8 document model and comments.
+- `modules/documents/review.c` — partial offline review/tracked editing.
+- `modules/documents/docx.c` — standards-shaped uncompressed DOCX export.
+- `modules/documents/import.c` — matching safe ZIP_STORED DOCX text/page import.
+- `modules/documents/gateway.c` — system-independent, capability-scoped file read/atomic save broker interface.
+- `modules/documents/ui.c` — independent draw command list and client-area event handling for a partial UI based on 14 approved screens.
+- `tools/test_restore.sh` — host tests, not OS guest tests.
+- `tools/render_documents_ui.py` — optional host-only preview requiring Python Pillow.
 
-- Модель текста UTF-8, выделения и комментариев;
-- модуль базовой офлайн-проверки и отслеживания правок;
-- частичный экспорт в DOCX (русский текст, параграфы, специальные XML-символы,
-  параметры листа, поля; подходит для открытого OOXML, но без таблиц/стилей);
-- инвентаризация встроенных данных `.tea` в EFI 744 с контролем SHA/CRC;
-- самостоятельные компиляционные тесты GCC, Clang, C11, Python; DOCX открыт
-  сторонней библиотекой `python-docx` на хосте.
+To test:
 
-Запустить `sh tools/test_restore.sh`.
+```sh
+sh tools/test_restore.sh
+python3 tools/render_documents_ui.py --view review --output /tmp/documents-review-preview.png
+```
 
-Ограничения и следующая работа: [`docs/CONTINUE.md`](docs/CONTINUE.md),
-[`docs/RECOVERY_753_RU.md`](docs/RECOVERY_753_RU.md),
-[`docs/IMPLEMENTATION_MATRIX_753.md`](docs/IMPLEMENTATION_MATRIX_753.md).
-
-Встроенных native `.tea`, рабочего GUI, системной установки, гостевой QEMU и
-VirtualBox проверки в этой ветке пока нет. ISO 744 неизменён.
+Details and unimplemented functionality: `docs/RECOVERY_754_RU.md`. Continuation point: `docs/CONTINUE.md`.
