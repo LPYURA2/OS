@@ -1,0 +1,17 @@
+{
+  "format": "styleos.system-apps.plan.v1",
+  "apps": [
+    {
+      "id": "styleos.documents",
+      "name": "Документы",
+      "package_name": "Documents.tea",
+      "preinstall": true,
+      "location": "system-volume",
+      "process": "independent",
+      "launcher_category": "Office",
+      "interface": "styleos.documents-preview-v1",
+      "file_access": "granted-tokens-only",
+      "window_access": "client-area-only"
+    }
+  ]
+}

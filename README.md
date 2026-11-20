@@ -1,37 +1,32 @@
-# StyleOS Documents — восстановительный исходный проект 756
+# StyleOS Documents — recovery sources (stage 757)
 
-**Контрольная система 744 неизменна. Полной установочной сборки пока нет.**
+**Current owner-approved requirement:** Documents is preinstalled by the StyleOS
+installer as a standalone SYSTEM APPLICATION (`Documents.tea`). It must never
+be compiled into the desktop shell or the kernel. The desktop launches it and
+brokers windows/files; the app owns the editor and its document state.
 
-В этом репозитории — независимый редактор-клиент: UTF-8 и комментарии, ограниченный DOCX export/import, грамматические подсказки, tracked-edit host-модуль, собственная отрисовка и файловый брокер с правами на отдельный файл.
+There is still **no installer-compatible bootable ISO** and the existing
+StyleOS 744 loader does not support the experimental `.tea` ABI. Production
+preinstallation intentionally fails until signing and native loader exist.
 
-Начиная с 755, есть настоящий x86-64 ELF в составе **экспериментального `Documents.tea`**, размером меньше 64 КиБ. Это **не подписанный системный `.tea` для 744** и не готовый установочный ISO. ABI для загрузчика 744 неизвестен; в manifest.json указано `installable_in_744: false`.
+New code for stage 757:
 
-Сборка и проверка на хосте:
+- `installer/system-apps.json` and `installer/README.md`: first-party default
+  application plan and system-vs-shell boundaries;
+- `tools/tea_package.py`: reusable host ELF policy validator;
+- `tools/system_apps.py`: development-only reference system-volume provisioner,
+  independent of the Documents builder;
+- `tools/build_preinstall_bundle.py`: content-addressed deterministic
+  preinstall development bundle (NOT BOOTABLE);
+- `tests/test_system_apps.py`, `tests/test_tea_package.py`,
+  `tests/test_preinstall_bundle.py`: refusal, identity, tamper,
+  rollback, user-data isolation and reproducible bundle tests.
 
-```sh
-sh tools/test_documents_756.sh
+Previous stages 752–756 remain present in this source tree; see
+`docs/CONTINUE.md` and `docs/RECOVERY_757_RU.md`.
+
+```
+sh tools/test_system_apps_757.sh
 ```
 
-Или только бинарник:
-
-```sh
-python3 tools/build_documents_tea.py --output build/756/Documents.tea
-```
-
-Прогон загружает собственный ELF в Linux-хосте и вызывает его реальные точки входа, редактирует текст и сохраняет TXT/DOCX через файловые токены. Это **не запуск в QEMU или StyleOS**. Все границы текущего результата описаны в `docs/RECOVERY_756_RU.md`; точка продолжения — `docs/CONTINUE.md`.
-
-
-## Дополнение 756 — вкладка «Текст»
-
-Проверяемые операции: точный UTF-8 поиск с переходом и оборачиванием,
-замена одного выбранного совпадения, атомарная замена всех, Ctrl+A/F/H/Z/Y,
-подсветка выделения в клиентской области, четыре шага Undo/Redo. История
-сохраняет комментарии и параметры листа вместе с текстом; это ограниченная
-модель (примерно 748 КиБ на экземпляр runtime), не промышленный движок
-форматирования. Функции поиска/замены передаются через новые события
-экспериментального брокера, а запросы Ctrl+F/H возвращают хозяину события
-для диалога. В гостевой StyleOS новый брокер **не реализован**.
-
-Полный DOCX, форматирование и остальные макеты НЕ готовы.
-Установочный ISO с новым приложением НЕ собран; QEMU/VirtualBox НЕ ПРОВЕРЕНЫ.
-Контрольная 744 не менялась.
+No user data disks or original 744 images are modified by these tests.
