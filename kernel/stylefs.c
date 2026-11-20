@@ -1,14 +1,19 @@
 #include <styleos/stylefs.h>
 
 enum {
-    ENTRY_BYTES = 64, TABLE_SECTORS = SFS_ENTRIES * ENTRY_BYTES / SFS_SECTOR_BYTES,
-    FILE_SECTORS = SFS_FILE_MAX / SFS_SECTOR_BYTES, DATA_LBA = 1 + 2 * (1 + TABLE_SECTORS),
+    ENTRY_V1 = 64, ENTRY_V2 = 128,
+    TABLE_V1 = SFS_V1_ENTRIES * ENTRY_V1 / SFS_SECTOR_BYTES,
+    TABLE_V2 = SFS_ENTRIES * ENTRY_V2 / SFS_SECTOR_BYTES,
+    FILE_SECTORS = SFS_FILE_MAX / SFS_SECTOR_BYTES,
+    DATA_V1 = 1 + 2 * (1 + TABLE_V1), DATA_V2 = 1 + 2 * (1 + TABLE_V2),
     SECTOR = SFS_SECTOR_BYTES
 };
-_Static_assert(DATA_LBA + 2 * (SFS_ENTRIES - 1) * FILE_SECTORS <= SFS_DISK_SECTORS,
+_Static_assert(DATA_V1 + 2 * (SFS_V1_ENTRIES - 1) * FILE_SECTORS <= SFS_DISK_SECTORS,
                "StyleFS data slots outside the volume");
-static const uint8_t super_magic[8] = {'S','T','Y','L','E','F','S','1'};
-static const uint8_t head_magic[8] = {'S','F','S','C','M','T','0','1'};
+static const uint8_t super_v1[8] = {'S','T','Y','L','E','F','S','1'};
+static const uint8_t super_v2[8] = {'S','T','Y','L','E','F','S','2'};
+static const uint8_t head_v1[8] = {'S','F','S','C','M','T','0','1'};
+static const uint8_t head_v2[8] = {'S','F','S','C','M','T','0','2'};
 
 static void zero(void *p, size_t n)
 { uint8_t *b = p; for (size_t i = 0; i < n; ++i) b[i] = 0; }
@@ -33,17 +38,27 @@ static uint32_t crc(uint32_t c, const uint8_t *p, size_t n)
     return c;
 }
 static uint32_t checksum(const uint8_t *p, size_t n) { return ~crc(UINT32_MAX, p, n); }
-static uint32_t header(unsigned bank) { return 1 + bank * (1 + TABLE_SECTORS); }
-static uint32_t file_lba(unsigned id, unsigned bank)
-{ return DATA_LBA + ((id - 1u) * 2 + bank) * FILE_SECTORS; }
+static unsigned slots(unsigned fmt) { return fmt == 2 ? SFS_ENTRIES : SFS_V1_ENTRIES; }
+static unsigned table_sectors(unsigned fmt) { return fmt == 2 ? TABLE_V2 : TABLE_V1; }
+static uint32_t header(unsigned fmt, unsigned bank) { return 1 + bank * (1 + table_sectors(fmt)); }
+static uint32_t file_lba(unsigned fmt, unsigned id, const struct sfs_entry *e)
+{ return fmt == 2 ? e->start : DATA_V1 + ((id - 1u) * 2 + e->bank) * FILE_SECTORS; }
+static uint32_t used_sectors(uint32_t bytes) { return bytes / SECTOR + !!(bytes % SECTOR); }
+bool sfs_capacity_valid(uint32_t sectors)
+{
+    return sectors == SFS_DISK_SECTORS ||
+           (sectors >= SFS_V2_MIN_SECTORS && sectors <= SFS_V2_MAX_SECTORS && sectors % 2048 == 0);
+}
+unsigned sfs_name_limit(const struct sfs_volume *v) { return v && v->format == 2 ? SFS_NAME_MAX : SFS_V1_NAME_MAX; }
+uint32_t sfs_file_limit(const struct sfs_volume *v) { return v && v->format == 2 ? SFS_V2_FILE_MAX : SFS_FILE_MAX; }
 
 /* Exact-byte, case-sensitive UTF-8 filenames. No normalization or escape syntax. */
-bool sfs_name_valid(const char *name)
+static bool name_valid(const char *name, unsigned limit)
 {
     if (!name || !name[0] || same_name(name, ".") || same_name(name, "..")) return false;
     const uint8_t *s = (const uint8_t *)name;
     size_t i = 0;
-    while (i <= SFS_NAME_MAX && s[i]) {
+    while (i <= limit && s[i]) {
         uint8_t first = s[i++];
         if (first < 0x80) {
             if (first < 32 || first == 127 || first == '/' || first == '\\') return false;
@@ -61,91 +76,111 @@ bool sfs_name_valid(const char *name)
             if (first == 0xf0) lo = 0x90;
             if (first == 0xf4) hi = 0x8f;
         } else return false;
-        if (i + n > SFS_NAME_MAX || s[i] < lo || s[i] > hi) return false;
+        if (i + n > limit || s[i] < lo || s[i] > hi) return false;
         ++i;
         while (--n) { if (s[i] < 0x80 || s[i] > 0xbf) return false; ++i; }
     }
-    return i != 0 && i <= SFS_NAME_MAX;
+    return i != 0 && i <= limit;
 }
+bool sfs_name_valid(const char *name) { return name_valid(name, SFS_NAME_MAX); }
 
-static void encode(uint8_t *buf, const struct sfs_entry *entries)
+static void encode(uint8_t *buf, const struct sfs_entry *entries, unsigned fmt)
 {
-    zero(buf, SFS_ENTRIES * ENTRY_BYTES);
-    for (unsigned i = 0; i < SFS_ENTRIES; ++i) {
+    unsigned stride = fmt == 2 ? ENTRY_V2 : ENTRY_V1;
+    zero(buf, slots(fmt) * stride);
+    for (unsigned i = 0; i < slots(fmt); ++i) {
         const struct sfs_entry *e = &entries[i];
-        uint8_t *p = buf + i * ENTRY_BYTES;
+        uint8_t *p = buf + i * stride;
         put32(p, e->size);
         put32(p + 4, e->checksum);
         p[8] = (uint8_t)e->parent;
         p[9] = (uint8_t)(e->parent >> 8);
         p[10] = e->type;
         p[11] = e->bank;
-        copy(p + 16, e->name, sizeof(e->name));
+        if (fmt == 2) put32(p + 12, e->start);
+        copy(p + 16, e->name, stride - 16);
     }
 }
 
-static bool decode(struct sfs_entry *entries, const uint8_t *buf)
+static bool decode(struct sfs_entry *entries, const uint8_t *buf, unsigned fmt, uint32_t capacity)
 {
-    for (unsigned i = 0; i < SFS_ENTRIES; ++i) {
-        const uint8_t *p = buf + i * ENTRY_BYTES;
+    unsigned stride = fmt == 2 ? ENTRY_V2 : ENTRY_V1, count = slots(fmt);
+    unsigned name_size = stride - 16;
+    zero(entries, sizeof(*entries) * SFS_ENTRIES);
+    for (unsigned i = 0; i < count; ++i) {
+        const uint8_t *p = buf + i * stride;
         struct sfs_entry *e = &entries[i];
-        if (!zeros(p + 12, 4) || p[63]) return false;
+        if ((fmt == 1 && !zeros(p + 12, 4)) || p[stride - 1]) return false;
         e->size = get32(p);
         e->checksum = get32(p + 4);
         e->parent = p[8] | (uint16_t)p[9] << 8;
         e->type = p[10];
         e->bank = p[11];
-        copy(e->name, p + 16, sizeof(e->name));
+        e->start = get32(p + 12);
+        copy(e->name, p + 16, name_size);
         if (!i) {
-            if (e->type != SFS_DIRECTORY || e->parent || !zeros(p + 16, 48)) return false;
+            if (e->type != SFS_DIRECTORY || e->parent || !zeros(p + 16, name_size)) return false;
         } else if (e->type == SFS_FREE) {
-            if (!zeros(p, ENTRY_BYTES)) return false;
+            if (!zeros(p, stride)) return false;
             continue;
-        } else if (!sfs_name_valid(e->name) || e->parent >= SFS_ENTRIES || e->parent == i) return false;
-        for (unsigned n = 0; n < sizeof(e->name); ++n)
-            if (!e->name[n]) { if (!zeros(p + 16 + n, sizeof(e->name) - n)) return false; break; }
+        } else if (!name_valid(e->name, name_size - 1) || e->parent >= count || e->parent == i) return false;
+        for (unsigned n = 0; n < name_size; ++n)
+            if (!e->name[n]) { if (!zeros(p + 16 + n, name_size - n)) return false; break; }
         if (e->type == SFS_DIRECTORY) {
-            if (e->size || e->checksum || e->bank) return false;
-        } else if (e->type != SFS_FILE || e->size > SFS_FILE_MAX || e->bank > 1 ||
-                   (!e->size && e->checksum)) return false;
+            if (e->size || e->checksum || e->bank || e->start) return false;
+        } else if (e->type != SFS_FILE || (!e->size && e->checksum)) return false;
+        else if (fmt == 1) {
+            if (e->size > SFS_FILE_MAX || e->bank > 1) return false;
+        } else {
+            if (e->bank || e->size > SFS_V2_FILE_MAX) return false;
+            if (e->size) {
+                if (e->start < DATA_V2 || e->start >= capacity || used_sectors(e->size) > capacity - e->start)
+                    return false;
+            } else if (e->start) return false;
+        }
     }
-    for (unsigned i = 1; i < SFS_ENTRIES; ++i) {
+    for (unsigned i = 1; i < count; ++i) {
         if (!entries[i].type) continue;
         unsigned parent = entries[i].parent;
         for (unsigned hops = 0; ; ++hops) {
-            if (parent >= SFS_ENTRIES || entries[parent].type != SFS_DIRECTORY ||
-                hops >= SFS_ENTRIES || parent == i) return false;
+            if (parent >= count || entries[parent].type != SFS_DIRECTORY ||
+                hops >= count || parent == i) return false;
             if (parent == SFS_ROOT) break;
             parent = entries[parent].parent;
         }
-        for (unsigned j = 1; j < i; ++j)
+        for (unsigned j = 1; j < i; ++j) {
             if (entries[j].type && entries[i].parent == entries[j].parent &&
                 same_name(entries[i].name, entries[j].name)) return false;
+            const struct sfs_entry *a = &entries[i], *b = &entries[j];
+            if (fmt == 2 && a->size && b->size && a->start < b->start + used_sectors(b->size) &&
+                b->start < a->start + used_sectors(a->size)) return false;
+        }
     }
     return true;
 }
 
 static enum sfs_result payload(const struct sfs_io *io, const struct sfs_entry *e,
-                              unsigned id, uint8_t *out)
+                              unsigned fmt, unsigned id, uint8_t *out, sfs_sink sink, void *ctx)
 {
     uint8_t sector[SECTOR];
     uint32_t c = UINT32_MAX;
-    uint32_t lba = file_lba(id, e->bank);
+    uint32_t lba = file_lba(fmt, id, e);
     for (unsigned off = 0; off < e->size; off += SECTOR) {
         if (!io->read(io->context, lba++, sector)) return SFS_IO;
         size_t n = e->size - off < SECTOR ? e->size - off : SECTOR;
         c = crc(c, sector, n);
         if (out) copy(out + off, sector, n);
+        if (sink && !sink(ctx, off, sector, n)) return SFS_IO;
     }
     return ~c == e->checksum ? SFS_OK : SFS_CORRUPT;
 }
 
 static enum sfs_result read_commit(const struct sfs_io *io, struct sfs_workspace *w,
-                                   unsigned bank, uint32_t *gen, uint32_t *digest)
+                                   unsigned fmt, unsigned bank, uint32_t *gen, uint32_t *digest)
 {
     uint8_t *s = w->sector;
-    if (!io->read(io->context, header(bank), s)) return SFS_IO;
-    if (!equal(s, head_magic, 8) || !get32(s + 8) || get32(s + 16) != bank ||
+    if (!io->read(io->context, header(fmt, bank), s)) return SFS_IO;
+    if (!equal(s, fmt == 2 ? head_v2 : head_v1, 8) || !get32(s + 8) || get32(s + 16) != bank ||
         get32(s + 20) != checksum(s, 20) || !zeros(s + 24, SECTOR - 24)) return SFS_CORRUPT;
     *gen = get32(s + 8);
     *digest = get32(s + 12);
@@ -153,28 +188,30 @@ static enum sfs_result read_commit(const struct sfs_io *io, struct sfs_workspace
 }
 
 static enum sfs_result read_tree(const struct sfs_io *io, struct sfs_workspace *w,
-                                 unsigned bank, uint32_t digest)
+                                 unsigned fmt, unsigned bank, uint32_t digest)
 {
-    for (unsigned i = 0; i < TABLE_SECTORS; ++i)
-        if (!io->read(io->context, header(bank) + 1 + i, w->table + i * SECTOR)) return SFS_IO;
-    if (checksum(w->table, sizeof(w->table)) != digest || !decode(w->pending, w->table)) return SFS_CORRUPT;
-    for (unsigned i = 1; i < SFS_ENTRIES; ++i) if (w->pending[i].type == SFS_FILE) {
-        enum sfs_result r = payload(io, &w->pending[i], i, 0);
+    for (unsigned i = 0; i < table_sectors(fmt); ++i)
+        if (!io->read(io->context, header(fmt, bank) + 1 + i, w->table + i * SECTOR)) return SFS_IO;
+    if (checksum(w->table, table_sectors(fmt) * SECTOR) != digest ||
+        !decode(w->pending, w->table, fmt, io->sectors)) return SFS_CORRUPT;
+    /* Preserve v1 recovery. v2 checks content when accessed, not by scanning the disk at mount. */
+    for (unsigned i = 1; fmt == 1 && i < SFS_V1_ENTRIES; ++i) if (w->pending[i].type == SFS_FILE) {
+        enum sfs_result r = payload(io, &w->pending[i], fmt, i, 0, 0, 0);
         if (r != SFS_OK) return r;
     }
     return SFS_OK;
 }
 
-static void superblock(uint8_t *s)
+static void superblock(uint8_t *s, unsigned fmt, uint32_t capacity)
 {
     zero(s, SECTOR);
-    copy(s, super_magic, sizeof(super_magic));
-    put32(s + 8, 1);
+    copy(s, fmt == 2 ? super_v2 : super_v1, 8);
+    put32(s + 8, fmt);
     put32(s + 12, SECTOR);
-    put32(s + 16, SFS_DISK_SECTORS);
-    put32(s + 20, SFS_ENTRIES);
-    put32(s + 24, DATA_LBA);
-    put32(s + 28, FILE_SECTORS);
+    put32(s + 16, capacity);
+    put32(s + 20, slots(fmt));
+    put32(s + 24, fmt == 2 ? DATA_V2 : DATA_V1);
+    put32(s + 28, fmt == 2 ? ENTRY_V2 : FILE_SECTORS);
     put32(s + 32, checksum(s, 32));
 }
 
@@ -183,27 +220,35 @@ enum sfs_result sfs_mount(struct sfs_volume *v, struct sfs_workspace *w, const s
     if (!v || !w || !source) return SFS_STATE;
     struct sfs_io io = *source;
     v->mounted = false;
-    if (io.sectors != SFS_DISK_SECTORS || !io.read) return SFS_SIGNATURE;
+    if (!sfs_capacity_valid(io.sectors) || !io.read) return SFS_SIGNATURE;
+    unsigned fmt = io.sectors == SFS_DISK_SECTORS ? 1 : 2;
     if (!io.read(io.context, 0, w->sector)) return SFS_IO;
-    if (!equal(w->sector, super_magic, sizeof(super_magic))) return SFS_SIGNATURE;
+    if (!equal(w->sector, fmt == 2 ? super_v2 : super_v1, 8)) return SFS_SIGNATURE;
     uint8_t expect[SECTOR];
-    superblock(expect);
+    superblock(expect, fmt, io.sectors);
     if (!equal(w->sector, expect, SECTOR)) return SFS_CORRUPT;
     uint32_t gen[2] = {0}, check[2] = {0};
     for (unsigned i = 0; i < 2; ++i)
-        if (read_commit(&io, w, i, &gen[i], &check[i]) == SFS_IO) return SFS_IO;
+        if (read_commit(&io, w, fmt, i, &gen[i], &check[i]) == SFS_IO) return SFS_IO;
     if (gen[0] == gen[1]) return SFS_CORRUPT;
     unsigned newest = gen[1] > gen[0];
     for (unsigned i = 0; i < 2; ++i) {
         unsigned bank = newest ^ i;
         if (!gen[bank]) continue;
-        enum sfs_result r = read_tree(&io, w, bank, check[bank]);
+        enum sfs_result r = read_tree(&io, w, fmt, bank, check[bank]);
         if (r == SFS_IO) return r;
         if (r != SFS_OK) continue;
         copy(v->entries, w->pending, sizeof(v->entries));
+        zero(v->previous, sizeof(v->previous));
+        if (fmt == 2 && i == 0 && gen[bank ^ 1u]) {
+            r = read_tree(&io, w, fmt, bank ^ 1u, check[bank ^ 1u]);
+            if (r == SFS_IO) return r;
+            if (r == SFS_OK) copy(v->previous, w->pending, sizeof(v->previous));
+        }
         v->io = io;
         v->generation = gen[bank];
         v->active = bank;
+        v->format = fmt;
         v->mounted = true;
         return SFS_OK;
     }
@@ -214,21 +259,23 @@ static enum sfs_result failed_io(struct sfs_volume *v) { v->mounted = false; ret
 static enum sfs_result commit(struct sfs_volume *v, struct sfs_workspace *w)
 {
     unsigned bank = v->active ^ 1u;
-    uint32_t gen = v->generation + 1, lba = header(bank);
+    unsigned fmt = v->format;
+    uint32_t gen = v->generation + 1, lba = header(fmt, bank);
     const struct sfs_io *io = &v->io;
-    encode(w->table, w->pending);
-    for (unsigned i = 0; i < TABLE_SECTORS; ++i)
+    encode(w->table, w->pending, fmt);
+    for (unsigned i = 0; i < table_sectors(fmt); ++i)
         if (!io->write(io->context, lba + 1 + i, w->table + i * SECTOR)) return failed_io(v);
     if (!io->flush(io->context)) return failed_io(v);
     zero(w->sector, SECTOR);
-    copy(w->sector, head_magic, 8);
+    copy(w->sector, fmt == 2 ? head_v2 : head_v1, 8);
     put32(w->sector + 8, gen);
-    put32(w->sector + 12, checksum(w->table, sizeof(w->table)));
+    put32(w->sector + 12, checksum(w->table, table_sectors(fmt) * SECTOR));
     put32(w->sector + 16, bank);
     put32(w->sector + 20, checksum(w->sector, 20));
     if (!io->write(io->context, lba, w->sector) || !io->flush(io->context)) return failed_io(v);
     v->generation = gen;
     v->active = bank;
+    if (fmt == 2) copy(v->previous, v->entries, sizeof(v->previous));
     copy(v->entries, w->pending, sizeof(v->entries));
     return SFS_OK;
 }
@@ -236,7 +283,7 @@ static enum sfs_result commit(struct sfs_volume *v, struct sfs_workspace *w)
 #ifdef STYLEFS_HOST_FORMAT
 enum sfs_result sfs_format(struct sfs_volume *v, struct sfs_workspace *w, const struct sfs_io *io)
 {
-    if (!v || !w || !io || !io->read || !io->write || !io->flush || io->sectors != SFS_DISK_SECTORS)
+    if (!v || !w || !io || !io->read || !io->write || !io->flush || !sfs_capacity_valid(io->sectors))
         return SFS_STATE;
     v->mounted = false;
     for (uint32_t i = 0; i < io->sectors; ++i) {
@@ -244,13 +291,16 @@ enum sfs_result sfs_format(struct sfs_volume *v, struct sfs_workspace *w, const 
         if (!zeros(w->sector, SECTOR)) return SFS_SIGNATURE;
     }
     v->io = *io;
+    v->format = io->sectors == SFS_DISK_SECTORS ? 1 : 2;
     v->active = 1;
     v->generation = 0;
+    zero(v->entries, sizeof(v->entries));
+    zero(v->previous, sizeof(v->previous));
     zero(w->pending, sizeof(w->pending));
     w->pending[0].type = SFS_DIRECTORY;
     enum sfs_result r = commit(v, w);
     if (r != SFS_OK) return r;
-    superblock(w->sector);
+    superblock(w->sector, v->format, io->sectors);
     if (!io->write(io->context, 0, w->sector) || !io->flush(io->context)) return failed_io(v);
     v->mounted = true;
     return SFS_OK;
@@ -258,13 +308,13 @@ enum sfs_result sfs_format(struct sfs_volume *v, struct sfs_workspace *w, const 
 #endif
 
 const struct sfs_entry *sfs_entry_at(const struct sfs_volume *v, unsigned id)
-{ return v && v->mounted && id < SFS_ENTRIES && v->entries[id].type ? &v->entries[id] : 0; }
+{ return v && v->mounted && id < slots(v->format) && v->entries[id].type ? &v->entries[id] : 0; }
 
 int sfs_find(const struct sfs_volume *v, unsigned parent, const char *name)
 {
     const struct sfs_entry *p = sfs_entry_at(v, parent);
-    if (!p || p->type != SFS_DIRECTORY || !sfs_name_valid(name)) return -1;
-    for (unsigned i = 1; i < SFS_ENTRIES; ++i)
+    if (!p || p->type != SFS_DIRECTORY || !name_valid(name, sfs_name_limit(v))) return -1;
+    for (unsigned i = 1; i < slots(v->format); ++i)
         if (v->entries[i].type && v->entries[i].parent == parent && same_name(v->entries[i].name, name))
             return (int)i;
     return -1;
@@ -280,13 +330,13 @@ static enum sfs_result prepare_new(struct sfs_volume *v, struct sfs_workspace *w
                                    unsigned parent, const char *name, uint8_t type, unsigned *id)
 {
     if (!can_write(v, w)) return SFS_STATE;
-    if (!sfs_name_valid(name)) return SFS_NAME;
+    if (!name_valid(name, sfs_name_limit(v))) return SFS_NAME;
     const struct sfs_entry *p = sfs_entry_at(v, parent);
     if (!p || p->type != SFS_DIRECTORY) return SFS_TYPE;
     if (sfs_find(v, parent, name) >= 0) return SFS_EXISTS;
     unsigned i = 1;
-    while (i < SFS_ENTRIES && v->entries[i].type) ++i;
-    if (i == SFS_ENTRIES) return SFS_FULL;
+    while (i < slots(v->format) && v->entries[i].type) ++i;
+    if (i == slots(v->format)) return SFS_FULL;
     copy(w->pending, v->entries, sizeof(v->entries));
     w->pending[i] = (struct sfs_entry){.parent = (uint16_t)parent, .type = type};
     copy_name(w->pending[i].name, name);
@@ -294,17 +344,44 @@ static enum sfs_result prepare_new(struct sfs_volume *v, struct sfs_workspace *w
     return SFS_OK;
 }
 
+/* A candidate never overlaps any extent of either admitted snapshot. One
+ * contiguous extent per file keeps the parser and commit protocol bounded. */
+static uint32_t reserve(const struct sfs_volume *v, uint32_t need)
+{
+    for (uint32_t start = DATA_V2; start < v->io.sectors && need <= v->io.sectors - start;) {
+        uint32_t skip = start, end = start + need;
+        const struct sfs_entry *trees[] = {v->entries, v->previous};
+        for (unsigned t = 0; t < 2; ++t) for (unsigned i = 1; i < SFS_ENTRIES; ++i) {
+            const struct sfs_entry *e = &trees[t][i];
+            if (!e->size || e->start >= end) continue;
+            uint32_t tail = e->start + used_sectors(e->size);
+            if (tail > skip) skip = tail;
+        }
+        if (skip == start) return start;
+        start = skip;
+    }
+    return 0;
+}
+
 static enum sfs_result write_data(struct sfs_volume *v, struct sfs_workspace *w, unsigned id,
-                                  const uint8_t *data, size_t size, unsigned source)
+                                  const uint8_t *data, size_t size, unsigned source,
+                                  sfs_source stream, void *context)
 {
     struct sfs_entry *e = &w->pending[id];
-    uint32_t lba = file_lba(id, e->bank), from = 0, c = UINT32_MAX;
+    if (v->format == 2) {
+        e->start = size ? reserve(v, used_sectors((uint32_t)size)) : 0;
+        if (size && !e->start) return SFS_FULL;
+    }
+    uint32_t lba = file_lba(v->format, id, e), from = 0, c = UINT32_MAX;
     const struct sfs_io *io = &v->io;
-    if (source) from = file_lba(source, v->entries[source].bank);
+    if (source) from = file_lba(v->format, source, &v->entries[source]);
     for (size_t off = 0; off < size; off += SECTOR) {
         size_t n = size - off < SECTOR ? size - off : SECTOR;
         if (source) {
             if (!io->read(io->context, from++, w->sector)) return failed_io(v);
+            zero(w->sector + n, SECTOR - n);
+        } else if (stream) {
+            if (!stream(context, (uint32_t)off, w->sector, n)) return failed_io(v);
             zero(w->sector + n, SECTOR - n);
         } else {
             zero(w->sector, SECTOR);
@@ -333,10 +410,21 @@ enum sfs_result sfs_mkdir(struct sfs_volume *v, struct sfs_workspace *w, unsigne
 enum sfs_result sfs_create(struct sfs_volume *v, struct sfs_workspace *w, unsigned parent,
                           const char *name, const uint8_t *data, size_t size, unsigned *id)
 {
-    if (size > SFS_FILE_MAX || (size && !data)) return SFS_RANGE;
+    if (size > sfs_file_limit(v) || (size && !data)) return SFS_RANGE;
     unsigned n;
     enum sfs_result r = prepare_new(v, w, parent, name, SFS_FILE, &n);
-    if (r == SFS_OK) r = write_data(v, w, n, data, size, 0);
+    if (r == SFS_OK) r = write_data(v, w, n, data, size, 0, 0, 0);
+    if (r == SFS_OK && id) *id = n;
+    return r;
+}
+
+enum sfs_result sfs_create_from(struct sfs_volume *v, struct sfs_workspace *w, unsigned parent,
+                               const char *name, uint32_t size, sfs_source stream, void *ctx, unsigned *id)
+{
+    if (size > sfs_file_limit(v) || (size && !stream)) return SFS_RANGE;
+    unsigned n;
+    enum sfs_result r = prepare_new(v, w, parent, name, SFS_FILE, &n);
+    if (r == SFS_OK) r = write_data(v, w, n, 0, size, 0, stream, ctx);
     if (r == SFS_OK && id) *id = n;
     return r;
 }
@@ -347,20 +435,28 @@ enum sfs_result sfs_read(const struct sfs_volume *v, unsigned id, uint8_t *data,
     if (!e) return SFS_NOT_FOUND;
     if (e->type != SFS_FILE) return SFS_TYPE;
     if (capacity < e->size || (e->size && !data)) return SFS_RANGE;
-    return payload(&v->io, e, id, data);
+    return payload(&v->io, e, v->format, id, data, 0, 0);
+}
+
+enum sfs_result sfs_read_to(const struct sfs_volume *v, unsigned id, sfs_sink output, void *ctx)
+{
+    const struct sfs_entry *e = sfs_entry_at(v, id);
+    if (!e) return SFS_NOT_FOUND;
+    if (e->type != SFS_FILE) return SFS_TYPE;
+    return payload(&v->io, e, v->format, id, 0, output, ctx);
 }
 
 enum sfs_result sfs_write(struct sfs_volume *v, struct sfs_workspace *w, unsigned id,
                          const uint8_t *data, size_t size)
 {
     if (!can_write(v, w)) return SFS_STATE;
-    if (size > SFS_FILE_MAX || (size && !data)) return SFS_RANGE;
+    if (size > sfs_file_limit(v) || (size && !data)) return SFS_RANGE;
     const struct sfs_entry *e = sfs_entry_at(v, id);
     if (!e) return SFS_NOT_FOUND;
     if (e->type != SFS_FILE) return SFS_TYPE;
     copy(w->pending, v->entries, sizeof(v->entries));
-    w->pending[id].bank ^= 1;
-    return write_data(v, w, id, data, size, 0);
+    if (v->format == 1) w->pending[id].bank ^= 1;
+    return write_data(v, w, id, data, size, 0, 0, 0);
 }
 
 enum sfs_result sfs_move(struct sfs_volume *v, struct sfs_workspace *w, unsigned id,
@@ -370,7 +466,7 @@ enum sfs_result sfs_move(struct sfs_volume *v, struct sfs_workspace *w, unsigned
     const struct sfs_entry *e = sfs_entry_at(v, id), *p = sfs_entry_at(v, parent);
     if (!e || id == SFS_ROOT) return SFS_NOT_FOUND;
     if (!p || p->type != SFS_DIRECTORY) return SFS_TYPE;
-    if (!sfs_name_valid(name)) return SFS_NAME;
+    if (!name_valid(name, sfs_name_limit(v))) return SFS_NAME;
     int existing = sfs_find(v, parent, name);
     if (existing >= 0) return (unsigned)existing == id ? SFS_OK : SFS_EXISTS;
     for (unsigned i = parent; i; i = v->entries[i].parent) if (i == id) return SFS_TYPE;
@@ -389,7 +485,7 @@ enum sfs_result sfs_copy(struct sfs_volume *v, struct sfs_workspace *w, unsigned
     if (e->type != SFS_FILE) return SFS_TYPE;
     unsigned n;
     enum sfs_result r = prepare_new(v, w, parent, name, SFS_FILE, &n);
-    if (r == SFS_OK) r = write_data(v, w, n, 0, e->size, id);
+    if (r == SFS_OK) r = write_data(v, w, n, 0, e->size, id, 0, 0);
     if (r == SFS_OK && new_id) *new_id = n;
     return r;
 }
@@ -398,7 +494,7 @@ enum sfs_result sfs_remove(struct sfs_volume *v, struct sfs_workspace *w, unsign
 {
     if (!can_write(v, w)) return SFS_STATE;
     if (!id || !sfs_entry_at(v, id)) return SFS_NOT_FOUND;
-    for (unsigned i = 1; i < SFS_ENTRIES; ++i)
+    for (unsigned i = 1; i < slots(v->format); ++i)
         if (v->entries[i].type && v->entries[i].parent == id) return SFS_NOT_EMPTY;
     copy(w->pending, v->entries, sizeof(v->entries));
     zero(&w->pending[id], sizeof(w->pending[id]));

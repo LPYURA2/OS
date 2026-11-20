@@ -36,7 +36,7 @@ def keys(q, sequence):
         q.key(key)
 
 
-def run(folder, iso, clean, image_tool, qemu, firmware, converter, modern):
+def run(folder, iso, clean, image_tool, qemu, firmware, converter, modern, larger_volume):
     iso_sha, clean_sha = digest(iso), digest(clean)
     seed = folder / 'seed.raw'
     data = folder / 'data.vdi'
@@ -60,10 +60,22 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter, modern):
     plain = folder/'drop-source.txt'
     plain.write_bytes('\nDeep Drop\nСтрока'.encode())
     command(image_tool, 'put', seed, '/Загрузки/Drop.txt', plain)
+    big_binary = b''
+    long_text = ''
+    if larger_volume:
+        if not command(image_tool, 'info', seed).startswith('StyleFS v2\n'):
+            raise RuntimeError('a v2 data template is required')
+        big_binary = bytes(range(256)) * 1025 + b'tail'
+        long_text = 'Длинная строка для редактора.\n' * 180
+        (folder/'binary-input.bin').write_bytes(big_binary)
+        (folder/'long-input.txt').write_text(long_text, encoding='utf-8')
+        command(image_tool, 'put', seed, '/Загрузки/External.bin', folder/'binary-input.bin')
+        command(image_tool, 'put', seed, '/Загрузки/Large.txt', folder/'long-input.txt')
     command(converter, 'convert', '-f', 'raw', '-O', 'vdi', seed, data)
 
     with vm(folder/'first', iso, data, qemu, firmware, image_format='iso', data_format='vdi') as (q, first):
         q.wait_uart('STYLEFS MOUNT')
+        if larger_volume: q.wait_uart('STYLEFS V2')
         b = file_box(first, modern)
         x, y = q.x, q.y
         q.move(x + 18, y + 12)
@@ -140,6 +152,34 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter, modern):
             q.wait_uart('DEEP DROP TEXT INSERT', count=2)
             q.key('ctrl-s')
             q.wait_uart('DOCUMENT SAVE', count=3)
+        if larger_volume:
+            # Current folder in Explorer is still «Загрузки».
+            q.key('f2')
+            row(q, b, 2)
+            keys(q, ('ctrl-c', 'backspace'))
+            activate(q, b, 3)  # Музыка
+            q.key('ctrl-v')
+            q.wait_uart('STYLEFS COPY', count=2)
+            q.key('backspace')
+            activate(q, b, 2)
+            row(q, b, 2)
+            keys(q, ('ctrl-x', 'backspace'))
+            activate(q, b, 5)  # Видео
+            q.key('ctrl-v')
+            q.wait_uart('STYLEFS MOVE')
+            row(q, b, 0)
+            keys(q, ('delete', 'esc'))
+            if b'STYLEOS DESKTOP STYLEFS REMOVE' in q.uart.read_bytes():
+                raise RuntimeError('cancelled delete removed the file')
+            keys(q, ('delete', 'ret'))
+            q.wait_uart('STYLEFS REMOVE')
+            q.key('backspace')
+            activate(q, b, 2)
+            activate(q, b, 2)  # Large.txt after moving External.bin
+            q.wait_uart('DOCUMENT OPEN')
+            keys(q, ('a', 'ctrl-s'))
+            q.wait_uart('DOCUMENT SAVE', count=4)
+            q.screen('v2-long-text')
         q.click(70, first.h - 27)
         q.click(125, first.h - 54 - 273 + 180)
         q.wait_uart('REBOOT')
@@ -170,10 +210,20 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter, modern):
         raise RuntimeError('the Deep Drop source file was modified')
     if 'Текст.txt' in command(image_tool, 'list', decoded, '/Проекты/lab'):
         raise RuntimeError('old name survived the rename')
+    if larger_volume:
+        command(image_tool, 'get', decoded, '/Музыка/External.bin', folder/'binary-copied.bin')
+        command(image_tool, 'get', decoded, '/Загрузки/Large.txt', folder/'long-after.txt')
+        if (folder/'binary-copied.bin').read_bytes() != big_binary:
+            raise RuntimeError('a copied file above 64 KiB differs')
+        if (folder/'long-after.txt').read_bytes() != ('a' + long_text).encode('utf-8'):
+            raise RuntimeError('an edited text above 4096 bytes differs')
+        for directory in ('Загрузки', 'Видео'):
+            if 'External.bin' in command(image_tool, 'list', decoded, '/' + directory):
+                raise RuntimeError('move/delete left an unexpected file')
 
     with foreign.open('xb') as f:
-        f.write(b'STYLEFS1' + b'invalid superblock')
-        f.truncate(8 * 1024 * 1024)
+        f.write((b'STYLEFS2' if larger_volume else b'STYLEFS1') + b'invalid superblock')
+        f.truncate(seed.stat().st_size)
     initial = digest(foreign)
     with vm(folder/'foreign', iso, foreign, qemu, firmware, image_format='iso', data_format='raw') as (q, _):
         q.wait_uart('STYLEFS REFUSED')
@@ -190,7 +240,10 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter, modern):
                        'corrupt same-size disk refused; ISO and source data template unchanged'] +
                       (['My computer and Back/Forward', 'real drop inserts text into minimized editor',
                         'real drop inserts text directly over the visible editor',
-                        'drop on empty desktop cancels; source file is still byte-identical'] if modern else [])}
+                        'drop on empty desktop cancels; source file is still byte-identical'] if modern else []) +
+                      (['v2 mount with real enlarged capacity', 'copy binary above 64 KiB; UI move and deletion',
+                        'cancelled deletion did not remove the file', 'open, edit, and save UTF-8 text above 4 KiB']
+                       if larger_volume else [])}
 
 
 def main():
@@ -198,7 +251,10 @@ def main():
     for key in ('boot', 'data-template', 'image-tool', 'output'):
         p.add_argument('--' + key, type=Path, required=True)
     p.add_argument('--layout', choices=['v04', 'v05'], default='v05')
+    p.add_argument('--larger-volume', action='store_true', help='exercise v2 file sizes and UI move/delete')
     a = p.parse_args()
+    if a.larger_volume and a.layout != 'v05':
+        p.error('--larger-volume requires the modern desktop layout')
     qemu = command_exists(os.environ.get('QEMU_X86', 'qemu-system-x86_64'))
     converter = command_exists(os.environ.get('QEMU_IMG', 'qemu-img'))
     firmware = (firmware_path('OVMF_CODE', 'OVMF_CODE'), firmware_path('OVMF_VARS', 'OVMF_VARS'))
@@ -207,7 +263,7 @@ def main():
     folder = a.output.resolve()
     folder.mkdir(parents=True, exist_ok=False)
     result = run(folder, a.boot.resolve(strict=True), a.data_template.resolve(strict=True),
-                 a.image_tool.resolve(strict=True), qemu, firmware, converter, a.layout == 'v05')
+                 a.image_tool.resolve(strict=True), qemu, firmware, converter, a.layout == 'v05', a.larger_volume)
     (folder/'results.json').write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
     print('STYLEFS DESKTOP: PASS', flush=True)
 

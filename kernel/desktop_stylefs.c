@@ -18,14 +18,17 @@ static bool flush_disk(void *context) { (void)context; return desk_ata_flush(); 
 
 void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
 {
-    b->mode = sectors == SFS_DISK_SECTORS;
-    b->selected = b->clip = -1;
+    b->mode = sfs_capacity_valid(sectors);
+    b->selected = b->clip = b->delete_id = -1;
     b->history_count = 1;
-    b->status = "F2: имя   Ctrl+C/V: копия";
+    b->status = "F2 Имя   Ctrl+C/X/V   Del Удалить";
     if (!b->mode) return;
     const struct sfs_io io = {0, sectors, read_sector, write_sector, flush_disk};
     enum sfs_result r = sfs_mount(&b->disk, &b->work, &io);
-    if (r == SFS_OK) arch_puts("STYLEOS DESKTOP STYLEFS MOUNT\n");
+    if (r == SFS_OK) {
+        arch_puts("STYLEOS DESKTOP STYLEFS MOUNT\n");
+        if (b->disk.format == 2) arch_puts("STYLEOS DESKTOP STYLEFS V2\n");
+    }
     else {
         arch_puts("STYLEOS DESKTOP STYLEFS REFUSED\n");
         b->status = "Том StyleFS недоступен. Диск не изменён";
@@ -37,6 +40,8 @@ static void show(struct desk_fs *b, unsigned id)
     b->computer = id == COMPUTER;
     if (!b->computer) b->folder = id;
     b->selected = -1;
+    if (b->delete_id >= 0) b->status = "Удаление отменено";
+    b->delete_id = -1;
     b->first = b->name_edit = 0;
     ++b->revision;
 }
@@ -122,8 +127,8 @@ static int open_selected(struct desk_fs *b)
     const struct sfs_entry *e = sfs_entry_at(&b->disk, (unsigned)b->selected);
     if (!e) return DESK_FS_NONE;
     if (e->type == SFS_DIRECTORY) { browse(b, (unsigned)b->selected); return DESK_FS_NONE; }
-    if (txt_name(e->name) && e->size <= DESK_TEXT_LIMIT) return b->selected;
-    b->status = e->size > DESK_TEXT_LIMIT && txt_name(e->name) ? "Текст больше 4096 байт" : "Можно копировать. Нет приложения";
+    if (txt_name(e->name) && e->size <= DESK_STYLEFS_TEXT_LIMIT) return b->selected;
+    b->status = e->size > DESK_STYLEFS_TEXT_LIMIT && txt_name(e->name) ? "Текст больше 64 КиБ" : "Можно копировать. Нет приложения";
     arch_puts("STYLEOS DESKTOP STYLEFS NO HANDLER\n");
     ++b->revision;
     return DESK_FS_NONE;
@@ -150,7 +155,8 @@ static const char *error_text(enum sfs_result r)
     switch (r) {
     case SFS_NAME: return "Недопустимое имя";
     case SFS_EXISTS: return "Такое имя уже есть";
-    case SFS_FULL: return "Нет свободных записей";
+    case SFS_FULL: return "Нет места для файла или свободных записей";
+    case SFS_NOT_EMPTY: return "Сначала освободите папку";
     case SFS_CORRUPT: return "Контрольная сумма не совпала";
     case SFS_IO: case SFS_STATE: return "Ошибка диска. Перезапустите систему";
     default: return "Не удалось выполнить операцию";
@@ -178,7 +184,7 @@ static void name_key(struct desk_fs *b, unsigned key, uint32_t cp)
         }
     } else if (cp >= 32 && cp < 0x800) {
         unsigned n = cp < 128 ? 1 : 2;
-        if (b->name_length + n <= SFS_NAME_MAX) {
+        if (b->name_length + n <= sfs_name_limit(&b->disk)) {
             if (n == 2) b->name[b->name_length++] = (char)(0xc0 | (cp >> 6));
             b->name[b->name_length++] = (char)(n == 1 ? cp : 0x80 | (cp & 63));
             b->name[b->name_length] = 0;
@@ -193,7 +199,32 @@ static void go_parent(struct desk_fs *b)
     if (!b->computer && here && b->folder) browse(b, here->parent);
 }
 
-int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned mods, uint32_t cp)
+static void delete_key(struct desk_fs *b, unsigned key, int protected_entry)
+{
+    if (key == 1) { b->status = "Удаление отменено"; b->delete_id = -1; }
+    else if (key == 0x1c || key == 0x11c) {
+        int id = b->delete_id;
+        b->delete_id = -1;
+        if (id == protected_entry || b->disk.generation != b->delete_generation)
+            b->status = "Удаление отменено: файл или диск изменился";
+        else {
+            enum sfs_result r = sfs_remove(&b->disk, &b->work, (unsigned)id);
+            b->status = r == SFS_OK ? "Удалено" : error_text(r);
+            if (r == SFS_OK) {
+                if (b->clip == id) b->clip = -1;
+                b->selected = -1;
+                b->first = 0;
+                b->history_at = 0;
+                b->history_count = 1;
+                b->history[0] = b->folder;
+                arch_puts("STYLEOS DESKTOP STYLEFS REMOVE\n");
+            }
+        }
+    } else return;
+    ++b->revision;
+}
+
+int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned mods, uint32_t cp, int protected_entry)
 {
     if (!b->disk.mounted) return DESK_FS_NONE;
     if (b->computer) {
@@ -201,24 +232,41 @@ int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned 
         return DESK_FS_NONE;
     }
     if (b->name_edit) { if (!(mods & (DESK_ALT | DESK_CTRL))) name_key(b, key, cp); return DESK_FS_NONE; }
+    if (b->delete_id >= 0) { if (!mods) delete_key(b, key, protected_entry); return DESK_FS_NONE; }
     if (mods & DESK_ALT) return DESK_FS_NONE;
     if (mods & DESK_CTRL) {
         if (key == 0x31) start_name(b, MAKE_DIR);
-        if (key == 0x2e && b->selected >= 0) {
+        if ((key == 0x2e || key == 0x2d) && b->selected >= 0) {
             const struct sfs_entry *e = sfs_entry_at(&b->disk, (unsigned)b->selected);
-            if (e && e->type == SFS_FILE) { b->clip = b->selected; b->status = "Файл выбран для копирования"; }
-            else b->status = "Копирование папок пока недоступно";
+            b->clip = -1;
+            if (e && (key == 0x2d || e->type == SFS_FILE)) {
+                b->clip = b->selected;
+                b->cut = key == 0x2d;
+                b->status = b->cut ? "Перейдите в нужную папку и нажмите Ctrl+V" : "Файл выбран для копирования";
+            } else b->status = "Копирование папок пока недоступно";
             ++b->revision;
         }
         if (key == 0x2f && b->clip >= 0) {
             const struct sfs_entry *e = sfs_entry_at(&b->disk, (unsigned)b->clip);
             if (e) {
-                enum sfs_result r = sfs_copy(&b->disk, &b->work, (unsigned)b->clip, b->folder, e->name, 0);
-                b->status = r == SFS_OK ? "Файл скопирован" : error_text(r);
-                if (r == SFS_OK) arch_puts("STYLEOS DESKTOP STYLEFS COPY\n");
+                enum sfs_result r = b->cut ? sfs_move(&b->disk, &b->work, (unsigned)b->clip, b->folder, e->name) :
+                    sfs_copy(&b->disk, &b->work, (unsigned)b->clip, b->folder, e->name, 0);
+                b->status = r == SFS_OK ? (b->cut ? "Перемещено" : "Файл скопирован") : error_text(r);
+                if (r == SFS_OK) {
+                    arch_puts(b->cut ? "STYLEOS DESKTOP STYLEFS MOVE\n" : "STYLEOS DESKTOP STYLEFS COPY\n");
+                    if (b->cut) b->clip = -1;
+                }
                 ++b->revision;
             }
         }
+    } else if (key == 0x153 && b->selected >= 0) {
+        if (b->selected == protected_entry) b->status = "Сначала закройте текстовый редактор";
+        else {
+            b->delete_id = b->selected;
+            b->delete_generation = b->disk.generation;
+            b->status = "Удалить без корзины? Enter / Esc";
+        }
+        ++b->revision;
     } else if (key == 0x3c) start_name(b, RENAME);
     else if (key == 0x148 || key == 0x150) change_selection(b, area, key == 0x148 ? -1 : 1);
     else if (key == 0x149 || key == 0x151) {
@@ -231,7 +279,7 @@ int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned 
 
 static int row_at(const struct desk_fs *b, struct desk_box a, int x, int y)
 {
-    if (b->computer || b->name_edit || x < sidebar(a) + 10 || x >= a.w - 12 || y < FILE_TOP)
+    if (b->computer || b->name_edit || b->delete_id >= 0 || x < sidebar(a) + 10 || x >= a.w - 12 || y < FILE_TOP)
         return DESK_FS_NONE;
     unsigned row = (unsigned)(y - FILE_TOP) / ROW_H;
     if (row >= visible_rows(a)) return DESK_FS_NONE;
@@ -244,12 +292,12 @@ int desk_fs_drag_source(const struct desk_fs *b, struct desk_box a, int x, int y
 {
     int id = row_at(b, a, x - a.x, y - a.y);
     const struct sfs_entry *e = id < 0 ? 0 : sfs_entry_at(&b->disk, (unsigned)id);
-    return e && e->type == SFS_FILE && e->size && e->size <= DESK_TEXT_LIMIT && txt_name(e->name) ? id : DESK_FS_NONE;
+    return e && e->type == SFS_FILE && e->size && e->size <= DESK_STYLEFS_TEXT_LIMIT && txt_name(e->name) ? id : DESK_FS_NONE;
 }
 
 int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y)
 {
-    if (!b->disk.mounted || b->name_edit) return DESK_FS_NONE;
+    if (!b->disk.mounted || b->name_edit || b->delete_id >= 0) return DESK_FS_NONE;
     x -= a.x;
     y -= a.y;
     int side = sidebar(a), local = x - side;
@@ -333,7 +381,14 @@ void desk_fs_draw(const struct desk_fs *b, struct desk_box a)
             desk_outline((struct desk_box){left + 14, a.y + 126, 224, 60}, LINE);
             desk_icon(left + 23, a.y + 143, 24, DESK_DRIVE, TEXT);
             desk_text(left + 58, a.y + 132, right, "Диск данных", TEXT);
-            desk_text(left + 58, a.y + 155, right, "StyleFS 8 МиБ", DIM);
+            char volume[40] = "StyleFS v0 / ";
+            volume[9] = (char)('0' + b->disk.format);
+            unsigned end = sizeof("StyleFS v0 / ") - 1;
+            decimal(volume + end, b->disk.io.sectors / 2048);
+            while (volume[end]) ++end;
+            const char *unit = " МиБ";
+            for (unsigned i = 0; unit[i]; ++i) volume[end + i] = unit[i];
+            desk_text(left + 58, a.y + 155, right, volume, DIM);
             desk_text(left + 15, a.y + 215, right, "Внешние устройства", TEXT);
             desk_text(left + 15, a.y + 248, right, "Нет подключённых устройств", DIM);
             desk_text(left + 14, a.y + a.h - 24, right, "1 доступный диск", DIM);
@@ -359,11 +414,12 @@ void desk_fs_draw(const struct desk_fs *b, struct desk_box a)
             if (e->type == SFS_FILE) { char size[12]; decimal(size, e->size); desk_text(right - 64, y + 5, right, size, DIM); }
         }
         if (!n) desk_text(left + 20, a.y + FILE_TOP + 10, right, "Папка пуста", DIM);
-        if (b->name_edit) {
+        if (b->name_edit || b->delete_id >= 0) {
             int y = a.y + a.h - FOOT - 27;
             desk_round((struct desk_box){left + 13, y, right - left - 13, 41}, 0x111a25);
             desk_outline((struct desk_box){left + 13, y, right - left - 13, 41}, AMBER);
-            desk_text(left + 22, y + 11, right - 8, b->name, TEXT);
+            const struct sfs_entry *target = b->delete_id >= 0 ? sfs_entry_at(&b->disk, (unsigned)b->delete_id) : 0;
+            desk_text(left + 22, y + 11, right - 8, target ? target->name : b->name, TEXT);
         }
     }
     desk_text(a.x + sidebar(a) + 14, a.y + a.h - 24, right, b->status, DIM);
@@ -372,8 +428,8 @@ void desk_fs_draw(const struct desk_fs *b, struct desk_box a)
 bool desk_fs_read_text(struct desk_fs *b, unsigned id, char *data, size_t *size)
 {
     const struct sfs_entry *e = sfs_entry_at(&b->disk, id);
-    if (!e || e->size > DESK_TEXT_LIMIT || !txt_name(e->name) ||
-        sfs_read(&b->disk, id, (uint8_t *)data, DESK_TEXT_LIMIT) != SFS_OK) return false;
+    if (!e || e->size > DESK_STYLEFS_TEXT_LIMIT || !txt_name(e->name) ||
+        sfs_read(&b->disk, id, (uint8_t *)data, DESK_STYLEFS_TEXT_LIMIT) != SFS_OK) return false;
     for (size_t off = 0; off < e->size;) {
         size_t used;
         uint32_t cp = desk_utf8(data + off, e->size - off, &used);

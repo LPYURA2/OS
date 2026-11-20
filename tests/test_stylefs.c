@@ -53,7 +53,13 @@ static void valid_names(void)
     CHECK(sfs_name_valid("Работа.txt"));
     CHECK(sfs_name_valid("📁.bin"));
     CHECK(sfs_name_valid("12345678901234567890123456789012345678901234567"));
-    CHECK(!sfs_name_valid("123456789012345678901234567890123456789012345678"));
+    CHECK(sfs_name_valid("123456789012345678901234567890123456789012345678"));
+    char limit[SFS_NAME_MAX + 2];
+    memset(limit, 'n', sizeof(limit));
+    limit[SFS_NAME_MAX + 1] = 0;
+    CHECK(!sfs_name_valid(limit));
+    limit[SFS_NAME_MAX] = 0;
+    CHECK(sfs_name_valid(limit));
     CHECK(!sfs_name_valid("../file") && !sfs_name_valid("a\\b") && !sfs_name_valid("a\nb"));
     CHECK(!sfs_name_valid(".") && !sfs_name_valid("..") && !sfs_name_valid(""));
     CHECK(!sfs_name_valid("\xc0\x80") && !sfs_name_valid("\xe2\x82") && !sfs_name_valid("\xed\xa0\x80"));
@@ -77,6 +83,8 @@ static void bad_media(void)
     CHECK(sfs_mount(&v, &w, &io) == SFS_OK && writes == count);
     CHECK(sfs_format(&v, &w, &io) == SFS_SIGNATURE && writes == count);
     CHECK(sfs_mount(&v, &w, &io) == SFS_OK);
+    CHECK(v.format == 1 && sfs_name_limit(&v) == 47 && sfs_file_limit(&v) == 65536);
+    CHECK(sfs_mkdir(&v, &w, 0, "123456789012345678901234567890123456789012345678", 0) == SFS_NAME);
     puts("PASS mount never writes; no formatting foreign, dirty or wrong-size media");
 }
 
@@ -166,7 +174,7 @@ static void readonly_and_limits(void)
     do {
         snprintf(field, sizeof(field), "dir-%u", n++);
         r = sfs_mkdir(&v, &w, 0, field, 0);
-    } while (r == SFS_OK && n <= SFS_ENTRIES);
+    } while (r == SFS_OK && n <= SFS_V1_ENTRIES);
     CHECK(r == SFS_FULL);
     CHECK(sfs_mount(&v, &w, &io) == SFS_OK);
     CHECK(sfs_mkdir(&v, &w, 0, "full", NULL) == SFS_FULL);
