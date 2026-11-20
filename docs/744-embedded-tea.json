@@ -1,0 +1,91 @@
+{
+  "interpretation": "byte-level audit only; no executable/installable app recovered",
+  "packages": [
+    {
+      "elf_bytes": 4216,
+      "elf_crc_valid": false,
+      "elf_offset": 528027,
+      "elf_sha256_manifest": "aae7771cfef34f50b8fb48e74a87f9c5a8426290b93b0819c85b380177b60d1d",
+      "elf_sha256_observed": "f52fb8983d535f7aded5070547e4380c415aebe86511d9649636e876f386570a",
+      "elf_sha256_valid": false,
+      "extractable_as_verified_package": false,
+      "interface": "styleos.system-module-v1",
+      "manifest_crc_valid": true,
+      "manifest_offset": 527524,
+      "project_id": "styleos.editor",
+      "project_name": "Текстовый редактор"
+    },
+    {
+      "elf_bytes": 4216,
+      "elf_crc_valid": false,
+      "elf_offset": 533165,
+      "elf_sha256_manifest": "67c8918f1de74ce8f48aadb48fc9ee717c3870445625529e8a565097898a82c6",
+      "elf_sha256_observed": "96f0830c9eb7cd79d4787af8c1ac2814c0bed035d45d3956951539e0f2f82f96",
+      "elf_sha256_valid": false,
+      "extractable_as_verified_package": false,
+      "interface": "styleos.system-module-v1",
+      "manifest_crc_valid": true,
+      "manifest_offset": 532684,
+      "project_id": "styleos.notes",
+      "project_name": "Заметки"
+    },
+    {
+      "elf_bytes": 57464,
+      "elf_crc_valid": false,
+      "elf_offset": 538334,
+      "elf_sha256_manifest": "46a80b440a2a50b4b0795578e7b088814cff379ed1ba96409766228682c26a07",
+      "elf_sha256_observed": "977eed204ef2ac2887f1acdbe42d343048d5ce2b92452be3218b0a7c7930ba15",
+      "elf_sha256_valid": false,
+      "extractable_as_verified_package": false,
+      "interface": "styleos.system-module-v1",
+      "manifest_crc_valid": true,
+      "manifest_offset": 537844,
+      "project_id": "styleos.documents",
+      "project_name": "Документы"
+    },
+    {
+      "elf_bytes": 4216,
+      "elf_crc_valid": false,
+      "elf_offset": 597156,
+      "elf_sha256_manifest": "6279c1dd0fa097378be7e1e89cdc1bc3aa5049c5a9c99b9a2baa385b005c7f76",
+      "elf_sha256_observed": "47e5121d119743f746ab7062c9f11b2bff646b6d875c89a2eaeab145178c8b9e",
+      "elf_sha256_valid": false,
+      "extractable_as_verified_package": false,
+      "interface": "styleos.system-module-v1",
+      "manifest_crc_valid": true,
+      "manifest_offset": 596668,
+      "project_id": "styleos.explorer",
+      "project_name": "Проводник"
+    },
+    {
+      "elf_bytes": 4216,
+      "elf_crc_valid": false,
+      "elf_offset": 602311,
+      "elf_sha256_manifest": "ee0d15b4c2ecf6ce7191295ce887c0eaeb5f54075f18af338fd30d8d2edd7fea",
+      "elf_sha256_observed": "3730ecbc53a004ab7db3cc36e67e73926e21a7ab557739830ac1cbe76b88e826",
+      "elf_sha256_valid": false,
+      "extractable_as_verified_package": false,
+      "interface": "styleos.system-module-v1",
+      "manifest_crc_valid": true,
+      "manifest_offset": 601828,
+      "project_id": "styleos.shell",
+      "project_name": "Оболочка"
+    },
+    {
+      "elf_bytes": 5080,
+      "elf_crc_valid": false,
+      "elf_offset": 607471,
+      "elf_sha256_manifest": "a4eb39ad45d42218795740231337028fac27d687e6128f9b9a152b836ee50156",
+      "elf_sha256_observed": "943b1174455fcbd5edde38f45f16a20255f19e7140a40f65f12e9e8d1bd1b15e",
+      "elf_sha256_valid": false,
+      "extractable_as_verified_package": false,
+      "interface": "styleos.window-v1",
+      "manifest_crc_valid": true,
+      "manifest_offset": 606988,
+      "project_id": "styleos.window-example",
+      "project_name": "Window Example"
+    }
+  ],
+  "sha256": "be89054aaae7efd10f83b10b07f3bd2c50bad113b61374b00f8d9dcc8c219f24",
+  "source": "/mnt/data/styleos-recovery-744/extracted/EFI/BOOT/BOOTX64.EFI"
+}

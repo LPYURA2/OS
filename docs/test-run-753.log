@@ -1,0 +1,36 @@
+grammar 8 checks PASS
+tracked changes insert/delete/accept/reject UTF-8 PASS
+review private serialization roundtrip + corruption PASS
+empty, pending insert deletion, accepted deletion PASS
+review UI spans, accept all / reject all PASS
+reject embedded NUL in serialized text PASS
+StyleOS Documents review engine: ALL PASS
+40 deterministic edit/reload scenarios PASS
+StyleOS documents model: tests PASS
+C11 DOCX export: PASS
+grammar 8 checks PASS
+tracked changes insert/delete/accept/reject UTF-8 PASS
+review private serialization roundtrip + corruption PASS
+empty, pending insert deletion, accepted deletion PASS
+review UI spans, accept all / reject all PASS
+reject embedded NUL in serialized text PASS
+StyleOS Documents review engine: ALL PASS
+40 deterministic edit/reload scenarios PASS
+StyleOS documents model: tests PASS
+C11 DOCX export: PASS
+test_original_iso_when_present (test_audit_744.Audits.test_original_iso_when_present) ... ok
+test_rejects_empty_input (test_audit_744.Audits.test_rejects_empty_input) ... ok
+test_rejects_invalid_fat (test_audit_744.Audits.test_rejects_invalid_fat) ... ok
+test_sha256 (test_audit_744.Audits.test_sha256) ... ok
+test_document_xml_roundtrip_using_python_docx_if_available (test_documents_docx.OpenXmlTests.test_document_xml_roundtrip_using_python_docx_if_available) ... C11 DOCX export: PASS
+ok
+test_embedded_744_when_available (test_embedded_tea_catalog.TeaAuditTests.test_embedded_744_when_available) ... ok
+test_limit (test_embedded_tea_catalog.TeaAuditTests.test_limit) ... ok
+test_modification_detected (test_embedded_tea_catalog.TeaAuditTests.test_modification_detected) ... ok
+test_truncated_and_invalid_manifest (test_embedded_tea_catalog.TeaAuditTests.test_truncated_and_invalid_manifest) ... ok
+test_valid_fixture (test_embedded_tea_catalog.TeaAuditTests.test_valid_fixture) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.305s
+
+OK

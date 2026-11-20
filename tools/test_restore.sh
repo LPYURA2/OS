@@ -12,6 +12,10 @@ for cc in gcc clang; do
   "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -I "$repo/include" \
       "$repo/modules/documents/model.c" "$repo/tests/test_documents_model.c" -o "$out/model"
   "$out/model"
+  "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -I "$repo/include" \
+      "$repo/modules/documents/model.c" "$repo/modules/documents/docx.c" \
+      "$repo/tests/test_documents_docx.c" -o "$out/docx"
+  "$out/docx" "$out/${cc##*/}.docx"
 done
-python3 -m unittest discover -s "$repo/tests" -p 'test_audit_744.py' -v
+python3 -m unittest discover -s "$repo/tests" -p 'test_*.py' -v
 if [ "${1:-}" ]; then python3 "$repo/tools/audit_744.py" "$1"; fi
