@@ -39,3 +39,7 @@ Desktop v0.3 в ветке `feature/styleos-desktop-v0-3-iso` загружает
 без установки. Диск заметок остаётся отдельным и совместим с v0.2.
 Панель «Процессы» пока показывает открытые окна.
 [Запуск ISO и проверки](docs/test-results/desktop-iso/README.md)
+
+Desktop v0.4 в `feature/styleos-filesystem-v1` добавляет первый вариант
+StyleFS на отдельном тестовом VDI. Старый диск заметок сохраняет прежний режим.
+[Запуск, операции и проверки StyleFS](docs/test-results/stylefs-v1/README.md)
