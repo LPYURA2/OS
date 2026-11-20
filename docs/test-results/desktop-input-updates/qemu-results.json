@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "checks": [
+    "703 to 705 with local signed package",
+    "separate Updates directory; real file opened from it",
+    "single click only selects",
+    "slow repeat does not open; rapid double click opens a real file",
+    "Alt+Shift in both orders toggles once; panel button toggles both ways",
+    "existing data disk byte-identical; legacy volume creates folder exactly once",
+    "no implicit move out of Downloads"
+  ]
+}

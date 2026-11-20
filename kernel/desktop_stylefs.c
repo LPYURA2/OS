@@ -42,6 +42,8 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
     }
 }
 
+static int find_folder(const struct desk_fs *b, const char *name);
+
 static void show(struct desk_fs *b, unsigned id)
 {
     b->computer = id == COMPUTER;
@@ -54,8 +56,19 @@ static void show(struct desk_fs *b, unsigned id)
 #endif
     b->first = b->name_edit = b->query_length = 0;
     b->query[0] = 0;
-    b->searching = b->update_view = false;
-    if (b->disk.mounted) b->status = "";
+    b->searching = false;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    b->update_view = !b->computer && b->disk.mounted &&
+                     (int)id == find_folder(b, "Обновления");
+#else
+    b->update_view = false;
+#endif
+    if (b->disk.mounted) {
+        b->status = "";
+#ifdef STYLEOS_DESKTOP_UPDATE
+        if (b->update_view) b->status = desk_update_status();
+#endif
+    }
     ++b->revision;
 }
 
@@ -452,9 +465,18 @@ static int row_at(const struct desk_fs *b, struct desk_box a, int x, int y)
     return row + b->first < n ? ids[b->first + row] : DESK_FS_NONE;
 }
 
+int desk_fs_hit_item(const struct desk_fs *b, struct desk_box a, int x, int y)
+{ return row_at(b, a, x - a.x, y - a.y); }
+
+int desk_fs_open_item(struct desk_fs *b, int item)
+{
+    if (item < 0 || item != b->selected) return DESK_FS_NONE;
+    return open_selected(b);
+}
+
 int desk_fs_drag_source(const struct desk_fs *b, struct desk_box a, int x, int y)
 {
-    int id = row_at(b, a, x - a.x, y - a.y);
+    int id = desk_fs_hit_item(b, a, x, y);
     const struct sfs_entry *e = id < 0 ? 0 : sfs_entry_at(&b->disk, (unsigned)id);
     return e && e->type == SFS_FILE && e->size && e->size <= DESK_STYLEFS_TEXT_LIMIT && txt_name(e->name) ? id : DESK_FS_NONE;
 }
@@ -515,11 +537,18 @@ int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y, int protec
             if (id >= 0) browse(b, (unsigned)id);
 #ifdef STYLEOS_DESKTOP_UPDATE
         } else if (y >= UPDATE_ROW && y < UPDATE_ROW + ROW_H) {
-            int downloads = find_folder(b, places[0]);
-            if (downloads >= 0) browse(b, (unsigned)downloads);
-            b->update_view = true;
-            b->status = desk_update_status();
-            ++b->revision;
+            if (!desk_update_probe()) { b->status = desk_update_status(); ++b->revision; }
+            else {
+                int dir = find_folder(b, "Обновления");
+                if (dir < 0) {
+                    unsigned created = 0;
+                    enum sfs_result r = sfs_mkdir(&b->disk, &b->work, SFS_ROOT, "Обновления", &created);
+                    if (r != SFS_OK) { b->status = error_text(r); ++b->revision; return DESK_FS_NONE; }
+                    dir = (int)created;
+                }
+                browse(b, (unsigned)dir);
+                arch_puts("STYLEOS DESKTOP UPDATES FOLDER\n");
+            }
 #endif
         } else if (y >= COMPUTER_ROW && y < COMPUTER_ROW + ROW_H) browse(b, COMPUTER);
         else if (y >= SYSTEM_ROW && y < SYSTEM_ROW + ROW_H) {

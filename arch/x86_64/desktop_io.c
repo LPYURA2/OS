@@ -117,9 +117,15 @@ bool desk_input_next(struct desk_event *event)
             *event = (struct desk_event){.key = key | (e ? 0x100 : 0), .modifiers = modifiers};
             return true;
         }
+        uint8_t previous = modifiers;
         modifiers = ((shift_l || shift_r) ? DESK_SHIFT : 0) |
                     ((ctrl_l || ctrl_r) ? DESK_CTRL : 0) |
                     ((alt_l || alt_r) ? DESK_ALT : 0);
+        const uint8_t chord = DESK_ALT | DESK_SHIFT;
+        if (down && previous != modifiers && (previous & chord) != chord && modifiers == chord) {
+            *event = (struct desk_event){.key = DESK_KEY_LANGUAGE, .modifiers = modifiers};
+            return true;
+        }
     }
     return false;
 }
@@ -142,6 +148,48 @@ bool desk_clock(unsigned *hour, unsigned *minute)
     *minute = m;
     return true;
 }
+
+/* Calibrate TSC once against PIT channel 2 with the speaker disabled. If the
+ * timer is absent, explicit Open remains available and no clicks are guessed. */
+static uint64_t double_click_ticks;
+static uint64_t pointer_tsc(void)
+{
+    uint32_t lo, hi;
+    __asm__ volatile ("lfence; rdtsc" : "=a"(lo), "=d"(hi) :: "memory");
+    return (uint64_t)hi << 32 | lo;
+}
+
+void desk_pointer_clock_init(void)
+{
+    uint32_t a, b, c, d;
+    __asm__ volatile ("cpuid" : "=a"(a), "=b"(b), "=c"(c), "=d"(d) : "0"(1), "2"(0));
+    if (!(d & (1u << 4))) return;
+    const uint16_t count = 59659; /* Almost exactly 50 ms at 1193182 Hz. */
+    uint8_t speaker = in8(0x61) & 3;
+    out8(0x61, 0);
+    out8(0x43, 0xb0);
+    out8(0x42, (uint8_t)count);
+    out8(0x42, (uint8_t)(count >> 8));
+    uint64_t first = pointer_tsc();
+    out8(0x61, 1);
+    for (unsigned i = 0; i < 3000000; ++i) {
+        if (in8(0x61) & 0x20) {
+            uint64_t elapsed = pointer_tsc() - first;
+            if (elapsed >= 1000000 && elapsed <= 2000000000) double_click_ticks = elapsed * 9;
+            break;
+        }
+        __asm__ volatile ("pause");
+    }
+    out8(0x61, speaker);
+    arch_puts(double_click_ticks ? "STYLEOS DESKTOP POINTER CLOCK PASS\n" :
+                                  "STYLEOS DESKTOP POINTER CLOCK UNAVAILABLE\n");
+}
+
+uint64_t desk_pointer_clock(void)
+{ return double_click_ticks ? pointer_tsc() : 0; }
+
+bool desk_pointer_near(uint64_t earlier, uint64_t later)
+{ return earlier && later > earlier && later - earlier <= double_click_ticks; }
 
 enum { BSY = 0x80, DRQ = 8, DF = 0x20, ERR = 1 };
 struct ata_disk { uint16_t port, alt; uint32_t sectors; };

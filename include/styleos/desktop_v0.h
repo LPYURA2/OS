@@ -34,7 +34,7 @@ enum { DESK_FOLDER, DESK_PAPER, DESK_LOGO, DESK_INFO, DESK_POWER, DESK_RESTART,
        DESK_APP_EDITOR, DESK_APP_NOTES, DESK_APP_PROCESSES, DESK_APP_DOCUMENTS,
        DESK_DRIVE };
 
-enum { DESK_SHIFT = 1, DESK_CTRL = 2, DESK_ALT = 4 };
+enum { DESK_SHIFT = 1, DESK_CTRL = 2, DESK_ALT = 4, DESK_KEY_LANGUAGE = 0x200 };
 struct desk_event {
     int dx, dy;
     uint16_t key; /* keyboard translated set 1, extended keys have bit 8 */
@@ -44,6 +44,9 @@ struct desk_event {
 unsigned desk_input_init(void);
 bool desk_input_next(struct desk_event *p);
 bool desk_clock(unsigned *hour, unsigned *minute);
+void desk_pointer_clock_init(void);
+uint64_t desk_pointer_clock(void);
+bool desk_pointer_near(uint64_t earlier, uint64_t later);
 void desk_reboot(void);
 
 /* Secondary IDE master only. Writable capacity must be separately admitted. */

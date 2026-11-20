@@ -30,6 +30,8 @@ void desk_fs_mount(struct desk_fs *, uint32_t sectors);
 void desk_fs_shortcut(struct desk_fs *, unsigned target);
 int desk_fs_key(struct desk_fs *, struct desk_box, unsigned key, unsigned mods, uint32_t cp, int protected_entry);
 int desk_fs_click(struct desk_fs *, struct desk_box, int x, int y, int protected_entry);
+int desk_fs_hit_item(const struct desk_fs *, struct desk_box, int x, int y);
+int desk_fs_open_item(struct desk_fs *, int item);
 int desk_fs_drag_source(const struct desk_fs *, struct desk_box, int x, int y);
 void desk_fs_draw(const struct desk_fs *, struct desk_box);
 bool desk_fs_read_text(struct desk_fs *, unsigned id, char *data, size_t *size);

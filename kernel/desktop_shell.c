@@ -25,6 +25,12 @@ static struct desk_fs filesystem;
 static int width, height, mx, my, order[WINDOWS] = {ABOUT, TASKS, NOTES, FILES};
 static int drag = -1, drag_x, drag_y;
 static bool mouse_down, menu, drag_moved;
+static struct file_click {
+    int id, x, y;
+    unsigned revision;
+    uint64_t at;
+} last_file_click, current_file_click = {.id = -1};
+static bool second_file_click;
 static unsigned current_folder, doc_folder, input_flags;
 static int document = -1;
 static char content[DESK_STYLEFS_TEXT_LIMIT], incoming[DESK_STYLEFS_TEXT_LIMIT];
@@ -62,6 +68,8 @@ static bool contains(struct desk_box b, int x, int y)
  * bottom, but windows use work_area(), not their own panel coordinates. */
 static struct desk_box panel_box(void) { return (struct desk_box){0, height - 54, width, 54}; }
 static struct desk_box work_area(void) { return (struct desk_box){0, 0, width, panel_box().y}; }
+static struct desk_box language_box(void)
+{ return (struct desk_box){width - 102, panel_box().y + 8, 42, 37}; }
 static struct desk_box start_box(void) { return (struct desk_box){9, panel_box().y + 1, 153, 51}; }
 static struct desk_box menu_box(void) { return (struct desk_box){9, panel_box().y - 273, 313, 260}; }
 static struct desk_box task_button(int number)
@@ -286,10 +294,18 @@ static int protected_file_entry(void)
     return win[NOTES].open ? (document >= 0 ? document : (int)doc_folder) : -1;
 }
 
+static void toggle_language(void)
+{
+    russian = !russian;
+    arch_puts(russian ? "STYLEOS DESKTOP INPUT RU\n" : "STYLEOS DESKTOP INPUT EN\n");
+}
+
 static bool keyboard(unsigned key, unsigned mods)
 {
+    last_file_click.at = 0;
+    current_file_click.id = -1;
     if (key == 0x01 && transfer.id >= 0) { transfer.id = -1; transfer.lifted = false; return true; }
-    if (key == 0x40) { russian = !russian; return true; } /* F6 */
+    if (key == 0x40 || key == DESK_KEY_LANGUAGE) { toggle_language(); return true; } /* F6 or Alt+Shift */
     if (key == 0x01 && menu) { menu = false; return true; }
     if (key == 0x15b || key == 0x3e) { menu = !menu; return true; } /* Super or F4 */
     if (filesystem.mode && active() == FILES && key != 0x3d && !menu) {
@@ -373,7 +389,7 @@ static struct desk_box menu_highlight(struct desk_box menu, unsigned row)
 }
 
 struct visual {
-    struct desk_box boxes[WINDOWS], hot[5];
+    struct desk_box boxes[WINDOWS], hot[6];
     bool shown[WINDOWS], open[WINDOWS];
     int z[WINDOWS], top, x, y;
     bool menu, russian, writable;
@@ -413,6 +429,7 @@ static void take_visual(struct visual *v)
         if (contains(row, mx, my)) v->hot[3] = row;
     }
     v->hot[4] = drop_target(mx, my);
+    if (contains(language_box(), mx, my)) v->hot[5] = language_box();
 }
 
 static void invalidate(struct desk_damage *d, const struct visual *old,
@@ -442,7 +459,7 @@ static void invalidate(struct desk_damage *d, const struct visual *old,
 
     if (panel) desk_damage_add(d, panel_box());
     else if (clock || old->russian != next->russian)
-        desk_damage_add(d, (struct desk_box){width - 96, panel_box().y + 14, 96, 24});
+        desk_damage_add(d, (struct desk_box){width - 102, panel_box().y + 8, 102, 37});
     if (old->menu != next->menu) {
         desk_damage_add(d, start_box());
         desk_damage_add(d, menu_box());
@@ -466,6 +483,7 @@ static void maximize(int id)
 static void click(int x, int y)
 {
     if (contains(start_box(), x, y)) { menu = !menu; return; }
+    if (contains(language_box(), x, y)) { menu = false; toggle_language(); return; }
     if (menu) {
         struct desk_box m = menu_box();
         menu = false;
@@ -687,7 +705,9 @@ static void draw(void)
         desk_text(b.x + 45, b.y + 14, b.x + b.w - 3,
                   filesystem.mode && i == NOTES ? "Редактор" : app_name(i), LIGHT);
     }
-    desk_text(width - 93, panel.y + 16, width - 61, russian ? "RU" : "EN", MUTED);
+    struct desk_box lang = language_box();
+    desk_round(lang, contains(lang, mx, my) ? 0x34455e : 0x202c40);
+    desk_text(lang.x + 9, panel.y + 16, width - 61, russian ? "RU" : "EN", LIGHT);
     desk_text(width - 59, panel.y + 16, width - 4, clock_text, LIGHT);
     if (menu && desk_clip_visible(menu_box())) {
         struct desk_box m = menu_box();
@@ -721,15 +741,28 @@ static bool mouse(const struct desk_event *event)
     bool down = (event->buttons & 1) != 0;
     bool pressed = down && !mouse_down;
     bool inserted = false;
+    if (current_file_click.id >= 0 &&
+        (mx - current_file_click.x > 5 || current_file_click.x - mx > 5 ||
+         my - current_file_click.y > 5 || current_file_click.y - my > 5))
+        current_file_click.id = -1;
     if (pressed) {
-        int source = filesystem.mode && !menu && !contains(panel_box(), mx, my) && window_at(mx, my) == FILES ?
-                     desk_fs_drag_source(&filesystem, win[FILES].box, mx, my) : -1;
+        bool in_files = filesystem.mode && !menu && !contains(panel_box(), mx, my) && window_at(mx, my) == FILES;
+        int item = in_files ? desk_fs_hit_item(&filesystem, win[FILES].box, mx, my) : -1;
+        uint64_t now = item >= 0 ? desk_pointer_clock() : 0;
+        second_file_click = item >= 0 && last_file_click.id == item &&
+            last_file_click.revision == filesystem.revision && desk_pointer_near(last_file_click.at, now) &&
+            last_file_click.x >= mx - 5 && last_file_click.x <= mx + 5 &&
+            last_file_click.y >= my - 5 && last_file_click.y <= my + 5;
+        last_file_click.at = 0;
+        current_file_click = (struct file_click){.id = item, .x = mx, .y = my, .at = now};
+        int source = item >= 0 ? desk_fs_drag_source(&filesystem, win[FILES].box, mx, my) : -1;
         transfer.id = source;
         transfer.generation = filesystem.disk.generation;
         transfer.x = mx;
         transfer.y = my;
         transfer.lifted = false;
         click(mx, my);
+        current_file_click.revision = filesystem.revision;
     }
     else if (down && drag >= 0) {
         struct desk_box *b = &win[drag].box;
@@ -750,6 +783,23 @@ static bool mouse(const struct desk_event *event)
             transfer.id = -1;
             transfer.lifted = false;
         }
+    }
+    if (!down && mouse_down) {
+        if (!inserted && current_file_click.id >= 0 && !menu && window_at(mx, my) == FILES &&
+            current_file_click.revision == filesystem.revision &&
+            desk_fs_hit_item(&filesystem, win[FILES].box, mx, my) == current_file_click.id) {
+            uint64_t now = desk_pointer_clock();
+            if (second_file_click && desk_pointer_near(current_file_click.at, now)) {
+                int opened = desk_fs_open_item(&filesystem, current_file_click.id);
+                if (opened >= 0) open_document((unsigned)opened);
+                arch_puts("STYLEOS DESKTOP FILE DOUBLE CLICK\n");
+                inserted = true;
+            } else {
+                last_file_click = current_file_click;
+                last_file_click.at = now;
+            }
+        }
+        current_file_click.id = -1;
     }
     mouse_down = down;
     return pressed || inserted;
@@ -799,6 +849,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     if (sectors == 4096) desk_store_mount(&store);
     arch_puts(data_writable() ? "STYLEOS DESKTOP DATA MOUNT\n" : "STYLEOS DESKTOP DATA UNAVAILABLE\n");
     input_flags = desk_input_init();
+    desk_pointer_clock_init();
     arch_puts(input_flags & 1 ? "STYLEOS DESKTOP KEYBOARD PASS\n" : "STYLEOS DESKTOP KEYBOARD UNAVAILABLE\n");
     arch_puts(input_flags & 2 ? "STYLEOS DESKTOP MOUSE PASS\n" : "STYLEOS DESKTOP MOUSE UNAVAILABLE\n");
     initial_windows();
