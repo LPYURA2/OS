@@ -14,12 +14,16 @@ def command(*args):
     return subprocess.check_output(list(map(str, args)), text=True)
 
 
-def file_box(frame):
-    return frame.w * 688 // 1536, (frame.h - 54) * 128 // 804
+def file_box(frame, modern):
+    h = frame.h - 54
+    if modern:
+        x = frame.w * 182 // 1536
+        return x, h * 54 // 804, min(222, (frame.w - x - 46) // 3), 154
+    return frame.w * 688 // 1536, h * 128 // 804, 0, 111
 
 
 def row(q, b, index):
-    q.click(b[0] + 105, b[1] + 120 + index * 31)
+    q.click(b[0] + b[2] + 105, b[1] + b[3] + 9 + index * 31)
 
 
 def activate(q, b, index):
@@ -32,7 +36,7 @@ def keys(q, sequence):
         q.key(key)
 
 
-def run(folder, iso, clean, image_tool, qemu, firmware, converter):
+def run(folder, iso, clean, image_tool, qemu, firmware, converter, modern):
     iso_sha, clean_sha = digest(iso), digest(clean)
     seed = folder / 'seed.raw'
     data = folder / 'data.vdi'
@@ -53,21 +57,31 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter):
                '<w:body><w:p><w:r><w:t>Office round trip</w:t></w:r></w:p></w:body></w:document>')
     command(converter, 'convert', '-f', 'vdi', '-O', 'raw', clean, seed)
     command(image_tool, 'put', seed, '/Загрузки/Foreign.docx', fixture)
+    plain = folder/'drop-source.txt'
+    plain.write_bytes('\nDeep Drop\nСтрока'.encode())
+    command(image_tool, 'put', seed, '/Загрузки/Drop.txt', plain)
     command(converter, 'convert', '-f', 'raw', '-O', 'vdi', seed, data)
 
     with vm(folder/'first', iso, data, qemu, firmware, image_format='iso', data_format='vdi') as (q, first):
         q.wait_uart('STYLEFS MOUNT')
-        b = file_box(first)
+        b = file_box(first, modern)
         x, y = q.x, q.y
         q.move(x + 18, y + 12)
         q.wait_uart('CURSOR DAMAGE PASS')
         first.expect_changes_in(q.screen('stylefs-cursor'), [(x, y, 10, 17), (q.x, q.y, 10, 17)])
+        if modern:
+            q.click(b[0] + 90, b[1] + 363)
+            q.screen('my-computer').check(b[0] + 10, b[1] + 356, '76572f')
+            q.click(b[0] + 30, b[1] + 62)
+            q.screen('back')
+            q.click(b[0] + 69, b[1] + 62)
+            q.screen('forward').check(b[0] + 10, b[1] + 356, '76572f')
         q.click(64, 270)  # Projects desktop shortcut.
-        q.click(b[0] + 107, b[1] + 65)
+        q.click(b[0] + (b[2] + 70 if modern else 107), b[1] + (102 if modern else 65))
         keys(q, ('l', 'a', 'b', 'ret'))
         q.wait_uart('STYLEFS MKDIR')
         activate(q, b, 0)
-        q.click(b[0] + 195, b[1] + 65)  # + Текст
+        q.click(b[0] + b[2] + 195, b[1] + (102 if modern else 65))  # + Текст
         keys(q, ('shift-s', 't', 'y', 'l', 'e', 'ret', 'f6', 'shift-g', 'h', 'b', 'd', 't', 'n', 'ctrl-s', 'f6'))
         q.wait_uart('DOCUMENT SAVE')
         q.key('f2')  # Bring Files to the front.
@@ -85,6 +99,47 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter):
         q.key('ctrl-v')
         q.wait_uart('STYLEFS COPY')
         q.screen('stylefs-copied')
+        if modern:
+            # Minimize the opened editor. Move to the imported file without keyboard focus in it.
+            q.key('f3')
+            button_x = 164 + min(160, (first.w - 252) // 4) + 70
+            q.click(button_x, first.h - 27)
+            q.wait_uart('WINDOW MINIMIZE')
+            q.key('backspace')
+            activate(q, b, 2)
+            x, yy = b[0] + b[2] + 105, b[1] + b[3] + 40
+            q.move(x, yy)
+            q.button(True)
+            q.move(first.w - 16, b[1] - 12)  # Invalid destination.
+            q.button(False)
+            if b'DEEP DROP TEXT INSERT' in q.uart.read_bytes():
+                raise RuntimeError('drop on empty desktop inserted text')
+            q.move(x, yy)
+            q.button(True)
+            q.move(button_x, first.h - 27)
+            q.button(False)
+            q.wait_uart('DEEP DROP TEXT INSERT')
+            q.wait_uart('WINDOW RESTORE')
+            if q.uart.read_bytes().splitlines().count(b'STYLEOS DESKTOP DOCUMENT SAVE') != 1:
+                raise RuntimeError('drop saved the text without explicit confirmation')
+            q.screen('deep-drop-in-editor')
+            q.key('ctrl-s')
+            q.wait_uart('DOCUMENT SAVE', count=2)
+            # Place part of the editor body below the Explorer window and drop directly there.
+            editor_x, editor_y = b[0] + 24, b[1] + 27
+            q.move(editor_x + 110, editor_y + 17)
+            q.button(True)
+            q.move(editor_x + 110, editor_y + 82)
+            q.button(False)
+            q.wait_uart('WINDOW DRAG')
+            q.key('f2')
+            q.move(x, yy)
+            q.button(True)
+            q.move(editor_x + 160, first.h - 54 - 40)
+            q.button(False)
+            q.wait_uart('DEEP DROP TEXT INSERT', count=2)
+            q.key('ctrl-s')
+            q.wait_uart('DOCUMENT SAVE', count=3)
         q.click(70, first.h - 27)
         q.click(125, first.h - 54 - 273 + 180)
         q.wait_uart('REBOOT')
@@ -92,7 +147,7 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter):
 
     with vm(folder/'restart', iso, data, qemu, firmware, image_format='iso', data_format='vdi') as (q, f):
         q.wait_uart('STYLEFS MOUNT')
-        b = file_box(f)
+        b = file_box(f, modern)
         q.click(64, 270)
         activate(q, b, 0)
         activate(q, b, 0)
@@ -103,12 +158,16 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter):
     command(converter, 'convert', '-f', 'vdi', '-O', 'raw', data, decoded)
     for path, host in (('/Загрузки/Foreign.docx', 'original.docx'),
                        ('/Документы/Foreign.docx', 'copied.docx'),
+                       ('/Загрузки/Drop.txt', 'source-after.txt'),
                        ('/Проекты/lab/report.txt', 'report.txt')):
         command(image_tool, 'get', decoded, path, folder / host)
     if not (folder / 'copied.docx').read_bytes() == (folder / 'original.docx').read_bytes() == fixture.read_bytes():
         raise RuntimeError('copy or original differs from the imported DOCX')
-    if (folder / 'report.txt').read_bytes() != 'Style\nПривет'.encode('utf-8'):
+    text = 'Style\nПривет' + (plain.read_text() * 2 if modern else '')
+    if (folder / 'report.txt').read_bytes() != text.encode('utf-8'):
         raise RuntimeError('wrong persisted UTF-8 text')
+    if (folder / 'source-after.txt').read_bytes() != plain.read_bytes():
+        raise RuntimeError('the Deep Drop source file was modified')
     if 'Текст.txt' in command(image_tool, 'list', decoded, '/Проекты/lab'):
         raise RuntimeError('old name survived the rename')
 
@@ -123,18 +182,22 @@ def run(folder, iso, clean, image_tool, qemu, firmware, converter):
     if digest(foreign) != initial or digest(iso) != iso_sha or digest(clean) != clean_sha:
         raise RuntimeError('a rejected disk or a source artifact was modified')
     return {'status': 'PASS', 'boot_sha256': iso_sha, 'clean_vdi_sha256': clean_sha,
-            'foreign_docx_sha256': digest(fixture), 'guest_text': 'Style\nПривет',
+            'foreign_docx_sha256': digest(fixture), 'guest_text': text,
             'checks': ['StyleFS VDI mount and cursor damage', 'nested directory creation via the Files UI',
                        'UTF-8 editor save and rename via UI', 'copy foreign DOCX without opening it',
                        'read the same UTF-8 document after restart and in a fresh VM',
                        'copied DOCX exactly equals host bytes; original remains identical',
-                       'corrupt same-size disk refused; ISO and source data template unchanged']}
+                       'corrupt same-size disk refused; ISO and source data template unchanged'] +
+                      (['My computer and Back/Forward', 'real drop inserts text into minimized editor',
+                        'real drop inserts text directly over the visible editor',
+                        'drop on empty desktop cancels; source file is still byte-identical'] if modern else [])}
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     for key in ('boot', 'data-template', 'image-tool', 'output'):
         p.add_argument('--' + key, type=Path, required=True)
+    p.add_argument('--layout', choices=['v04', 'v05'], default='v05')
     a = p.parse_args()
     qemu = command_exists(os.environ.get('QEMU_X86', 'qemu-system-x86_64'))
     converter = command_exists(os.environ.get('QEMU_IMG', 'qemu-img'))
@@ -144,7 +207,7 @@ def main():
     folder = a.output.resolve()
     folder.mkdir(parents=True, exist_ok=False)
     result = run(folder, a.boot.resolve(strict=True), a.data_template.resolve(strict=True),
-                 a.image_tool.resolve(strict=True), qemu, firmware, converter)
+                 a.image_tool.resolve(strict=True), qemu, firmware, converter, a.layout == 'v05')
     (folder/'results.json').write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
     print('STYLEFS DESKTOP: PASS', flush=True)
 
