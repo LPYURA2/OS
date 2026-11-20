@@ -1,3 +1,6 @@
+#ifdef STYLEOS_DESKTOP_UPDATE
+#include <styleos/system_update.h>
+#endif
 #include <styleos/arch.h>
 #include <styleos/desktop_v0.h>
 #include <styleos/desktop_stylefs.h>
@@ -633,11 +636,18 @@ static void draw_window(int id, int top)
         }
         desk_text(b.x + 18, b.y + b.h - 46, r - 15, "Приложения пока не отдельные процессы.", MUTED);
     } else {
+#ifdef STYLEOS_DESKTOP_UPDATE
+        desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0.7", LIGHT);
+#else
         desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0.6", LIGHT);
+#endif
         desk_text(b.x + 18, b.y + 90, r - 15, "x86-64 UEFI", MUTED);
         desk_text(b.x + 18, b.y + 120, r - 15, (input_flags & 1) ? "Клавиатура PS/2 готова" : "Нет клавиатуры PS/2", MUTED);
         desk_text(b.x + 18, b.y + 149, r - 15, (input_flags & 2) ? "Мышь PS/2 готова" : "Нет мыши PS/2", MUTED);
         desk_text(b.x + 18, b.y + 178, r - 15, data_writable() ? "Диск данных подключён" : "Нет диска данных для записи", MUTED);
+#ifdef STYLEOS_DESKTOP_UPDATE
+        desk_text(b.x + 18, b.y + 207, r - 15, desk_update_status(), LIGHT);
+#endif
     }
 }
 
@@ -789,7 +799,12 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     arch_puts(input_flags & 2 ? "STYLEOS DESKTOP MOUSE PASS\n" : "STYLEOS DESKTOP MOUSE UNAVAILABLE\n");
     initial_windows();
     (void)update_clock();
+#ifdef STYLEOS_DESKTOP_UPDATE
+    size_t painted = desk_present(&(struct desk_damage){.all = true}, draw);
+    if ((input_flags & 3) == 3 && painted) desk_update_mark_ready();
+#else
     (void)desk_present(&(struct desk_damage){.all = true}, draw);
+#endif
     arch_puts("STYLEOS DESKTOP READY\n");
     unsigned tick = 0;
     bool cursor_proven = false;

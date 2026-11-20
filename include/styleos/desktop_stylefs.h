@@ -14,6 +14,10 @@ struct desk_fs {
     unsigned history[SFS_ENTRIES], history_at, history_count;
     int selected, clip, delete_id;
     uint32_t delete_generation;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    int update_id;
+    uint32_t update_generation;
+#endif
     bool mode, computer, cut;
     char name[SFS_NAME_MAX + 1];
     const char *status;

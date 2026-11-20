@@ -1,5 +1,8 @@
 #include <styleos/desktop_stylefs.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_DESKTOP_UPDATE
+#include <styleos/system_update.h>
+#endif
 
 enum { TEXT = 0xf3f0e9, DIM = 0xaeb8c7, AMBER = 0xe6ad63, BUTTON = 0x253143,
        LINE = 0x49596f, SELECT = 0x76572f, DISABLED = 0x748297,
@@ -20,6 +23,9 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
 {
     b->mode = sfs_capacity_valid(sectors);
     b->selected = b->clip = b->delete_id = -1;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    b->update_id = -1;
+#endif
     b->history_count = 1;
     b->status = "F2 Имя   Ctrl+C/X/V   Del Удалить";
     if (!b->mode) return;
@@ -42,6 +48,9 @@ static void show(struct desk_fs *b, unsigned id)
     b->selected = -1;
     if (b->delete_id >= 0) b->status = "Удаление отменено";
     b->delete_id = -1;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    b->update_id = -1;
+#endif
     b->first = b->name_edit = 0;
     ++b->revision;
 }
@@ -121,12 +130,63 @@ static bool txt_name(const char *name)
     return (name[n - 3] | 32) == 't' && (name[n - 2] | 32) == 'x' && (name[n - 1] | 32) == 't';
 }
 
+#ifdef STYLEOS_DESKTOP_UPDATE
+static bool update_name(const char *s)
+{
+    const char suffix[] = ".supdate";
+    unsigned n = 0;
+    while (s[n]) ++n;
+    if (n <= sizeof(suffix) - 1) return false;
+    for (unsigned i = 0; i < sizeof(suffix) - 1; ++i)
+        if ((s[n - (sizeof(suffix) - 1) + i] | 32) != suffix[i]) return false;
+    return true;
+}
+
+static void update_key(struct desk_fs *b, unsigned key)
+{
+    if (key == 1) {
+        b->update_id = -1;
+        b->status = "Обновление отменено";
+    } else if (key == 0x1c || key == 0x11c) {
+        unsigned id = (unsigned)b->update_id;
+        b->update_id = -1;
+        const struct sfs_entry *e = sfs_entry_at(&b->disk, id);
+        if (b->disk.generation != b->update_generation || !e || e->type != SFS_FILE ||
+            !update_name(e->name) || e->size > UP_BLOB_MAX) {
+            b->status = "Файл изменился. Откройте его снова";
+        } else if (sfs_read(&b->disk, id, desk_update_buffer(), UP_BLOB_MAX) != SFS_OK) {
+            b->status = "Не удалось прочитать пакет с диска данных";
+        } else switch (desk_update_stage(e->size)) {
+        case UP_OK: case UP_BUSY: case UP_DISK: b->status = desk_update_status(); break;
+        case UP_AUTH: b->status = "Пакет не прошёл проверку подписи"; break;
+        case UP_FORMAT: b->status = "Неверный формат пакета обновления"; break;
+        case UP_OLD: b->status = "Пакет не новее установленной версии"; break;
+        case UP_IO: b->status = "Ошибка записи. Перезапустите ВМ и проверьте статус"; break;
+        }
+    } else return;
+    ++b->revision;
+}
+#endif
+
 static int open_selected(struct desk_fs *b)
 {
     if (b->selected < 0) return DESK_FS_NONE;
     const struct sfs_entry *e = sfs_entry_at(&b->disk, (unsigned)b->selected);
     if (!e) return DESK_FS_NONE;
     if (e->type == SFS_DIRECTORY) { browse(b, (unsigned)b->selected); return DESK_FS_NONE; }
+#ifdef STYLEOS_DESKTOP_UPDATE
+    if (update_name(e->name)) {
+        if (!desk_update_probe() || desk_update_pending()) b->status = desk_update_status();
+        else if (e->size > UP_BLOB_MAX || e->size < UP_SECTOR) b->status = "Неверный размер пакета обновления";
+        else {
+            b->update_id = b->selected;
+            b->update_generation = b->disk.generation;
+            b->status = "Установить? Enter — да, Esc — отмена";
+        }
+        ++b->revision;
+        return DESK_FS_NONE;
+    }
+#endif
     if (txt_name(e->name) && e->size <= DESK_STYLEFS_TEXT_LIMIT) return b->selected;
     b->status = e->size > DESK_STYLEFS_TEXT_LIMIT && txt_name(e->name) ? "Текст больше 64 КиБ" : "Можно копировать. Нет приложения";
     arch_puts("STYLEOS DESKTOP STYLEFS NO HANDLER\n");
@@ -227,6 +287,9 @@ static void delete_key(struct desk_fs *b, unsigned key, int protected_entry)
 int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned mods, uint32_t cp, int protected_entry)
 {
     if (!b->disk.mounted) return DESK_FS_NONE;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    if (b->update_id >= 0) { if (!mods) update_key(b, key); return DESK_FS_NONE; }
+#endif
     if (b->computer) {
         if (!mods && (key == 0x1c || key == 0x11c)) browse(b, SFS_ROOT);
         return DESK_FS_NONE;
@@ -298,6 +361,9 @@ int desk_fs_drag_source(const struct desk_fs *b, struct desk_box a, int x, int y
 int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y)
 {
     if (!b->disk.mounted || b->name_edit || b->delete_id >= 0) return DESK_FS_NONE;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    if (b->update_id >= 0) return DESK_FS_NONE;
+#endif
     x -= a.x;
     y -= a.y;
     int side = sidebar(a), local = x - side;
@@ -309,6 +375,13 @@ int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y)
         if (y >= SIDE_ROWS && y < SIDE_ROWS + ROW_H * (int)(sizeof(places)/sizeof(*places))) {
             int id = find_folder(b, places[(y - SIDE_ROWS) / ROW_H]);
             if (id >= 0) browse(b, (unsigned)id);
+#ifdef STYLEOS_DESKTOP_UPDATE
+        } else if (y >= 308 && y < 341) {
+            int downloads = find_folder(b, places[0]);
+            if (downloads >= 0) browse(b, (unsigned)downloads);
+            b->status = desk_update_status();
+            ++b->revision;
+#endif
         } else if (y >= COMPUTER_ROW && y < COMPUTER_ROW + ROW_H) browse(b, COMPUTER);
         else if (y >= VOLUME_ROW && y < VOLUME_ROW + ROW_H) browse(b, SFS_ROOT);
     } else if (b->computer) {
@@ -371,7 +444,11 @@ void desk_fs_draw(const struct desk_fs *b, struct desk_box a)
             desk_icon(a.x + 16, y + 4, 20, DESK_FOLDER, target >= 0 ? AMBER : DISABLED);
             desk_text(a.x + 45, y + 5, left - 8, places[i], target >= 0 ? TEXT : DISABLED);
         }
+#ifdef STYLEOS_DESKTOP_UPDATE
+        desk_text(a.x + 17, a.y + 315, left - 6, "Обновления", desk_update_probe() ? TEXT : DISABLED);
+#else
         desk_text(a.x + 17, a.y + 315, left - 6, "Обновления", DISABLED);
+#endif
         desk_fill(a.x + 12, a.y + 341, side - 24, 1, LINE);
         if (b->computer) desk_round((struct desk_box){a.x + 8, a.y + COMPUTER_ROW, side - 15, ROW_H - 1}, SELECT);
         desk_text(a.x + 17, a.y + COMPUTER_ROW + 4, left - 6, "Мой компьютер", TEXT);
