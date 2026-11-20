@@ -35,7 +35,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_bootpool=False, test_paging=False, test_paging_fault=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
-          test_disk_app=False, test_desktop_display=False, desktop_v0=False):
+          test_disk_app=False, test_desktop_display=False, desktop_v0=False,
+          update_build=None, update_public_key=None, test_update_fail=False):
+    if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
+        raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
     if desktop_v0 and arch != 'x86_64':
         raise ValueError('desktop v0 requires x86-64 UEFI')
     if test_desktop_display and arch != 'x86_64':
@@ -135,6 +138,21 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_DESKTOP_DISPLAY=1')
     if desktop_v0:
         flags.append('-DSTYLEOS_DESKTOP_V0=1')
+    if update_build is not None:
+        vendor = ROOT / 'third_party/monocypher'
+        public = Path(update_public_key).read_bytes()
+        if len(public) != 32 or not any(public):
+            raise ValueError('expected a 32-byte raw Ed25519 public key')
+        (folder / 'styleos_update_key.h').write_text(
+            'const unsigned char styleos_update_key[32] = {' +
+            ','.join(str(x) for x in public) + '};\n')
+        flags += ['-DSTYLEOS_DESKTOP_UPDATE=1', f'-DSTYLEOS_UPDATE_BUILD={update_build}',
+                  '-I', str(folder), '-I', str(vendor)]
+        if test_update_fail:
+            flags.append('-DSTYLEOS_TEST_UPDATE_FAIL=1')
+        sources += ['kernel/system_update.c', 'boot/x86_64/desktop_update.c',
+                    'third_party/monocypher/monocypher.c',
+                    'third_party/monocypher/monocypher-ed25519.c']
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
@@ -276,7 +294,18 @@ def main():
                           help='Dedicated x86-64 UEFI image: framebuffer proof only')
     negative.add_argument('--desktop-v0', action='store_true',
                           help='Experimental interactive x86-64 UEFI desktop image')
+    parser.add_argument('--update-build', type=int, help='Guest update build number')
+    parser.add_argument('--update-public-key', type=Path, help='Raw Ed25519 verification key')
+    parser.add_argument('--test-update-fail', action='store_true', help='Trial intentionally never becomes ready')
     args = parser.parse_args()
+    if args.update_build is not None:
+        if not (0 < args.update_build < 2**32 and args.desktop_v0 and args.arch == 'x86_64'
+                and args.update_public_key and args.output):
+            parser.error('--update-build needs x86-64 desktop, public key and dedicated --output')
+        if args.output.resolve() in {(ROOT / 'build').resolve(), (ROOT / 'build/desktop-v0').resolve()}:
+            parser.error('update builds must use a separate output folder')
+    elif args.update_public_key or args.test_update_fail:
+        parser.error('update key and test require --update-build')
     if args.test_storage and args.arch != 'aarch64':
         parser.error('--test-storage requires --arch aarch64')
     if args.test_disk_app and args.arch != 'aarch64':
@@ -315,15 +344,20 @@ def main():
                              args.test_user_processes, args.test_storage,
                              args.test_disk_app, **({'test_desktop_display': True}
                                                    if args.test_desktop_display else {}),
-                             **({'desktop_v0': True} if args.desktop_v0 else {})))
+                             **({'desktop_v0': True} if args.desktop_v0 else {}),
+                             **({'update_build': args.update_build, 'update_public_key': args.update_public_key,
+                                 'test_update_fail': args.test_update_fail} if args.update_build is not None else {})))
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     version = subprocess.check_output([cc, '--version'], text=True).splitlines()[0]
     (output / 'manifest.json').write_text(json.dumps({
-        'prototype': 'StyleOS desktop v0' if args.desktop_v0 else
+        'prototype': 'StyleOS guest updates v0.7' if args.update_build is not None else
+                     'StyleOS desktop v0' if args.desktop_v0 else
                      'StyleOS desktop display check' if args.test_desktop_display else
                      'StyleOS T-P1.8B' if args.test_disk_app else
                      'StyleOS T-P1.8A' if args.test_storage else
                      'StyleOS T-P1.7' if args.test_user_processes else 'StyleOS T-P1.6',
+        **({'update_build': args.update_build, 'test_update_fail': args.test_update_fail}
+           if args.update_build is not None else {}),
         'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,
         'invalid_memory_map': args.invalid_memory_map,

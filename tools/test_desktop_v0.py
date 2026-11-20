@@ -149,7 +149,7 @@ class Desktop:
 
 
 @contextlib.contextmanager
-def vm(out, image, data, qemu, firmware, *, image_format, data_format):
+def vm(out, image, data, qemu, firmware, *, image_format, data_format, persist_boot=False):
     out.mkdir()
     nvram, uart = out / 'vars.fd', out / 'COM1.log'
     shutil.copyfile(firmware[1], nvram)
@@ -162,7 +162,8 @@ def vm(out, image, data, qemu, firmware, *, image_format, data_format):
         cmd += ['-boot', 'order=d,strict=on',
                 '-drive', f'file={image},format=raw,if=ide,index=0,media=cdrom,readonly=on']
     else:
-        cmd += ['-drive', f'file={image},format={image_format},if=ide,index=0,snapshot=on']
+        backing = 'cache=writeback' if persist_boot else 'snapshot=on'
+        cmd += ['-drive', f'file={image},format={image_format},if=ide,index=0,{backing}']
     if data is not None:
         cmd += ['-drive', f'file={data},format={data_format},if=ide,index=2,cache=writeback']
     if os.environ.get('QEMU_DATA_DIR'):
