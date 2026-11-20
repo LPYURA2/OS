@@ -281,6 +281,11 @@ static uint32_t character(unsigned key, bool shift)
     return key < sizeof(normal) - 1 ? (uint8_t)(shift ? upper[key] : normal[key]) : 0;
 }
 
+static int protected_file_entry(void)
+{
+    return win[NOTES].open ? (document >= 0 ? document : (int)doc_folder) : -1;
+}
+
 static bool keyboard(unsigned key, unsigned mods)
 {
     if (key == 0x01 && transfer.id >= 0) { transfer.id = -1; transfer.lifted = false; return true; }
@@ -288,9 +293,8 @@ static bool keyboard(unsigned key, unsigned mods)
     if (key == 0x01 && menu) { menu = false; return true; }
     if (key == 0x15b || key == 0x3e) { menu = !menu; return true; } /* Super or F4 */
     if (filesystem.mode && active() == FILES && key != 0x3d && !menu) {
-        int protected_entry = win[NOTES].open ? (document >= 0 ? document : (int)doc_folder) : -1;
         int item = desk_fs_key(&filesystem, win[FILES].box, key, mods,
-                               character(key, (mods & DESK_SHIFT) != 0), protected_entry);
+                               character(key, (mods & DESK_SHIFT) != 0), protected_file_entry());
         if (item >= 0) open_document((unsigned)item);
         return true;
     }
@@ -514,7 +518,7 @@ static void click(int x, int y)
                 arch_puts("STYLEOS DESKTOP WINDOW MINIMIZE\n");
             } else if (!w->maximized) { drag = id; drag_x = dx; drag_y = dy; drag_moved = false; }
         } else if (id == FILES && filesystem.mode) {
-            int item = desk_fs_click(&filesystem, b, x, y);
+            int item = desk_fs_click(&filesystem, b, x, y, protected_file_entry());
             if (item == DESK_FS_NEW_TEXT) new_document();
             else if (item >= 0) open_document((unsigned)item);
         } else if (id == FILES && dy >= TITLE + 12 && dy < b.h - 25) {

@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "checks": [
+    "original 701 to 703 signed update",
+    "two disk cards; open data card by mouse",
+    "list and grid selector",
+    "Cyrillic search; open filtered text by click and by Enter",
+    "dialog cancellation and explicit install by mouse; Enter still confirms",
+    "703 to 704 using only mouse, followed by fresh VM boot",
+    "data VDI byte-identical"
+  ]
+}

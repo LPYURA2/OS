@@ -7,8 +7,9 @@
 enum { TEXT = 0xf3f0e9, DIM = 0xaeb8c7, AMBER = 0xe6ad63, BUTTON = 0x253143,
        LINE = 0x49596f, SELECT = 0x76572f, DISABLED = 0x748297,
        FILE_TOP = 154, ROW_H = 31, FOOT = 43, SIDEBAR = 222,
-       SIDE_ROWS = 122, COMPUTER_ROW = 350, VOLUME_ROW = 384,
-       MAKE_DIR = 1, RENAME = 2, COMPUTER = SFS_ENTRIES };
+       SIDE_ROWS = 122, COMPUTER_ROW = 350,
+       MAKE_DIR = 1, RENAME = 2, COMPUTER = SFS_ENTRIES,
+       SYSTEM_ROW = 384, DATA_ROW = 415, UPDATE_ROW = 308, GRID_H = 78 };
 static const char *const places[] = {"Загрузки", "Документы", "Изображения", "Музыка", "Видео", "Проекты"};
 
 static int sidebar(struct desk_box a) { return a.w / 3 < SIDEBAR ? a.w / 3 : SIDEBAR; }
@@ -51,7 +52,10 @@ static void show(struct desk_fs *b, unsigned id)
 #ifdef STYLEOS_DESKTOP_UPDATE
     b->update_id = -1;
 #endif
-    b->first = b->name_edit = 0;
+    b->first = b->name_edit = b->query_length = 0;
+    b->query[0] = 0;
+    b->searching = b->update_view = false;
+    if (b->disk.mounted) b->status = "";
     ++b->revision;
 }
 
@@ -92,6 +96,62 @@ void desk_fs_shortcut(struct desk_fs *b, unsigned target)
     }
 }
 
+static unsigned str_length(const char *s)
+{
+    unsigned n = 0;
+    while (s[n]) ++n;
+    return n;
+}
+
+static uint32_t lower(uint32_t cp)
+{
+    if ((cp >= 'A' && cp <= 'Z') || (cp >= 0x410 && cp <= 0x42f)) return cp + 32;
+    return cp == 0x401 ? 0x451 : cp;
+}
+
+static bool matches(const char *name, const struct desk_fs *b)
+{
+    if (!b->query_length) return true;
+    unsigned length = str_length(name);
+    for (size_t start = 0, step; start < length; start += step) {
+        (void)desk_utf8(name + start, length - start, &step);
+        size_t i = start, j = 0, a, q;
+        while (j < b->query_length && i < length) {
+            uint32_t x = desk_utf8(name + i, length - i, &a);
+            uint32_t y = desk_utf8(b->query + j, b->query_length - j, &q);
+            if (lower(x) != lower(y)) break;
+            i += a;
+            j += q;
+        }
+        if (j == b->query_length) return true;
+    }
+    return false;
+}
+
+static bool search_key(struct desk_fs *b, unsigned key, uint32_t cp)
+{
+    if (key == 0x1c || key == 0x11c) b->searching = false;
+    else if (key == 1) {
+        b->query_length = 0;
+        b->query[0] = 0;
+        b->searching = false;
+    } else if (key == 0x0e) {
+        if (b->query_length) {
+            while (--b->query_length && ((uint8_t)b->query[b->query_length] & 0xc0) == 0x80) {}
+            b->query[b->query_length] = 0;
+        }
+    } else if (cp >= 32 && cp < 0x800 && b->query_length + (cp < 128 ? 1u : 2u) < sizeof(b->query)) {
+        if (cp >= 128) b->query[b->query_length++] = (char)(0xc0 | (cp >> 6));
+        b->query[b->query_length++] = (char)(cp < 128 ? cp : 0x80 | (cp & 63));
+        b->query[b->query_length] = 0;
+    } else return false;
+    b->first = 0;
+    b->selected = -1;
+    b->status = b->searching ? "Введите имя файла. Enter / Esc" : "";
+    ++b->revision;
+    return true;
+}
+
 static unsigned rows(const struct desk_fs *b, int out[SFS_ENTRIES])
 {
     if (!b->disk.mounted || b->computer) return 0;
@@ -99,18 +159,31 @@ static unsigned rows(const struct desk_fs *b, int out[SFS_ENTRIES])
     for (unsigned type = SFS_DIRECTORY; type <= SFS_FILE; ++type)
         for (unsigned id = 1; id < SFS_ENTRIES; ++id) {
             const struct sfs_entry *e = sfs_entry_at(&b->disk, id);
-            if (e && e->parent == b->folder && e->type == type) out[n++] = (int)id;
+            if (e && e->parent == b->folder && e->type == type && matches(e->name, b)) out[n++] = (int)id;
         }
     return n;
 }
 
-static unsigned visible_rows(struct desk_box area)
-{ return area.h > FILE_TOP + FOOT ? (unsigned)(area.h - FILE_TOP - FOOT) / ROW_H : 0u; }
+static int grid_columns(struct desk_box area)
+{
+    int n = (area.w - sidebar(area) - 25) / 124;
+    return n > 1 ? n : 1;
+}
+
+static int grid_width(struct desk_box area)
+{ return (area.w - sidebar(area) - 25) / grid_columns(area); }
+
+static unsigned visible_rows(const struct desk_fs *b, struct desk_box area)
+{
+    if (area.h <= FILE_TOP + FOOT) return 0;
+    unsigned h = (unsigned)(area.h - FILE_TOP - FOOT);
+    return b->grid ? h / GRID_H * (unsigned)grid_columns(area) : h / ROW_H;
+}
 
 static void change_selection(struct desk_fs *b, struct desk_box area, int delta)
 {
     int ids[SFS_ENTRIES], pos = -1;
-    unsigned n = rows(b, ids), visible = visible_rows(area);
+    unsigned n = rows(b, ids), visible = visible_rows(b, area);
     if (!n || !visible) return;
     for (unsigned i = 0; i < n; ++i) if (ids[i] == b->selected) pos = (int)i;
     pos = pos < 0 ? 0 : pos + delta;
@@ -119,6 +192,11 @@ static void change_selection(struct desk_fs *b, struct desk_box area, int delta)
     b->selected = ids[pos];
     if ((unsigned)pos < b->first) b->first = (unsigned)pos;
     if ((unsigned)pos >= b->first + visible) b->first = (unsigned)pos + 1 - visible;
+    if (b->grid) {
+        unsigned cols = (unsigned)grid_columns(area);
+        b->first = b->first / cols * cols;
+        if ((unsigned)pos >= b->first + visible) b->first += cols;
+    }
     ++b->revision;
 }
 
@@ -181,7 +259,7 @@ static int open_selected(struct desk_fs *b)
         else {
             b->update_id = b->selected;
             b->update_generation = b->disk.generation;
-            b->status = "Установить? Enter — да, Esc — отмена";
+            b->status = "Enter - установить, Esc - отменить";
         }
         ++b->revision;
         return DESK_FS_NONE;
@@ -296,6 +374,17 @@ int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned 
     }
     if (b->name_edit) { if (!(mods & (DESK_ALT | DESK_CTRL))) name_key(b, key, cp); return DESK_FS_NONE; }
     if (b->delete_id >= 0) { if (!mods) delete_key(b, key, protected_entry); return DESK_FS_NONE; }
+    if ((mods & DESK_CTRL) && key == 0x21) {
+        b->searching = true;
+        b->status = "Введите имя файла. Enter / Esc";
+        ++b->revision;
+        return DESK_FS_NONE;
+    }
+    if (b->searching) {
+        if (!(mods & (DESK_CTRL | DESK_ALT))) (void)search_key(b, key, cp);
+        return DESK_FS_NONE;
+    }
+    if (key == 1 && b->query_length && !mods) { (void)search_key(b, key, 0); return DESK_FS_NONE; }
     if (mods & DESK_ALT) return DESK_FS_NONE;
     if (mods & DESK_CTRL) {
         if (key == 0x31) start_name(b, MAKE_DIR);
@@ -331,9 +420,13 @@ int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned 
         }
         ++b->revision;
     } else if (key == 0x3c) start_name(b, RENAME);
-    else if (key == 0x148 || key == 0x150) change_selection(b, area, key == 0x148 ? -1 : 1);
+    else if (key == 0x148 || key == 0x150) {
+        int step = b->grid ? grid_columns(area) : 1;
+        change_selection(b, area, key == 0x148 ? -step : step);
+    } else if (b->grid && (key == 0x14b || key == 0x14d))
+        change_selection(b, area, key == 0x14b ? -1 : 1);
     else if (key == 0x149 || key == 0x151) {
-        int step = (int)visible_rows(area);
+        int step = (int)visible_rows(b, area);
         change_selection(b, area, key == 0x149 ? -step : step);
     } else if (key == 0x0e) go_parent(b);
     else if (key == 0x1c || key == 0x11c) return open_selected(b);
@@ -342,10 +435,18 @@ int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned 
 
 static int row_at(const struct desk_fs *b, struct desk_box a, int x, int y)
 {
-    if (b->computer || b->name_edit || b->delete_id >= 0 || x < sidebar(a) + 10 || x >= a.w - 12 || y < FILE_TOP)
-        return DESK_FS_NONE;
+    if (b->computer || b->name_edit || b->delete_id >= 0 || x < sidebar(a) + 10 || x >= a.w - 14 ||
+        y < FILE_TOP || y >= a.h - FOOT) return DESK_FS_NONE;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    if (b->update_id >= 0) return DESK_FS_NONE;
+#endif
     unsigned row = (unsigned)(y - FILE_TOP) / ROW_H;
-    if (row >= visible_rows(a)) return DESK_FS_NONE;
+    if (b->grid) {
+        unsigned col = (unsigned)(x - sidebar(a) - 10) / (unsigned)grid_width(a);
+        if (col >= (unsigned)grid_columns(a)) return DESK_FS_NONE;
+        row = (unsigned)(y - FILE_TOP) / GRID_H * (unsigned)grid_columns(a) + col;
+    }
+    if (row >= visible_rows(b, a)) return DESK_FS_NONE;
     int ids[SFS_ENTRIES];
     unsigned n = rows(b, ids);
     return row + b->first < n ? ids[b->first + row] : DESK_FS_NONE;
@@ -358,17 +459,54 @@ int desk_fs_drag_source(const struct desk_fs *b, struct desk_box a, int x, int y
     return e && e->type == SFS_FILE && e->size && e->size <= DESK_STYLEFS_TEXT_LIMIT && txt_name(e->name) ? id : DESK_FS_NONE;
 }
 
-int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y)
+static struct desk_box action_panel(struct desk_box a)
 {
-    if (!b->disk.mounted || b->name_edit || b->delete_id >= 0) return DESK_FS_NONE;
+    int x = sidebar(a) + 13;
+    return (struct desk_box){x, a.h - FOOT - 100, a.w - x - 14, 100};
+}
+
+static bool in_button(int x, int y, int l, int t, int w, int h)
+{ return x >= l && x < l + w && y >= t && y < t + h; }
+
+static int search_left(struct desk_box a) { return a.w - (a.w >= 760 ? 208 : 182); }
+
+static bool action_open(const struct desk_fs *b)
+{
 #ifdef STYLEOS_DESKTOP_UPDATE
-    if (b->update_id >= 0) return DESK_FS_NONE;
+    if (b->update_id >= 0) return true;
 #endif
+    return b->name_edit || b->delete_id >= 0;
+}
+
+int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y, int protected_entry)
+{
+    if (!b->disk.mounted) return DESK_FS_NONE;
     x -= a.x;
     y -= a.y;
+    if (action_open(b)) {
+        struct desk_box p = action_panel(a);
+        unsigned key = in_button(x, y, p.x + 13, p.y + 64, 130, 28) ? 0x1c :
+                       in_button(x, y, p.x + 153, p.y + 64, 110, 28) ? 1 : 0;
+        if (!key) return DESK_FS_NONE;
+#ifdef STYLEOS_DESKTOP_UPDATE
+        if (b->update_id >= 0) update_key(b, key);
+        else
+#endif
+        if (b->name_edit) name_key(b, key, 0);
+        else delete_key(b, key, protected_entry);
+        return DESK_FS_NONE;
+    }
     int side = sidebar(a), local = x - side;
+    if (b->searching) { b->searching = false; b->status = ""; ++b->revision; }
     if (y >= 48 && y < 79) {
-        if (x >= 12 && x < 49) history_step(b, false);
+        if (!b->computer && x >= search_left(a) && x < a.w - 14) {
+            if (x >= a.w - 43 && b->query_length) (void)search_key(b, 1, 0);
+            else {
+                b->searching = true;
+                b->status = "Введите имя файла. Enter / Esc";
+                ++b->revision;
+            }
+        } else if (x >= 12 && x < 49) history_step(b, false);
         else if (x >= 53 && x < 90) history_step(b, true);
         else if (x >= 94 && x < 131) go_parent(b);
     } else if (x >= 8 && x < side) {
@@ -376,20 +514,47 @@ int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y)
             int id = find_folder(b, places[(y - SIDE_ROWS) / ROW_H]);
             if (id >= 0) browse(b, (unsigned)id);
 #ifdef STYLEOS_DESKTOP_UPDATE
-        } else if (y >= 308 && y < 341) {
+        } else if (y >= UPDATE_ROW && y < UPDATE_ROW + ROW_H) {
             int downloads = find_folder(b, places[0]);
             if (downloads >= 0) browse(b, (unsigned)downloads);
+            b->update_view = true;
             b->status = desk_update_status();
             ++b->revision;
 #endif
         } else if (y >= COMPUTER_ROW && y < COMPUTER_ROW + ROW_H) browse(b, COMPUTER);
-        else if (y >= VOLUME_ROW && y < VOLUME_ROW + ROW_H) browse(b, SFS_ROOT);
+        else if (y >= SYSTEM_ROW && y < SYSTEM_ROW + ROW_H) {
+#ifdef STYLEOS_DESKTOP_UPDATE
+            if (desk_update_probe()) { browse(b, COMPUTER); b->status = "Системный диск защищён от записи через Проводник"; }
+            else
+#endif
+                browse(b, SFS_ROOT);
+        } else if (y >= DATA_ROW && y < DATA_ROW + ROW_H) browse(b, SFS_ROOT);
     } else if (b->computer) {
-        if (local >= 14 && local < 238 && y >= 126 && y < 186) browse(b, SFS_ROOT);
+        int card = (a.w - side - 43) / 2;
+        if (card > 220) card = 220;
+        if (y >= 126 && y < 186) {
+#ifdef STYLEOS_DESKTOP_UPDATE
+            if (desk_update_probe()) {
+                if (local >= 14 && local < 14 + card) {
+                    b->status = "Системный диск защищён от записи через Проводник";
+                    ++b->revision;
+                } else if (local >= 28 + card && local < 28 + card * 2) browse(b, SFS_ROOT);
+            } else
+#endif
+                if (local >= 14 && local < 14 + card) browse(b, SFS_ROOT);
+        }
     } else if (y >= 90 && y < 120) {
-        if (local >= 13 && local < 145) start_name(b, MAKE_DIR);
+        if (x >= a.w - 48 && x < a.w - 14) {
+            b->grid = true;
+            b->first = 0;
+            ++b->revision;
+        } else if (x >= a.w - 86 && x < a.w - 52) {
+            b->grid = false;
+            b->first = 0;
+            ++b->revision;
+        } else if (local >= 13 && local < 145) start_name(b, MAKE_DIR);
         else if (local >= 152 && local < 260) return DESK_FS_NEW_TEXT;
-        else if (local >= 267 && local < 355) return open_selected(b);
+        else if (local >= 267 && local < 347) return open_selected(b);
     } else {
         int id = row_at(b, a, x, y);
         if (id >= 0) { b->selected = id; ++b->revision; }
@@ -411,20 +576,160 @@ static void decimal(char *out, unsigned value)
     *out = 0;
 }
 
+static void active_row(int x, int y, int w, int h)
+{
+    desk_round((struct desk_box){x, y, w, h}, SELECT);
+    desk_fill(x - 3, y + h - 12, 6, 9, 0xd19247);
+    desk_fill(x + 3, y + h - 19, 6, 9, AMBER);
+}
+
+static void side_icon(int x, int y, unsigned id, uint32_t color)
+{
+    switch (id) {
+    case 0: case 6:  /* Downloads / Updates. */
+        desk_outline((struct desk_box){x + 2, y + 7, 17, 12}, color);
+        desk_line(x + 10, y + 2, x + 10, y + 15, color);
+        desk_line(x + 7, y + 12, x + 10, y + 15, color);
+        desk_line(x + 10, y + 15, x + 13, y + 12, color);
+        break;
+    case 2:
+        desk_outline((struct desk_box){x + 1, y + 3, 18, 15}, color);
+        desk_line(x + 2, y + 15, x + 8, y + 9, color);
+        desk_line(x + 8, y + 9, x + 15, y + 16, color);
+        desk_fill(x + 13, y + 6, 2, 2, color);
+        break;
+    case 3:
+        desk_fill(x + 8, y + 4, 2, 12, color);
+        desk_fill(x + 9, y + 4, 7, 2, color);
+        desk_round((struct desk_box){x + 3, y + 13, 7, 5}, color);
+        break;
+    case 4:
+        desk_outline((struct desk_box){x + 1, y + 3, 18, 15}, color);
+        desk_line(x + 8, y + 6, x + 8, y + 15, color);
+        desk_line(x + 8, y + 6, x + 14, y + 10, color);
+        desk_line(x + 14, y + 10, x + 8, y + 15, color);
+        break;
+    case 7:
+        desk_outline((struct desk_box){x + 1, y + 2, 19, 13}, color);
+        desk_fill(x + 9, y + 15, 3, 3, color);
+        desk_fill(x + 6, y + 18, 9, 1, color);
+        break;
+    default:
+        desk_icon(x, y, 20, id == 1 ? DESK_PAPER : DESK_FOLDER, color);
+        break;
+    }
+}
+
+static void view_button(struct desk_box a, bool grid, bool selected)
+{
+    int x = a.x + a.w - (grid ? 48 : 86), y = a.y + 90;
+    desk_round((struct desk_box){x, y, 34, 28}, selected ? SELECT : BUTTON);
+    uint32_t rgb = selected ? AMBER : DIM;
+    if (grid) {
+        for (int i = 0; i < 4; ++i)
+            desk_outline((struct desk_box){x + 9 + i % 2 * 9, y + 6 + i / 2 * 9, 7, 7}, rgb);
+    } else for (int i = 0; i < 3; ++i) {
+        desk_fill(x + 8, y + 7 + i * 6, 3, 2, rgb);
+        desk_fill(x + 14, y + 7 + i * 6, 13, 2, rgb);
+    }
+}
+
+static const char *kind(const struct sfs_entry *e)
+{
+    if (e->type == SFS_DIRECTORY) return "Папка";
+    if (txt_name(e->name)) return "Текст";
+#ifdef STYLEOS_DESKTOP_UPDATE
+    if (update_name(e->name)) return "Пакет";
+#endif
+    return "Файл";
+}
+
+static void volume_label(char out[40], const struct desk_fs *b)
+{
+    const char prefix[] = "StyleFS v0 / ";
+    unsigned end = sizeof(prefix) - 1;
+    for (unsigned i = 0; i < end; ++i) out[i] = prefix[i];
+    out[9] = (char)('0' + b->disk.format);
+    decimal(out + end, b->disk.io.sectors / 2048);
+    while (out[end]) ++end;
+    const char unit[] = " МиБ";
+    for (unsigned i = 0; i < sizeof(unit); ++i) out[end + i] = unit[i];
+}
+
+static void disk_card(int x, int y, int w, const char *name, const char *sub)
+{
+    struct desk_box card = {x, y, w, 60};
+    desk_round(card, 0x1b283a);
+    desk_outline(card, LINE);
+    desk_icon(x + 10, y + 17, 30, DESK_DRIVE, TEXT);
+    desk_text(x + 52, y + 9, x + w - 6, name, TEXT);
+    desk_text(x + 52, y + 32, x + w - 6, sub, DIM);
+}
+
+static void object_count(int x, int y, int right, unsigned n, bool disk)
+{
+    char count[14];
+    decimal(count, n);
+    x = desk_text(x, y, right, count, DIM);
+    unsigned one = n % 10, ten = n % 100;
+    const char *one_label = disk ? " диск" : " объект";
+    const char *some = disk ? " диска" : " объекта";
+    const char *many = disk ? " дисков" : " объектов";
+    desk_text(x, y, right, ten >= 11 && ten <= 14 ? many : one == 1 ? one_label :
+              one >= 2 && one <= 4 ? some : many, DIM);
+}
+
+static void file_size(int x, int y, int right, unsigned size)
+{
+    char text[16];
+    const char *unit = " Б";
+    if (size >= 1024 * 1024) { size = (size + 1024 * 1024 - 1) / (1024 * 1024); unit = " МиБ"; }
+    else if (size >= 1024) { size = (size + 1023) / 1024; unit = " КиБ"; }
+    decimal(text, size);
+    x = desk_text(x, y, right, text, DIM);
+    desk_text(x, y, right, unit, DIM);
+}
+
 void desk_fs_draw(const struct desk_fs *b, struct desk_box a)
 {
-    int right = a.x + a.w - 14;
+    int right = a.x + a.w - 14, side = sidebar(a), left = a.x + side;
+    int footer = a.y + a.h - FOOT;
+    unsigned count = 0;
     if (b->disk.mounted) {
-        int side = sidebar(a), left = a.x + side;
-        button(a, 12, 49, 37, "<", b->history_at > 0);
-        button(a, 53, 49, 37, ">", b->history_at + 1 < b->history_count);
-        button(a, 94, 49, 37, "^", !b->computer && b->folder);
-        int path_right = right;
-        if (a.w >= 760) {
-            path_right -= 182;
-            desk_outline((struct desk_box){path_right + 8, a.y + 48, 174, 29}, LINE);
-            desk_text(path_right + 19, a.y + 53, right, "Поиск в папке", DISABLED);
+        bool system = false;
+#ifdef STYLEOS_DESKTOP_UPDATE
+        system = desk_update_probe();
+#endif
+        const uint32_t muted = 0x35455b;
+        for (int i = 0; i < 3; ++i) {
+            int x = a.x + 30 + i * 41, y = a.y + 63;
+            uint32_t color = (i == 0 ? b->history_at > 0 : i == 1 ?
+                              b->history_at + 1 < b->history_count : !b->computer && b->folder) ? TEXT : DISABLED;
+            if (i < 2) {
+                int dir = i == 0 ? -1 : 1;
+                desk_line(x - 8, y, x + 8, y, color);
+                desk_line(x + dir * 8, y, x + dir * 2, y - 6, color);
+                desk_line(x + dir * 8, y, x + dir * 2, y + 6, color);
+            } else {
+                desk_line(x, y - 7, x, y + 9, color);
+                desk_line(x, y - 7, x - 6, y - 1, color);
+                desk_line(x, y - 7, x + 6, y - 1, color);
+            }
         }
+        desk_fill(a.x + 135, a.y + 51, 1, 25, muted);
+        int search_x = a.x + search_left(a), path_right = search_x - 12;
+        struct desk_box search = {search_x, a.y + 48, right - search_x, 29};
+        desk_outline(search, b->searching ? AMBER : LINE);
+        desk_outline((struct desk_box){search_x + 9, a.y + 56, 10, 10}, DIM);
+        desk_line(search_x + 17, a.y + 64, search_x + 22, a.y + 69, DIM);
+        desk_text(search_x + 30, a.y + 53, right - (b->query_length ? 28 : 3),
+                  b->query_length ? b->query : b->computer ? "Поиск" : "Поиск в папке",
+                  b->query_length ? TEXT : DISABLED);
+        if (b->query_length) {
+            desk_line(right - 16, a.y + 59, right - 8, a.y + 67, DIM);
+            desk_line(right - 8, a.y + 59, right - 16, a.y + 67, DIM);
+        }
+
         int xx = desk_text(a.x + 151, a.y + 53, path_right, b->computer ? "Мой компьютер" : "Данные", TEXT);
         if (!b->computer && b->folder) {
             unsigned chain[SFS_ENTRIES], n = 0;
@@ -436,70 +741,119 @@ void desk_fs_draw(const struct desk_fs *b, struct desk_box a)
         }
         desk_fill(a.x + 1, a.y + 83, a.w - 2, 1, LINE);
         desk_fill(left, a.y + 84, 1, a.h - 85, LINE);
-        desk_text(a.x + 15, a.y + 94, left - 6, "Быстрый доступ", TEXT);
+        desk_text(a.x + 16, a.y + 94, left - 6, "Быстрый доступ", TEXT);
         for (unsigned i = 0; i < sizeof(places)/sizeof(*places); ++i) {
             int y = a.y + SIDE_ROWS + (int)i * ROW_H, target = find_folder(b, places[i]);
-            if (!b->computer && target >= 0 && b->folder == (unsigned)target)
-                desk_round((struct desk_box){a.x + 8, y, side - 15, ROW_H - 2}, SELECT);
-            desk_icon(a.x + 16, y + 4, 20, DESK_FOLDER, target >= 0 ? AMBER : DISABLED);
+            if (!b->computer && !b->update_view && target >= 0 && b->folder == (unsigned)target)
+                active_row(a.x + 9, y, side - 16, ROW_H - 2);
+            side_icon(a.x + 18, y + 4, i, target >= 0 ? TEXT : DISABLED);
             desk_text(a.x + 45, y + 5, left - 8, places[i], target >= 0 ? TEXT : DISABLED);
         }
-#ifdef STYLEOS_DESKTOP_UPDATE
-        desk_text(a.x + 17, a.y + 315, left - 6, "Обновления", desk_update_probe() ? TEXT : DISABLED);
-#else
-        desk_text(a.x + 17, a.y + 315, left - 6, "Обновления", DISABLED);
-#endif
+        if (b->update_view) active_row(a.x + 9, a.y + UPDATE_ROW, side - 16, ROW_H - 2);
+        side_icon(a.x + 18, a.y + UPDATE_ROW + 4, 6, system ? TEXT : DISABLED);
+        desk_text(a.x + 45, a.y + UPDATE_ROW + 5, left - 6, "Обновления", system ? TEXT : DISABLED);
         desk_fill(a.x + 12, a.y + 341, side - 24, 1, LINE);
-        if (b->computer) desk_round((struct desk_box){a.x + 8, a.y + COMPUTER_ROW, side - 15, ROW_H - 1}, SELECT);
-        desk_text(a.x + 17, a.y + COMPUTER_ROW + 4, left - 6, "Мой компьютер", TEXT);
-        desk_text(a.x + 27, a.y + VOLUME_ROW + 4, left - 6, "Диск данных", DIM);
+        if (b->computer) active_row(a.x + 9, a.y + COMPUTER_ROW, side - 16, ROW_H - 1);
+        side_icon(a.x + 18, a.y + COMPUTER_ROW + 5, 7, TEXT);
+        desk_text(a.x + 45, a.y + COMPUTER_ROW + 4, left - 6, "Мой компьютер", TEXT);
+        desk_icon(a.x + 36, a.y + SYSTEM_ROW + 4, 22, DESK_DRIVE, DIM);
+        desk_text(a.x + 67, a.y + SYSTEM_ROW + 5, left - 6, system ? "Диск 1" : "Диск данных", DIM);
+        if (system) {
+            desk_icon(a.x + 36, a.y + DATA_ROW + 4, 22, DESK_DRIVE, DIM);
+            desk_text(a.x + 67, a.y + DATA_ROW + 5, left - 6, "Диск 2", DIM);
+        }
         if (b->computer) {
             desk_text(left + 15, a.y + 94, right, "Диски", TEXT);
-            desk_outline((struct desk_box){left + 14, a.y + 126, 224, 60}, LINE);
-            desk_icon(left + 23, a.y + 143, 24, DESK_DRIVE, TEXT);
-            desk_text(left + 58, a.y + 132, right, "Диск данных", TEXT);
-            char volume[40] = "StyleFS v0 / ";
-            volume[9] = (char)('0' + b->disk.format);
-            unsigned end = sizeof("StyleFS v0 / ") - 1;
-            decimal(volume + end, b->disk.io.sectors / 2048);
-            while (volume[end]) ++end;
-            const char *unit = " МиБ";
-            for (unsigned i = 0; unit[i]; ++i) volume[end + i] = unit[i];
-            desk_text(left + 58, a.y + 155, right, volume, DIM);
+            char volume[40];
+            volume_label(volume, b);
+            int w = (a.w - side - 43) / 2;
+            if (w > 220) w = 220;
+            if (system) {
+                disk_card(left + 14, a.y + 126, w, "Диск 1", "Системный");
+                disk_card(left + 28 + w, a.y + 126, w, "Диск 2 / Данные", volume);
+            } else disk_card(left + 14, a.y + 126, w, "Диск данных", volume);
             desk_text(left + 15, a.y + 215, right, "Внешние устройства", TEXT);
-            desk_text(left + 15, a.y + 248, right, "Нет подключённых устройств", DIM);
-            desk_text(left + 14, a.y + a.h - 24, right, "1 доступный диск", DIM);
-            return;
+            desk_text(left + 15, a.y + 248, right, "Нет доступных устройств", DIM);
+            count = system ? 2 : 1;
+        } else {
+            button(a, side + 13, 91, 132, "+ Новая папка", true);
+            button(a, side + 152, 91, 105, "+ Текст", true);
+            button(a, side + 267, 91, 80, "Открыть", b->selected >= 0);
+            view_button(a, false, !b->grid);
+            view_button(a, true, b->grid);
+            desk_fill(left + 12, a.y + 125, right - left - 12, 1, LINE);
+            int ids[SFS_ENTRIES];
+            count = rows(b, ids);
+            unsigned shown = visible_rows(b, a);
+            if (b->grid) {
+                int cols = grid_columns(a), w = grid_width(a);
+                for (unsigned i = 0; i < shown && b->first + i < count; ++i) {
+                    int id = ids[b->first + i], x = left + 10 + (int)i % cols * w;
+                    int y = a.y + FILE_TOP + (int)i / cols * GRID_H;
+                    if (y + 72 > footer) break;
+                    const struct sfs_entry *e = &b->disk.entries[id];
+                    if (id == b->selected) active_row(x, y, w - 6, 72);
+                    desk_icon(x + (w - 42) / 2, y + 4, 36,
+                              e->type == SFS_DIRECTORY ? DESK_FOLDER : DESK_PAPER,
+                              e->type == SFS_DIRECTORY ? AMBER : TEXT);
+                    desk_text(x + 7, y + 44, x + w - 10, e->name, TEXT);
+                }
+            } else {
+                int type = right - 157, size = right - 74;
+                desk_text(left + 16, a.y + 130, type - 12, "Имя", DIM);
+                desk_text(type, a.y + 130, size - 8, "Тип", DIM);
+                desk_text(size, a.y + 130, right, "Размер", DIM);
+                desk_fill(left + 12, a.y + 152, right - left - 12, 1, muted);
+                for (unsigned i = 0; i < shown && b->first + i < count; ++i) {
+                    int id = ids[b->first + i], y = a.y + FILE_TOP + (int)i * ROW_H;
+                    const struct sfs_entry *e = &b->disk.entries[id];
+                    if (id == b->selected) active_row(left + 10, y, right - left - 10, ROW_H - 1);
+                    desk_icon(left + 20, y + 4, 22, e->type == SFS_DIRECTORY ? DESK_FOLDER : DESK_PAPER,
+                              e->type == SFS_DIRECTORY ? AMBER : TEXT);
+                    desk_text(left + 55, y + 5, type - 12, e->name, TEXT);
+                    desk_text(type, y + 5, size - 8, kind(e), DIM);
+                    if (e->type == SFS_FILE) file_size(size, y + 5, right, e->size);
+                    else desk_fill(size + 2, y + 15, 12, 1, DIM);
+                }
+            }
+            if (!count) desk_text(left + 20, a.y + FILE_TOP + 10, right,
+                                  b->query_length ? "Ничего не найдено" : "Папка пуста", DIM);
         }
-        button(a, side + 13, 91, 132, "+ Папка", true);
-        button(a, side + 152, 91, 108, "+ Текст", true);
-        button(a, side + 267, 91, 88, "Открыть", b->selected >= 0);
-        desk_fill(left + 12, a.y + 125, right - left - 12, 1, LINE);
-        desk_text(left + 16, a.y + 130, right - 160, "Имя", DIM);
-        desk_text(right - 146, a.y + 130, right - 73, "Тип", DIM);
-        desk_text(right - 67, a.y + 130, right, "Размер", DIM);
-        int ids[SFS_ENTRIES];
-        unsigned n = rows(b, ids), shown = visible_rows(a);
-        for (unsigned i = 0; i < shown && b->first + i < n; ++i) {
-            int id = ids[b->first + i], y = a.y + FILE_TOP + (int)i * ROW_H;
-            const struct sfs_entry *e = &b->disk.entries[id];
-            if (id == b->selected) desk_round((struct desk_box){left + 10, y, right - left - 10, ROW_H - 1}, SELECT);
-            desk_icon(left + 20, y + 4, 22, e->type == SFS_DIRECTORY ? DESK_FOLDER : DESK_PAPER,
-                      e->type == SFS_DIRECTORY ? AMBER : TEXT);
-            desk_text(left + 55, y + 5, right - 158, e->name, TEXT);
-            desk_text(right - 146, y + 5, right - 74, e->type == SFS_DIRECTORY ? "Папка" : "Файл", DIM);
-            if (e->type == SFS_FILE) { char size[12]; decimal(size, e->size); desk_text(right - 64, y + 5, right, size, DIM); }
+        if (action_open(b)) {
+            struct desk_box p = action_panel(a);
+            struct desk_box screen = {a.x + p.x, a.y + p.y, p.w, p.h};
+            const char *prompt, *target = "", *action;
+#ifdef STYLEOS_DESKTOP_UPDATE
+            if (b->update_id >= 0) {
+                const struct sfs_entry *e = sfs_entry_at(&b->disk, (unsigned)b->update_id);
+                prompt = "Установить обновление?";
+                if (e) target = e->name;
+                action = "Установить";
+            } else
+#endif
+            if (b->delete_id >= 0) {
+                const struct sfs_entry *e = sfs_entry_at(&b->disk, (unsigned)b->delete_id);
+                prompt = "Удалить без корзины?";
+                if (e) target = e->name;
+                action = "Удалить";
+            } else {
+                prompt = b->name_edit == MAKE_DIR ? "Имя новой папки" : "Новое имя";
+                target = b->name;
+                action = b->name_edit == MAKE_DIR ? "Создать" : "Сохранить";
+            }
+            desk_round(screen, 0x111a25);
+            desk_outline(screen, AMBER);
+            desk_text(screen.x + 13, screen.y + 8, right - 8, prompt, TEXT);
+            int tx = desk_text(screen.x + 13, screen.y + 33, right - 14, target, DIM);
+            if (b->name_edit && tx < right - 13) desk_fill(tx, screen.y + 33, 1, 20, AMBER);
+            button(a, p.x + 13, p.y + 64, 130, action, true);
+            button(a, p.x + 153, p.y + 64, 110, "Отмена", true);
         }
-        if (!n) desk_text(left + 20, a.y + FILE_TOP + 10, right, "Папка пуста", DIM);
-        if (b->name_edit || b->delete_id >= 0) {
-            int y = a.y + a.h - FOOT - 27;
-            desk_round((struct desk_box){left + 13, y, right - left - 13, 41}, 0x111a25);
-            desk_outline((struct desk_box){left + 13, y, right - left - 13, 41}, AMBER);
-            const struct sfs_entry *target = b->delete_id >= 0 ? sfs_entry_at(&b->disk, (unsigned)b->delete_id) : 0;
-            desk_text(left + 22, y + 11, right - 8, target ? target->name : b->name, TEXT);
-        }
+        desk_fill(left + 12, a.y + a.h - 34, right - left - 12, 1, LINE);
     }
-    desk_text(a.x + sidebar(a) + 14, a.y + a.h - 24, right, b->status, DIM);
+    int status = left + 14;
+    if (b->disk.mounted && !b->status[0]) object_count(status, a.y + a.h - 26, right, count, b->computer);
+    else desk_text(status, a.y + a.h - 26, right, b->status, DIM);
 }
 
 bool desk_fs_read_text(struct desk_fs *b, unsigned id, char *data, size_t *size)

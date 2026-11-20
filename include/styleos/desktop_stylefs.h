@@ -18,7 +18,10 @@ struct desk_fs {
     int update_id;
     uint32_t update_generation;
 #endif
-    bool mode, computer, cut;
+    bool mode, computer, cut, grid, searching;
+    bool update_view;
+    char query[SFS_NAME_MAX + 1];
+    unsigned query_length;
     char name[SFS_NAME_MAX + 1];
     const char *status;
 };
@@ -26,7 +29,7 @@ struct desk_fs {
 void desk_fs_mount(struct desk_fs *, uint32_t sectors);
 void desk_fs_shortcut(struct desk_fs *, unsigned target);
 int desk_fs_key(struct desk_fs *, struct desk_box, unsigned key, unsigned mods, uint32_t cp, int protected_entry);
-int desk_fs_click(struct desk_fs *, struct desk_box, int x, int y);
+int desk_fs_click(struct desk_fs *, struct desk_box, int x, int y, int protected_entry);
 int desk_fs_drag_source(const struct desk_fs *, struct desk_box, int x, int y);
 void desk_fs_draw(const struct desk_fs *, struct desk_box);
 bool desk_fs_read_text(struct desk_fs *, unsigned id, char *data, size_t *size);
