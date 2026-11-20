@@ -52,3 +52,7 @@ Desktop v0.5 добавляет новый интерфейс Проводник
 Desktop v0.6 добавляет StyleFS v2 с переменным размером тома, потоковым
 копированием и сохранением совместимости со StyleFS v1.
 [Запуск, перенос данных и проверки](docs/test-results/stylefs-v2/README.md)
+
+Desktop v0.7 в `feature/styleos-offline-update-v1` добавляет отдельный
+системный VDI и первую проверенную в QEMU установку подписанных обновлений
+из файла с откатом. [Настройки ВМ, код и результаты](docs/test-results/system-update-v1/README.md).

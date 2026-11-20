@@ -5,6 +5,11 @@
 #include "desktop_display.h"
 #endif
 
+#ifdef STYLEOS_DESKTOP_UPDATE
+EFI_STATUS desk_update_boot(EFI_HANDLE, struct efi_boot_services *,
+                            const struct efi_loaded_image *, struct efi_guid *);
+#endif
+
 static struct boot_range loaded_image;
 
 static struct boot_info handoff = {
@@ -63,6 +68,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
         arch_puts("STYLEOS BOOT_ERROR invalid Loaded Image extent\n");
         return EFI_INVALID_PARAMETER;
     }
+#ifdef STYLEOS_DESKTOP_UPDATE
+    status = desk_update_boot(image, table->boot_services, loaded, &loaded_image_guid);
+    if (status != EFI_SUCCESS) return status;
+#endif
 #if defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0)
     desktop_capture_uefi_mode(table->boot_services);
 #endif

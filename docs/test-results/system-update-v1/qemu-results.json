@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "base": 700,
+  "installed": 701,
+  "rolled_back_trial": 702,
+  "system_vdi_sha256": "732a30f798c3485afc128a2b8d44a668ab6988f145c91bcca6949192155162da",
+  "active_journal": [
+    7,
+    1,
+    701,
+    0,
+    0,
+    0
+  ],
+  "checks": [
+    "boot from persistent system VDI, no ISO",
+    "cancel and modified Ed25519 signature leave system disk byte-identical",
+    "stage from Explorer; reboot via menu; boot and confirm 701",
+    "refuse already installed build",
+    "trial 702 stalls; reset rolls back to 701",
+    "fresh QEMU session still starts 701",
+    "EFI partition and separate user data disk unchanged"
+  ]
+}

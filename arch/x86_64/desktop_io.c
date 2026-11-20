@@ -1,5 +1,8 @@
 #include <styleos/desktop_v0.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_DESKTOP_UPDATE
+#include <styleos/system_update.h>
+#endif
 
 static inline void out8(uint16_t port, uint8_t value)
 {
@@ -140,22 +143,26 @@ bool desk_clock(unsigned *hour, unsigned *minute)
     return true;
 }
 
-enum { ATA = 0x170, ALT = 0x376, BSY = 0x80, DRQ = 8, DF = 0x20, ERR = 1 };
-static uint32_t sectors;
-static void ata_fault(const char *where)
+enum { BSY = 0x80, DRQ = 8, DF = 0x20, ERR = 1 };
+struct ata_disk { uint16_t port, alt; uint32_t sectors; };
+static struct ata_disk data_disk = {0x170, 0x376, 0};
+#ifdef STYLEOS_DESKTOP_UPDATE
+static struct ata_disk primary_disk = {0x1f0, 0x3f6, 0};
+#endif
+static void ata_fault(struct ata_disk *d, const char *where)
 {
-    unsigned status = in8(ATA + 7), error = in8(ATA + 1);
+    unsigned status = in8(d->port + 7), error = in8(d->port + 1);
     unsigned report = status << 8 | error;
     arch_puts("STYLEOS DESKTOP ATA "); arch_puts(where); arch_puts(" 0x");
     for (int shift = 12; shift >= 0; shift -= 4) arch_putc("0123456789abcdef"[(report >> shift) & 15]);
     arch_putc('\n');
 }
 
-static void ata_delay(void) { for (unsigned i = 0; i < 4; ++i) (void)in8(ALT); }
-static bool ata_wait(bool data, bool error_check)
+static void ata_delay(struct ata_disk *d) { for (unsigned i = 0; i < 4; ++i) (void)in8(d->alt); }
+static bool ata_wait(struct ata_disk *d, bool data, bool error_check)
 {
     for (unsigned i = 0; i < 300000; ++i) {
-        uint8_t s = in8(ATA + 7);
+        uint8_t s = in8(d->port + 7);
         if (!s || s == 0xff) return false;
         if (s & BSY) continue;
         if (error_check && (s & (ERR | DF))) return false;
@@ -164,73 +171,91 @@ static bool ata_wait(bool data, bool error_check)
     return false;
 }
 
-uint32_t desk_ata_probe(void)
+static uint32_t ata_probe(struct ata_disk *d)
 {
-    sectors = 0;
-    out8(ALT, 2); /* Disable this channel's interrupts. */
-    out8(ATA + 6, 0xa0); /* Secondary channel, master. */
-    ata_delay();
-    if (!ata_wait(false, false)) { arch_puts("STYLEOS DESKTOP ATA NOT READY\n"); return 0; }
-    for (unsigned i = 2; i <= 5; ++i) out8(ATA + i, 0);
-    out8(ATA + 7, 0xec);
-    ata_delay();
-    if (!ata_wait(true, true) || in8(ATA + 4) || in8(ATA + 5)) {
+    d->sectors = 0;
+    out8(d->alt, 2); /* Disable this channel's interrupts. */
+    out8(d->port + 6, 0xa0); /* Select master on this channel. */
+    ata_delay(d);
+    if (!ata_wait(d, false, false)) { arch_puts("STYLEOS DESKTOP ATA NOT READY\n"); return 0; }
+    for (unsigned i = 2; i <= 5; ++i) out8(d->port + i, 0);
+    out8(d->port + 7, 0xec);
+    ata_delay(d);
+    if (!ata_wait(d, true, true) || in8(d->port + 4) || in8(d->port + 5)) {
         arch_puts("STYLEOS DESKTOP ATA IDENTIFY REFUSED\n"); return 0;
     }
     uint16_t w[256];
-    for (unsigned i = 0; i < 256; ++i) w[i] = in16(ATA);
-    if (!ata_wait(false, true) || !(w[49] & (1u << 9)) ||
+    for (unsigned i = 0; i < 256; ++i) w[i] = in16(d->port);
+    if (!ata_wait(d, false, true) || !(w[49] & (1u << 9)) ||
         (w[83] & 0xc000u) != 0x4000u || !(w[83] & (1u << 12))) {
         arch_puts("STYLEOS DESKTOP ATA CAPABILITY REFUSED\n"); return 0;
     }
     if ((w[106] & 0xd000u) == 0x5000u && (w[117] != 256 || w[118])) return 0;
-    sectors = (uint32_t)w[60] | ((uint32_t)w[61] << 16);
+    d->sectors = (uint32_t)w[60] | ((uint32_t)w[61] << 16);
     arch_puts("STYLEOS DESKTOP ATA SECTORS 0x");
-    for (int shift = 28; shift >= 0; shift -= 4) arch_putc("0123456789abcdef"[(sectors >> shift) & 15]);
+    for (int shift = 28; shift >= 0; shift -= 4) arch_putc("0123456789abcdef"[(d->sectors >> shift) & 15]);
     arch_putc('\n');
-    return sectors;
+    return d->sectors;
 }
 
-static bool ata_start(uint32_t lba, uint8_t command)
+static bool ata_start(struct ata_disk *d, uint32_t lba, uint8_t command)
 {
-    if (lba >= sectors || lba >= 0x10000000u || !ata_wait(false, false)) return false;
-    out8(ATA + 6, 0xe0 | (uint8_t)(lba >> 24));
-    ata_delay();
-    out8(ATA + 1, 0);
-    out8(ATA + 2, 1);
-    out8(ATA + 3, (uint8_t)lba);
-    out8(ATA + 4, (uint8_t)(lba >> 8));
-    out8(ATA + 5, (uint8_t)(lba >> 16));
-    out8(ATA + 7, command);
-    ata_delay();
-    return ata_wait(true, true);
+    if (lba >= d->sectors || lba >= 0x10000000u || !ata_wait(d, false, false)) return false;
+    out8(d->port + 6, 0xe0 | (uint8_t)(lba >> 24));
+    ata_delay(d);
+    out8(d->port + 1, 0);
+    out8(d->port + 2, 1);
+    out8(d->port + 3, (uint8_t)lba);
+    out8(d->port + 4, (uint8_t)(lba >> 8));
+    out8(d->port + 5, (uint8_t)(lba >> 16));
+    out8(d->port + 7, command);
+    ata_delay(d);
+    return ata_wait(d, true, true);
 }
 
-bool desk_ata_read(uint32_t lba, uint8_t data[512])
+static bool ata_read(void *context, uint32_t lba, uint8_t data[512])
 {
-    if (!ata_start(lba, 0x20)) { ata_fault("READ START ERROR"); return false; }
+    struct ata_disk *d = context;
+    if (!ata_start(d, lba, 0x20)) { ata_fault(d, "READ START ERROR"); return false; }
     for (unsigned i = 0; i < 512; i += 2) {
-        uint16_t word = in16(ATA);
+        uint16_t word = in16(d->port);
         data[i] = (uint8_t)word;
         data[i + 1] = (uint8_t)(word >> 8);
     }
-    ata_delay();
-    if (!ata_wait(false, true)) { ata_fault("READ FINISH ERROR"); return false; }
+    ata_delay(d);
+    if (!ata_wait(d, false, true)) { ata_fault(d, "READ FINISH ERROR"); return false; }
     return true;
 }
 
-bool desk_ata_write(uint32_t lba, const uint8_t data[512])
+static bool ata_write(void *context, uint32_t lba, const uint8_t data[512])
 {
-    if (!ata_start(lba, 0x30)) return false;
-    for (unsigned i = 0; i < 512; i += 2) out16(ATA, data[i] | ((uint16_t)data[i + 1] << 8));
-    ata_delay();
-    return ata_wait(false, true);
+    struct ata_disk *d = context;
+    if (!ata_start(d, lba, 0x30)) return false;
+    for (unsigned i = 0; i < 512; i += 2) out16(d->port, data[i] | ((uint16_t)data[i + 1] << 8));
+    ata_delay(d);
+    return ata_wait(d, false, true);
 }
 
-bool desk_ata_flush(void)
+static bool ata_flush(void *context)
 {
-    if (!sectors || !ata_wait(false, false)) return false;
-    out8(ATA + 7, 0xe7);
-    ata_delay();
-    return ata_wait(false, true);
+    struct ata_disk *d = context;
+    if (!d->sectors || !ata_wait(d, false, false)) return false;
+    out8(d->port + 7, 0xe7);
+    ata_delay(d);
+    return ata_wait(d, false, true);
 }
+
+uint32_t desk_ata_probe(void) { return ata_probe(&data_disk); }
+bool desk_ata_read(uint32_t lba, uint8_t data[512]) { return ata_read(&data_disk, lba, data); }
+bool desk_ata_write(uint32_t lba, const uint8_t data[512]) { return ata_write(&data_disk, lba, data); }
+bool desk_ata_flush(void) { return ata_flush(&data_disk); }
+
+#ifdef STYLEOS_DESKTOP_UPDATE
+bool desk_update_io(struct upd_io *io)
+{
+    if (!primary_disk.sectors && ata_probe(&primary_disk) != UP_DISK_SECTORS) return false;
+    if (primary_disk.sectors != UP_DISK_SECTORS) return false;
+    *io = (struct upd_io){&primary_disk, primary_disk.sectors, ata_read, ata_write, ata_flush};
+    return true;
+}
+#endif
