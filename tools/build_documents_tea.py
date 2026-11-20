@@ -16,7 +16,8 @@ import zipfile
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 SOURCES=["apps/documents/main.c","modules/runtime/freestanding.c",
- "modules/documents/model.c","modules/documents/review.c","modules/documents/docx.c",
+ "modules/documents/model.c","modules/documents/edit.c",
+ "modules/documents/history.c","modules/documents/review.c","modules/documents/docx.c",
  "modules/documents/import.c","modules/documents/gateway.c","modules/documents/ui.c",
  "modules/documents/runtime.c"]
 MAX_TEA=65536

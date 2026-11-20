@@ -27,7 +27,8 @@ typedef struct {
 } sdu_ui;
 typedef enum {
  SDU_EVENT_NONE=0, SDU_EVENT_NEW, SDU_EVENT_OPEN, SDU_EVENT_SAVE,
- SDU_EVENT_SAVE_AS, SDU_EVENT_PRINT, SDU_EVENT_UNAVAILABLE
+ SDU_EVENT_SAVE_AS, SDU_EVENT_PRINT, SDU_EVENT_FIND,
+ SDU_EVENT_REPLACE, SDU_EVENT_UNDO, SDU_EVENT_REDO, SDU_EVENT_UNAVAILABLE
 } sdu_action;
 int sdu_init(sdu_ui *ui,sda_documents_app *app,int width,int height);
 int sdu_set_screen(sdu_ui *ui,sdu_screen screen);

@@ -31,6 +31,12 @@ int main(void){
  assert(sdu_input_text(&ui,"Привет 🟠",strlen("Привет 🟠"))==SDM_OK);
  assert(sdu_backspace(&ui)==SDM_OK);
  assert(strcmp(a->document.content,"Привет ")==0);
+ assert(sdm_select(&a->document,0,strlen("Привет"))==SDM_OK);
+ assert(sdu_set_screen(&ui,SDU_TEXT)==SDM_OK);
+ assert(sdu_render(&ui,canvas,SDU_COMMANDS_MAX,&n)==SDM_OK);
+ int highlighted=0;
+ for(size_t i=0;i<n;i++)if(canvas[i].type==SDU_RECT && canvas[i].rgb==0xf1d38f)highlighted++;
+ assert(highlighted==1);
  assert(sdu_set_screen(&ui,SDU_PAGE)==SDM_OK);
  assert(sdu_click(&ui,100,80)==SDU_EVENT_NONE);
  assert(a->document.page.paper==SDM_LETTER);

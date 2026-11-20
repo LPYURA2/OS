@@ -85,7 +85,8 @@ int sdu_render(const sdu_ui *ui,sdu_draw *out,size_t cap,size_t *total){
         int tw=(int)glyphs(ribbon[tab][a])*8+20;
         if(tw<70)tw=70;
         if(x+tw> w-10)break;
-        int ready=(tab==0 && a<4) || (tab==3 && a<2);
+        int ready=(tab==0 && a<4) || (tab==3 && a<2) ||
+                  (tab==1 && (a==6 || a==7));
         DRAW(SDU_TEXT_DRAW,x,80,0,0,ready?MAIN:MUTE,ribbon[tab][a],12,0);
         x+=tw;
     }
@@ -123,6 +124,21 @@ int sdu_render(const sdu_ui *ui,sdu_draw *out,size_t cap,size_t *total){
        size_t end=start;
        while(end<d->bytes && d->content[end]!='\n' && end-start<72)end++;
        char line[192];cut_utf8_line(d->content,start,end,line,sizeof(line));
+       /* The selected span belongs to the app canvas, not the shell.
+        * Glyph width remains approximate until a font metric service exists. */
+       if(d->anchor!=d->cursor){
+          size_t a=d->anchor<d->cursor?d->anchor:d->cursor;
+          size_t b=d->anchor>d->cursor?d->anchor:d->cursor;
+          if(a<end && b>start){
+            size_t lo=a>start?a:start,hi=b<end?b:end;
+            char prefix[192],selected[192];
+            cut_utf8_line(d->content,start,lo,prefix,sizeof(prefix));
+            cut_utf8_line(d->content,lo,hi,selected,sizeof(selected));
+            int px=sheet_x+35+(int)glyphs(prefix)*8;
+            int pw=(int)glyphs(selected)*8;
+            if(pw>0)DRAW(SDU_RECT,px,sheet_y+27+row*22,pw,20,0xf1d38fu,NULL,0,0);
+          }
+       }
        DRAW(SDU_TEXT_DRAW,sheet_x+35,sheet_y+30+row*22,0,0,INK,line,13,0);
        row++;
        if(end>=d->bytes)break;
@@ -158,6 +174,19 @@ sdu_action sdu_click(sdu_ui *ui,int x,int y){
    if(x>=170 && x<278)return SDU_EVENT_SAVE;
    if(x>=278 && x<394)return SDU_EVENT_SAVE_AS;
   }
+  if(ui->screen==SDU_TEXT){
+   int left=18;
+   for(int a=0;a<8 && ribbon[1][a];a++){
+     int tw=(int)glyphs(ribbon[1][a])*8+20;
+     if(tw<70)tw=70;
+     if(x>=left && x<left+tw){
+       if(a==6)return SDU_EVENT_FIND;
+       if(a==7)return SDU_EVENT_REPLACE;
+       return SDU_EVENT_UNAVAILABLE;
+     }
+     left+=tw;
+   }
+  }
   if(ui->screen==SDU_PAGE){
    sdm_page page=ui->app->document.page;
    if(x>=18 && x<88)page.paper=SDM_A4;
@@ -176,6 +205,11 @@ sdu_action sdu_shortcut(sdu_ui *ui,unsigned key,int ctrl){
  if(key=='o')return SDU_EVENT_OPEN;
  if(key=='s')return SDU_EVENT_SAVE;
  if(key=='p')return SDU_EVENT_PRINT;
+ if(key=='f')return SDU_EVENT_FIND;
+ if(key=='h')return SDU_EVENT_REPLACE;
+ if(key=='z')return SDU_EVENT_UNDO;
+ if(key=='y')return SDU_EVENT_REDO;
+ if(key=='a'){(void)sdm_select(&ui->app->document,0,ui->app->document.bytes);return SDU_EVENT_NONE;}
  return SDU_EVENT_NONE;
 }
 int sdu_input_text(sdu_ui *ui,const char *text,size_t n){

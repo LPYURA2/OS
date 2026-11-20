@@ -7,7 +7,8 @@ mkdir -p build/755
 sh tools/test_restore.sh
 for cc in gcc clang; do
  "$cc" -std=c11 -Wall -Wextra -Werror -pedantic -Iinclude \
-  modules/documents/model.c modules/documents/docx.c modules/documents/import.c \
+  modules/documents/model.c modules/documents/edit.c modules/documents/history.c \
+  modules/documents/docx.c modules/documents/import.c \
   modules/documents/gateway.c modules/documents/ui.c modules/documents/review.c \
   modules/documents/runtime.c tests/test_documents_runtime.c \
   -o "build/755/runtime-$cc"
@@ -15,7 +16,8 @@ for cc in gcc clang; do
 done
 clang -std=c11 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
  -Wall -Wextra -Werror -pedantic -Iinclude \
- modules/documents/model.c modules/documents/docx.c modules/documents/import.c \
+ modules/documents/model.c modules/documents/edit.c modules/documents/history.c \
+  modules/documents/docx.c modules/documents/import.c \
  modules/documents/gateway.c modules/documents/ui.c modules/documents/review.c \
  modules/documents/runtime.c tests/test_documents_runtime.c \
  -o build/755/runtime-sanitized
@@ -36,5 +38,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-pedantic -Iinclude \
 build/755/elf-host-smoke build/755/Documents.elf
 python3 -m unittest discover -s tests -p 'test_documents_package.py' -v
 sha256sum build/755/Documents.tea > build/755/Documents.tea.sha256
-sha256sum /mnt/data/styleos-recovery-744/StyleOS-Install-x64.iso > build/755/control-744.sha256
+if [ -n "${STYLEOS_744_ISO:-}" ] && [ -f "$STYLEOS_744_ISO" ]; then
+ sha256sum "$STYLEOS_744_ISO" > build/755/control-744.sha256
+else
+ echo "744 ISO hash SKIPPED: supply STYLEOS_744_ISO" > build/755/control-744.sha256
+fi
 printf 'ALL 755 HOST TESTS PASS; STYLEOS GUEST/QEMU NOT RUN\n'

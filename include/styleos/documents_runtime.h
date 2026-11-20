@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "styleos/documents_ui.h"
 #include "styleos/documents_review.h"
+#include "styleos/documents_history.h"
 /* Preview app-owned process contract. NO 744 loader ABI claim. A host must grant
  * each file token; no raw paths, device handles, shell global or IPC access. */
 #define SDR_ABI_VERSION 1u
@@ -16,6 +17,12 @@
 #define SDR_EVENT_OPEN_GRANTED 6u
 #define SDR_EVENT_SAVE_AS_GRANTED 7u
 #define SDR_EVENT_NEW 8u
+#define SDR_EVENT_FIND 9u
+#define SDR_EVENT_FIND_NEXT 10u
+#define SDR_EVENT_REPLACE_ALL 11u
+#define SDR_EVENT_REPLACE_SELECTED 12u
+#define SDR_EVENT_UNDO 13u
+#define SDR_EVENT_REDO 14u
 
 typedef struct {
  uint32_t type;
@@ -29,7 +36,8 @@ typedef struct {
 } sdr_event;
 typedef enum {
  SDR_RESPONSE_OK=0, SDR_RESPONSE_OPEN_DIALOG=1, SDR_RESPONSE_SAVE_DIALOG=2,
- SDR_RESPONSE_PRINT_DIALOG=3, SDR_RESPONSE_DENIED=-50, SDR_RESPONSE_BAD_EVENT=-51
+ SDR_RESPONSE_PRINT_DIALOG=3, SDR_RESPONSE_FIND_DIALOG=4,
+ SDR_RESPONSE_REPLACE_DIALOG=5, SDR_RESPONSE_DENIED=-50, SDR_RESPONSE_BAD_EVENT=-51
 } sdr_response;
 typedef struct {
  uint32_t version;
@@ -47,6 +55,9 @@ typedef struct {
  uint8_t *scratch;
  size_t scratch_bytes;
  sdm_document *staged;
+ sdh_history history;
+ char query[257];
+ size_t query_bytes;
  int ready;
  int last_error;
 } sdr_runtime;
