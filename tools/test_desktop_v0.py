@@ -207,6 +207,9 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
         bw = w * 756 // 1536
         first.check(bx + 12, by, 'e6ad63')
         first.check(w // 2, h - 11, '101822')
+        first.check(63, 54, '496680')       # Files launcher: title bar, not a folder.
+        first.check(60, 270, 'e7be80')      # Projects launcher: still a folder.
+        first.check(182, h - 35, '496680')  # Files taskbar button: same window icon.
         before_x, before_y = q.x, q.y
         q.move(before_x + 25, before_y + 15)
         q.wait_uart('CURSOR DAMAGE PASS')
@@ -224,7 +227,9 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
         if restored.pixels != first.pixels:
             raise RuntimeError('moving out did not restore the exact original scene')
         q.click(70, h - 27)
-        q.screen('menu').check(37, h - 54 - 273 + 19, '76572f')
+        menu = q.screen('menu')
+        menu.check(37, h - 54 - 273 + 19, '76572f')
+        menu.check(46, h - 54 - 273 + 30, '496680')
         q.click(70, h - 27)
 
         q.move(bx + 115, by + 22)
@@ -293,7 +298,8 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
         raise RuntimeError('unrecognized disk was written')
     return {'status': 'PASS', 'boot_format': boot_format, 'data_format': data_format,
             'boot_sha256': old_boot, 'resolution': [w, h], 'persisted_utf8': EXPECTED.decode(),
-            'checks': ['live VGA and Start menu pixels', 'real PS/2 cursor changes only two small regions',
+            'checks': ['live VGA and Start menu pixels', 'distinct Files icon and standard Projects folder',
+                       'real PS/2 cursor changes only two small regions',
                        'hover repaints only its row and cursor; no stale highlight or pointer',
                        'PS/2 mouse move/minimize/restore/maximize',
                        'keyboard English/Cyrillic and backspace', 'save to separate IDE disk',

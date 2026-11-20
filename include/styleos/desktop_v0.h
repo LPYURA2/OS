@@ -29,7 +29,8 @@ int desk_text(int x, int y, int right, const char *string, uint32_t rgb);
 int desk_glyph(int x, int y, int right, uint32_t cp, uint32_t rgb);
 uint32_t desk_utf8(const char *s, size_t remaining, size_t *used);
 void desk_icon(int x, int y, int size, unsigned icon, uint32_t rgb);
-enum { DESK_FOLDER, DESK_PAPER, DESK_LOGO, DESK_INFO, DESK_POWER, DESK_RESTART, DESK_TASK };
+enum { DESK_FOLDER, DESK_PAPER, DESK_LOGO, DESK_INFO, DESK_POWER, DESK_RESTART,
+       DESK_TASK, DESK_FILE_MANAGER };
 
 enum { DESK_SHIFT = 1, DESK_CTRL = 2, DESK_ALT = 4 };
 struct desk_event {

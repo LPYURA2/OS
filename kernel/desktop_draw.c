@@ -218,6 +218,22 @@ void desk_icon(int x, int y, int size, unsigned icon, uint32_t rgb)
 {
     int b = size, r = b - 2;
     switch (icon) {
+    case DESK_FILE_MANAGER: {
+        /* App shortcut: a split-pane window, never a standalone folder.
+         * Keep the silhouette legible at 23 px on the taskbar as well. */
+        int top = y + b / 8, h = b * 3 / 4, t = hi(1, b / 18);
+        desk_round((struct desk_box){x, top, b, h}, 0xa2bbd4);
+        desk_round((struct desk_box){x + t, top + t, b - 2*t, h - 2*t}, 0x1c2b3e);
+        desk_fill(x + 2*t, top + 2*t, b - 4*t, b / 6, 0x496680);
+        int row = top + b / 3;
+        desk_fill(x + b / 7, row, b / 4, h - b / 3 - 2*t, 0x6d88a7);
+        for (int line = 0; line < 2; ++line) {
+            int yy = row + line * b / 6;
+            desk_fill(x + b / 2, yy, b / 9, b / 9, 0xe7be80);
+            desk_fill(x + 2*b / 3, yy + t, b / 5, t, rgb);
+        }
+        break;
+    }
     case DESK_FOLDER:
         desk_round((struct desk_box){x, y + b / 7, b * 5 / 8, b / 2}, rgb);
         desk_round((struct desk_box){x, y + b / 4, b, b * 2 / 3}, rgb);

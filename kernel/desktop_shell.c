@@ -9,7 +9,7 @@ enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
 static const char *const names[WINDOWS] = {"Файлы", "Заметки", "Задачи", "О системе"};
 static const char *const folders[] = {"Файлы", "Документы", "Проекты"};
 static const char *const files[] = {"Заметки.txt", "Заметки 2.txt", "Заметки 3.txt", "Заметки 4.txt"};
-static const uint8_t icons[] = {DESK_FOLDER, DESK_PAPER, DESK_TASK, DESK_INFO};
+static const uint8_t icons[] = {DESK_FILE_MANAGER, DESK_PAPER, DESK_TASK, DESK_INFO};
 
 static struct window {
     struct desk_box box, previous;
@@ -503,7 +503,7 @@ static void draw(void)
         struct desk_box b = desktop_shortcuts[i];
         if (!desk_clip_visible(b)) continue;
         if (contains(b, mx, my)) desk_round(b, 0x2b374b);
-        desk_icon(b.x + 15, b.y + 3, 50, i == 1 ? DESK_PAPER : DESK_FOLDER, i == 1 ? LIGHT : FOLDER);
+        desk_icon(b.x + 15, b.y + 3, 50, i == 2 ? DESK_FOLDER : icons[i], i == 2 ? FOLDER : LIGHT);
         desk_text(b.x + 9, b.y + 57, b.x + b.w, i == 2 ? folders[DESK_PROJECTS] : names[i], LIGHT);
     }
     int top = active();
@@ -530,7 +530,7 @@ static void draw(void)
         struct desk_box m = menu_box();
         desk_round(m, 0x1d2838);
         desk_outline(m, STROKE);
-        static const uint8_t symbols[] = {DESK_FOLDER, DESK_INFO, DESK_TASK, DESK_RESTART, DESK_POWER};
+        static const uint8_t symbols[] = {DESK_FILE_MANAGER, DESK_INFO, DESK_TASK, DESK_RESTART, DESK_POWER};
         static const char *const labels[] = {"Файлы", "О системе", "Задачи", "Перезагрузить", "Выключить"};
         desk_fill(m.x + 17, m.y + 147, m.w - 34, 1, STROKE);
         for (int i = 0; i < 5; ++i) {
