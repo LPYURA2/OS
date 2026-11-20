@@ -32,6 +32,11 @@ def command_exists(name):
     return found
 
 
+def image_kind(path):
+    suffix = path.suffix.lower()
+    return {'.iso': 'iso', '.vdi': 'vdi'}.get(suffix, 'raw')
+
+
 class Frame:
     def __init__(self, path):
         raw = path.read_bytes()
@@ -48,6 +53,14 @@ class Frame:
         actual = self.pixels[pos:pos + 3].hex()
         if actual != color:
             raise RuntimeError(f'guest pixel {(x, y)} is {actual}, not {color}')
+
+    def contains_color(self, x, y, w, h, color):
+        for row in range(y, y + h):
+            start = 3 * (self.w * row + x)
+            for i in range(start, start + 3 * w, 3):
+                if self.pixels[i:i+3] == color:
+                    return True
+        return False
 
     def expect_changes_in(self, other, rectangles):
         if (self.w, self.h) != (other.w, other.h) or self.pixels == other.pixels:
@@ -144,8 +157,12 @@ def vm(out, image, data, qemu, firmware, *, image_format, data_format):
            '-rtc', 'base=2026-11-18T12:00:00,clock=vm',
            '-net', 'none', '-display', 'none', '-vga', 'std', '-monitor', 'none', '-qmp', 'stdio',
            '-serial', f'file:{uart}', '-drive', f'if=pflash,format=raw,readonly=on,file={firmware[0]}',
-           '-drive', f'if=pflash,format=raw,file={nvram}',
-           '-drive', f'file={image},format={image_format},if=ide,index=0,snapshot=on']
+           '-drive', f'if=pflash,format=raw,file={nvram}']
+    if image_format == 'iso':
+        cmd += ['-boot', 'order=d,strict=on',
+                '-drive', f'file={image},format=raw,if=ide,index=0,media=cdrom,readonly=on']
+    else:
+        cmd += ['-drive', f'file={image},format={image_format},if=ide,index=0,snapshot=on']
     if data is not None:
         cmd += ['-drive', f'file={data},format={data_format},if=ide,index=2,cache=writeback']
     if os.environ.get('QEMU_DATA_DIR'):
@@ -177,18 +194,69 @@ def vm(out, image, data, qemu, firmware, *, image_format, data_format):
             proc.stdout.close()
 
 
-def verify_disk(path):
+def verify_disk(path, expected=EXPECTED, *, bank=0, version=1):
     raw = path.read_bytes()
-    # slot 1, first committed bank, project folder. The host never writes it.
-    pos = (1 + 2 * 9) * 512
+    # Slot 1, project folder. The host never writes it.
+    pos = (1 + (2 + bank) * 9) * 512
     magic, generation, length, folder, slot, checksum = struct.unpack_from('<8sIIBB2xI', raw, pos)
     payload = raw[pos + 512:pos + 512 + length]
     h = 2166136261
     for byte in raw[pos:pos + 20] + payload:
         h = ((h ^ byte) * 16777619) & 0xffffffff
     if (magic, generation, length, folder, slot, checksum, payload) != (
-            b'STYLED01', 1, len(EXPECTED), 2, 1, h, EXPECTED):
+            b'STYLED01', version, len(expected), 2, 1, h, expected):
         raise RuntimeError(f'wrong persistent file, found {payload!r}')
+
+
+def project_note(q, frame):
+    q.click(65, 267)
+    bx, by = frame.w * 688 // 1536, (frame.h - 54) * 128 // 804
+    q.click(bx + 115, by + 111)  # First document, after «Назад».
+    q.wait_uart('DOCUMENT OPEN')
+
+
+def raw_data(path, data_format, target):
+    if data_format != 'vdi':
+        return path
+    subprocess.run([command_exists(os.environ.get('QEMU_IMG', 'qemu-img')),
+                    'convert', '-f', 'vdi', '-O', 'raw', str(path), str(target)], check=True)
+    return target
+
+
+def exercise_switch(folder, iso, previous, template, qemu, firmware, data_format):
+    folder.mkdir()
+    data = folder / ('same-data.' + ('vdi' if data_format == 'vdi' else 'img'))
+    if template:
+        shutil.copyfile(template, data)
+    else:
+        provision(data)
+    before = digest(previous)
+    old_format = image_kind(previous)
+    with vm(folder/'before', previous, data, qemu, firmware, image_format=old_format,
+            data_format=data_format) as (q, _):
+        q.wait_uart('DATA MOUNT')
+        q.click(64, 270)
+        q.click(64, 172)
+        q.key('ctrl-n')
+        q.key('a')
+        q.key('ctrl-s')
+        q.wait_uart('DOCUMENT SAVE')
+    verify_disk(raw_data(data, data_format, folder/'before.img'), b'a')
+    with vm(folder/'iso', iso, data, qemu, firmware, image_format='iso',
+            data_format=data_format) as (q, f):
+        q.wait_uart('DATA MOUNT')
+        project_note(q, f)
+        q.key('b')  # The freshly opened document has its caret at the beginning.
+        q.key('ctrl-s')
+        q.wait_uart('DOCUMENT SAVE')
+    verify_disk(raw_data(data, data_format, folder/'after.img'), b'ba', bank=1, version=2)
+    committed = digest(data)
+    with vm(folder/'rollback', previous, data, qemu, firmware, image_format=old_format,
+            data_format=data_format) as (q, f):
+        q.wait_uart('DATA MOUNT')
+        project_note(q, f)
+    if digest(previous) != before or digest(data) != committed:
+        raise RuntimeError('rollback read changed a disk')
 
 
 def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
@@ -198,6 +266,18 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
     else:
         provision(data)
     old_boot = digest(image)
+    if boot_format == 'iso':
+        with vm(folder/'optical-only', image, None, qemu, firmware, image_format=boot_format,
+                data_format=data_format) as (q, f):
+            q.wait_uart('DATA UNAVAILABLE')
+            q.click(70, f.h - 27)
+            q.click(125, f.h - 54 - 273 + 121)
+            q.wait_uart('WINDOW OPEN')
+            processes = q.screen('processes')
+            px, py = f.w // 3, (f.h - 54) // 6
+            processes.check(px + 12, py, 'e6ad63')
+            if not processes.contains_color(px + 16 + 7 * 11, py + 11, 11, 18, b'\xf3\xf0\xe9'):
+                raise RuntimeError('the longer "Процессы" title was not drawn')
     with vm(folder/'first', image, data, qemu, firmware, image_format=boot_format,
             data_format=data_format) as (q, first):
         q.wait_uart('DATA MOUNT')
@@ -222,6 +302,7 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
         moved.expect_changes_in(hover, [(*old, 10, 17), (q.x, q.y, 10, 17),
                                        (bx + 12, by + 54, bw - 24, 45)])
         hover.check(bx + 20, by + 65, '253143')
+        hover.check(q.x + 1, q.y + 1, 'f3f0e9')  # The cursor is on top of the hovered window row.
         q.move(before_x, before_y)
         restored = q.screen('cursor-return')
         if restored.pixels != first.pixels:
@@ -265,21 +346,12 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
     with vm(folder/'second', image, data, qemu, firmware, image_format=boot_format,
             data_format=data_format) as (q, second):
         q.wait_uart('DATA MOUNT')
-        q.click(65, 267)
-        bx, by = second.w * 688 // 1536, (second.h - 54) * 128 // 804
-        q.click(bx + 115, by + 111)  # After «Назад», the document from the data disk.
-        q.wait_uart('DOCUMENT OPEN')
+        project_note(q, second)
         q.screen('reopened')
 
     if digest(image) != old_boot:
         raise RuntimeError('system image was modified')
-    if data_format == 'vdi':
-        raw = folder/'data-proof.img'
-        subprocess.run([command_exists(os.environ.get('QEMU_IMG', 'qemu-img')),
-                        'convert', '-f', 'vdi', '-O', 'raw', str(data), str(raw)], check=True)
-        verify_disk(raw)
-    else:
-        verify_disk(data)
+    verify_disk(raw_data(data, data_format, folder/'data-proof.img'))
 
     foreign = folder/'foreign.img'
     with foreign.open('xb') as out:
@@ -300,19 +372,26 @@ def exercise(folder, image, template, qemu, firmware, boot_format, data_format):
             'boot_sha256': old_boot, 'resolution': [w, h], 'persisted_utf8': EXPECTED.decode(),
             'checks': ['live VGA and Start menu pixels', 'distinct Files icon and standard Projects folder',
                        'real PS/2 cursor changes only two small regions',
-                       'hover repaints only its row and cursor; no stale highlight or pointer',
+                       'cursor above the window; hover repaints only its row and cursor',
                        'PS/2 mouse move/minimize/restore/maximize',
                        'keyboard English/Cyrillic and backspace', 'save to separate IDE disk',
                        'restart from guest menu', 'reopen in fresh VM', 'disk bytes and UTF-8',
-                       'unchanged system disk', 'foreign disk refusal without writes']}
+                       'unchanged system image', 'foreign disk refusal without writes'] + (
+                           ['optical-only UEFI boot without a hard disk', 'live «Процессы» window']
+                           if boot_format == 'iso' else [])}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True, type=Path)
-    parser.add_argument('--boot', type=Path, help='optional already-built boot VDI or raw image')
+    parser.add_argument('--boot', type=Path, help='optional already-built boot ISO, VDI or raw image')
     parser.add_argument('--data-template', type=Path, help='optional fresh data template, copied before use')
+    parser.add_argument('--previous-boot', type=Path,
+                        help='with ISO: check an update from and a rollback to this legacy boot VDI/raw image')
     args = parser.parse_args()
+    if args.previous_boot and (not args.boot or image_kind(args.boot) != 'iso' or
+                               image_kind(args.previous_boot) == 'iso'):
+        parser.error('--previous-boot requires a legacy boot disk and an optical --boot ISO')
     qemu = command_exists(os.environ.get('QEMU_X86', 'qemu-system-x86_64'))
     firmware = (firmware_path('OVMF_CODE', 'OVMF_CODE'), firmware_path('OVMF_VARS', 'OVMF_VARS'))
     if not all(firmware):
@@ -326,9 +405,17 @@ def main():
                         '--desktop-v0', '--output', folder/'build'], check=True)
         image = folder/'build/x86_64/styleos.img'
     template = args.data_template.resolve(strict=True) if args.data_template else None
-    run = exercise(folder, image, template, qemu, firmware,
-                   'vdi' if image.suffix.lower() == '.vdi' else 'raw',
-                   'vdi' if template and template.suffix.lower() == '.vdi' else 'raw')
+    data_format = image_kind(template) if template else 'raw'
+    if data_format == 'iso':
+        parser.error('data template must be a VDI or a raw disk image')
+    run = exercise(folder, image, template, qemu, firmware, image_kind(image), data_format)
+    if args.previous_boot:
+        exercise_switch(folder/'switch', image, args.previous_boot.resolve(strict=True), template,
+                        qemu, firmware, data_format)
+        if digest(image) != run['boot_sha256']:
+            raise RuntimeError('ISO contents changed after update and rollback')
+        run['previous_boot_sha256'] = digest(args.previous_boot)
+        run['checks'].append('legacy VDI → ISO → legacy VDI with the same data disk and new generation')
     (folder/'results.json').write_text(json.dumps(run, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print('DESKTOP V0: PASS', flush=True)
 

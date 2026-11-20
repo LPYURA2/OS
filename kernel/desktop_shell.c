@@ -6,7 +6,8 @@ enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
        WINDOW = 0x171f2c, STROKE = 0x586272, PANEL = 0x101822, CELL = 11,
        LINE = 24, TITLE = 42, ROW = 45, CURSOR_W = 10, CURSOR_H = 17 };
 
-static const char *const names[WINDOWS] = {"Файлы", "Заметки", "Задачи", "О системе"};
+static const char processes_name[] = "Процессы";
+static const char *const names[WINDOWS] = {"Файлы", "Заметки", processes_name, "О системе"};
 static const char *const folders[] = {"Файлы", "Документы", "Проекты"};
 static const char *const files[] = {"Заметки.txt", "Заметки 2.txt", "Заметки 3.txt", "Заметки 4.txt"};
 static const uint8_t icons[] = {DESK_FILE_MANAGER, DESK_PAPER, DESK_TASK, DESK_INFO};
@@ -488,7 +489,7 @@ static void draw_window(int id, int top)
         }
         desk_text(b.x + 18, b.y + b.h - 46, r - 15, "Приложения пока не отдельные процессы.", MUTED);
     } else {
-        desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0", LIGHT);
+        desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0.3", LIGHT);
         desk_text(b.x + 18, b.y + 90, r - 15, "x86-64 UEFI", MUTED);
         desk_text(b.x + 18, b.y + 120, r - 15, (input_flags & 1) ? "Клавиатура PS/2 готова" : "Нет клавиатуры PS/2", MUTED);
         desk_text(b.x + 18, b.y + 149, r - 15, (input_flags & 2) ? "Мышь PS/2 готова" : "Нет мыши PS/2", MUTED);
@@ -531,7 +532,7 @@ static void draw(void)
         desk_round(m, 0x1d2838);
         desk_outline(m, STROKE);
         static const uint8_t symbols[] = {DESK_FILE_MANAGER, DESK_INFO, DESK_TASK, DESK_RESTART, DESK_POWER};
-        static const char *const labels[] = {"Файлы", "О системе", "Задачи", "Перезагрузить", "Выключить"};
+        static const char *const labels[] = {"Файлы", "О системе", processes_name, "Перезагрузить", "Выключить"};
         desk_fill(m.x + 17, m.y + 147, m.w - 34, 1, STROKE);
         for (int i = 0; i < 5; ++i) {
             int y = m.y + menu_rows[i];
