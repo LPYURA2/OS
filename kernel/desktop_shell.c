@@ -24,7 +24,7 @@ static int drag = -1, drag_x, drag_y;
 static bool mouse_down, menu, drag_moved;
 static unsigned current_folder, doc_folder, input_flags;
 static int document = -1;
-static char content[DESK_TEXT_LIMIT], incoming[DESK_TEXT_LIMIT];
+static char content[DESK_STYLEFS_TEXT_LIMIT], incoming[DESK_STYLEFS_TEXT_LIMIT];
 static size_t length, caret;
 static int scroll;
 static bool dirty, russian;
@@ -237,7 +237,11 @@ static void replace(size_t lo, size_t hi, uint32_t cp)
         bytes[n++] = (char)(0x80 | (cp & 0x3f));
     }
     if (hi == lo && !n) return;
-    if (length - (hi - lo) + n > DESK_TEXT_LIMIT) { notice = "Лимит заметки 4096 байт"; return; }
+    size_t limit = filesystem.mode ? DESK_STYLEFS_TEXT_LIMIT : DESK_TEXT_LIMIT;
+    if (length - (hi - lo) + n > limit) {
+        notice = filesystem.mode ? "Лимит текста 64 КиБ" : "Лимит заметки 4096 байт";
+        return;
+    }
     if (lo + n > hi) for (size_t p = length; p > hi; --p) content[p - 1 - hi + lo + n] = content[p - 1];
     else for (size_t p = hi; p < length; ++p) content[p - hi + lo + n] = content[p];
     for (size_t i = 0; i < n; ++i) content[lo + i] = bytes[i];
@@ -281,7 +285,9 @@ static bool keyboard(unsigned key, unsigned mods)
     if (key == 0x01 && menu) { menu = false; return true; }
     if (key == 0x15b || key == 0x3e) { menu = !menu; return true; } /* Super or F4 */
     if (filesystem.mode && active() == FILES && key != 0x3d && !menu) {
-        int item = desk_fs_key(&filesystem, win[FILES].box, key, mods, character(key, (mods & DESK_SHIFT) != 0));
+        int protected_entry = win[NOTES].open ? (document >= 0 ? document : (int)doc_folder) : -1;
+        int item = desk_fs_key(&filesystem, win[FILES].box, key, mods,
+                               character(key, (mods & DESK_SHIFT) != 0), protected_entry);
         if (item >= 0) open_document((unsigned)item);
         return true;
     }
@@ -489,7 +495,16 @@ static void click(int x, int y)
         if (dy < TITLE) {
             if (right < 42) {
                 if (id == NOTES && dirty) notice = "Перед закрытием сохраните текст";
-                else { w->open = false; arch_puts("STYLEOS DESKTOP WINDOW CLOSE\n"); }
+                else {
+                    if (id == NOTES && filesystem.mode) {
+                        document = -1;
+                        length = caret = 0;
+                        scroll = 0;
+                        notice = "";
+                    }
+                    w->open = false;
+                    arch_puts("STYLEOS DESKTOP WINDOW CLOSE\n");
+                }
             } else if (right < 84) maximize(id);
             else if (right < 126) {
                 w->minimized = true;
@@ -618,7 +633,7 @@ static void draw_window(int id, int top)
         }
         desk_text(b.x + 18, b.y + b.h - 46, r - 15, "Приложения пока не отдельные процессы.", MUTED);
     } else {
-        desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0.5", LIGHT);
+        desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0.6", LIGHT);
         desk_text(b.x + 18, b.y + 90, r - 15, "x86-64 UEFI", MUTED);
         desk_text(b.x + 18, b.y + 120, r - 15, (input_flags & 1) ? "Клавиатура PS/2 готова" : "Нет клавиатуры PS/2", MUTED);
         desk_text(b.x + 18, b.y + 149, r - 15, (input_flags & 2) ? "Мышь PS/2 готова" : "Нет мыши PS/2", MUTED);

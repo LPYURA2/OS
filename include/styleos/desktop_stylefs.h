@@ -5,21 +5,23 @@
 #include <styleos/stylefs.h>
 
 enum { DESK_FS_NONE = -1, DESK_FS_NEW_TEXT = -2 };
+enum { DESK_STYLEFS_TEXT_LIMIT = 64 * 1024 };
 
 struct desk_fs {
     struct sfs_volume disk;
     struct sfs_workspace work;
     unsigned folder, first, revision, name_edit, name_length;
     unsigned history[SFS_ENTRIES], history_at, history_count;
-    int selected, clip;
-    bool mode, computer;
+    int selected, clip, delete_id;
+    uint32_t delete_generation;
+    bool mode, computer, cut;
     char name[SFS_NAME_MAX + 1];
     const char *status;
 };
 
 void desk_fs_mount(struct desk_fs *, uint32_t sectors);
 void desk_fs_shortcut(struct desk_fs *, unsigned target);
-int desk_fs_key(struct desk_fs *, struct desk_box, unsigned key, unsigned mods, uint32_t cp);
+int desk_fs_key(struct desk_fs *, struct desk_box, unsigned key, unsigned mods, uint32_t cp, int protected_entry);
 int desk_fs_click(struct desk_fs *, struct desk_box, int x, int y);
 int desk_fs_drag_source(const struct desk_fs *, struct desk_box, int x, int y);
 void desk_fs_draw(const struct desk_fs *, struct desk_box);
