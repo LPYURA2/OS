@@ -10,8 +10,9 @@ struct desk_fs {
     struct sfs_volume disk;
     struct sfs_workspace work;
     unsigned folder, first, revision, name_edit, name_length;
+    unsigned history[SFS_ENTRIES], history_at, history_count;
     int selected, clip;
-    bool mode;
+    bool mode, computer;
     char name[SFS_NAME_MAX + 1];
     const char *status;
 };
@@ -20,6 +21,7 @@ void desk_fs_mount(struct desk_fs *, uint32_t sectors);
 void desk_fs_shortcut(struct desk_fs *, unsigned target);
 int desk_fs_key(struct desk_fs *, struct desk_box, unsigned key, unsigned mods, uint32_t cp);
 int desk_fs_click(struct desk_fs *, struct desk_box, int x, int y);
+int desk_fs_drag_source(const struct desk_fs *, struct desk_box, int x, int y);
 void desk_fs_draw(const struct desk_fs *, struct desk_box);
 bool desk_fs_read_text(struct desk_fs *, unsigned id, char *data, size_t *size);
 bool desk_fs_save_text(struct desk_fs *, unsigned folder, int *id, const char *data, size_t length);

@@ -43,3 +43,8 @@ Desktop v0.3 в ветке `feature/styleos-desktop-v0-3-iso` загружает
 Desktop v0.4 в `feature/styleos-filesystem-v1` добавляет первый вариант
 StyleFS на отдельном тестовом VDI. Старый диск заметок сохраняет прежний режим.
 [Запуск, операции и проверки StyleFS](docs/test-results/stylefs-v1/README.md)
+
+Desktop v0.5 добавляет новый интерфейс Проводника и Текстового редактора
+для тома StyleFS и первый сценарий Deep Drop для текста. Старый диск заметок
+по-прежнему открывается в прежнем режиме.
+[Запуск, жест переноса и проверки v0.5](docs/test-results/desktop-v05/README.md)

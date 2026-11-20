@@ -1,5 +1,6 @@
 #include <styleos/desktop_v0.h>
 #include "desktop_font.inc"
+#include "desktop_app_icons.inc"
 
 static const struct desktop_surface *fb;
 static int width, height;
@@ -214,10 +215,41 @@ int desk_text(int x, int y, int right, const char *label, uint32_t rgb)
     return x;
 }
 
+static void app_icon(int x, int y, int size, unsigned app)
+{
+    if (size <= 0 || !desk_clip_visible((struct desk_box){x, y, size, size})) return;
+    const uint16_t *bitmap = app_icon_pixels[app];
+    int left = hi(x, clip.x), right = lo(x + size, clip.x + clip.w);
+    for (int row = hi(y, clip.y); row < lo(y + size, clip.y + clip.h); ++row) {
+        const uint16_t *src = bitmap + (row - y) * DESK_ICON_PIXELS / size * DESK_ICON_PIXELS;
+        uint32_t *dst = strip + (size_t)(row - clip.y) * clip.w + (left - clip.x);
+        for (int col = left; col < right; ++col, ++dst) {
+            uint16_t p = src[(col - x) * DESK_ICON_PIXELS / size];
+            unsigned a = p & 15;
+            if (!a) continue;
+            uint32_t color = native(((p >> 12) & 15) * 17u << 16 |
+                                    ((p >> 8) & 15) * 17u << 8 | ((p >> 4) & 15) * 17u);
+            *dst = a == 15 ? color : mix(*dst, color, a, 15);
+        }
+    }
+}
+
 void desk_icon(int x, int y, int size, unsigned icon, uint32_t rgb)
 {
+    if (icon >= DESK_APP_SETTINGS && icon <= DESK_APP_DOCUMENTS) {
+        app_icon(x, y, size, icon - DESK_APP_SETTINGS);
+        return;
+    }
     int b = size, r = b - 2;
     switch (icon) {
+    case DESK_DRIVE: {
+        int top = y + b / 4, thick = hi(1, b / 18);
+        desk_round((struct desk_box){x, top, b, b * 3 / 5}, rgb);
+        desk_round((struct desk_box){x + thick, top + thick, b - 2 * thick, b * 3 / 5 - 2 * thick}, 0x263345);
+        desk_fill(x + b / 5, top + b / 3, thick + 1, thick + 1, rgb);
+        desk_fill(x + b * 2 / 5, top + b / 3, thick + 1, thick + 1, rgb);
+        break;
+    }
     case DESK_FILE_MANAGER: {
         /* App shortcut: a split-pane window, never a standalone folder.
          * Keep the silhouette legible at 23 px on the taskbar as well. */
