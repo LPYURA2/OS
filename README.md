@@ -1,22 +1,21 @@
-# StyleOS Documents — recovery source checkpoint 754
+# StyleOS Documents — восстановительный исходный проект 755
 
-**This is host-tested recovery source, not a StyleOS installer image or a runnable Documents.tea.** Immutable system control: 744.
+**Контрольная система 744 неизменна. Полной установочной сборки пока нет.**
 
-Contents:
-- `modules/documents/model.c` — bounded UTF-8 document model and comments.
-- `modules/documents/review.c` — partial offline review/tracked editing.
-- `modules/documents/docx.c` — standards-shaped uncompressed DOCX export.
-- `modules/documents/import.c` — matching safe ZIP_STORED DOCX text/page import.
-- `modules/documents/gateway.c` — system-independent, capability-scoped file read/atomic save broker interface.
-- `modules/documents/ui.c` — independent draw command list and client-area event handling for a partial UI based on 14 approved screens.
-- `tools/test_restore.sh` — host tests, not OS guest tests.
-- `tools/render_documents_ui.py` — optional host-only preview requiring Python Pillow.
+В этом репозитории — независимый редактор-клиент: UTF-8 и комментарии, ограниченный DOCX export/import, грамматические подсказки, tracked-edit host-модуль, собственная отрисовка и файловый брокер с правами на отдельный файл.
 
-To test:
+Начиная с 755, есть настоящий x86-64 ELF в составе **экспериментального `Documents.tea`**, размером меньше 64 КиБ. Это **не подписанный системный `.tea` для 744** и не готовый установочный ISO. ABI для загрузчика 744 неизвестен; в manifest.json указано `installable_in_744: false`.
+
+Сборка и проверка на хосте:
 
 ```sh
-sh tools/test_restore.sh
-python3 tools/render_documents_ui.py --view review --output /tmp/documents-review-preview.png
+sh tools/test_documents_755.sh
 ```
 
-Details and unimplemented functionality: `docs/RECOVERY_754_RU.md`. Continuation point: `docs/CONTINUE.md`.
+Или только бинарник:
+
+```sh
+python3 tools/build_documents_tea.py --output build/755/Documents.tea
+```
+
+Прогон загружает собственный ELF в Linux-хосте и вызывает его реальные точки входа, редактирует текст и сохраняет TXT/DOCX через файловые токены. Это **не запуск в QEMU или StyleOS**. Все границы текущего результата описаны в `docs/RECOVERY_755_RU.md`; точка продолжения — `docs/CONTINUE.md`.
