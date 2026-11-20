@@ -1,0 +1,18 @@
+{
+  "documents_tea_mentioned_in_boot_executable": true,
+  "efi_bytes": 642560,
+  "efi_sha256": "be89054aaae7efd10f83b10b07f3bd2c50bad113b61374b00f8d9dcc8c219f24",
+  "esp_paths": [
+    "/EFI/BOOT/BOOTX64.EFI"
+  ],
+  "iso_and_esp_efi_identical": true,
+  "iso_bytes": 17797120,
+  "iso_paths": [
+    "/BOOT.CAT",
+    "/EFI/BOOT/BOOTX64.EFI",
+    "/EFI_BOOT.IMG"
+  ],
+  "iso_sha256": "011dd3560e8d232b00201623443d9a09b0c67e03227b66504312a31f75e285ae",
+  "limitation": "No source code or real app test is established by binary inspection.",
+  "standalone_documents_tea_file_in_installer": false
+}
