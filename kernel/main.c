@@ -80,7 +80,7 @@ _Noreturn void kernel_main(const struct boot_info *info)
         arch_puts("STYLEOS USER SESSION SERVICE ERROR\n");
         arch_halt();
     }
-    arch_puts("STYLEOS USER SESSION SERVICE READY sessions=0\n");
+    arch_puts("STYLEOS DESKTOP USER SESSION SERVICE READY sessions=0\n");
     arch_puts("STYLEOS DESKTOP SCHEDULER READY registered=0\n");
     arch_puts("STYLEOS DESKTOP PROCESS SERVICE READY registered=0\n");
     arch_puts("STYLEOS DESKTOP WINDOW SERVICE READY registered=0\n");
