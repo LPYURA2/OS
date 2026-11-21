@@ -664,8 +664,14 @@ def verified_paging_site(folder, arch, fault=False, roundtrip=False):
     expected_modes = {'invalid_boot_info': False, 'invalid_memory_map': False,
                       'test_exception': False, 'test_bootpool': False,
                       'test_paging': not fault and not roundtrip,
-                      'test_paging_fault': fault,
-                      'test_paging_roundtrip': roundtrip}
+                      'test_paging_fault': fault}
+    # Historic manifests predate this optional mode.  If present, the
+    # flag must still be the exact bool, not a truthy integer/string.
+    if (roundtrip and manifest.get('test_paging_roundtrip') is not True or
+            'test_paging_roundtrip' in manifest and
+            type(manifest['test_paging_roundtrip']) is not bool or
+            not roundtrip and manifest.get('test_paging_roundtrip', False) is not False):
+        raise ValueError('paging roundtrip manifest mode mismatch')
     if (not isinstance(manifest, dict) or
             any(type(manifest.get(key)) is not bool or manifest[key] != value
                 for key, value in expected_modes.items())):
