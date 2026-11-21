@@ -2,6 +2,10 @@
 #include "styleos/boot_pool.h"
 #include "styleos/user_processes.h"
 #include "styleos/process_scheduler.h"
+#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+#include "styleos/native_session_hw_770.h"
+static struct nsh_stage observed_sessions;
+#endif
 #ifdef STYLEOS_TEST_NATIVE_TEA
 #include "styleos/tea_768_demo.h"
 #endif
@@ -235,6 +239,9 @@ void up_demo_run(const struct boot_memory_evidence *e)
     up_init(&d->control,d->platform.roots[UP_ROOT_SAFE]);
     pr_init(&observed_registry);
     pscheck(ps_init(&observed_scheduler,&observed_registry,d->platform.roots[UP_ROOT_SAFE]));
+#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+    if(!nsh_init(&observed_sessions,&observed_registry))up_fail("session initialize");
+#endif
     objects(e);tables(&d->platform);
     struct up_machine initial;check(up_arch_observe(&initial));
     if(initial.root!=d->platform.roots[UP_ROOT_SAFE])up_fail("safe activation");
@@ -247,6 +254,10 @@ void up_demo_run(const struct boot_memory_evidence *e)
         pscheck(ps_register(&observed_scheduler,id,observed_handle[id],spec.root,
                             0,id?"EL0/CPL3 User B":"EL0/CPL3 User A",
                             &observed_pid[id]));
+#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+        if(!nsh_attach(&observed_sessions,id,observed_pid[id],
+                       observed_handle[id],spec.root))up_fail("session attach");
+#endif
 #if STYLEOS_EXPECT_ARCH == 1
         d->control.slots[id].context.status=2;d->control.slots[id].context.cs=0x23;d->control.slots[id].context.ss=0x1b;
 #else
@@ -263,6 +274,10 @@ void up_demo_run(const struct boot_memory_evidence *e)
      * Previously this guard ran before ps_register() and halted the guest
      * before the first CPL3 transition with "STYLEOS USER ERROR: tea PID". */
     tea_768_report(observed_pid[1]);
+#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+    if(!nsh_review(&observed_sessions))up_fail("session review");
+    arch_puts("STYLEOS TEA770 SESSION REGISTERED real_pids=2 separated_roots=2 windows=2\n");
+#endif
 #endif
     for(unsigned turn=0;turn<4;++turn){
         unsigned chosen=UP_SLOTS;uint32_t pid=0;
@@ -290,6 +305,11 @@ void up_demo_run(const struct boot_memory_evidence *e)
                     event.kind==UP_EXIT?PS_EXIT:PS_FAULT;
         pscheck(ps_accept(&observed_scheduler,id,observed_handle[id],
                            event.active_root,now.root,observed));
+#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+        if(!nsh_on_event(&observed_sessions,id,observed))up_fail("session event");
+        if(observed==PS_FAULT)arch_puts("STYLEOS TEA770 USER A FAULT WINDOW REAP PASS\n");
+        if(observed==PS_EXIT)arch_puts("STYLEOS TEA770 USER B EXIT WINDOW REAP PASS\n");
+#endif
         const enum pr_state expected=observed==PS_YIELD?PR_READY:
                       observed==PS_EXIT?PR_EXITED:PR_FAULTED;
         if(pr_find(&observed_registry,pid)->state!=expected ||
@@ -317,6 +337,10 @@ void up_demo_run(const struct boot_memory_evidence *e)
        observed_scheduler.dispatches!=4)up_fail("scheduler completion");
     struct up_machine final;check(up_arch_observe(&final));
     if(!machine_same(&initial,&final) || dispatcher_cookie!=UP_DISPATCH_COOKIE)up_fail("kernel final check");
+#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+    if(!nsh_finish(&observed_sessions))up_fail("session final");
+    arch_puts("STYLEOS TEA770 PID ROOT SESSION WINDOW PASS\n");
+#endif
     machine_line("FINAL",&final);arch_puts("STYLEOS USER PASS\n");
 #ifdef STYLEOS_TEST_NATIVE_TEA
 #ifdef STYLEOS_TEST_NATIVE_TEA_DISK

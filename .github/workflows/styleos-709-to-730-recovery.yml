@@ -15,6 +15,7 @@ on:
       - feature/styleos-native-launch-transaction-767
       - feature/styleos-native-tea-cpl3-768
       - feature/styleos-guest-disk-tea-cpl3-769
+      - feature/styleos-real-pid-user-session-window-770
   workflow_dispatch:
 
 permissions:
@@ -208,6 +209,16 @@ jobs:
           set -euo pipefail
           python3 tools/test_native_tea_769_guest.py --output build/recovery-canonical/native-tea-769-qemu 2>&1 | tee build/recovery-canonical/native-tea-769-qemu.log
 
+      - name: Verify native hardware PID-to-session/window lifecycle with sanitized host fixture
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_session_hw_770.py --output build/recovery-canonical/native-session-770-host 2>&1 | tee build/recovery-canonical/native-session-770-host.log
+
+      - name: Execute disk .tea in CPL3 with per-user session window ownership in QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_tea_770_guest.py --output build/recovery-canonical/native-session-770-qemu 2>&1 | tee build/recovery-canonical/native-session-770-qemu.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -284,6 +295,20 @@ jobs:
             build/recovery-canonical/native-tea-769-qemu/compiled/x86_64/BOOTX64.EFI
             build/recovery-canonical/native-tea-769-qemu/compiled/x86_64/native-tea-769-disk.img
             build/recovery-canonical/native-tea-769-qemu/compiled/x86_64/tea-769-site.json
+            build/recovery-canonical/native-session-770-host.log
+            build/recovery-canonical/native-session-770-host/test.log
+            build/recovery-canonical/native-session-770-qemu.log
+            build/recovery-canonical/native-session-770-qemu/build.log
+            build/recovery-canonical/native-session-770-qemu/results.json
+            build/recovery-canonical/native-session-770-qemu/positive/UART.log
+            build/recovery-canonical/native-session-770-qemu/positive/QEMU.log
+            build/recovery-canonical/native-session-770-qemu/negative/UART.log
+            build/recovery-canonical/native-session-770-qemu/negative/QEMU.log
+            build/recovery-canonical/native-session-770-qemu/compiled/x86_64/BOOTX64.EFI
+            build/recovery-canonical/native-session-770-qemu/compiled/x86_64/styleos.img
+            build/recovery-canonical/native-session-770-qemu/compiled/x86_64/native-tea-769-disk.img
+            build/recovery-canonical/native-session-770-qemu/compiled/x86_64/minimal.tea
+            build/recovery-canonical/native-session-770-qemu/compiled/x86_64/tea-769-site.json
             build/recovery-canonical/native-launch-host/test.log
             build/recovery-canonical/desktop-vm-host.log
             build/recovery-canonical/frame-owner-host.log
