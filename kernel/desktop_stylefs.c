@@ -31,8 +31,17 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
     b->history_count = 1;
     b->status = "F2 Имя   Ctrl+C/X/V   Del Удалить";
     if (!b->mode) return;
-    const struct sfs_io io = {0, sectors, read_sector, write_sector, flush_disk};
-    enum sfs_result r = sfs_mount(&b->disk, &b->work, &io);
+    /* Preserve the original secondary-master whole-disk mapping. The explicit
+     * map allows the installer to supply an offset for Data 1 later without
+     * teaching StyleFS about physical IDE ports. */
+    const struct desk_physical_disk physical = {
+        0, sectors, read_sector, write_sector, flush_disk
+    };
+    if (!desk_volume_map_init(&b->mapping, &physical, 0, sectors, true)) {
+        b->status = "Том StyleFS недоступен. Диск не изменён";
+        return;
+    }
+    enum sfs_result r = sfs_mount(&b->disk, &b->work, &b->mapping.io);
     if (r == SFS_OK) {
         arch_puts("STYLEOS DESKTOP STYLEFS MOUNT\n");
         if (b->disk.format == 2) arch_puts("STYLEOS DESKTOP STYLEFS V2\n");

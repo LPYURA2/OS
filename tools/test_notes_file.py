@@ -24,6 +24,7 @@ def main():
            '-DSTYLEFS_HOST_FORMAT=1', '-I', str(ROOT / 'include'),
            str(ROOT / 'tests/test_notes_file.c'),
            str(ROOT / 'kernel/stylefs.c'),
+           str(ROOT / 'kernel/desktop_volume_io.c'),
            str(ROOT / 'kernel/desktop_stylefs.c'),
            '-o', str(target)]
     subprocess.run(cmd, check=True)

@@ -67,6 +67,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_730_notes_f5.py --iso build/recovery-canonical/StyleOS-Recovery-Experimental.iso --output build/recovery-canonical/f5-qemu 2>&1 | tee build/recovery-canonical/f5-qemu.log
 
+      - name: Assert two-volume disk mapping, no auto-format and read-only guards
+        run: |
+          set -euo pipefail
+          python3 tools/test_desktop_volume_io.py --output build/recovery-canonical/volume-host 2>&1 | tee build/recovery-canonical/volume-host.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |

@@ -3,11 +3,13 @@
 
 #include <styleos/desktop_v0.h>
 #include <styleos/stylefs.h>
+#include <styleos/desktop_volume_io.h>
 
 enum { DESK_FS_NONE = -1, DESK_FS_NEW_TEXT = -2 };
 enum { DESK_STYLEFS_TEXT_LIMIT = 64 * 1024 };
 
 struct desk_fs {
+    struct desk_volume_map mapping;
     struct sfs_volume disk;
     struct sfs_workspace work;
     unsigned folder, first, revision, name_edit, name_length;
