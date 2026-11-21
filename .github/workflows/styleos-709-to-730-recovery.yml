@@ -12,6 +12,7 @@ on:
       - feature/styleos-frame-ownership-764
       - feature/styleos-physical-grant-attestation-765
       - feature/styleos-user-session-boundary-766
+      - feature/styleos-native-launch-transaction-767
   workflow_dispatch:
 
 permissions:
@@ -119,6 +120,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/test_user_session_runtime.py --output build/recovery-canonical/user-session-host 2>&1 | tee build/recovery-canonical/user-session-host.log
+
+      - name: Verify atomic native app PID, frame lease, session and window transactions
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_launch_stage.py --output build/recovery-canonical/native-launch-host 2>&1 | tee build/recovery-canonical/native-launch-host.log
 
       - name: Verify process and window registry start empty in real UEFI guest
         run: |
@@ -228,6 +234,8 @@ jobs:
             build/recovery-canonical/process-api-host.log
             build/recovery-canonical/desktop-runtime-host.log
             build/recovery-canonical/user-session-host.log
+            build/recovery-canonical/native-launch-host.log
+            build/recovery-canonical/native-launch-host/test.log
             build/recovery-canonical/desktop-vm-host.log
             build/recovery-canonical/frame-owner-host.log
             build/recovery-canonical/grant-policy-host.log
