@@ -1,6 +1,9 @@
 #include "styleos/arch.h"
 #include "styleos/paging.h"
 #include "styleos/boot_pool.h"
+#ifdef STYLEOS_TEST_FRAME_GRANTS
+#include "styleos/frame_grant_proof.h"
+#endif
 
 _Alignas(PG_PAGE) uint64_t styleos_paging_tables[PG_TABLE_PAGES][512];
 _Alignas(PG_PAGE) union pg_control styleos_paging_control;
@@ -120,10 +123,13 @@ void paging_experiment(const struct boot_memory_evidence *e)
     arch_puts(" pa="); paging_hex(s->data_pa);
     arch_puts(" before="); paging_hex(before);
     arch_puts(" after="); paging_hex(after); arch_putc('\n');
-#ifdef STYLEOS_TEST_PAGING_ROUNDTRIP
+#if defined(STYLEOS_TEST_PAGING_ROUNDTRIP) || defined(STYLEOS_TEST_FRAME_GRANTS)
     error = arch_paging_restore(s);
     if (error != PG_OK) paging_fail("guarded CR3 restore");
     verify(s, 0);
+#ifdef STYLEOS_TEST_FRAME_GRANTS
+    fg_experiment_run(s); /* only after inherited root has been restored */
+#endif
     arch_puts("STYLEOS PAGING ROUNDTRIP PASS\n");
 #elif defined(STYLEOS_TEST_PAGING_FAULT)
     extern void styleos_paging_fault(void);

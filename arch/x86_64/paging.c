@@ -428,7 +428,24 @@ enum pg_error arch_paging_activate(struct pg_experiment *x)
     return PG_OK;
 }
 
-#ifdef STYLEOS_TEST_PAGING_ROUNDTRIP
+#ifdef STYLEOS_TEST_FRAME_GRANTS
+/* Only while the inherited root is actually active: the old page-table
+ * walker assumes firmware's identity physical RAM reads are valid. */
+enum pg_error arch_paging_attest_image_writable(struct pg_experiment *x,
+                                                uint64_t va, uint64_t bytes)
+{
+    struct x86_state *s=&saved;
+    if(!x || !s->prepared || !x->evidence || !bytes ||
+       (va | bytes) & (PG_PAGE-1u) ||
+       read_cr3()!=s->cr3 || read_cr4()!=s->cr4 ||
+       read_msr(0xc0000080u)!=s->efer || read_flags() & BIT(9) ||
+       !writable_identity(s,va,bytes,x->evidence->live.image) ||
+       !identity_tables(s)) return PG_PLATFORM;
+    return PG_OK;
+}
+#endif
+
+#if defined(STYLEOS_TEST_PAGING_ROUNDTRIP) || defined(STYLEOS_TEST_FRAME_GRANTS)
 /* A second, guarded hardware transition, available ONLY to the dedicated
  * experiment. The original root remains valid because the test does not
  * reclaim firmware pages or allocate from candidate RAM. Both roots retain

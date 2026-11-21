@@ -649,6 +649,63 @@ def serial_paging_roundtrip_ok(output, arch, site, ram_mib=128, el2=False):
                             ram_mib=ram_mib, el2=el2)
 
 
+def serial_frame_grants_ok(output, arch, site, map_file, ram_mib=128, el2=False):
+    """Bind actual grant VA/PA trace to linked PE RVA, EFI memory map and
+    independent 763 CR3 round-trip evidence. Never treat text as a grant. """
+    if arch != 'x86_64' or b'STYLEOS GRANTS ERROR' in output:
+        return False
+    lines=output.splitlines()
+    grants=[(i,x) for i,x in enumerate(lines) if x.startswith(b'STYLEOS GRANTS ')]
+    if len(grants)!=10 or [i for i,_ in grants] != list(range(grants[0][0], grants[0][0]+10)):
+        return False
+    names=[b'TABLES',b'USER_A_CODE',b'USER_A_STACK',b'USER_A_DATA',
+           b'USER_B_CODE',b'USER_B_STACK',b'USER_B_DATA']
+    vals=[]
+    for (_,line),name in zip(grants[:7],names):
+        d=_paging_fields(line,b'STYLEOS GRANTS '+name,('va','pa','bytes'))
+        if not d or d['va']!=d['pa'] or d['va']&4095 or d['bytes']!=(72*4096 if name==b'TABLES' else 4096):
+            return False
+        vals.append((d['va'],d['va']+d['bytes']))
+    if grants[7][1] != b'STYLEOS GRANTS REFUSALS alias=1 alignment=1 stack=1 candidate=1' or grants[8][1] != b'STYLEOS GRANTS PASS pages=0x000000000000004e origin=image-owned no-pmm=1':
+        return False
+    # A single orphan line or reordered event must not count as proof.
+    # The ten lines include one terminal sequence emitted by the kernel test.
+    if grants[9][1] != b'STYLEOS GRANTS END':
+        return False
+    if any(a[0]<b[1] and b[0]<a[1] for i,a in enumerate(vals) for b in vals[:i]):
+        return False
+    mmap=re.findall(rb'^STYLEOS MEMMAP (IMAGE|STACK|HANDOFF|SOURCE|RESERVED|CANDIDATE) (0x[0-9a-f]{16}) (0x[0-9a-f]{16})$',output,re.M)
+    by={kind:[] for kind in [b'IMAGE',b'STACK',b'HANDOFF',b'SOURCE',b'RESERVED',b'CANDIDATE']}
+    for kind,begin,end in mmap:
+        by[kind].append((int(begin,16),int(end,16)))
+    if len(by[b'IMAGE'])!=1:
+        return False
+    image=by[b'IMAGE'][0]
+    for extent in vals:
+        if not (image[0]<=extent[0]<extent[1]<=image[1] and
+                any(a<=extent[0] and extent[1]<=b for a,b in by[b'RESERVED']) and
+                not any(extent[0]<b and a<extent[1] for a,b in by[b'CANDIDATE']+by[b'STACK']+by[b'HANDOFF']+by[b'SOURCE'])):
+            return False
+    try:
+        raw=map_file.read_text()
+    except (OSError,UnicodeError):
+        return False
+    base=re.search(r'^\s*Preferred load address is ([0-9A-Fa-f]{16})\s*$',raw,re.M)
+    def rva(symbol):
+        x=re.findall(r'^\s*[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}\s+'+symbol+r'\s+([0-9A-Fa-f]{16})\s+',raw,re.M)
+        return int(x[0],16)-int(base[1],16) if base and len(x)==1 else -1
+    table_rva,user_rva=rva('styleos_grant_tables'),rva('styleos_grant_users')
+    if (table_rva<0 or user_rva<0 or vals[0][0]!=image[0]+table_rva or
+            vals[1][0]!=image[0]+user_rva):
+        return False
+    if any(vals[i][0]!=vals[i-1][1] for i in range(2,7)):
+        return False
+    # The paging proof checks the exact linked PE, old root, new root, live
+    # PTEs, CR3 readback and restoration. Only remove our known extra lines.
+    stripped=b'\n'.join(line for line in lines if not line.startswith(b'STYLEOS GRANTS '))+b'\n'
+    return serial_paging_roundtrip_ok(stripped,arch,site,ram_mib,el2)
+
+
 def verified_paging_site(folder, arch, fault=False, roundtrip=False):
     """Rederive the full image/fault proof and bind every actual loaded input."""
     target = folder / arch
@@ -2055,6 +2112,7 @@ class Checks:
                     'bootpool': b'STYLEOS KERNEL HALT',
                     'paging': b'STYLEOS KERNEL HALT',
                     'paging-roundtrip': b'STYLEOS KERNEL HALT',
+                    'paging-grants': b'STYLEOS KERNEL HALT',
                     'paging-fault': b'STYLEOS EMERGENCY HALT',
                     'ownership': b'STYLEOS KERNEL HALT',
                     'ownership-invalid': b'STYLEOS OWNERSHIP ERROR: required',
@@ -2197,12 +2255,14 @@ class Checks:
             except (OSError, ValueError) as error:
                 return result('FAIL', 'pool-site proof unavailable/mismatched: ' + str(error), text)
             good = serial_pool_ok(output, arch, site, mib, el2)
-        elif mode in ('paging', 'paging-fault', 'paging-roundtrip'):
+        elif mode in ('paging', 'paging-fault', 'paging-roundtrip', 'paging-grants'):
             try:
-                site = verified_paging_site(folder, arch, mode == 'paging-fault', mode == 'paging-roundtrip')
+                site = verified_paging_site(folder, arch, mode == 'paging-fault', mode in ('paging-roundtrip','paging-grants'))
             except (OSError, ValueError) as error:
                 return result('FAIL', 'paging-site proof unavailable/mismatched: ' + str(error), text)
-            good = (serial_paging_roundtrip_ok(output, arch, site, mib, el2)
+            good = (serial_frame_grants_ok(output, arch, site, folder / arch / 'kernel.map', mib, el2)
+                    if mode == 'paging-grants' else
+                    serial_paging_roundtrip_ok(output, arch, site, mib, el2)
                     if mode == 'paging-roundtrip' else
                     serial_paging_ok(output, arch, site, mode == 'paging-fault', mib, el2))
         elif mode == 'tasks':
@@ -2227,7 +2287,7 @@ class Checks:
             good = serial_memory_ok(output, arch, mode, mib, el2)
         if arch == 'x86_64':
             good = good and serial_idt_ready(output)
-        if mode in ('paging', 'paging-fault', 'paging-roundtrip'):
+        if mode in ('paging', 'paging-fault', 'paging-roundtrip', 'paging-grants'):
             (self.logs / (name + '.json')).write_text(json.dumps({
                 'arch': arch, 'mode': mode, 'initial_el2': el2,
                 'ram_mib': mib, 'status': 'PASS' if good else 'FAIL',

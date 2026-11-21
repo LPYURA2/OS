@@ -64,9 +64,15 @@ void paging_experiment(const struct boot_memory_evidence *);
  * Activate consumes a completely validated result, then reads hardware state. */
 enum pg_error arch_paging_prepare(struct pg_experiment *);
 enum pg_error arch_paging_activate(struct pg_experiment *);
+#ifdef STYLEOS_TEST_FRAME_GRANTS
+/* Actual inherited CR3 walk; image-owned, WB, present, writable identity only.
+ * No guest-owned page mapping or general physical-memory allocator. */
+enum pg_error arch_paging_attest_image_writable(struct pg_experiment *,
+                                                uint64_t va, uint64_t bytes);
+#endif
 /* Dedicated x86-only hardware test: restore a pre-verified inherited CR3.
  * This is not a general kernel root switcher. */
-#ifdef STYLEOS_TEST_PAGING_ROUNDTRIP
+#if defined(STYLEOS_TEST_PAGING_ROUNDTRIP) || defined(STYLEOS_TEST_FRAME_GRANTS)
 enum pg_error arch_paging_restore(struct pg_experiment *);
 #endif
 void arch_paging_fault(uint64_t probe);

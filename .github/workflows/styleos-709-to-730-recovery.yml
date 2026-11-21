@@ -10,6 +10,7 @@ on:
       - feature/styleos-owned-vm-stage-762
       - feature/styleos-cr3-roundtrip-763
       - feature/styleos-frame-ownership-764
+      - feature/styleos-physical-grant-attestation-765
   workflow_dispatch:
 
 permissions:
@@ -163,6 +164,16 @@ jobs:
           set -euo pipefail
           python3 tools/test_paging_roundtrip.py --output build/recovery-canonical/cr3-roundtrip 2>&1 | tee build/recovery-canonical/cr3-roundtrip.log
 
+      - name: Check finite image-frame policy refusals with ASAN and UBSAN
+        run: |
+          set -euo pipefail
+          python3 tools/test_frame_grant_proof.py --output build/recovery-canonical/grant-policy-host 2>&1 | tee build/recovery-canonical/grant-policy-host.log
+
+      - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_frame_grant_guest.py --output build/recovery-canonical/grant-qemu 2>&1 | tee build/recovery-canonical/grant-qemu.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -212,6 +223,11 @@ jobs:
             build/recovery-canonical/desktop-runtime-host.log
             build/recovery-canonical/desktop-vm-host.log
             build/recovery-canonical/frame-owner-host.log
+            build/recovery-canonical/grant-policy-host.log
+            build/recovery-canonical/grant-qemu.log
+            build/recovery-canonical/grant-qemu/serial.log
+            build/recovery-canonical/grant-qemu/results.json
+            build/recovery-canonical/grant-qemu/hardware/logs/*.json
             build/recovery-canonical/cr3-roundtrip.log
             build/recovery-canonical/cr3-roundtrip/serial.log
             build/recovery-canonical/cr3-roundtrip/results.json
