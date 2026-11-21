@@ -228,11 +228,6 @@ void up_demo_run(const struct boot_memory_evidence *e)
     pr_init(&observed_registry);
     pscheck(ps_init(&observed_scheduler,&observed_registry,d->platform.roots[UP_ROOT_SAFE]));
     objects(e);tables(&d->platform);
-#ifdef STYLEOS_TEST_NATIVE_TEA
-    if(observed_pid[0]==0 || observed_pid[1]==0 ||
-       observed_pid[0]==observed_pid[1])up_fail("tea PID");
-    tea_768_report(observed_pid[1]);
-#endif
     struct up_machine initial;check(up_arch_observe(&initial));
     if(initial.root!=d->platform.roots[UP_ROOT_SAFE])up_fail("safe activation");
     d->platform.safe=initial;machine_line("SAFE",&initial);
@@ -255,6 +250,12 @@ void up_demo_run(const struct boot_memory_evidence *e)
     if(!point(e->live.stack,(uintptr_t)&dispatcher_cookie,8) || !point(e->live.stack,dispatcher_sp,1))up_fail("dispatcher stack");
     if(observed_pid[0]==0 || observed_pid[1]<=observed_pid[0] ||
        pr_snapshot(&observed_registry,0,0,false)!=2)up_fail("PID admission");
+#ifdef STYLEOS_TEST_NATIVE_TEA
+    /* Report only after both real scheduler admissions have succeeded.
+     * Previously this guard ran before ps_register() and halted the guest
+     * before the first CPL3 transition with "STYLEOS USER ERROR: tea PID". */
+    tea_768_report(observed_pid[1]);
+#endif
     for(unsigned turn=0;turn<4;++turn){
         unsigned chosen=UP_SLOTS;uint32_t pid=0;
         pscheck(ps_next(&observed_scheduler,&chosen,&pid));
