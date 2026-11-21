@@ -1,0 +1,55 @@
+name: Restore StyleOS 730 behavior - build and QEMU tests
+on:
+  push:
+    branches:
+      - restore/styleos-730-reimplementation
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recover-shell:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout complete restored source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install x86-64 UEFI build and emulator tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Build and host-test app session runtime
+        run: |
+          python3 tools/test_desktop_sessions.py --output build/recovery-730-host
+      - name: Compile genuine StyleOS x86-64 UEFI executable
+        run: |
+          set -o pipefail
+          mkdir -p build/recovery-730
+          python3 tools/build.py --arch x86_64 --desktop-v0 --output build/recovery-730/compiler 2>&1 | tee build/recovery-730/build.log
+          test -s build/recovery-730/compiler/x86_64/BOOTX64.EFI
+      - name: Package UEFI bootable ISO
+        run: |
+          set -o pipefail
+          python3 tools/make_desktop_iso.py --efi build/recovery-730/compiler/x86_64/BOOTX64.EFI --output build/recovery-730/StyleOS-730-Rebuild-Experimental.iso 2>&1 | tee build/recovery-730/iso.log
+          sha256sum build/recovery-730/StyleOS-730-Rebuild-Experimental.iso build/recovery-730/compiler/x86_64/BOOTX64.EFI > build/recovery-730/SHA256SUMS.txt
+      - name: Boot ISO in QEMU and exercise F8/F10/unsaved document
+        run: |
+          set -o pipefail
+          python3 tools/test_730_shell_f10.py --iso build/recovery-730/StyleOS-730-Rebuild-Experimental.iso --output build/recovery-730/f10-qemu 2>&1 | tee build/recovery-730/f10.log
+      - name: Preserve exact build evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-730-rebuild-${{ github.run_number }}
+          path: |
+            build/recovery-730/compiler/x86_64/BOOTX64.EFI
+            build/recovery-730/StyleOS-730-Rebuild-Experimental.iso
+            build/recovery-730/compiler/manifest.json
+            build/recovery-730/SHA256SUMS.txt
+            build/recovery-730/*.log
+            build/recovery-730/f10-qemu/results.json
+            build/recovery-730-host/host.log
+            build/recovery-730-host/result.json
+          if-no-files-found: warn
+          retention-days: 30
