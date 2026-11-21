@@ -427,3 +427,41 @@ enum pg_error arch_paging_activate(struct pg_experiment *x)
     arch_putc('\n');
     return PG_OK;
 }
+
+#ifdef STYLEOS_TEST_PAGING_ROUNDTRIP
+/* A second, guarded hardware transition, available ONLY to the dedicated
+ * experiment. The original root remains valid because the test does not
+ * reclaim firmware pages or allocate from candidate RAM. Both roots retain
+ * the image, stack, descriptor tables and interrupt-disabled continuity. */
+enum pg_error arch_paging_restore(struct pg_experiment *x)
+{
+    struct x86_state *s = &saved;
+    if (!x || s->prepared || !x->old_root || x->old_root != s->cr3 ||
+        x->result.error != PG_OK || x->result.root == s->cr3 ||
+        read_cr3() != x->result.root || read_cr0() != (s->cr0 | BIT(16)) ||
+        read_cr4() != s->cr4 || read_msr(0xc0000080u) != s->efer ||
+        read_msr(0x277u) != s->pat || read_flags() & BIT(9))
+        return PG_PLATFORM;
+    const uint64_t candidate = read_cr3();
+    switch_root(s->cr3, s->cr0 | BIT(16), s->cr4);
+    const uint64_t restored = read_cr3(), cr0 = read_cr0();
+    const uint64_t cr4 = read_cr4(), efer = read_msr(0xc0000080u);
+    if (restored != s->cr3 || cr0 != (s->cr0 | BIT(16)) ||
+        cr4 != s->cr4 || efer != s->efer || read_flags() & BIT(9) ||
+        !image_identity(s, x->evidence->live.image) ||
+        !identity_tables(s)) return PG_PLATFORM;
+    struct x86_state descriptors = {0};
+    read_descriptors(&descriptors);
+    if (descriptors.gdtr.base != s->gdtr.base ||
+        descriptors.gdtr.limit != s->gdtr.limit ||
+        descriptors.idtr.base != s->idtr.base ||
+        descriptors.idtr.limit != s->idtr.limit ||
+        descriptors.cs != s->cs) return PG_PLATFORM;
+    arch_puts("STYLEOS PAGING X86 RETURN");
+    field(" before=", s->cr3); field(" candidate=", candidate);
+    field(" after=", restored); field(" cr0=", cr0);
+    field(" cr4=", cr4); field(" efer=", efer);
+    arch_putc('\n');
+    return PG_OK;
+}
+#endif

@@ -614,7 +614,42 @@ def serial_paging_ok(output, arch, site, fault=False, ram_mib=128, el2=False):
             spsr & 0x3df == 0x3c5)
 
 
-def verified_paging_site(folder, arch, fault=False):
+def serial_paging_roundtrip_ok(output, arch, site, ram_mib=128, el2=False):
+    """Require the original binary-verified paging contract PLUS a real return.
+
+    This test does not use the dormant desktop_vm_stage tables: its own
+    image-owned PG tables were already independently admitted and walked.
+    """
+    if arch != 'x86_64' or b'STYLEOS PAGING ERROR' in output:
+        return False
+    lines = output.splitlines()
+    before = next((_paging_fields(x, b'STYLEOS PAGING X86 BEFORE',
+                ('cr0', 'cr3', 'cr4', 'efer', 'pat', 'rflags', 'bits'))
+                for x in lines if x.startswith(b'STYLEOS PAGING X86 BEFORE ')), None)
+    after = next((_paging_fields(x, b'STYLEOS PAGING X86 AFTER',
+                ('cr0', 'cr3', 'cr4', 'efer'))
+                for x in lines if x.startswith(b'STYLEOS PAGING X86 AFTER ')), None)
+    returns = [line for line in lines if line.startswith(b'STYLEOS PAGING X86 RETURN')]
+    if len(returns) != 1 or lines.count(b'STYLEOS PAGING ROUNDTRIP PASS') != 1:
+        return False
+    restored = _paging_fields(returns[0], b'STYLEOS PAGING X86 RETURN',
+                  ('before', 'candidate', 'after', 'cr0', 'cr4', 'efer'))
+    if not before or not after or not restored or not before['cr3'] or not after['cr3']:
+        return False
+    if not (restored['before'] == restored['after'] == before['cr3'] and
+            restored['candidate'] == after['cr3'] != before['cr3'] and
+            restored['cr0'] == (before['cr0'] | (1 << 16)) == after['cr0'] and
+            restored['cr4'] == before['cr4'] == after['cr4'] and
+            restored['efer'] == before['efer'] == after['efer']):
+        return False
+    stripped = b'\n'.join(line if line != b'STYLEOS PAGING ROUNDTRIP PASS'
+                          else b'STYLEOS PAGING PASS'
+                          for line in lines if line != returns[0]) + b'\n'
+    return serial_paging_ok(stripped, arch, site, fault=False,
+                            ram_mib=ram_mib, el2=el2)
+
+
+def verified_paging_site(folder, arch, fault=False, roundtrip=False):
     """Rederive the full image/fault proof and bind every actual loaded input."""
     target = folder / arch
     site = json.loads((target / 'paging-site.json').read_text())
@@ -628,7 +663,9 @@ def verified_paging_site(folder, arch, fault=False):
     manifest = json.loads((folder / 'manifest.json').read_text())
     expected_modes = {'invalid_boot_info': False, 'invalid_memory_map': False,
                       'test_exception': False, 'test_bootpool': False,
-                      'test_paging': not fault, 'test_paging_fault': fault}
+                      'test_paging': not fault and not roundtrip,
+                      'test_paging_fault': fault,
+                      'test_paging_roundtrip': roundtrip}
     if (not isinstance(manifest, dict) or
             any(type(manifest.get(key)) is not bool or manifest[key] != value
                 for key, value in expected_modes.items())):
@@ -2011,6 +2048,7 @@ class Checks:
                     'exception': b'STYLEOS EMERGENCY HALT',
                     'bootpool': b'STYLEOS KERNEL HALT',
                     'paging': b'STYLEOS KERNEL HALT',
+                    'paging-roundtrip': b'STYLEOS KERNEL HALT',
                     'paging-fault': b'STYLEOS EMERGENCY HALT',
                     'ownership': b'STYLEOS KERNEL HALT',
                     'ownership-invalid': b'STYLEOS OWNERSHIP ERROR: required',
@@ -2153,12 +2191,14 @@ class Checks:
             except (OSError, ValueError) as error:
                 return result('FAIL', 'pool-site proof unavailable/mismatched: ' + str(error), text)
             good = serial_pool_ok(output, arch, site, mib, el2)
-        elif mode in ('paging', 'paging-fault'):
+        elif mode in ('paging', 'paging-fault', 'paging-roundtrip'):
             try:
-                site = verified_paging_site(folder, arch, mode == 'paging-fault')
+                site = verified_paging_site(folder, arch, mode == 'paging-fault', mode == 'paging-roundtrip')
             except (OSError, ValueError) as error:
                 return result('FAIL', 'paging-site proof unavailable/mismatched: ' + str(error), text)
-            good = serial_paging_ok(output, arch, site, mode == 'paging-fault', mib, el2)
+            good = (serial_paging_roundtrip_ok(output, arch, site, mib, el2)
+                    if mode == 'paging-roundtrip' else
+                    serial_paging_ok(output, arch, site, mode == 'paging-fault', mib, el2))
         elif mode == 'tasks':
             try:
                 site = verified_tasks_site(folder, arch)
@@ -2181,7 +2221,7 @@ class Checks:
             good = serial_memory_ok(output, arch, mode, mib, el2)
         if arch == 'x86_64':
             good = good and serial_idt_ready(output)
-        if mode in ('paging', 'paging-fault'):
+        if mode in ('paging', 'paging-fault', 'paging-roundtrip'):
             (self.logs / (name + '.json')).write_text(json.dumps({
                 'arch': arch, 'mode': mode, 'initial_el2': el2,
                 'ram_mib': mib, 'status': 'PASS' if good else 'FAIL',

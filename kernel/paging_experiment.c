@@ -120,7 +120,12 @@ void paging_experiment(const struct boot_memory_evidence *e)
     arch_puts(" pa="); paging_hex(s->data_pa);
     arch_puts(" before="); paging_hex(before);
     arch_puts(" after="); paging_hex(after); arch_putc('\n');
-#ifdef STYLEOS_TEST_PAGING_FAULT
+#ifdef STYLEOS_TEST_PAGING_ROUNDTRIP
+    error = arch_paging_restore(s);
+    if (error != PG_OK) paging_fail("guarded CR3 restore");
+    verify(s, 0);
+    arch_puts("STYLEOS PAGING ROUNDTRIP PASS\n");
+#elif defined(STYLEOS_TEST_PAGING_FAULT)
     extern void styleos_paging_fault(void);
     arch_puts("STYLEOS PAGING FAULT READY va="); paging_hex(PG_PROBE);
     arch_puts(" pc="); paging_hex((uint64_t)(uintptr_t)styleos_paging_fault);

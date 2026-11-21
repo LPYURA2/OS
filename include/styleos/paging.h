@@ -64,5 +64,10 @@ void paging_experiment(const struct boot_memory_evidence *);
  * Activate consumes a completely validated result, then reads hardware state. */
 enum pg_error arch_paging_prepare(struct pg_experiment *);
 enum pg_error arch_paging_activate(struct pg_experiment *);
+/* Dedicated x86-only hardware test: restore a pre-verified inherited CR3.
+ * This is not a general kernel root switcher. */
+#ifdef STYLEOS_TEST_PAGING_ROUNDTRIP
+enum pg_error arch_paging_restore(struct pg_experiment *);
+#endif
 void arch_paging_fault(uint64_t probe);
 #endif

@@ -36,7 +36,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          update_build=None, update_public_key=None, test_update_fail=False):
+          test_paging_roundtrip=False, update_build=None, update_public_key=None, test_update_fail=False):
     if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
         raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
     if desktop_v0 and arch != 'x86_64':
@@ -80,12 +80,14 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if ownership:
         common += ['kernel/ownership.c', 'kernel/ownership_plan.c',
                    f'arch/{arch}/ownership.c']
-    paging = test_paging or test_paging_fault
+    paging = test_paging or test_paging_fault or test_paging_roundtrip
     if paging:
         common += ['kernel/paging.c', 'kernel/paging_admission.c',
                    'kernel/paging_experiment.c', f'arch/{arch}/paging.c']
         if test_paging_fault:
             common.append(f'arch/{arch}/paging_fault.S')
+    if test_paging_roundtrip and arch != 'x86_64':
+        raise ValueError('CR3 roundtrip is x86-64 only')
     if arch == 'x86_64':
         target = 'x86_64-pc-win32-coff'
         sources = common + ['boot/x86_64/exit_boot.c', 'boot/x86_64/uefi.c',
@@ -123,6 +125,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_PAGING=1')
     if test_paging_fault:
         flags.append('-DSTYLEOS_TEST_PAGING_FAULT=1')
+    if test_paging_roundtrip:
+        flags.append('-DSTYLEOS_TEST_PAGING_ROUNDTRIP=1')
     if ownership:
         flags.append('-DSTYLEOS_TEST_OWNERSHIP=1')
     if test_ownership_plan_invalid:
@@ -279,6 +283,8 @@ def main():
                           help='Dedicated image only: owned translation tables and alias RW')
     negative.add_argument('--test-paging-fault', action='store_true',
                           help='Dedicated image only: owned tables and real unmapped read')
+    negative.add_argument('--test-paging-roundtrip', action='store_true',
+                          help='Dedicated x86-64 test only: prove new CR3 and restore inherited CR3')
     negative.add_argument('--test-ownership-plan', action='store_true',
                           help='Dedicated image only: read-only ownership plan, GRANTED=0')
     negative.add_argument('--test-ownership-plan-invalid', action='store_true',
@@ -311,6 +317,8 @@ def main():
         parser.error('--test-storage requires --arch aarch64')
     if args.test_disk_app and args.arch != 'aarch64':
         parser.error('--test-disk-app requires --arch aarch64')
+    if args.test_paging_roundtrip and args.arch != 'x86_64':
+        parser.error('--test-paging-roundtrip requires --arch x86_64')
     if args.test_desktop_display and args.arch != 'x86_64':
         parser.error('--test-desktop-display requires --arch x86_64')
     if args.desktop_v0 and args.arch != 'x86_64':
@@ -320,6 +328,7 @@ def main():
                'bootpool' if args.test_bootpool else
                'paging' if args.test_paging else
                'paging-fault' if args.test_paging_fault else
+               'paging-roundtrip' if args.test_paging_roundtrip else
                'ownership' if args.test_ownership_plan else
                'ownership-invalid' if args.test_ownership_plan_invalid else
                'tasks' if args.test_tasks else
@@ -329,7 +338,7 @@ def main():
                'desktop-v0' if args.desktop_v0 else
                'desktop-display' if args.test_desktop_display else '')).resolve()
     if (args.test_exception or args.test_bootpool or args.test_paging or
-            args.test_paging_fault or args.test_ownership_plan or
+            args.test_paging_fault or args.test_paging_roundtrip or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
             args.test_user_processes or args.test_storage or args.test_disk_app or
             args.test_desktop_display or args.desktop_v0) and output == (ROOT / 'build').resolve():
@@ -343,7 +352,8 @@ def main():
                              args.test_paging_fault, args.test_ownership_plan,
                              args.test_ownership_plan_invalid, args.test_tasks,
                              args.test_user_processes, args.test_storage,
-                             args.test_disk_app, **({'test_desktop_display': True}
+                             args.test_disk_app, **({'test_paging_roundtrip': True} if args.test_paging_roundtrip else {}),
+                             **({'test_desktop_display': True}
                                                    if args.test_desktop_display else {}),
                              **({'desktop_v0': True} if args.desktop_v0 else {}),
                              **({'update_build': args.update_build, 'update_public_key': args.update_public_key,
@@ -365,6 +375,7 @@ def main():
         'test_exception': args.test_exception,
         'test_bootpool': args.test_bootpool,
         'test_paging': args.test_paging, 'test_paging_fault': args.test_paging_fault,
+        'test_paging_roundtrip': args.test_paging_roundtrip,
         'test_ownership_plan': args.test_ownership_plan,
         'test_ownership_plan_invalid': args.test_ownership_plan_invalid,
         'test_tasks': args.test_tasks,

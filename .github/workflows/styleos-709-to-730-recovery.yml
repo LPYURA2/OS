@@ -8,6 +8,7 @@ on:
       - feature/styleos-process-runtime-760
       - feature/styleos-desktop-process-bootstrap-761
       - feature/styleos-owned-vm-stage-762
+      - feature/styleos-cr3-roundtrip-763
   workflow_dispatch:
 
 permissions:
@@ -151,6 +152,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_process_scheduler_guest.py --arch all --output build/recovery-canonical/scheduler-guest 2>&1 | tee build/recovery-canonical/scheduler-guest.log
 
+      - name: Prove x86-64 owned-table CR3 transition and inherited-root return in real QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_paging_roundtrip.py --output build/recovery-canonical/cr3-roundtrip 2>&1 | tee build/recovery-canonical/cr3-roundtrip.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -199,6 +205,10 @@ jobs:
             build/recovery-canonical/process-api-host.log
             build/recovery-canonical/desktop-runtime-host.log
             build/recovery-canonical/desktop-vm-host.log
+            build/recovery-canonical/cr3-roundtrip.log
+            build/recovery-canonical/cr3-roundtrip/serial.log
+            build/recovery-canonical/cr3-roundtrip/results.json
+            build/recovery-canonical/cr3-roundtrip/hardware/logs/*.json
             build/recovery-canonical/scheduler-host.log
             build/recovery-canonical/scheduler-guest.log
             build/recovery-canonical/scheduler-guest/results.json
