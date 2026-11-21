@@ -31,7 +31,7 @@ def guest(qemu,firmware_code,firmware_var,efi_disk,package_disk,out,seconds):
          '-drive',f'if=pflash,format=raw,file={vars}',
          '-drive',f'if=none,id=styleos,format=raw,readonly=on,file={efi_disk}',
          '-device','virtio-blk-pci,drive=styleos,bootindex=1',
-         '-drive',f'if=ide,index=0,media=disk,format=raw,readonly=on,file={package_disk}']
+         '-drive',f'if=ide,index=0,media=disk,format=raw,snapshot=on,file={package_disk}']
     trace=b'';start=time.monotonic()
     with stderr.open('wb') as err:
         proc=subprocess.Popen(cmd,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=err)
@@ -80,10 +80,17 @@ def run(output):
         raise AssertionError('guest did not load canonical package from separate IDE: see positive/UART.log')
     # Prove the *entire* inherited CPL3 trace with the independently reviewed
     # 768 validator (PC, PTE, X86 frame, data, PID and event sequence).
-    checked=check_uart(text.replace(b'STYLEOS TEA769',b'STYLEOS TEA768'),site)
+    compatible=text.replace(b'STYLEOS TEA769',b'STYLEOS TEA768')
+    compatible=compatible.replace(b'STYLEOS TEA768 DISK CPL3 EXIT PASS',
+                                  b'STYLEOS TEA768 CPL3 EXIT PASS')
+    checked=check_uart(compatible,site)
+    if hashlib.sha256((target/'native-tea-769-disk.img').read_bytes()).hexdigest()!=proof['image_sha256']:
+        raise AssertionError('original external disk image modified by QEMU')
     bad=bytearray(disk);bad[512+len(package)//2]^=0x01
     badfile=output/'tampered-disk.img';badfile.write_bytes(bad)
     negative=guest(qemu,code,var,target/'styleos.img',badfile,output/'negative',40)
+    if hashlib.sha256(badfile.read_bytes()).hexdigest()!=hashlib.sha256(bad).hexdigest():
+        raise AssertionError('tampered test input unexpectedly written by QEMU')
     nl=negative.splitlines()
     if not any(line.startswith(b'STYLEOS USER ERROR:') for line in nl) or \
        any(b'STYLEOS USER FRAME ' in line or b'STYLEOS TEA769 ADMITTED' in line for line in nl):
