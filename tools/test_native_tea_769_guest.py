@@ -76,7 +76,8 @@ def run(output):
     text=guest(qemu,code,var,target/'styleos.img',target/'native-tea-769-disk.img',output/'positive',75)
     lines=text.splitlines()
     marker=f'STYLEOS TEA769 DISK LOAD PASS bytes={len(package)} sectors=128'.encode()
-    if lines.count(marker)!=1 or b'STYLEOS TEA769 DISK CPL3 EXIT PASS' not in lines:
+    if lines.count(b'STYLEOS TEA776 SHARED STAGING PASS')!=1 or \
+       lines.count(marker)!=1 or b'STYLEOS TEA769 DISK CPL3 EXIT PASS' not in lines:
         raise AssertionError('guest did not load canonical package from separate IDE: see positive/UART.log')
     # Prove the *entire* inherited CPL3 trace with the independently reviewed
     # 768 validator (PC, PTE, X86 frame, data, PID and event sequence).

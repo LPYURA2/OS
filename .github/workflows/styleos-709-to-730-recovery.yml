@@ -21,6 +21,7 @@ on:
       - feature/styleos-returning-cpl3-window-ipc-773
       - feature/styleos-native-desktop-presentation-774
       - feature/styleos-native-desktop-launch-775
+      - feature/styleos-native-disk-staging-776
   workflow_dispatch:
 
 permissions:
@@ -148,6 +149,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/test_native_desktop_launch.py --output build/recovery-canonical/native-admission-775-host 2>&1 | tee build/recovery-canonical/native-admission-775-host.log
+
+      - name: Verify shared read-only .tea disk staging with ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_tea_staging.py --output build/recovery-canonical/native-tea-staging-776-host 2>&1 | tee build/recovery-canonical/native-tea-staging-776-host.log
 
       - name: Verify process and window registry start empty in real UEFI guest
         run: |
@@ -350,6 +356,9 @@ jobs:
             build/recovery-canonical/native-tea-qemu/compiled/x86_64/BOOTX64.EFI
             build/recovery-canonical/native-tea-qemu/compiled/x86_64/styleos.img
             build/recovery-canonical/native-tea-qemu/compiled/x86_64/tea-768-site.json
+            build/recovery-canonical/native-tea-staging-776-host.log
+            build/recovery-canonical/native-tea-staging-776-host/test.log
+            build/recovery-canonical/native-tea-staging-776-host/native-tea-staging.obj
             build/recovery-canonical/native-tea-769-host.log
             build/recovery-canonical/native-tea-769-host/test.log
             build/recovery-canonical/native-tea-769-qemu.log

@@ -98,7 +98,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_native_tea:
         common += ['kernel/native_tea_elf.c']
         if test_native_tea_disk:
-            common += ['kernel/native_tea_package.c', 'kernel/tea_769_demo.c',
+            common += ['kernel/native_tea_package.c', 'kernel/native_tea_staging.c', 'kernel/tea_769_demo.c',
                        'arch/x86_64/tea_769_disk_io.c']
         else:
             common += ['kernel/tea_768_demo.c']
@@ -113,7 +113,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_desktop_display or desktop_v0:
         common += ['kernel/desktop_display.c', 'boot/x86_64/desktop_display.c']
     if desktop_v0:
-        common += ['kernel/process_runtime.c', 'kernel/process_scheduler.c', 'kernel/desktop_process_runtime.c', 'kernel/desktop_vm_stage.c', 'kernel/desktop_frame_owner.c', 'kernel/window_service.c', 'kernel/user_session_runtime.c', 'kernel/native_launch_stage.c', 'kernel/native_window_channel.c', 'kernel/native_desktop_launch.c', 'kernel/native_desktop_bridge.c', 'kernel/process_inspector.c', 'kernel/process_view.c', 'kernel/process_api.c', 'kernel/system_apps.c', 'kernel/desktop_sessions.c', 'kernel/desktop_text_app.c', 'kernel/desktop_shell.c', 'kernel/desktop_draw.c',
+        common += ['kernel/process_runtime.c', 'kernel/process_scheduler.c', 'kernel/desktop_process_runtime.c', 'kernel/desktop_vm_stage.c', 'kernel/desktop_frame_owner.c', 'kernel/window_service.c', 'kernel/user_session_runtime.c', 'kernel/native_launch_stage.c', 'kernel/native_window_channel.c', 'kernel/native_desktop_launch.c', 'kernel/native_tea_elf.c', 'kernel/native_tea_package.c', 'kernel/native_tea_staging.c', 'kernel/native_desktop_bridge.c', 'kernel/process_inspector.c', 'kernel/process_view.c', 'kernel/process_api.c', 'kernel/system_apps.c', 'kernel/desktop_sessions.c', 'kernel/desktop_text_app.c', 'kernel/desktop_shell.c', 'kernel/desktop_draw.c',
                    'kernel/desktop_store.c', 'kernel/stylefs.c', 'kernel/desktop_volume_io.c',
                    'kernel/desktop_stylefs.c', 'kernel/desktop_extra_volume.c',
                    'arch/x86_64/desktop_io.c', 'arch/x86_64/desktop_process_arch.c']
