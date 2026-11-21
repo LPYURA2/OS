@@ -2,6 +2,7 @@
 #include "styleos/paging.h"
 #ifdef STYLEOS_TEST_FRAME_GRANTS
 #include "styleos/kernel_mapping_inventory.h"
+#include "styleos/kernel_dependency_inventory.h"
 #endif
 
 /* T-P1.4 only: the build does not link this file into any historical profile.
@@ -509,6 +510,42 @@ enum pg_error arch_paging_inventory_inherited(struct pg_experiment *x)
     field(" rwx=",report.rwx_pages);
     field(" tr=",tr);
     arch_puts(" tss-ist=unverified devices=unverified wx=unverified active=0\n");
+    /* 780: classify PE sections by *loaded* RVA, without ever reading past
+     * the memory range reported by UEFI LoadedImage. PE SizeOfImage may be
+     * larger than that range; any discrepancy remains an explicit blocker. */
+    const struct boot_range image=x->evidence->live.image;
+    if (image.start>=image.end || image.end-image.start>SIZE_MAX)
+        return PG_CONTEXT;
+    struct kdi_pe_profile pe={0};
+    if (!kdi_profile_loaded_pe((const void*)(uintptr_t)image.start,
+                                (size_t)(image.end-image.start),&pe))
+        return PG_CONTEXT;
+    const struct kdi_live_dependencies deps={
+        .tr_selector=tr,.inherited_rwx_pages=report.rwx_pages
+    };
+    struct kdi_report dep_report={0};
+    if (!kdi_audit_dependencies(&pe,&deps,&dep_report) ||
+        !(dep_report.blockers&KDI_TSS_IST) ||
+        !(dep_report.blockers&KDI_WX_POLICY) ||
+        !(dep_report.blockers&KDI_FRAMEBUFFER) ||
+        !(dep_report.blockers&KDI_DEVICE_MMIO) ||
+        dep_report.activation_permitted || read_cr3()!=s->cr3)
+        return PG_CONTEXT;
+    arch_puts("STYLEOS KDI 780 INHERITED");
+    field(" cr3=",s->cr3);
+    field(" tr=",tr);
+    field(" pe-pages=",pe.image_pages);
+    field(" pe-sections=",pe.sections);
+    field(" pe-text=",pe.text_pages);
+    field(" pe-ro=",pe.readonly_pages);
+    field(" pe-rw=",pe.writable_pages);
+    field(" pe-mixed=",pe.mixed_pages);
+    field(" pe-gaps=",pe.uncovered_pages);
+    field(" pe-declared-extra=",pe.declared_extra_pages);
+    field(" inherited-rwx=",deps.inherited_rwx_pages);
+    field(" blockers=",dep_report.blockers);
+    arch_puts(" framebuffer=unprovided mmio=unproven runtime=unproven");
+    arch_puts(" tss-ist=unverified active=0 no-cr3-switch=1\n");
     return PG_OK;
 }
 /* Only while the inherited root is actually active: the old page-table

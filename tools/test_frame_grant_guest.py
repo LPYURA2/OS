@@ -84,6 +84,50 @@ def main():
                 tampered=actual.replace(b' tss-ist=unverified ',b' tss-ist=verified ',1)
                 if re.fullmatch(pattern,[line for line in tampered.replace(b'\r',b'').splitlines() if line.startswith(b'STYLEOS KMI ')][0]):
                     status='FAIL';detail='779 proof parser accepted false TSS completion'
+    if status=='PASS':
+        # 780 dependency census is hardware-originated, but never a CR3 grant.
+        # Bind actual PE headers to the UEFI IMAGE range and inherited KMI trace.
+        uart_lines=actual.replace(b'\r',b'').splitlines()
+        prefix=b'STYLEOS KDI 780 INHERITED'
+        kdi_lines=[line for line in uart_lines if line.startswith(prefix)]
+        pattern=(rb'STYLEOS KDI 780 INHERITED cr3=(0x[0-9a-f]{16}) '
+                 rb'tr=(0x[0-9a-f]{16}) pe-pages=(0x[0-9a-f]{16}) '
+                 rb'pe-sections=(0x[0-9a-f]{16}) pe-text=(0x[0-9a-f]{16}) '
+                 rb'pe-ro=(0x[0-9a-f]{16}) pe-rw=(0x[0-9a-f]{16}) '
+                 rb'pe-mixed=(0x[0-9a-f]{16}) pe-gaps=(0x[0-9a-f]{16}) '
+                 rb'pe-declared-extra=(0x[0-9a-f]{16}) '
+                 rb'inherited-rwx=(0x[0-9a-f]{16}) blockers=(0x[0-9a-f]{16}) '
+                 rb'framebuffer=unprovided mmio=unproven runtime=unproven '
+                 rb'tss-ist=unverified active=0 no-cr3-switch=1')
+        match=(re.fullmatch(pattern,kdi_lines[0]) if len(kdi_lines)==1 else None)
+        if not match:
+            status='FAIL';detail='780 dependency UART proof absent, duplicated or malformed'
+        else:
+            fields=[int(x,16) for x in match.groups()]
+            cr3,tr,loaded,sections,text_pages,ro_pages,rw_pages,mixed,gaps,extra,legacy,blocks=fields
+            kmi=re.search(rb'STYLEOS KMI 779 INHERITED cr3=(0x[0-9a-f]{16}) '
+                          rb'image=(0x[0-9a-f]{16}).*?rwx=(0x[0-9a-f]{16}) '
+                          rb'tr=(0x[0-9a-f]{16})',actual)
+            image_ranges=re.findall(rb'STYLEOS MEMMAP IMAGE (0x[0-9a-f]{16}) '
+                                   rb'(0x[0-9a-f]{16})',actual)
+            binary=(built/'x86_64'/'BOOTX64.EFI').read_bytes()
+            header= int.from_bytes(binary[0x3c:0x40], 'little')
+            declared=int.from_bytes(binary[header+24+56:header+24+60],'little')
+            pe_sections=int.from_bytes(binary[header+6:header+8],'little')
+            if (not kmi or len(image_ranges)!=1 or
+                cr3!=int(kmi[1],16) or tr!=int(kmi[4],16) or
+                loaded!=int(kmi[2],16) or legacy!=int(kmi[3],16) or
+                loaded != (int(image_ranges[0][1],16)-int(image_ranges[0][0],16))//4096 or
+                sections!=pe_sections or not (3<=sections<=32) or
+                loaded!=text_pages+ro_pages+rw_pages+mixed+gaps or
+                text_pages==0 or rw_pages==0 or
+                extra!=(declared//4096)-loaded or (blocks&0xff)!=0xff or
+                bool(blocks&0x100)!=bool(extra or mixed or gaps)):
+                status='FAIL';detail='780 hardware PE map, inherited CR3 or blockers mismatch'
+            else:
+                tampered=kdi_lines[0].replace(b'active=0',b'active=1',1)
+                if re.fullmatch(pattern,tampered):
+                    status='FAIL';detail='780 active-root tamper accepted'
     result={'status':status,'details':detail,'branch_scope':'dedicated image-owned frames',
             'candidate_ram_granted':False,'desktop_root_activated':False}
     (a.output/'results.json').write_text(json.dumps(result,indent=2)+'\n')

@@ -1,3 +1,12 @@
+## Stage 780 — live PE W^X intent and missing kernel dependencies
+
+Branch `feature/styleos-kernel-dependency-census-780` from accepted 779.
+Read-only test records actual loaded PE section roles and unresolved hardware
+requirements, including TSS/IST, device MMIO, firmware runtime and cache
+policy. **It never grants a CR3 switch**; see
+[the 780 report](architecture/KERNEL_DEPENDENCY_CENSUS_780.md) and
+[handoff](NEXT_CHAT_780.md). Verify final CI by exact commit.
+
 ## Этап 777 — проверенные физические страницы и отсоединённые корни
 
 Ветка `feature/styleos-attested-detached-roots-777` объединяет 765
