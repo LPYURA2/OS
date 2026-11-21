@@ -72,7 +72,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_desktop_display or desktop_v0:
         common += ['kernel/desktop_display.c', 'boot/x86_64/desktop_display.c']
     if desktop_v0:
-        common += ['kernel/process_runtime.c', 'kernel/window_service.c', 'kernel/process_inspector.c', 'kernel/process_view.c', 'kernel/system_apps.c', 'kernel/desktop_sessions.c', 'kernel/desktop_text_app.c', 'kernel/desktop_shell.c', 'kernel/desktop_draw.c',
+        common += ['kernel/process_runtime.c', 'kernel/window_service.c', 'kernel/process_inspector.c', 'kernel/process_view.c', 'kernel/process_api.c', 'kernel/system_apps.c', 'kernel/desktop_sessions.c', 'kernel/desktop_text_app.c', 'kernel/desktop_shell.c', 'kernel/desktop_draw.c',
                    'kernel/desktop_store.c', 'kernel/stylefs.c', 'kernel/desktop_volume_io.c',
                    'kernel/desktop_stylefs.c', 'kernel/desktop_extra_volume.c',
                    'arch/x86_64/desktop_io.c']

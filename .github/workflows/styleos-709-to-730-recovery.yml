@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - restore/styleos-709-to-730-canonical
+      - feature/styleos-process-snapshot-api-759
   workflow_dispatch:
 
 permissions:
@@ -122,6 +123,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_process_view.py --output build/recovery-canonical/process-view-host 2>&1 | tee build/recovery-canonical/process-view-host.log
 
+      - name: Verify capability-gated read-only process snapshot API
+        run: |
+          set -euo pipefail
+          python3 tools/test_process_api.py --output build/recovery-canonical/process-api-host 2>&1 | tee build/recovery-canonical/process-api-host.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -167,6 +173,7 @@ jobs:
             build/recovery-canonical/process-qemu/results.json
             build/recovery-canonical/inspector-host.log
             build/recovery-canonical/process-view-host.log
+            build/recovery-canonical/process-api-host.log
             build/recovery-canonical/process-host.log
             build/recovery-canonical/window-host.log
             build/recovery-canonical/preinstall-host.log
