@@ -11,6 +11,7 @@
 #include "styleos/process_runtime.h"
 #include "styleos/window_service.h"
 #include "styleos/desktop_process_runtime.h"
+#include "styleos/user_session_runtime.h"
 #endif
 #ifdef STYLEOS_TEST_DISK_APP
 #include "styleos/disk_app_demo.h"
@@ -73,6 +74,13 @@ _Noreturn void kernel_main(const struct boot_info *info)
         arch_puts("STYLEOS DESKTOP SCHEDULER ERROR\n");
         arch_halt();
     }
+    if (usr_global_start() != USR_OK || !usr_global() ||
+        usr_global()->selected_session ||
+        usr_global()->next_session != 1) {
+        arch_puts("STYLEOS USER SESSION SERVICE ERROR\n");
+        arch_halt();
+    }
+    arch_puts("STYLEOS USER SESSION SERVICE READY sessions=0\n");
     arch_puts("STYLEOS DESKTOP SCHEDULER READY registered=0\n");
     arch_puts("STYLEOS DESKTOP PROCESS SERVICE READY registered=0\n");
     arch_puts("STYLEOS DESKTOP WINDOW SERVICE READY registered=0\n");

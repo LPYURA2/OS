@@ -11,6 +11,7 @@ on:
       - feature/styleos-cr3-roundtrip-763
       - feature/styleos-frame-ownership-764
       - feature/styleos-physical-grant-attestation-765
+      - feature/styleos-user-session-boundary-766
   workflow_dispatch:
 
 permissions:
@@ -113,6 +114,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/test_window_service.py --output build/recovery-canonical/window-host 2>&1 | tee build/recovery-canonical/window-host.log
+
+      - name: Verify kernel-owned app/session boundary and shell-independent window filtering
+        run: |
+          set -euo pipefail
+          python3 tools/test_user_session_runtime.py --output build/recovery-canonical/user-session-host 2>&1 | tee build/recovery-canonical/user-session-host.log
 
       - name: Verify process and window registry start empty in real UEFI guest
         run: |
@@ -221,6 +227,7 @@ jobs:
             build/recovery-canonical/process-view-host.log
             build/recovery-canonical/process-api-host.log
             build/recovery-canonical/desktop-runtime-host.log
+            build/recovery-canonical/user-session-host.log
             build/recovery-canonical/desktop-vm-host.log
             build/recovery-canonical/frame-owner-host.log
             build/recovery-canonical/grant-policy-host.log

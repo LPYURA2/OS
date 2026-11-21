@@ -20,13 +20,15 @@ def main():
     before=digest(iso)
     with vm(a.output/'qemu',iso,None,qemu,firmware,
             image_format='iso',data_format='raw') as (guest, frame):
+        guest.wait_uart('USER SESSION SERVICE READY sessions=0')
         guest.wait_uart('SCHEDULER READY registered=0')
         guest.wait_uart('PROCESS SERVICE READY registered=0')
         guest.wait_uart('WINDOW SERVICE READY registered=0')
         guest.wait_uart('DATA UNAVAILABLE')
         guest.screen('desktop-before-process-activation')
         uart=guest.uart.read_bytes().decode('utf-8','replace')
-        if 'RUNTIME SERVICE ERROR' in uart or 'SCHEDULER ERROR' in uart:
+        if ('RUNTIME SERVICE ERROR' in uart or 'SCHEDULER ERROR' in uart or
+                'USER SESSION SERVICE ERROR' in uart):
             raise RuntimeError('process or window initialization failed')
     if digest(iso)!=before:raise RuntimeError('ISO modified by guest')
     (a.output/'results.json').write_text(json.dumps({
