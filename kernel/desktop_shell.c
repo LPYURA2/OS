@@ -6,6 +6,7 @@
 #include <styleos/desktop_v0.h>
 #include <styleos/desktop_stylefs.h>
 #include <styleos/desktop_sessions.h>
+#include <styleos/desktop_text_app.h>
 
 enum { FILES, NOTES, TASKS, ABOUT, NOTE_WINDOW, WINDOWS };
 enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
@@ -327,26 +328,8 @@ static bool insert_drop(void)
 
 static void replace(size_t lo, size_t hi, uint32_t cp)
 {
-    char bytes[2];
-    size_t n = 0;
-    if (cp && cp < 0x80) bytes[n++] = (char)cp;
-    else if (cp >= 0x80 && cp < 0x800) {
-        bytes[n++] = (char)(0xc0 | (cp >> 6));
-        bytes[n++] = (char)(0x80 | (cp & 0x3f));
-    }
-    if (hi == lo && !n) return;
-    size_t limit = filesystem.mode ? DESK_STYLEFS_TEXT_LIMIT : DESK_TEXT_LIMIT;
-    if (length - (hi - lo) + n > limit) {
-        notice = filesystem.mode ? "Лимит текста 64 КиБ" : "Лимит заметки 4096 байт";
-        return;
-    }
-    if (lo + n > hi) for (size_t p = length; p > hi; --p) content[p - 1 - hi + lo + n] = content[p - 1];
-    else for (size_t p = hi; p < length; ++p) content[p - hi + lo + n] = content[p];
-    for (size_t i = 0; i < n; ++i) content[lo + i] = bytes[i];
-    length = length - (hi - lo) + n;
-    caret = lo + n;
-    dirty = true;
-    notice = "Есть несохранённые изменения";
+    desk_text_app_replace(current_draft(), lo, hi, cp,
+                          filesystem.mode ? DESK_STYLEFS_TEXT_LIMIT : DESK_TEXT_LIMIT);
 }
 
 static size_t before(size_t p)
