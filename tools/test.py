@@ -672,6 +672,9 @@ def serial_frame_grants_ok(output, arch, site, map_file, ram_mib=128, el2=False)
     # The ten lines include one terminal sequence emitted by the kernel test.
     if grants[9][1] != b'STYLEOS GRANTS END':
         return False
+    if [x for x in lines if x.startswith(b'STYLEOS DGB ')] != [
+        b'STYLEOS DGB PASS pages=79 roots=3 active=0 no-pmm=1']:
+        return False
     if any(a[0]<b[1] and b[0]<a[1] for i,a in enumerate(vals) for b in vals[:i]):
         return False
     mmap=[match.groups() for line in lines if (match:=re.fullmatch(
@@ -703,7 +706,7 @@ def serial_frame_grants_ok(output, arch, site, map_file, ram_mib=128, el2=False)
         return False
     # The paging proof checks the exact linked PE, old root, new root, live
     # PTEs, CR3 readback and restoration. Only remove our known extra lines.
-    stripped=b'\n'.join(line for line in lines if not line.startswith(b'STYLEOS GRANTS '))+b'\n'
+    stripped=b'\n'.join(line for line in lines if not line.startswith((b'STYLEOS GRANTS ',b'STYLEOS DGB ')))+b'\n'
     return serial_paging_roundtrip_ok(stripped,arch,site,ram_mib,el2)
 
 

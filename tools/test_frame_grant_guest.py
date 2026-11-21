@@ -31,6 +31,11 @@ def main():
         data=actual.replace(b'STYLEOS GRANTS PASS pages=',b'STYLEOS GRANTS PASS pagesX=',1)
         if serial_frame_grants_ok(data,'x86_64',site,built/'x86_64'/'kernel.map'):
             status='FAIL';detail='proof parser accepted tampered UART'
+        if status=='PASS':
+            altered=actual.replace(b'STYLEOS DGB PASS pages=79',
+                                   b'STYLEOS DGB PASX pages=79',1)
+            if serial_frame_grants_ok(altered,'x86_64',site,built/'x86_64'/'kernel.map'):
+                status='FAIL';detail='bridge parser accepted tampered UART'
     result={'status':status,'details':detail,'branch_scope':'dedicated image-owned frames',
             'candidate_ram_granted':False,'desktop_root_activated':False}
     (a.output/'results.json').write_text(json.dumps(result,indent=2)+'\n')

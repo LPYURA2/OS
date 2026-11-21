@@ -1,3 +1,13 @@
+## Этап 777 — проверенные физические страницы и отсоединённые корни
+
+Ветка `feature/styleos-attested-detached-roots-777` объединяет 765
+hardware frame proof и 762/764 detached safe/user roots. Требует
+подтверждения всех 79 страниц, инициализирует три корня без включения
+их в штатную загрузку. Это НЕ завершённый PMM, kernel closure или
+графический запуск .tea. Статус CI только по финальному коммиту.
+См. [отчёт 777](architecture/ATTESTED_DETACHED_ROOTS_777.md) и
+[точку продолжения](NEXT_CHAT_777.md).
+
 ## Этап 775 — связь транзакции процессов с оконным IPC
 
 Новая ветка `feature/styleos-native-desktop-launch-775` добавляет отдельный

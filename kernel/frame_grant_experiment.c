@@ -1,6 +1,7 @@
 #include <styleos/frame_grant_proof.h>
 #include <styleos/paging.h>
 #include <styleos/arch.h>
+#include <styleos/desktop_grant_bridge.h>
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -10,6 +11,11 @@ _Alignas(DVM_PAGE_SIZE) unsigned char
     styleos_grant_users[DVM_USER_SLOTS][DVM_USER_PAGES][DVM_PAGE_SIZE];
 _Static_assert(sizeof styleos_grant_tables == 72u * 4096u,"72 page-table frames");
 _Static_assert(sizeof styleos_grant_users == 6u * 4096u,"six private frames");
+static struct dfo_owner styleos_grant_owner;
+static bool grant_walk(void *ctx,uint64_t pa,uint64_t bytes)
+{ return arch_paging_attest_image_writable((struct pg_experiment*)ctx,pa,bytes)==PG_OK; }
+static bool refuse_walk(void *ctx,uint64_t pa,uint64_t bytes)
+{ (void)ctx;(void)pa;(void)bytes;return false; }
 
 static void put_field(const char *key,uint64_t value)
 { arch_puts(key); paging_hex(value); }
@@ -76,4 +82,18 @@ void fg_experiment_run(struct pg_experiment *p)
     arch_puts("STYLEOS GRANTS REFUSALS alias=1 alignment=1 stack=1 candidate=1\n");
     arch_puts("STYLEOS GRANTS PASS pages=0x000000000000004e origin=image-owned no-pmm=1\n");
     arch_puts("STYLEOS GRANTS END\n");
+    /* All grants were individually walked under the inherited CR3.
+     * Build detached 762 roots ONLY after one intentional refusal. */
+    struct dgb_result roots={0};
+    if(dgb_prepare(&styleos_grant_owner,&styleos_grant_tables,e,&claims,
+        e->live.image.start,refuse_walk,p,&roots)!=DGB_ATTEST ||
+       styleos_grant_owner.ready || roots.safe_root)
+        paging_fail("777 missing physical proof refusal");
+    if(dgb_prepare(&styleos_grant_owner,&styleos_grant_tables,e,&claims,
+        e->live.image.start,grant_walk,p,&roots)!=DGB_OK ||
+       !styleos_grant_owner.ready || roots.proved_pages!=79u ||
+       roots.safe_root!=table_va || roots.user_root[0]==roots.user_root[1] ||
+       roots.user_root[0]==p->old_root || roots.user_root[1]==p->old_root)
+        paging_fail("777 detached grant admission");
+    arch_puts("STYLEOS DGB PASS pages=79 roots=3 active=0 no-pmm=1\n");
 }
