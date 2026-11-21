@@ -207,7 +207,20 @@ static void validate_frame(unsigned turn,unsigned id,const struct up_context *c,
        c->gpr[1]!=(id?UINT64_C(0xb22c):UINT64_C(0xa11c)) || c->gpr[11]!=cookie)up_fail("CPL3 frame");
     for(unsigned n=15;n<31;++n)if(c->gpr[n])up_fail("x86 context tail");
     if(expected==UP_FAULT){if(ev->vector!=14 || ev->syndrome!=4 || ev->fault_va!=UP_DATA_B_VA)up_fail("user page fault");}
-    else if(ev->vector!=128 || ev->syndrome || ev->fault_va || c->gpr[0]!=(expected==UP_YIELD?1u:2u))up_fail("user operation");
+    else if(ev->vector!=128 || ev->syndrome || ev->fault_va ||
+#ifdef STYLEOS_TEST_USER_SYSCALL
+        c->gpr[0]!=(turn==0?3u:expected==UP_YIELD?1u:2u))up_fail("user operation");
+#else
+        c->gpr[0]!=(expected==UP_YIELD?1u:2u))up_fail("user operation");
+#endif
+#ifdef STYLEOS_TEST_USER_SYSCALL
+    if(turn==0 && (c->gpr[2]!=8u ||
+#ifdef STYLEOS_TEST_USER_SYSCALL_DENY
+       c->gpr[3]!=UP_DATA_B_VA))up_fail("772 CPL3 request registers");
+#else
+       c->gpr[3]!=UP_STACK_A_VA+UP_PAGE-16u))up_fail("772 CPL3 request registers");
+#endif
+#endif
 #else
     if(!point(entry,ev->kernel_sp,320) || (c->status&UINT64_C(0x3df))!=UINT64_C(0x3c0) ||
        c->cs || c->ss || c->gpr[19]!=(id?UINT64_C(0xb22c):UINT64_C(0xa11c)) || c->gpr[20]!=cookie || ev->vector!=8)up_fail("EL0 frame");
@@ -297,6 +310,27 @@ void up_demo_run(const struct boot_memory_evidence *e)
         if(!machine_same(&initial,&now) || dispatcher_cookie!=UP_DISPATCH_COOKIE ||
            current_sp()!=dispatcher_sp)up_fail("dispatcher return");
         validate_frame(turn,id,&slot->context,&event,&d->platform);
+#ifdef STYLEOS_TEST_USER_SYSCALL
+        if(turn==0){
+            extern unsigned uc772_observed_state(void);
+            extern uint64_t uc772_observed_cookie(void), uc772_observed_source(void);
+#ifdef STYLEOS_TEST_USER_SYSCALL_DENY
+            if(uc772_observed_state()!=2 || uc772_observed_cookie()!=0 ||
+               uc772_observed_source()!=UP_DATA_B_VA)up_fail("772 copied a foreign page");
+            arch_puts("STYLEOS UC772 HARDWARE DENIED foreign_user_page root=");
+#else
+            if(uc772_observed_state()!=1 ||
+               uc772_observed_cookie()!=UINT64_C(0xa11ce55a12345678) ||
+               uc772_observed_source()!=UP_STACK_A_VA+UP_PAGE-16u)
+                up_fail("772 CPL3 payload evidence");
+            arch_puts("STYLEOS UC772 HARDWARE COPIED pid=");
+            up_hex(observed_pid[0]);arch_puts(" root=");
+#endif
+            up_hex(event.active_root);arch_puts(" source=");
+            up_hex(uc772_observed_source());arch_puts(" len=0x0000000000000008");
+            arch_putc('\n');
+        }
+#endif
         frame_line(id,&slot->context,&event);
         for(unsigned n=0;n<UP_SLOTS;++n){named("DATA",n);up_field(" value=",private_data(n));arch_putc('\n');}
         arch_puts("STYLEOS USER SAFE");up_field(" root=",now.root);up_field(" sp=",current_sp());arch_putc('\n');
@@ -340,6 +374,9 @@ void up_demo_run(const struct boot_memory_evidence *e)
 #ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
     if(!nsh_finish(&observed_sessions))up_fail("session final");
     arch_puts("STYLEOS TEA770 PID ROOT SESSION WINDOW PASS\n");
+#endif
+#ifdef STYLEOS_TEST_USER_SYSCALL
+    arch_puts("STYLEOS UC772 KERNEL-TRAP COPY PROOF PASS\n");
 #endif
     machine_line("FINAL",&final);arch_puts("STYLEOS USER PASS\n");
 #ifdef STYLEOS_TEST_NATIVE_TEA

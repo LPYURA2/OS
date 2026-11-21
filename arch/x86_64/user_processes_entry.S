@@ -157,7 +157,18 @@ styleos_user_a_start:
     movabsq $0xa11ce55a12345678, %r12
     movq %r12, (%rsp)
     movq $0xa11c, %rbx
+#ifdef STYLEOS_TEST_USER_SYSCALL
+    /* Diagnostic INT80 only: RDX = CPL3 pointer, RCX = length. */
+#ifdef STYLEOS_TEST_USER_SYSCALL_DENY
+    movabsq $0x12010000, %rdx
+#else
+    movq %rsp, %rdx
+#endif
+    movq $8, %rcx
+    movq $3, %rax
+#else
     movq $1, %rax
+#endif
 .globl styleos_user_a_yield
 styleos_user_a_yield:
     int $0x80

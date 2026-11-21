@@ -36,9 +36,14 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, update_build=None, update_public_key=None, test_update_fail=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
     if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
         raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
+    if test_user_syscall_deny:
+        test_user_syscall = True
+    if test_user_syscall:
+        if arch != 'x86_64': raise ValueError('772 hardware syscall profile is x86-64 only')
+        test_user_processes = True
     if test_native_tea_session:
         test_native_tea_disk = True
     if test_native_tea_disk:
@@ -75,6 +80,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_user_processes:
         common += ['kernel/process_runtime.c', 'kernel/process_scheduler.c', 'kernel/user_processes.c', 'kernel/user_processes_demo.c',
                    f'arch/{arch}/user_processes.c', f'arch/{arch}/user_processes_entry.S']
+        if test_user_syscall:
+            common.append('kernel/user_copy_772.c')
         if test_native_tea_session:
             common += ['kernel/window_service.c', 'kernel/user_session_runtime.c',
                        'kernel/native_session_hw_770.c']
@@ -164,6 +171,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_TASKS=1')
     if test_user_processes:
         flags.append('-DSTYLEOS_TEST_USER_PROCESSES=1')
+    if test_user_syscall:
+        flags.append('-DSTYLEOS_TEST_USER_SYSCALL=1')
+    if test_user_syscall_deny:
+        flags.append('-DSTYLEOS_TEST_USER_SYSCALL_DENY=1')
     if test_native_tea_disk:
         flags.append('-DSTYLEOS_TEST_NATIVE_TEA_DISK=1')
     if test_native_tea_session:
@@ -331,6 +342,10 @@ def main():
                           help='Dedicated image only: two cooperative integer kernel tasks')
     negative.add_argument('--test-user-processes', action='store_true',
                           help='Dedicated image only: CPL3/EL0 fault containment experiment')
+    negative.add_argument('--test-user-syscall', action='store_true',
+                          help='772 x86 CPL3 hardware user-copy trap positive proof')
+    negative.add_argument('--test-user-syscall-deny', action='store_true',
+                          help='772 x86 CPL3 hardware foreign-page refusal proof')
     negative.add_argument('--test-native-tea-session', action='store_true',
                           help='Hardware test only: real disk .tea PID/root bound to isolated session/window')
     negative.add_argument('--test-native-tea-disk', action='store_true',
@@ -357,6 +372,8 @@ def main():
             parser.error('update builds must use a separate output folder')
     elif args.update_public_key or args.test_update_fail:
         parser.error('update key and test require --update-build')
+    if (args.test_user_syscall or args.test_user_syscall_deny) and args.arch != 'x86_64':
+        parser.error('772 syscall profile is x86-64 only')
     if args.test_native_tea_session and args.arch != 'x86_64':
         parser.error('--test-native-tea-session requires --arch x86_64')
     if args.test_native_tea_disk and args.arch != 'x86_64':
@@ -383,6 +400,8 @@ def main():
                'ownership' if args.test_ownership_plan else
                'ownership-invalid' if args.test_ownership_plan_invalid else
                'tasks' if args.test_tasks else
+               'user-syscall-deny' if args.test_user_syscall_deny else
+               'user-syscall' if args.test_user_syscall else
                'user-processes' if args.test_user_processes else
                'native-tea-session' if args.test_native_tea_session else
                'native-tea-disk' if args.test_native_tea_disk else
@@ -394,7 +413,7 @@ def main():
     if (args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
-            args.test_user_processes or args.test_native_tea or args.test_native_tea_disk or args.test_native_tea_session or args.test_storage or args.test_disk_app or
+            args.test_user_processes or args.test_user_syscall or args.test_user_syscall_deny or args.test_native_tea or args.test_native_tea_disk or args.test_native_tea_session or args.test_storage or args.test_disk_app or
             args.test_desktop_display or args.desktop_v0) and output == (ROOT / 'build').resolve():
         parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
@@ -408,6 +427,8 @@ def main():
                              args.test_user_processes, args.test_storage,
                              args.test_disk_app, **({'test_paging_roundtrip': True} if args.test_paging_roundtrip else {}),
                              **({'test_frame_grants': True} if args.test_frame_grants else {}),
+                             **({'test_user_syscall': True} if args.test_user_syscall else {}),
+                             **({'test_user_syscall_deny': True} if args.test_user_syscall_deny else {}),
                              **({'test_native_tea': True} if args.test_native_tea else {}),
                              **({'test_native_tea_disk': True} if args.test_native_tea_disk else {}),
                              **({'test_native_tea_session': True} if args.test_native_tea_session else {}),
@@ -427,6 +448,7 @@ def main():
                      'StyleOS 769 guest disk .tea CPL3 proof' if args.test_native_tea_disk else
                      'StyleOS 768 native .tea hardware proof' if args.test_native_tea else
                      'StyleOS T-P1.8A' if args.test_storage else
+                     'StyleOS 772 x86 CPL3 trap copy proof' if (args.test_user_syscall or args.test_user_syscall_deny) else
                      'StyleOS T-P1.7' if args.test_user_processes else 'StyleOS T-P1.6',
         **({'update_build': args.update_build, 'test_update_fail': args.test_update_fail}
            if args.update_build is not None else {}),
@@ -441,6 +463,8 @@ def main():
         'test_native_tea': args.test_native_tea or args.test_native_tea_disk,
         'test_native_tea_disk': args.test_native_tea_disk or args.test_native_tea_session,
         'test_native_tea_session': args.test_native_tea_session,
+        'test_user_syscall': args.test_user_syscall or args.test_user_syscall_deny,
+        'test_user_syscall_deny': args.test_user_syscall_deny,
         'test_ownership_plan': args.test_ownership_plan,
         'test_ownership_plan_invalid': args.test_ownership_plan_invalid,
         'test_tasks': args.test_tasks,

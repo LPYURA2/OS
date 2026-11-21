@@ -1,4 +1,7 @@
 #include "styleos/user_processes.h"
+#ifdef STYLEOS_TEST_USER_SYSCALL
+#include "styleos/user_copy_772.h"
+#endif
 #include "styleos/boot_pool.h"
 #include "styleos/exception.h"
 #include "styleos/arch.h"
@@ -572,6 +575,57 @@ struct x86_raw_frame {
 _Static_assert(sizeof(struct x86_raw_frame)==176,"full user hardware frame");
 _Static_assert(offsetof(struct x86_raw_frame,cs)==144,"rawCS offset");
 
+#ifdef STYLEOS_TEST_USER_SYSCALL
+/* Observable evidence is emitted only after a hardware-authenticated trap.
+ * No caller-supplied PID/root is accepted, and there is no user pointer
+ * dereference. The live page table is checked before BSS-backed copying. */
+static volatile uint64_t copied_cookie_772;
+static volatile uint64_t copied_source_772;
+static volatile unsigned copy_state_772;
+uint64_t uc772_observed_cookie(void) { return copied_cookie_772; }
+uint64_t uc772_observed_source(void) { return copied_source_772; }
+unsigned uc772_observed_state(void) { return copy_state_772; }
+
+static void trap_user_copy_772(const struct x86_raw_frame *f,uint64_t root)
+{
+    struct up_x86_control *s=XCONTROL;
+    if(s->running!=0u || f->vector!=128u || f->gpr[0]!=3u ||
+       copy_state_772 || !s->prepared || root!=s->selected_root ||
+       root!=(uint64_t)(uintptr_t)styleos_user_tables[UP_ROOT_A])
+        up_fail("772 untrusted trap origin");
+    const uint64_t source=f->gpr[3]; /* RDX saved on the real trap stack */
+    const uint64_t count=f->gpr[2]; /* RCX saved by hardware trap ASM */
+    copied_source_772=source;
+    size_t offset=UC772_PAGE;
+    const enum uc772_status plan=uc772_plan(root,s->selected_root,
+                                           UP_STACK_A_VA,source,(size_t)count,&offset);
+#ifdef STYLEOS_TEST_USER_SYSCALL_DENY
+    if(plan!=UC772_RANGE || offset!=UC772_PAGE ||
+       source!=UP_DATA_B_VA) up_fail("772 foreign pointer not refused");
+    copy_state_772=2u;
+#else
+    if(plan!=UC772_OK || offset!=UC772_PAGE-16u || count!=8u)
+        up_fail("772 user range");
+    struct own_mapping map={0};
+    struct up_platform *p=&styleos_user_control.demo.platform;
+    if(!own_walk(UP_ROOT_A,p->table_pages[UP_ROOT_A],source,&map) ||
+       map.pa!=(uint64_t)(uintptr_t)styleos_user_stack_a+offset ||
+       !map.user || !map.writable || map.executable)
+        up_fail("772 actual page table");
+    unsigned char staging[UC772_MAX_COPY];
+    for(unsigned i=0;i<sizeof(staging);++i)staging[i]=0;
+    if(uc772_copy_page(staging,sizeof(staging),styleos_user_stack_a,
+                       offset,(size_t)count)!=UC772_OK)
+        up_fail("772 copy denied");
+    uint64_t value=0;
+    for(unsigned i=0;i<8;++i)value|=(uint64_t)staging[i]<<(8u*i);
+    if(value!=UINT64_C(0xa11ce55a12345678))up_fail("772 copied value");
+    copied_cookie_772=value;
+    copy_state_772=1u;
+#endif
+}
+#endif
+
 void up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t root)
 {
     if((frame->cs&3u)!=3u){
@@ -591,6 +645,12 @@ void up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t root)
     s->context->cs=frame->cs;s->context->ss=frame->ss;
     enum up_kind kind=UP_EVENT_NONE;
     if(frame->vector==14u)kind=UP_FAULT;
+#ifdef STYLEOS_TEST_USER_SYSCALL
+    else if(frame->vector==128u && frame->gpr[0]==3u){
+        trap_user_copy_772(frame,root);
+        kind=UP_YIELD; /* cooperative dispatch, not a returning syscall */
+    }
+#endif
     else if(frame->vector==128u && frame->gpr[0]==1u)kind=UP_YIELD;
     else if(frame->vector==128u && frame->gpr[0]==2u)kind=UP_EXIT;
     else up_fail("x86-user-operation");
