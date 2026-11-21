@@ -694,7 +694,11 @@ static uint64_t trap_user_ipc_773(const struct x86_raw_frame *f,uint64_t root)
 }
 #endif
 
+#ifdef STYLEOS_TEST_USER_IPC_773
 uint64_t up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t root)
+#else
+void up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t root)
+#endif
 {
     if((frame->cs&3u)!=3u){
         if(frame->vector==14u)early_exception_x86(14u,frame->pc,1,frame->error,cr2);
@@ -733,7 +737,9 @@ uint64_t up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t roo
     else up_fail("x86-user-operation");
     *s->event=(struct up_event){kind,frame->vector,frame->error,
         frame->vector==14u?cr2:0u,root,raw};
+#ifdef STYLEOS_TEST_USER_IPC_773
     return 0u; /* terminal cooperative handoff to SAFE root */
+#endif
 }
 
 enum up_error up_arch_run(unsigned id,struct up_context *context,struct up_event *event)
