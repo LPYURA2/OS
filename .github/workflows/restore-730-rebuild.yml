@@ -37,6 +37,10 @@ jobs:
         run: |
           set -o pipefail
           python3 tools/test_730_shell_f10.py --iso build/recovery-730/StyleOS-730-Rebuild-Experimental.iso --output build/recovery-730/f10-qemu 2>&1 | tee build/recovery-730/f10.log
+      - name: Archive complete restored source from exact Git commit
+        if: always()
+        run: |
+          python3 tools/archive_source.py --output build/recovery-730/StyleOS-730-Rebuild-Full-Source.zip
       - name: Preserve exact build evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -47,6 +51,8 @@ jobs:
             build/recovery-730/StyleOS-730-Rebuild-Experimental.iso
             build/recovery-730/compiler/manifest.json
             build/recovery-730/SHA256SUMS.txt
+            build/recovery-730/StyleOS-730-Rebuild-Full-Source.zip
+            build/recovery-730/StyleOS-730-Rebuild-Full-Source.zip.sha256
             build/recovery-730/*.log
             build/recovery-730/f10-qemu/results.json
             build/recovery-730-host/host.log
