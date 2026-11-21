@@ -23,11 +23,12 @@ def run():
     if not cc:
         raise RuntimeError('clang required')
     source = str(ROOT / 'kernel' / 'desktop_sessions.c')
+    catalog_source = str(ROOT / 'kernel' / 'system_apps.c')
     tests = str(ROOT / 'tests' / 'test_desktop_sessions.c')
     headers = str(ROOT / 'include')
     exe = folder / 'desktop-sessions-host'
     host = [cc, '-std=c11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
-            '-I', headers, source, tests, '-o', str(exe)]
+            '-I', headers, source, catalog_source, tests, '-o', str(exe)]
     subprocess.run(host, check=True)
     result = subprocess.run([str(exe)], check=True, text=True, capture_output=True)
     (folder / 'host.log').write_text(result.stdout + result.stderr)

@@ -1,4 +1,5 @@
 #include <styleos/desktop_sessions.h>
+#include <styleos/system_apps.h>
 
 static struct desk_sessions runtime_sessions;
 
@@ -77,14 +78,22 @@ bool desk_sessions_notes_unsaved(const struct desk_sessions *s)
     return s && s->notes.dirty;
 }
 
+/* Historical five shell sessions are associated with the canonical native
+ * app IDs. They remain session records until actual .tea CPL3 loading. */
+static const char *const session_ids[DESK_SESSION_COUNT] = {
+    "org.styleos.explorer",
+    "org.styleos.editor",
+    "org.styleos.notes",
+    "org.styleos.documents",
+    "org.styleos.processes"
+};
+const char *desk_sessions_app_id(enum desk_session_kind kind)
+{
+    return (unsigned)kind < DESK_SESSION_COUNT ? session_ids[kind] : 0;
+}
 const char *desk_sessions_name(enum desk_session_kind kind)
 {
-    switch (kind) {
-    case DESK_SESSION_EXPLORER: return "Проводник";
-    case DESK_SESSION_EDITOR: return "Текстовый редактор";
-    case DESK_SESSION_NOTES: return "Заметки";
-    case DESK_SESSION_DOCUMENTS: return "Документы";
-    case DESK_SESSION_PROCESSES: return "Процессы";
-    default: return "Неизвестное приложение";
-    }
+    const struct styleos_system_app *app =
+        styleos_system_app_find(desk_sessions_app_id(kind));
+    return app ? app->display_name : "Неизвестное приложение";
 }

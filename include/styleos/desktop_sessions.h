@@ -53,6 +53,7 @@ uint32_t desk_sessions_pid(const struct desk_sessions *sessions, enum desk_sessi
 uint32_t desk_sessions_restart_shell(struct desk_sessions *sessions);
 bool desk_sessions_has_unsaved(const struct desk_sessions *sessions);
 bool desk_sessions_notes_unsaved(const struct desk_sessions *sessions);
+const char *desk_sessions_app_id(enum desk_session_kind kind);
 const char *desk_sessions_name(enum desk_session_kind kind);
 
 #endif

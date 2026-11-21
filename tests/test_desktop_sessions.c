@@ -19,6 +19,13 @@ static void basic(void)
     assert(desk_sessions_pid(s, DESK_SESSION_EDITOR) == edit);
     assert(desk_sessions_pid(s, DESK_SESSION_DOCUMENTS) == 0);
     assert(strcmp(desk_sessions_name(DESK_SESSION_DOCUMENTS), "Документы") == 0);
+    assert(strcmp(desk_sessions_app_id(DESK_SESSION_DOCUMENTS), "org.styleos.documents") == 0);
+    assert(strcmp(desk_sessions_app_id(DESK_SESSION_EXPLORER), "org.styleos.explorer") == 0);
+    assert(strcmp(desk_sessions_name(DESK_SESSION_NOTES), "Заметки") == 0);
+    assert(strcmp(desk_sessions_name(DESK_SESSION_EDITOR), "Текстовый редактор") == 0);
+    assert(strcmp(desk_sessions_name(DESK_SESSION_PROCESSES), "Процессы") == 0);
+    assert(desk_sessions_app_id(DESK_SESSION_COUNT) == NULL);
+    assert(strcmp(desk_sessions_name(DESK_SESSION_COUNT), "Неизвестное приложение") == 0);
     assert(desk_sessions_start(s, DESK_SESSION_COUNT) == 0);
     assert(!desk_sessions_stop(s, DESK_SESSION_COUNT));
     assert(desk_sessions_pid(NULL, DESK_SESSION_EDITOR) == 0);
