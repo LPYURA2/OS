@@ -2,9 +2,13 @@
 #include "styleos/boot_pool.h"
 #include "styleos/user_processes.h"
 #include "styleos/process_scheduler.h"
-#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+#if defined(STYLEOS_TEST_NATIVE_TEA_SESSION) || defined(STYLEOS_TEST_USER_IPC_773)
 #include "styleos/native_session_hw_770.h"
 static struct nsh_stage observed_sessions;
+#endif
+#ifdef STYLEOS_TEST_USER_IPC_773
+#include "styleos/user_ipc_773.h"
+struct ipc773_broker observed_ipc_773;
 #endif
 #ifdef STYLEOS_TEST_NATIVE_TEA
 #include "styleos/tea_768_demo.h"
@@ -252,8 +256,11 @@ void up_demo_run(const struct boot_memory_evidence *e)
     up_init(&d->control,d->platform.roots[UP_ROOT_SAFE]);
     pr_init(&observed_registry);
     pscheck(ps_init(&observed_scheduler,&observed_registry,d->platform.roots[UP_ROOT_SAFE]));
-#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+#if defined(STYLEOS_TEST_NATIVE_TEA_SESSION) || defined(STYLEOS_TEST_USER_IPC_773)
     if(!nsh_init(&observed_sessions,&observed_registry))up_fail("session initialize");
+#endif
+#ifdef STYLEOS_TEST_USER_IPC_773
+    if(!ipc773_start(&observed_ipc_773,&observed_sessions))up_fail("773 bridge init");
 #endif
     objects(e);tables(&d->platform);
     struct up_machine initial;check(up_arch_observe(&initial));
@@ -267,7 +274,7 @@ void up_demo_run(const struct boot_memory_evidence *e)
         pscheck(ps_register(&observed_scheduler,id,observed_handle[id],spec.root,
                             0,id?"EL0/CPL3 User B":"EL0/CPL3 User A",
                             &observed_pid[id]));
-#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+#if defined(STYLEOS_TEST_NATIVE_TEA_SESSION) || defined(STYLEOS_TEST_USER_IPC_773)
         if(!nsh_attach(&observed_sessions,id,observed_pid[id],
                        observed_handle[id],spec.root))up_fail("session attach");
 #endif
@@ -291,6 +298,11 @@ void up_demo_run(const struct boot_memory_evidence *e)
     if(!nsh_review(&observed_sessions))up_fail("session review");
     arch_puts("STYLEOS TEA770 SESSION REGISTERED real_pids=2 separated_roots=2 windows=2\n");
 #endif
+#endif
+#ifdef STYLEOS_TEST_USER_IPC_773
+    if(!nsh_review(&observed_sessions) || !ipc773_arm(&observed_ipc_773))
+        up_fail("773 window arm");
+    arch_puts("STYLEOS IPC773 WINDOW PORT ARMED\n");
 #endif
     for(unsigned turn=0;turn<4;++turn){
         unsigned chosen=UP_SLOTS;uint32_t pid=0;
@@ -331,6 +343,28 @@ void up_demo_run(const struct boot_memory_evidence *e)
             arch_putc('\n');
         }
 #endif
+#ifdef STYLEOS_TEST_USER_IPC_773
+        if(turn==0){
+            extern unsigned ipc773_denial_count(void);
+            const unsigned refused=ipc773_denial_count();
+#ifdef STYLEOS_TEST_USER_IPC_773_DENY
+            if(refused!=1u)up_fail("773 foreign reply not refused");
+#else
+            if(refused!=0u)up_fail("773 unexpected denied reply");
+#endif
+            if(observed_ipc_773.returns!=1u ||
+               nwc_port_count(&observed_ipc_773.channel)!=1 ||
+               !observed_ipc_773.channel.ports[0].window_id ||
+               observed_ipc_773.channel.ports[0].length!=0)
+                up_fail("773 returned window event");
+            arch_puts("STYLEOS IPC773 HARDWARE IRET COPY PASS pid=");
+            up_hex(observed_pid[0]);up_field(" root=",event.active_root);
+            up_field(" success=",observed_ipc_773.returns);
+            up_field(" denied=",refused);arch_putc('\n');
+            if(usr_select(&observed_sessions.users,observed_sessions.sid[1])!=USR_OK)
+                up_fail("773 restore selected session");
+        }
+#endif
         frame_line(id,&slot->context,&event);
         for(unsigned n=0;n<UP_SLOTS;++n){named("DATA",n);up_field(" value=",private_data(n));arch_putc('\n');}
         arch_puts("STYLEOS USER SAFE");up_field(" root=",now.root);up_field(" sp=",current_sp());arch_putc('\n');
@@ -339,10 +373,15 @@ void up_demo_run(const struct boot_memory_evidence *e)
                     event.kind==UP_EXIT?PS_EXIT:PS_FAULT;
         pscheck(ps_accept(&observed_scheduler,id,observed_handle[id],
                            event.active_root,now.root,observed));
-#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+#if defined(STYLEOS_TEST_NATIVE_TEA_SESSION) || defined(STYLEOS_TEST_USER_IPC_773)
         if(!nsh_on_event(&observed_sessions,id,observed))up_fail("session event");
         if(observed==PS_FAULT)arch_puts("STYLEOS TEA770 USER A FAULT WINDOW REAP PASS\n");
         if(observed==PS_EXIT)arch_puts("STYLEOS TEA770 USER B EXIT WINDOW REAP PASS\n");
+#endif
+#ifdef STYLEOS_TEST_USER_IPC_773
+        if((observed==PS_FAULT && nwc_reconcile(&observed_ipc_773.channel)!=1) ||
+           (observed==PS_EXIT && nwc_port_count(&observed_ipc_773.channel)!=0))
+            up_fail("773 orphan window port");
 #endif
         const enum pr_state expected=observed==PS_YIELD?PR_READY:
                       observed==PS_EXIT?PR_EXITED:PR_FAULTED;
@@ -371,12 +410,15 @@ void up_demo_run(const struct boot_memory_evidence *e)
        observed_scheduler.dispatches!=4)up_fail("scheduler completion");
     struct up_machine final;check(up_arch_observe(&final));
     if(!machine_same(&initial,&final) || dispatcher_cookie!=UP_DISPATCH_COOKIE)up_fail("kernel final check");
-#ifdef STYLEOS_TEST_NATIVE_TEA_SESSION
+#if defined(STYLEOS_TEST_NATIVE_TEA_SESSION) || defined(STYLEOS_TEST_USER_IPC_773)
     if(!nsh_finish(&observed_sessions))up_fail("session final");
     arch_puts("STYLEOS TEA770 PID ROOT SESSION WINDOW PASS\n");
 #endif
 #ifdef STYLEOS_TEST_USER_SYSCALL
     arch_puts("STYLEOS UC772 KERNEL-TRAP COPY PROOF PASS\n");
+#endif
+#ifdef STYLEOS_TEST_USER_IPC_773
+    arch_puts("STYLEOS IPC773 RETURNING CPL3 WINDOW IPC PASS\n");
 #endif
     machine_line("FINAL",&final);arch_puts("STYLEOS USER PASS\n");
 #ifdef STYLEOS_TEST_NATIVE_TEA

@@ -1,6 +1,9 @@
 #include "styleos/user_processes.h"
-#ifdef STYLEOS_TEST_USER_SYSCALL
+#if defined(STYLEOS_TEST_USER_SYSCALL) || defined(STYLEOS_TEST_USER_IPC_773)
 #include "styleos/user_copy_772.h"
+#endif
+#ifdef STYLEOS_TEST_USER_IPC_773
+#include "styleos/user_ipc_773.h"
 #endif
 #include "styleos/boot_pool.h"
 #include "styleos/exception.h"
@@ -260,7 +263,13 @@ struct up_x86_control {
     uint64_t safe_root,selected_root,running;
     uint64_t prepared,cr0,cr4,efer,pat;
     struct boot_range image;
+#ifdef STYLEOS_TEST_USER_IPC_773
+    uint64_t saved_user_frame;
+#endif
 };
+#ifdef STYLEOS_TEST_USER_IPC_773
+_Static_assert(offsetof(struct up_x86_control,saved_user_frame)==104,"ASM trap frame offset");
+#endif
 _Static_assert(offsetof(struct up_x86_control,safe_root)==24,"ASM safe root");
 _Static_assert(offsetof(struct up_x86_control,selected_root)==32,"ASM selected root");
 _Static_assert(sizeof(struct up_x86_control)<=UP_ARCH_CONTROL_BYTES,"arch scratch extent");
@@ -626,7 +635,66 @@ static void trap_user_copy_772(const struct x86_raw_frame *f,uint64_t root)
 }
 #endif
 
-void up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t root)
+#ifdef STYLEOS_TEST_USER_IPC_773
+extern struct ipc773_broker observed_ipc_773;
+static volatile unsigned ipc773_denials;
+unsigned ipc773_denial_count(void) { return ipc773_denials; }
+/* Only called after physical trap origin has been authenticated.
+ * All live PTEs and backing image bytes are validated before any write or
+ * queued event consumption. Caller cannot provide PID, root or kernel pointer. */
+static uint64_t trap_user_ipc_773(const struct x86_raw_frame *f,uint64_t root)
+{
+    struct up_x86_control *ctl=XCONTROL;
+    if(ctl->running!=0u || f->gpr[0]!=4u || f->vector!=128u ||
+       root!=(uint64_t)(uintptr_t)styleos_user_tables[UP_ROOT_A])
+        up_fail("773 trap identity");
+    const uint64_t reqva=f->gpr[3], replyva=f->gpr[2]; /* saved RDX and RCX */
+    size_t roff=UC772_PAGE, woff=UC772_PAGE;
+    enum uc772_status request_plan=uc772_plan(root,ctl->selected_root,
+                            UP_STACK_A_VA,reqva,sizeof(struct ipc773_request),&roff);
+    enum uc772_status reply_plan=uc772_plan(root,ctl->selected_root,
+                            UP_STACK_A_VA,replyva,sizeof(struct ipc773_reply),&woff);
+    if(request_plan!=UC772_OK || reply_plan!=UC772_OK ||
+       (roff<woff+sizeof(struct ipc773_reply) && woff<roff+sizeof(struct ipc773_request)) ||
+       roff>UC772_PAGE-sizeof(struct ipc773_request) ||
+       woff>UC772_PAGE-sizeof(struct ipc773_reply)){
+        ++ipc773_denials;
+        return IPC773_USER_DENIED;
+    }
+    struct own_mapping reqmap={0},replmap={0};
+    struct up_platform *platform=&styleos_user_control.demo.platform;
+    if(!own_walk(UP_ROOT_A,platform->table_pages[UP_ROOT_A],reqva,&reqmap) ||
+       !own_walk(UP_ROOT_A,platform->table_pages[UP_ROOT_A],replyva,&replmap) ||
+       reqmap.pa!=(uint64_t)(uintptr_t)styleos_user_stack_a+roff ||
+       replmap.pa!=(uint64_t)(uintptr_t)styleos_user_stack_a+woff ||
+       !reqmap.user || !reqmap.writable || reqmap.executable ||
+       !replmap.user || !replmap.writable || replmap.executable){
+        ++ipc773_denials;
+        return IPC773_USER_DENIED;
+    }
+    struct ipc773_request request={0};
+    if(uc772_copy_page(&request,sizeof(request),styleos_user_stack_a,
+                       roff,sizeof(request))!=UC772_OK){
+        ++ipc773_denials;return IPC773_USER_DENIED;
+    }
+    if(!ipc773_validate(&request,observed_ipc_773.stage->window[0])){
+        ++ipc773_denials;return IPC773_USER_DENIED;
+    }
+    struct ipc773_reply reply={0};
+    if(!ipc773_fetch(&observed_ipc_773,root,&request,&reply)){
+        ++ipc773_denials;return IPC773_USER_DENIED;
+    }
+    /* Checked kernel image backing page: no raw user pointer dereference.
+     * This is safe here only because the finite image-owned leaf is not
+     * reclaimable or concurrently mutable in the dedicated single CPU guest. */
+    unsigned char *out=styleos_user_stack_a+woff;
+    const unsigned char *in=(const unsigned char *)&reply;
+    for(size_t i=0;i<sizeof(reply);++i)out[i]=in[i];
+    return 0;
+}
+#endif
+
+uint64_t up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t root)
 {
     if((frame->cs&3u)!=3u){
         if(frame->vector==14u)early_exception_x86(14u,frame->pc,1,frame->error,cr2);
@@ -640,6 +708,15 @@ void up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t root)
        raw<top-UP_ENTRY_STACK_BYTES || raw>top-sizeof(*frame) || (raw&15u) ||
        frame->cs!=0x23u || frame->ss!=0x1bu || frame->status&(BIT(9)|BIT(10)|BIT(12)|BIT(13)))
         up_fail("x86-trap-origin");
+#ifdef STYLEOS_TEST_USER_IPC_773
+    if(frame->vector==128u && frame->gpr[0]==4u){
+        const uint64_t reply=trap_user_ipc_773(frame,root);
+        /* The kernel controls saved RAX and then assembly IRETQs to the
+         * same CPL3 context. No trusted dispatcher event is fabricated. */
+        ((struct x86_raw_frame *)(void *)frame)->gpr[0]=reply;
+        return 1u;
+    }
+#endif
     for(unsigned i=0;i<31;++i)s->context->gpr[i]=i<15u?frame->gpr[i]:0u;
     s->context->sp=frame->sp;s->context->pc=frame->pc;s->context->status=frame->status;
     s->context->cs=frame->cs;s->context->ss=frame->ss;
@@ -656,6 +733,7 @@ void up_x86_trap(const struct x86_raw_frame *frame,uint64_t cr2,uint64_t root)
     else up_fail("x86-user-operation");
     *s->event=(struct up_event){kind,frame->vector,frame->error,
         frame->vector==14u?cr2:0u,root,raw};
+    return 0u; /* terminal cooperative handoff to SAFE root */
 }
 
 enum up_error up_arch_run(unsigned id,struct up_context *context,struct up_event *event)

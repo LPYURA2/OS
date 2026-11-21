@@ -88,6 +88,9 @@ styleos_user_x86_trap_common:
     pushq %rax
     cld
     movq %rsp, %rcx
+#ifdef STYLEOS_TEST_USER_IPC_773
+    movq %rcx, styleos_user_control+12392(%rip)
+#endif
     movq %cr2, %rdx
     movq %cr3, %r8
     /* Both accepted user gates leave this frame16-aligned. Align again for
@@ -95,6 +98,32 @@ styleos_user_x86_trap_common:
     andq $-16, %rsp
     subq $32, %rsp
     call up_x86_trap
+#ifdef STYLEOS_TEST_USER_IPC_773
+    testq %rax,%rax
+    jz 773f
+    /* Privileged trap authenticated the user caller and wrote a staged
+     * return value to the saved raw hardware frame. Pop all original GPRs
+     * and IRETQ directly; CR3 remains the verified current user root. */
+    movq styleos_user_control+12392(%rip), %rsp
+    popq %rax
+    popq %rbx
+    popq %rcx
+    popq %rdx
+    popq %rsi
+    popq %rdi
+    popq %rbp
+    popq %r8
+    popq %r9
+    popq %r10
+    popq %r11
+    popq %r12
+    popq %r13
+    popq %r14
+    popq %r15
+    addq $16,%rsp
+    iretq
+773:
+#endif
     /* Discard the complete user entry stack and its context only after the
      * safe root is active. Never IRET to a faulted user's PC from this path. */
     movq styleos_user_control+12312(%rip), %rax
@@ -153,11 +182,61 @@ up_x86_descriptors_end:
 .globl styleos_user_a_start
 styleos_user_code_a:
 styleos_user_a_start:
+#ifdef STYLEOS_TEST_USER_IPC_773
+    subq $64, %rsp
+#else
     subq $16, %rsp
+#endif
     movabsq $0xa11ce55a12345678, %r12
+#ifndef STYLEOS_TEST_USER_IPC_773
     movq %r12, (%rsp)
+#endif
     movq $0xa11c, %rbx
-#ifdef STYLEOS_TEST_USER_SYSCALL
+#ifdef STYLEOS_TEST_USER_IPC_773
+    /* Two authenticated, returning IPC traps are performed only by this
+     * fixed image-owned CPL3 experiment. One event waits in a kernel port. */
+    movq %r12,48(%rsp)
+    movl $1,0(%rsp) /* version */
+    movl $1,4(%rsp) /* receive key */
+    movl $1,8(%rsp) /* first window ID is independently checked in kernel */
+    movl $16,12(%rsp)
+    movq $0,16(%rsp)
+    movq $0,24(%rsp)
+    leaq 0(%rsp),%rdx
+#ifdef STYLEOS_TEST_USER_IPC_773_DENY
+    movabsq $0x12010000,%rcx /* B foreign data page */
+#else
+    leaq 16(%rsp),%rcx
+#endif
+    movq $4,%rax
+    int $0x80
+#ifdef STYLEOS_TEST_USER_IPC_773_DENY
+    cmpq $2,%rax
+    jne 773f
+    cmpq $0,16(%rsp)
+    jne 773f
+    cmpq $0,24(%rsp)
+    jne 773f
+    leaq 16(%rsp),%rcx
+    movq $4,%rax
+    int $0x80
+#endif
+    testq %rax,%rax
+    jne 773f
+    movabsq $0x0000000100000000,%r8
+    cmpq %r8,16(%rsp)
+    jne 773f
+    movabsq $0x0000000100000773,%r8
+    cmpq %r8,24(%rsp)
+    jne 773f
+    addq $48,%rsp /* restore the original saved-cookie SP for old lifecycle */
+    movq $1,%rax
+    jmp 774f
+773:
+    movq $3,%rax
+    int $0x80 /* invalid operation must never be accepted */
+774:
+#elif defined(STYLEOS_TEST_USER_SYSCALL)
     /* Diagnostic INT80 only: RDX = CPL3 pointer, RCX = length. */
 #ifdef STYLEOS_TEST_USER_SYSCALL_DENY
     movabsq $0x12010000, %rdx
