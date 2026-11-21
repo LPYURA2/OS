@@ -674,7 +674,8 @@ def serial_frame_grants_ok(output, arch, site, map_file, ram_mib=128, el2=False)
         return False
     if any(a[0]<b[1] and b[0]<a[1] for i,a in enumerate(vals) for b in vals[:i]):
         return False
-    mmap=re.findall(rb'^STYLEOS MEMMAP (IMAGE|STACK|HANDOFF|SOURCE|RESERVED|CANDIDATE) (0x[0-9a-f]{16}) (0x[0-9a-f]{16})$',output,re.M)
+    mmap=[match.groups() for line in lines if (match:=re.fullmatch(
+        rb'STYLEOS MEMMAP (IMAGE|STACK|HANDOFF|SOURCE|RESERVED|CANDIDATE) (0x[0-9a-f]{16}) (0x[0-9a-f]{16})',line))]
     by={kind:[] for kind in [b'IMAGE',b'STACK',b'HANDOFF',b'SOURCE',b'RESERVED',b'CANDIDATE']}
     for kind,begin,end in mmap:
         by[kind].append((int(begin,16),int(end,16)))
