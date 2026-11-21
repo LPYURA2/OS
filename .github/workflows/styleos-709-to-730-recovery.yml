@@ -9,6 +9,7 @@ on:
       - feature/styleos-desktop-process-bootstrap-761
       - feature/styleos-owned-vm-stage-762
       - feature/styleos-cr3-roundtrip-763
+      - feature/styleos-owned-arena-admission-764
   workflow_dispatch:
 
 permissions:
@@ -147,6 +148,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_desktop_vm_stage.py --output build/recovery-canonical/desktop-vm-host 2>&1 | tee build/recovery-canonical/desktop-vm-host.log
 
+      - name: Prove exact image-backed x86 VM arena admission and no unsafe early writes
+        run: |
+          set -euo pipefail
+          python3 tools/test_desktop_vm_owner.py --output build/recovery-canonical/desktop-vm-owner-host 2>&1 | tee build/recovery-canonical/desktop-vm-owner-host.log
+
       - name: Verify real CPL3 and EL0 traps drive registry PIDs in QEMU
         run: |
           set -euo pipefail
@@ -205,6 +211,7 @@ jobs:
             build/recovery-canonical/process-api-host.log
             build/recovery-canonical/desktop-runtime-host.log
             build/recovery-canonical/desktop-vm-host.log
+            build/recovery-canonical/desktop-vm-owner-host.log
             build/recovery-canonical/cr3-roundtrip.log
             build/recovery-canonical/cr3-roundtrip/serial.log
             build/recovery-canonical/cr3-roundtrip/results.json
