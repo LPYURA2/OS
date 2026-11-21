@@ -1,6 +1,7 @@
 #include "styleos/arch.h"
 #include "styleos/boot_pool.h"
 #include "styleos/user_processes.h"
+#include "styleos/process_scheduler.h"
 
 _Alignas(4096) uint64_t styleos_user_tables[UP_ROOTS][UP_TABLE_PAGES][512];
 _Alignas(4096) union up_demo_control styleos_user_control;
@@ -9,6 +10,16 @@ _Alignas(4096) unsigned char styleos_user_stack_a[UP_PAGE],styleos_user_stack_b[
 _Alignas(4096) uint64_t styleos_user_data_a[UP_PAGE/8],styleos_user_data_b[UP_PAGE/8];
 _Static_assert(sizeof styleos_user_tables==393216,"complete table reserve");
 _Static_assert(sizeof styleos_user_control==UP_CONTROL_BYTES,"complete control");
+
+/* Test-image-only scheduler state, isolated from desktop/ordinary profiles.
+ * Entries come from actual prepared CPL3/EL0 contexts and verified traps. */
+static struct pr_table observed_registry;
+static struct ps_dispatcher observed_scheduler;
+static uint32_t observed_pid[UP_SLOTS];
+static uint64_t observed_handle[UP_SLOTS];
+static void pscheck(enum ps_status s)
+{ if (s != PS_OK) up_fail("process scheduler bridge"); }
+
 
 _Noreturn void up_fail(const char *why)
 {
@@ -205,6 +216,8 @@ void up_demo_run(const struct boot_memory_evidence *e)
     struct up_demo *d=&styleos_user_control.demo;*d=(struct up_demo){0};
     d->platform=local_platform;d->evidence=e;
     up_init(&d->control,d->platform.roots[UP_ROOT_SAFE]);
+    pr_init(&observed_registry);
+    pscheck(ps_init(&observed_scheduler,&observed_registry,d->platform.roots[UP_ROOT_SAFE]));
     objects(e);tables(&d->platform);
     struct up_machine initial;check(up_arch_observe(&initial));
     if(initial.root!=d->platform.roots[UP_ROOT_SAFE])up_fail("safe activation");
@@ -213,6 +226,10 @@ void up_demo_run(const struct boot_memory_evidence *e)
         struct up_spec spec={d->platform.roots[id+1],d->platform.entry[id],UP_CODE_VA,
                             id?UP_DATA_B_VA:UP_DATA_A_VA,stack_va(id)};
         unsigned created=UP_SLOTS;check(up_create(&d->control,&spec,&created));if(created!=id)up_fail("creation order");
+        observed_handle[id]=(uint64_t)(uintptr_t)&d->control.slots[id];
+        pscheck(ps_register(&observed_scheduler,id,observed_handle[id],spec.root,
+                            0,id?"EL0/CPL3 User B":"EL0/CPL3 User A",
+                            &observed_pid[id]));
 #if STYLEOS_EXPECT_ARCH == 1
         d->control.slots[id].context.status=2;d->control.slots[id].context.cs=0x23;d->control.slots[id].context.ss=0x1b;
 #else
@@ -222,8 +239,14 @@ void up_demo_run(const struct boot_memory_evidence *e)
     volatile uint64_t dispatcher_cookie=UP_DISPATCH_COOKIE;
     uint64_t dispatcher_sp=current_sp();
     if(!point(e->live.stack,(uintptr_t)&dispatcher_cookie,8) || !point(e->live.stack,dispatcher_sp,1))up_fail("dispatcher stack");
+    if(observed_pid[0]==0 || observed_pid[1]<=observed_pid[0] ||
+       pr_snapshot(&observed_registry,0,0,false)!=2)up_fail("PID admission");
     for(unsigned turn=0;turn<4;++turn){
+        unsigned chosen=UP_SLOTS;uint32_t pid=0;
+        pscheck(ps_next(&observed_scheduler,&chosen,&pid));
         unsigned id=UP_SLOTS;check(up_go(&d->control,&id));
+        if(chosen!=id || pid!=observed_pid[id] ||
+           pr_find(&observed_registry,pid)->state!=PR_RUNNING)up_fail("schedule selection");
         struct up_slot *slot=&d->control.slots[id];
         if(id!=(turn&1u))up_fail("dispatch order");
         if(turn==2 && slot->context.pc!=d->platform.resume_pc[0])up_fail("A continuation");
@@ -240,6 +263,15 @@ void up_demo_run(const struct boot_memory_evidence *e)
         for(unsigned n=0;n<UP_SLOTS;++n){named("DATA",n);up_field(" value=",private_data(n));arch_putc('\n');}
         arch_puts("STYLEOS USER SAFE");up_field(" root=",now.root);up_field(" sp=",current_sp());arch_putc('\n');
         check(up_accept(&d->control,event.kind,now.root));
+        const enum ps_event observed=event.kind==UP_YIELD?PS_YIELD:
+                    event.kind==UP_EXIT?PS_EXIT:PS_FAULT;
+        pscheck(ps_accept(&observed_scheduler,id,observed_handle[id],
+                           event.active_root,now.root,observed));
+        const enum pr_state expected=observed==PS_YIELD?PR_READY:
+                      observed==PS_EXIT?PR_EXITED:PR_FAULTED;
+        if(pr_find(&observed_registry,pid)->state!=expected ||
+           pr_snapshot(&observed_registry,0,0,false)!=(turn<2?2u:turn==2?1u:0u))
+           up_fail("registry event");
         if(turn==1){d->before_b=slot->context;d->b_before=private_data(1);}
         if(turn==2)arch_puts("STYLEOS USER TERMINATED id=A state=FAULTED\n");
     }
@@ -251,9 +283,15 @@ void up_demo_run(const struct boot_memory_evidence *e)
     arch_puts("STYLEOS USER EMPTY");up_field(" faulted=",1);up_field(" exited=",1);up_field(" dispatches=",4);arch_putc('\n');
     for(unsigned id=0;id<UP_SLOTS;++id){
         struct up_machine now;check(up_arch_observe(&now));
-        check(up_release(&d->control,id,now.root));named("RELEASE",id);arch_puts(" state=FREE");up_field(" root=",now.root);arch_putc('\n');
+        check(up_release(&d->control,id,now.root));
+        pscheck(ps_reap(&observed_scheduler,id,observed_handle[id]));
+        named("RELEASE",id);arch_puts(" state=FREE");up_field(" root=",now.root);arch_putc('\n');
     }
     if(up_go(&d->control,&unused)!=UP_EMPTY)up_fail("released context reused");
+    unsigned ignored=UP_SLOTS;uint32_t ignored_pid=0;
+    if(ps_next(&observed_scheduler,&ignored,&ignored_pid)!=PS_EMPTY ||
+       pr_snapshot(&observed_registry,0,0,false)!=0 ||
+       observed_scheduler.dispatches!=4)up_fail("scheduler completion");
     struct up_machine final;check(up_arch_observe(&final));
     if(!machine_same(&initial,&final) || dispatcher_cookie!=UP_DISPATCH_COOKIE)up_fail("kernel final check");
     machine_line("FINAL",&final);arch_puts("STYLEOS USER PASS\n");

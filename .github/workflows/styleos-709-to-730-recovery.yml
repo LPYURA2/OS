@@ -5,6 +5,7 @@ on:
     branches:
       - restore/styleos-709-to-730-canonical
       - feature/styleos-process-snapshot-api-759
+      - feature/styleos-process-runtime-760
   workflow_dispatch:
 
 permissions:
@@ -23,7 +24,7 @@ jobs:
       - name: Install x86 UEFI and QEMU/OVMF tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+          sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf
 
       - name: Compile native x86-64 EFI from checked-out source
         run: |
@@ -128,6 +129,16 @@ jobs:
           set -euo pipefail
           python3 tools/test_process_api.py --output build/recovery-canonical/process-api-host 2>&1 | tee build/recovery-canonical/process-api-host.log
 
+      - name: Verify bounded scheduler host state machine + two architecture builds
+        run: |
+          set -euo pipefail
+          python3 tools/test_process_scheduler.py --output build/recovery-canonical/scheduler-host 2>&1 | tee build/recovery-canonical/scheduler-host.log
+
+      - name: Verify real CPL3 and EL0 traps drive registry PIDs in QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_process_scheduler_guest.py --arch all --output build/recovery-canonical/scheduler-guest 2>&1 | tee build/recovery-canonical/scheduler-guest.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -174,6 +185,11 @@ jobs:
             build/recovery-canonical/inspector-host.log
             build/recovery-canonical/process-view-host.log
             build/recovery-canonical/process-api-host.log
+            build/recovery-canonical/scheduler-host.log
+            build/recovery-canonical/scheduler-guest.log
+            build/recovery-canonical/scheduler-guest/results.json
+            build/recovery-canonical/scheduler-guest/checks/logs/*.json
+            build/recovery-canonical/scheduler-guest/scheduler-*.log
             build/recovery-canonical/process-host.log
             build/recovery-canonical/window-host.log
             build/recovery-canonical/preinstall-host.log

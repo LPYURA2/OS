@@ -59,7 +59,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/tasks.c','kernel/tasks_demo.c',
                    f'arch/{arch}/tasks.c',f'arch/{arch}/tasks_context.S']
     if test_user_processes:
-        common += ['kernel/user_processes.c', 'kernel/user_processes_demo.c',
+        common += ['kernel/process_runtime.c', 'kernel/process_scheduler.c', 'kernel/user_processes.c', 'kernel/user_processes_demo.c',
                    f'arch/{arch}/user_processes.c', f'arch/{arch}/user_processes_entry.S']
     if test_storage:
         common += ['kernel/storage.c', 'kernel/storage_demo.c',
