@@ -72,6 +72,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_desktop_volume_io.py --output build/recovery-canonical/volume-host 2>&1 | tee build/recovery-canonical/volume-host.log
 
+      - name: Validate staged 20MiB cross-volume copy with ASAN and UBSAN
+        run: |
+          set -euo pipefail
+          python3 tools/test_stylefs_background_copy.py --output build/recovery-canonical/copy-host 2>&1 | tee build/recovery-canonical/copy-host.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -110,5 +115,6 @@ jobs:
             build/recovery-canonical/f5-qemu/results.json
             build/recovery-canonical/f5-qemu/qemu/*.ppm
             build/recovery-canonical/f5-host/result.json
+            build/recovery-canonical/copy-host/test.log
             build/recovery-canonical/notes-host/test.log
             build/recovery-canonical/host-check/logs/results.json
