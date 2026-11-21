@@ -299,9 +299,12 @@ static uint32_t ata_probe(struct ata_disk *d)
 
 static bool ata_start(struct ata_disk *d, uint32_t lba, uint8_t command)
 {
-    if (lba >= d->sectors || lba >= 0x10000000u || !ata_wait(d, false, false)) return false;
+    if (lba >= d->sectors || lba >= 0x10000000u) return false;
+    /* After probing a missing slave the bus can still report slave status.
+     * Select the intended device BEFORE polling its status. */
     out8(d->port + 6, (uint8_t)(0xe0 | (d->drive << 4) | (lba >> 24)));
     ata_delay(d);
+    if (!ata_wait(d, false, false)) return false;
     out8(d->port + 1, 0);
     out8(d->port + 2, 1);
     out8(d->port + 3, (uint8_t)lba);
