@@ -67,3 +67,6 @@ Desktop v0.7 в `feature/styleos-offline-update-v1` добавляет отде�
 
 Сборка 707 добавляет приём пакета обновления из Windows в запущенной
 StyleOS без перестановки VDI. [Настройка COM2, границы и тест](docs/test-results/live-update-import/README.md).
+
+Сборка 709 сохраняет новый рабочий стол независимо от состояния диска
+данных. [Причина, исправление и проверка](docs/test-results/stable-desktop-shell/README.md).

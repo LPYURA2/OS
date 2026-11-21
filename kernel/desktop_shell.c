@@ -33,6 +33,7 @@ static struct file_click {
 } last_file_click, current_file_click = {.id = -1};
 static bool second_file_click;
 static unsigned current_folder, doc_folder, input_flags;
+static uint32_t data_sectors;
 static int document = -1;
 static char content[DESK_STYLEFS_TEXT_LIMIT], incoming[DESK_STYLEFS_TEXT_LIMIT];
 static size_t length, caret;
@@ -47,16 +48,40 @@ static struct {
 } transfer = {.id = -1};
 
 static bool data_writable(void) { return filesystem.mode ? filesystem.disk.mounted : store.writable; }
+
+/* The updatable desktop has one visual identity. Media detection selects a
+ * storage backend, never an older skin. Keep old standalone profiles intact. */
+static bool modern_shell(void)
+{
+#ifdef STYLEOS_DESKTOP_UPDATE
+    return true;
+#else
+    return filesystem.mode;
+#endif
+}
+
+static const char *data_description(void)
+{
+#ifdef STYLEOS_DESKTOP_UPDATE
+    if (!data_sectors) return "Диск данных не обнаружен";
+    if (filesystem.disk.mounted) return filesystem.disk.format == 2 ? "Диск данных StyleFS v2" : "Диск данных StyleFS v1";
+    if (store.writable) return "Диск заметок старого формата";
+    return "Диск данных не распознан";
+#else
+    return data_writable() ? "Диск данных подключён" : "Нет диска данных для записи";
+#endif
+}
+
 static const char *app_name(int id)
 {
-    if (filesystem.mode && id == FILES) return "Проводник";
-    if (filesystem.mode && id == NOTES) return "Текстовый редактор";
+    if (modern_shell() && id == FILES) return "Проводник";
+    if (modern_shell() && id == NOTES) return "Текстовый редактор";
     return names[id];
 }
 static unsigned app_icon(int id)
 {
     static const uint8_t new_icons[] = {DESK_APP_EXPLORER, DESK_APP_EDITOR, DESK_APP_PROCESSES, DESK_INFO};
-    return filesystem.mode ? new_icons[id] : icons[id];
+    return modern_shell() ? new_icons[id] : icons[id];
 }
 
 static int max(int a, int b) { return a > b ? a : b; }
@@ -176,7 +201,7 @@ static void save(void)
     arch_puts("STYLEOS DESKTOP DOCUMENT SAVE\n");
 }
 
-static int text_top(void) { return filesystem.mode ? 128 : 96; }
+static int text_top(void) { return modern_shell() ? 128 : 96; }
 static int text_columns(struct desk_box b) { return max(1, (b.w - 42) / CELL); }
 static int text_rows(struct desk_box b) { return max(1, (b.h - text_top() - 28) / LINE); }
 static void advance(uint32_t cp, int cols, int *row, int *col)
@@ -321,7 +346,7 @@ static bool keyboard(unsigned key, unsigned mods)
     if (mods & DESK_CTRL) {
         if (key == 0x1f) save();
         else if (key == 0x31) new_document();
-        else if (key == 0x18 && filesystem.mode) open_window(FILES);
+        else if (key == 0x18 && modern_shell()) open_window(FILES);
         else return false;
     } else if (mods & DESK_ALT) return false;
     else if (key == 0x0e) replace(before(caret), caret, 0);
@@ -375,7 +400,7 @@ static const int menu_rows[] = {18, 62, 103, 163, 209};
 static struct desk_box shortcut_box(unsigned index)
 {
     struct desk_box a = desktop_shortcuts[index];
-    if (filesystem.mode) { a.x = 18; a.w = 112; }
+    if (modern_shell()) { a.x = 18; a.w = 112; }
     return a;
 }
 
@@ -415,7 +440,7 @@ static void take_visual(struct visual *v)
     for (unsigned i = 0; i < sizeof(desktop_shortcuts) / sizeof(*desktop_shortcuts); ++i)
         if (contains(shortcut_box(i), mx, my)) v->hot[0] = shortcut_box(i);
     if (!menu && contains(start_box(), mx, my)) v->hot[1] = start_box();
-    if (!filesystem.mode && v->top == FILES) {
+    if (!filesystem.mode && (!modern_shell() || store.writable) && v->top == FILES) {
         const struct desk_box b = win[FILES].box;
         int items[DESK_DOCS + 2];
         unsigned n = file_rows(items);
@@ -522,7 +547,7 @@ static void click(int x, int y)
             if (right < 42) {
                 if (id == NOTES && dirty) notice = "Перед закрытием сохраните текст";
                 else {
-                    if (id == NOTES && filesystem.mode) {
+                    if (id == NOTES && modern_shell()) {
                         document = -1;
                         length = caret = 0;
                         scroll = 0;
@@ -540,15 +565,15 @@ static void click(int x, int y)
             int item = desk_fs_click(&filesystem, b, x, y, protected_file_entry());
             if (item == DESK_FS_NEW_TEXT) new_document();
             else if (item >= 0) open_document((unsigned)item);
-        } else if (id == FILES && dy >= TITLE + 12 && dy < b.h - 25) {
+        } else if (id == FILES && (!modern_shell() || store.writable) && dy >= TITLE + 12 && dy < b.h - 25) {
             int items[DESK_DOCS + 2];
             unsigned count = file_rows(items), at = (unsigned)(dy - TITLE - 12) / ROW;
             if (at < count) pick_file(items[at]);
         } else if (id == NOTES) {
             if (dy >= 52 && dy < 83 && dx >= 12 && dx < 88) new_document();
-            else if (dy >= 52 && dy < 83 && filesystem.mode && dx >= 94 && dx < 192) open_window(FILES);
-            else if (dy >= 52 && dy < 83 && ((!filesystem.mode && dx >= 94 && dx < 195) ||
-                                                (filesystem.mode && dx >= 198 && dx < 304))) save();
+            else if (dy >= 52 && dy < 83 && modern_shell() && dx >= 94 && dx < 192) open_window(FILES);
+            else if (dy >= 52 && dy < 83 && ((!modern_shell() && dx >= 94 && dx < 195) ||
+                                                (modern_shell() && dx >= 198 && dx < 304))) save();
             else if (dy >= text_top() && dy < b.h - 29 && dx >= 18) {
                 caret = offset_at(scroll + (dy - text_top()) / LINE, (dx - 18) / CELL, text_columns(b));
                 edit_scroll();
@@ -567,14 +592,30 @@ static void accent(struct desk_box b)
     desk_fill(b.x + 2, b.y + 2, b.w - 4, 1, GOLD);
 }
 
+static void draw_without_data(struct desk_box b)
+{
+    int right = b.x + b.w - 16, side = min(b.w / 3, 222), left = b.x + side;
+    desk_text(b.x + 16, b.y + 53, right, "Мой компьютер", LIGHT);
+    desk_fill(b.x + 1, b.y + 83, b.w - 2, 1, STROKE);
+    desk_fill(left, b.y + 84, 1, b.h - 85, STROKE);
+    desk_text(b.x + 16, b.y + 95, left - 6, "Быстрый доступ", MUTED);
+    desk_text(b.x + 16, b.y + 129, left - 6, "Документы", 0x748297);
+    desk_text(b.x + 16, b.y + 160, left - 6, "Обновления", 0x748297);
+    desk_text(left + 15, b.y + 94, right, "Диски", LIGHT);
+    desk_icon(left + 15, b.y + 135, 29, DESK_DRIVE, GOLD);
+    desk_text(left + 56, b.y + 135, right, data_description(), LIGHT);
+    desk_text(left + 15, b.y + 172, right, "Проверьте диск StyleFS на вторичном IDE 0.", MUTED);
+    desk_text(left + 15, b.y + 200, right, "Носитель не форматировался.", MUTED);
+}
+
 static void draw_window(int id, int top)
 {
     struct desk_box b = win[id].box;
     desk_round(b, WINDOW);
     desk_outline(b, STROKE);
     if (id == top) accent(b);
-    if (filesystem.mode) desk_icon(b.x + 15, b.y + 9, 24, app_icon(id), LIGHT);
-    desk_text(b.x + (filesystem.mode ? 47 : 16), b.y + 11, b.x + b.w - 128, app_name(id), LIGHT);
+    if (modern_shell()) desk_icon(b.x + 15, b.y + 9, 24, app_icon(id), LIGHT);
+    desk_text(b.x + (modern_shell() ? 47 : 16), b.y + 11, b.x + b.w - 128, app_name(id), LIGHT);
     int r = b.x + b.w, y = b.y + 19;
     desk_fill(b.x + 8, b.y + TITLE, b.w - 16, 1, STROKE);
     desk_fill(r - 115, y + 4, 13, 2, LIGHT);
@@ -585,7 +626,8 @@ static void draw_window(int id, int top)
     desk_line(r - 31, y - 3, r - 20, y + 8, LIGHT);
     desk_line(r - 20, y - 3, r - 31, y + 8, LIGHT);
 
-    if (id == FILES && filesystem.mode) desk_fs_draw(&filesystem, b);
+    if (id == FILES && modern_shell() && !data_writable()) draw_without_data(b);
+    else if (id == FILES && filesystem.mode) desk_fs_draw(&filesystem, b);
     else if (id == FILES) {
         int items[DESK_DOCS + 2];
         unsigned count = file_rows(items);
@@ -601,11 +643,12 @@ static void draw_window(int id, int top)
         }
         int foot = b.y + b.h - 24;
         if (!store.writable) desk_text(b.x + 18, foot, r - 10, "Диск данных не доступен для записи", MUTED);
+        else if (modern_shell()) desk_text(b.x + 18, foot, r - 10, "Старый диск заметок. Обновления недоступны.", MUTED);
         else if (current_folder != DESK_ROOT) desk_text(b.x + 18, foot, r - 10, folders[current_folder], MUTED);
     } else if (id == NOTES) {
         desk_round((struct desk_box){b.x + 12, b.y + 52, 76, 31}, 0x253143);
         desk_text(b.x + 22, b.y + 58, b.x + 84, "Новый", LIGHT);
-        if (filesystem.mode) {
+        if (modern_shell()) {
             desk_round((struct desk_box){b.x + 94, b.y + 52, 98, 31}, 0x253143);
             desk_text(b.x + 103, b.y + 58, b.x + 191, "Открыть", LIGHT);
             desk_round((struct desk_box){b.x + 198, b.y + 52, 106, 31}, 0x4e3c2a);
@@ -618,7 +661,7 @@ static void draw_window(int id, int top)
             sfs_entry_at(&filesystem.disk, (unsigned)document) : 0;
         const char *label = filesystem.mode ? (entry ? entry->name : "Без имени") :
                                               (document < 0 ? "Без имени" : files[document]);
-        if (filesystem.mode) {
+        if (modern_shell()) {
             desk_fill(b.x + 10, b.y + 89, b.w - 20, 1, STROKE);
             desk_round((struct desk_box){b.x + 12, b.y + 94, 236, 29}, 0x4e3c2a);
             int end = desk_text(b.x + 22, b.y + 98, b.x + 229, label, LIGHT);
@@ -643,16 +686,16 @@ static void draw_window(int id, int top)
             if (tr >= scroll && tr < scroll + nrows)
                 desk_fill(b.x + 18 + tc * CELL, b.y + text_top() + 2 + (tr - scroll) * LINE, 1, 17, GOLD);
         }
-        if (filesystem.mode) {
+        if (modern_shell()) {
             desk_fill(b.x + 10, b.y + b.h - 27, b.w - 20, 1, STROKE);
             desk_text(r - 65, b.y + b.h - 23, r - 9, "UTF-8", MUTED);
         }
-        desk_text(b.x + 14, b.y + b.h - 24, r - (filesystem.mode ? 77 : 12), notice, MUTED);
+        desk_text(b.x + 14, b.y + b.h - 24, r - (modern_shell() ? 77 : 12), notice, MUTED);
     } else if (id == TASKS) {
         desk_text(b.x + 18, b.y + 55, r - 15, "Открытые окна оболочки", GOLD);
         unsigned row = 0;
         for (int i = 0; i < WINDOWS; ++i) if (win[i].open) {
-            int blank = filesystem.mode ? 267 : 171;
+            int blank = modern_shell() ? 267 : 171;
             desk_text(b.x + 18, b.y + 86 + (int)row * 25, b.x + blank - 8, app_name(i), LIGHT);
             desk_text(b.x + blank, b.y + 86 + (int)row++ * 25, r - 15,
                       win[i].minimized ? "Свёрнуто" : "Открыто", MUTED);
@@ -667,7 +710,7 @@ static void draw_window(int id, int top)
         desk_text(b.x + 18, b.y + 90, r - 15, "x86-64 UEFI", MUTED);
         desk_text(b.x + 18, b.y + 120, r - 15, (input_flags & 1) ? "Клавиатура PS/2 готова" : "Нет клавиатуры PS/2", MUTED);
         desk_text(b.x + 18, b.y + 149, r - 15, (input_flags & 2) ? "Мышь PS/2 готова" : "Нет мыши PS/2", MUTED);
-        desk_text(b.x + 18, b.y + 178, r - 15, data_writable() ? "Диск данных подключён" : "Нет диска данных для записи", MUTED);
+        desk_text(b.x + 18, b.y + 178, r - 15, data_description(), MUTED);
 #ifdef STYLEOS_DESKTOP_UPDATE
         desk_text(b.x + 18, b.y + 207, r - 15, desk_update_status(), LIGHT);
 #endif
@@ -681,10 +724,10 @@ static void draw(void)
         struct desk_box b = shortcut_box(i);
         if (!desk_clip_visible(b)) continue;
         if (contains(b, mx, my)) desk_round(b, 0x2b374b);
-        desk_icon(b.x + (filesystem.mode ? 27 : 15), b.y + 3, 50,
+        desk_icon(b.x + (modern_shell() ? 27 : 15), b.y + 3, 50,
                   i == 2 ? DESK_FOLDER : app_icon((int)i), i == 2 ? FOLDER : LIGHT);
         const char *label = i == 2 ? folders[DESK_PROJECTS] :
-                            i == 1 && filesystem.mode ? "Редактор" : app_name((int)i);
+                            i == 1 && modern_shell() ? "Редактор" : app_name((int)i);
         desk_text(b.x + 9, b.y + 57, b.x + b.w, label, LIGHT);
     }
     int top = active();
@@ -704,7 +747,7 @@ static void draw(void)
         if (i == top) accent(b);
         desk_icon(b.x + 12, b.y + 12, 23, app_icon(i), LIGHT);
         desk_text(b.x + 45, b.y + 14, b.x + b.w - 3,
-                  filesystem.mode && i == NOTES ? "Редактор" : app_name(i), LIGHT);
+                  modern_shell() && i == NOTES ? "Редактор" : app_name(i), LIGHT);
     }
     struct desk_box lang = language_box();
     desk_round(lang, contains(lang, mx, my) ? 0x34455e : 0x202c40);
@@ -813,7 +856,7 @@ static void initial_windows(void)
     win[NOTES].box = (struct desk_box){width * 405 / 1536, h * 175 / 804, width * 900 / 1536, h * 488 / 804};
     win[TASKS].box = (struct desk_box){width / 3, h / 6, min(width / 2, 510), min(h * 4 / 5, 316)};
     win[ABOUT].box = (struct desk_box){width / 3, h / 5, min(width / 2, 490), min(h * 4 / 5, 238)};
-    if (filesystem.mode) {
+    if (modern_shell()) {
         int x = width * 182 / 1536, y = h * 54 / 804;
         win[FILES].box = (struct desk_box){x, y, width - x - 46, h - y - 49};
         win[NOTES].box = (struct desk_box){x + 24, y + 27, width - x - 76, h - y - 75};
@@ -845,9 +888,14 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     mx = width / 2;
     my = height * 3 / 4;
     desk_draw_init(surface);
-    uint32_t sectors = desk_ata_probe();
-    desk_fs_mount(&filesystem, sectors);
-    if (sectors == 4096) desk_store_mount(&store);
+    data_sectors = desk_ata_probe();
+    desk_fs_mount(&filesystem, data_sectors);
+    if (data_sectors == 4096) desk_store_mount(&store);
+#ifdef STYLEOS_DESKTOP_UPDATE
+    arch_puts(!data_sectors ? "STYLEOS DESKTOP DATA ABSENT\n" :
+              filesystem.disk.mounted ? "STYLEOS DESKTOP DATA STYLEFS\n" :
+              store.writable ? "STYLEOS DESKTOP DATA LEGACY\n" : "STYLEOS DESKTOP DATA UNRECOGNIZED\n");
+#endif
     arch_puts(data_writable() ? "STYLEOS DESKTOP DATA MOUNT\n" : "STYLEOS DESKTOP DATA UNAVAILABLE\n");
     input_flags = desk_input_init();
     desk_pointer_clock_init();

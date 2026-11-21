@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "checks": [
+    "same 707 EFI has different desktop icons with and without the data disk",
+    "709 shortcuts and Explorer title pixels match the accepted modern 707 UI on all four storage states",
+    "no data, legacy notes, unsupported volume, and healthy StyleFS are distinct",
+    "old notes backend writes and reopens in the same modern appearance",
+    "untouched StyleFS and rejected disk are byte-identical"
+  ]
+}
