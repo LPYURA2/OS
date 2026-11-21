@@ -40,6 +40,9 @@ def main():
         denied(lambda:inspect(path))
     forged('traversal',name='../app.elf')
     forged('altered',data=exe+b'X')
+    trailing=out/'trailing.tea'
+    trailing.write_bytes(native.read_bytes()+b'junk')
+    denied(lambda:inspect(trailing))
     m=json.loads(metadata);m['permissions']=['disk.all']
     forged('rights',m=json.dumps(m))
     m=json.loads(metadata);m['architecture']='aarch64'

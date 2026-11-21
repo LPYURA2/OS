@@ -54,7 +54,19 @@ def validate_manifest(m):
     return arch
 
 def inspect(path):
-    if Path(path).suffix!='.tea':raise TeaError('native format is .tea only')
+    path = Path(path)
+    if path.suffix != '.tea':
+        raise TeaError('native format is .tea only')
+    # A native package is a canonical, comment-free ZIP. Python's ZipFile
+    # normally accepts arbitrary bytes appended after the final directory,
+    # which would make archive identity ambiguous for installers/signatures.
+    if path.stat().st_size < 22:
+        raise TeaError('truncated ZIP')
+    with path.open('rb') as raw:
+        raw.seek(-22, 2)
+        trailer = raw.read(22)
+    if trailer[:4] != b'PK\x05\x06' or trailer[-2:] != b'\x00\x00':
+        raise TeaError('noncanonical ZIP trailer or appended data')
     with zipfile.ZipFile(path) as z:
         entries=z.infolist()
         if len(entries)!=2 or len({e.filename for e in entries})!=2:
