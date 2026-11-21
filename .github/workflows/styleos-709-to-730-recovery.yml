@@ -97,6 +97,16 @@ jobs:
           set -euo pipefail
           python3 tools/test_preinstall_tea.py --output build/recovery-canonical/preinstall-host 2>&1 | tee build/recovery-canonical/preinstall-host.log
 
+      - name: Verify process registry lifecycle and provenance
+        run: |
+          set -euo pipefail
+          python3 tools/test_process_runtime.py --output build/recovery-canonical/process-host 2>&1 | tee build/recovery-canonical/process-host.log
+
+      - name: Verify process-owned windows and approved system dialogs
+        run: |
+          set -euo pipefail
+          python3 tools/test_window_service.py --output build/recovery-canonical/window-host 2>&1 | tee build/recovery-canonical/window-host.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -138,6 +148,8 @@ jobs:
             build/recovery-canonical/copy-host/test.log
             build/recovery-canonical/notes-host/test.log
             build/recovery-canonical/text-app-host.log
+            build/recovery-canonical/process-host.log
+            build/recovery-canonical/window-host.log
             build/recovery-canonical/preinstall-host.log
             build/recovery-canonical/preinstall-host/result.json
             build/recovery-canonical/tea-host.log
