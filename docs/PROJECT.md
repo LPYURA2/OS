@@ -1,3 +1,13 @@
+## StyleOS 772 — isolated x86 CPL3 kernel user-copy boundary
+
+Task branch: `feature/styleos-cpl3-user-copy-772`. Base accepted: 771 (`96834d3b`).
+Two dedicated QEMU profiles exercise actual CPL3 INT80 trap copying a private
+user stack word into trusted image memory and refusal of a foreign B page.
+The normal Desktop stays unchanged, including its zero-port window channel.
+The new copy-only trap is **not yet production syscalls or `.tea` IPC/rendering**.
+See [`CPL3_USER_COPY_BOUNDARY_772.md`](architecture/CPL3_USER_COPY_BOUNDARY_772.md)
+and [`NEXT_CHAT_772.md`](NEXT_CHAT_772.md). Confirm final CI before acceptance.
+
 ## 771 — kernel-owned канал будущих окон `.tea` (21 ноября 2026)
 
 В ветке `feature/styleos-desktop-window-ipc-771` добавлена в обычную загрузку

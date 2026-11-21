@@ -17,6 +17,7 @@ on:
       - feature/styleos-guest-disk-tea-cpl3-769
       - feature/styleos-real-pid-user-session-window-770
       - feature/styleos-desktop-window-ipc-771
+      - feature/styleos-cpl3-user-copy-772
   workflow_dispatch:
 
 permissions:
@@ -225,6 +226,16 @@ jobs:
           set -euo pipefail
           python3 tools/test_native_tea_770_guest.py --output build/recovery-canonical/native-session-770-qemu 2>&1 | tee build/recovery-canonical/native-session-770-qemu.log
 
+      - name: Verify bounded kernel user copy, output-on-error invariants and x86 COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_user_copy_772.py --output build/recovery-canonical/user-copy-772-host 2>&1 | tee build/recovery-canonical/user-copy-772-host.log
+
+      - name: Hardware prove x86 CPL3 INT80 copied user stack and denied foreign page
+        run: |
+          set -euo pipefail
+          python3 tools/test_user_syscall_772_guest.py --output build/recovery-canonical/user-copy-772-qemu 2>&1 | tee build/recovery-canonical/user-copy-772-qemu.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -275,6 +286,14 @@ jobs:
             build/recovery-canonical/user-session-host.log
             build/recovery-canonical/window-ipc-host.log
             build/recovery-canonical/window-ipc-host/test.log
+            build/recovery-canonical/user-copy-772-host.log
+            build/recovery-canonical/user-copy-772-host/test.log
+            build/recovery-canonical/user-copy-772-qemu.log
+            build/recovery-canonical/user-copy-772-qemu/results.json
+            build/recovery-canonical/user-copy-772-qemu/*/qemu/UART.log
+            build/recovery-canonical/user-copy-772-qemu/*/qemu/QEMU.log
+            build/recovery-canonical/user-copy-772-qemu/*-build.log
+            build/recovery-canonical/user-copy-772-qemu/*/compiled/x86_64/BOOTX64.EFI
             build/recovery-canonical/native-launch-host.log
             build/recovery-canonical/native-tea-host.log
             build/recovery-canonical/native-tea-host/test.log
