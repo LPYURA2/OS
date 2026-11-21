@@ -1,0 +1,85 @@
+#include <styleos/native_tea_package.h>
+#include <styleos/native_tea_elf.h>
+
+static uint16_t l16(const uint8_t *x){return (uint16_t)x[0]|((uint16_t)x[1]<<8);}
+static uint32_t l32(const uint8_t *x){return (uint32_t)l16(x)|((uint32_t)l16(x+2)<<16);}
+static int eq(const uint8_t *a,const uint8_t *b,size_t n)
+{ unsigned diff=0;for(size_t i=0;i<n;++i)diff|=a[i]^b[i];return !diff; }
+static int same_name(const uint8_t *a,size_t n,const char *s)
+{ size_t i=0;while(s[i])++i;return n==i && eq(a,(const uint8_t*)s,n); }
+static uint32_t crc(const uint8_t *p,size_t n)
+{
+    uint32_t v=~UINT32_C(0);
+    for(size_t i=0;i<n;++i){v^=p[i];for(unsigned k=0;k<8;++k)
+        v=(v>>1)^(UINT32_C(0xedb88320)&(0u-(v&1u)));}
+    return ~v;
+}
+struct member {const uint8_t *data;size_t size;size_t start,end;};
+static enum ntp_status parse_member(const uint8_t *p,size_t n,size_t *index,
+                                    const char *expected,struct member *out)
+{
+    size_t o=*index;
+    if(o>n || n-o<46 || l32(p+o)!=UINT32_C(0x02014b50))return NTP_FORMAT;
+    const uint8_t *c=p+o;
+    const uint32_t packed=l32(c+20),unpacked=l32(c+24),local=l32(c+42);
+    const size_t name=l16(c+28),extra=l16(c+30),comment=l16(c+32);
+    if(l16(c+8) || l16(c+10) || (l16(c+6)&8u) || l16(c+34) ||
+       packed!=unpacked || !name || extra || comment ||
+       (l32(c+38)&0xffffu) || name>n-o-46 ||
+       !same_name(c+46,name,expected)) return NTP_FORMAT;
+    o+=46+name;
+    if(local>n || n-local<30 || l32(p+local)!=UINT32_C(0x04034b50))return NTP_FORMAT;
+    const uint8_t *h=p+local;
+    const size_t localname=l16(h+26),localextra=l16(h+28);
+    if(l16(h+6) || l16(h+8) || localextra || localname!=name ||
+       l32(h+14)!=l32(c+16) || l32(h+18)!=packed || l32(h+22)!=unpacked ||
+       30+localname>n-local || !eq(h+30,c+46,name))return NTP_FORMAT;
+    size_t payload=local+30+localname;
+    if(payload>n || packed>n-payload) return NTP_BOUNDS;
+    if(crc(p+payload,packed)!=l32(c+16))return NTP_FORMAT;
+    *index=o;
+    *out=(struct member){p+payload,packed,local,payload+packed};
+    return NTP_OK;
+}
+
+enum ntp_status ntp_open(const uint8_t *p,size_t n,const uint8_t pkg_sha[32],
+                         const uint8_t elf_sha[32],const uint8_t *manifest,
+                         size_t manifest_bytes,struct ntp_payload *out)
+{
+    if(!p || !pkg_sha || !elf_sha || !manifest || !manifest_bytes || !out)
+        return NTP_ARGUMENT;
+    if(n<22 || n>NTP_MAX_PACKAGE) return NTP_BOUNDS;
+    uint8_t digest[32];nte_sha256(p,n,digest);
+    if(!eq(digest,pkg_sha,32))return NTP_HASH;
+    size_t end=n-22;
+    const uint8_t *e=p+end;
+    if(l32(e)!=UINT32_C(0x06054b50) || l16(e+4) || l16(e+6) ||
+       l16(e+8)!=2 || l16(e+10)!=2 || l16(e+20))return NTP_FORMAT;
+    size_t dir=l32(e+16),dirbytes=l32(e+12);
+    if(dir>n || dirbytes>n-dir || dir+dirbytes!=end) return NTP_BOUNDS;
+    size_t it=dir;
+    struct member a,b;
+    enum ntp_status rc=parse_member(p,n,&it,"manifest.json",&a);
+    if(rc!=NTP_OK)return rc;
+    rc=parse_member(p,n,&it,"bin/x86_64/app.elf",&b);
+    if(rc!=NTP_OK)return rc;
+    if(it!=end || a.start!=0 || a.end!=b.start || b.end!=dir ||
+       a.size!=manifest_bytes || !eq(a.data,manifest,manifest_bytes))return NTP_FORMAT;
+    nte_sha256(b.data,b.size,digest);
+    if(!eq(digest,elf_sha,32))return NTP_HASH;
+    *out=(struct ntp_payload){b.data,b.size};
+    return NTP_OK;
+}
+
+enum ntp_status ntp_disk_header(const uint8_t h[NTP_SECTOR_BYTES],
+                                const uint8_t expected[32],uint32_t *n)
+{
+    if(!h || !expected || !n)return NTP_ARGUMENT;
+    static const uint8_t magic[8]={'S','T','E','A','7','6','9',0};
+    if(!eq(h,magic,8) || l32(h+8)!=1)return NTP_FORMAT;
+    const uint32_t bytes=l32(h+12);
+    if(bytes<22 || bytes>NTP_MAX_PACKAGE)return NTP_BOUNDS;
+    if(!eq(h+16,expected,32))return NTP_HASH;
+    for(size_t j=48;j<NTP_SECTOR_BYTES;++j)if(h[j])return NTP_FORMAT;
+    *n=bytes;return NTP_OK;
+}

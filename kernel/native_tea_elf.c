@@ -41,7 +41,7 @@ static void sha_block(uint32_t h[8],const uint8_t p[64])
     }
     h[0]+=a;h[1]+=b;h[2]+=c;h[3]+=d;h[4]+=e;h[5]+=f;h[6]+=g;h[7]+=hh;
 }
-static void sha256(const uint8_t *input,size_t bytes,uint8_t out[32])
+void nte_sha256(const uint8_t *input,size_t bytes,uint8_t out[32])
 {
     uint32_t h[8]={0x6a09e667u,0xbb67ae85u,0x3c6ef372u,0xa54ff53au,
                    0x510e527fu,0x9b05688cu,0x1f83d9abu,0x5be0cd19u};
@@ -88,7 +88,7 @@ enum nte_status nte_load_x64_page(const uint8_t *elf,size_t elf_bytes,
         return NTE_RIGHTS;
     if(offset>elf_bytes || filesz>elf_bytes-offset ||
        (offset&(NTE_PAGE-1u)) || memsz>UINT32_MAX) return NTE_BOUNDS;
-    uint8_t actual[32];sha256(elf,elf_bytes,actual);
+    uint8_t actual[32];nte_sha256(elf,elf_bytes,actual);
     unsigned difference=0;
     for(unsigned j=0;j<32;j++)difference|=actual[j]^hash[j];
     if(difference)return NTE_HASH;

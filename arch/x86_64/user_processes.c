@@ -301,6 +301,10 @@ static int admit_new_objects(struct observation *o)
         object(styleos_user_x86_idt,UP_PAGE)
 #ifdef STYLEOS_TEST_NATIVE_TEA
         ,object(styleos_tea_768_code_b,NTE_PAGE)
+#ifdef STYLEOS_TEST_NATIVE_TEA_DISK
+        ,object(styleos_tea_769_package,NTP_MAX_PACKAGE)
+        ,object(styleos_tea_769_sector,NTE_PAGE)
+#endif
 #endif
     };
     const struct boot_memory_evidence *e=o->evidence;

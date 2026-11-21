@@ -91,6 +91,10 @@ static void admit_common(const struct boot_memory_evidence *e)
         extent(styleos_user_code_a,UP_PAGE),extent(styleos_user_code_b,UP_PAGE)
 #ifdef STYLEOS_TEST_NATIVE_TEA
         ,extent(styleos_tea_768_code_b,NTE_PAGE)
+#ifdef STYLEOS_TEST_NATIVE_TEA_DISK
+        ,extent(styleos_tea_769_package,NTP_MAX_PACKAGE)
+        ,extent(styleos_tea_769_sector,NTE_PAGE)
+#endif
 #endif
     };
     const struct boot_range excluded[]={e->live.stack,e->live.handoff,e->live.source,
@@ -117,6 +121,10 @@ static void objects(const struct boot_memory_evidence *e)
     up_range_line("OBJECT name=code_b",extent(styleos_user_code_b,UP_PAGE));
 #ifdef STYLEOS_TEST_NATIVE_TEA
     up_range_line("OBJECT name=tea_code_b",extent(styleos_tea_768_code_b,NTE_PAGE));
+#ifdef STYLEOS_TEST_NATIVE_TEA_DISK
+    up_range_line("OBJECT name=tea_disk_buffer",extent(styleos_tea_769_package,NTP_MAX_PACKAGE));
+    up_range_line("OBJECT name=tea_sector_buffer",extent(styleos_tea_769_sector,NTE_PAGE));
+#endif
 #endif
     up_range_line("OBJECT name=stack",e->live.stack);
     up_range_line("OBJECT name=diagnostic",e->workspace);
@@ -311,6 +319,10 @@ void up_demo_run(const struct boot_memory_evidence *e)
     if(!machine_same(&initial,&final) || dispatcher_cookie!=UP_DISPATCH_COOKIE)up_fail("kernel final check");
     machine_line("FINAL",&final);arch_puts("STYLEOS USER PASS\n");
 #ifdef STYLEOS_TEST_NATIVE_TEA
+#ifdef STYLEOS_TEST_NATIVE_TEA_DISK
+    arch_puts("STYLEOS TEA769 DISK CPL3 EXIT PASS\n");
+#else
     arch_puts("STYLEOS TEA768 CPL3 EXIT PASS\n");
+#endif
 #endif
 }

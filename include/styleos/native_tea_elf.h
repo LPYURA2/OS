@@ -19,6 +19,8 @@ struct nte_loaded { uint64_t entry; uint32_t code_bytes, memory_bytes; };
 /* No destination or result write on error. Caller must have separately proven
  * that destination is a writable, reserved, image-owned physical page.
  * Single CPU, privileged kernel call only, no general ELF/ASLR support. */
+void nte_sha256(const uint8_t *input, size_t bytes, uint8_t out[32]);
+
 enum nte_status nte_load_x64_page(const uint8_t *elf, size_t elf_bytes,
                                   const uint8_t expected_sha256[32],
                                   uint8_t *page, size_t page_bytes,

@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include <styleos/native_tea_elf.h>
 extern unsigned char styleos_tea_768_code_b[NTE_PAGE];
+#ifdef STYLEOS_TEST_NATIVE_TEA_DISK
+#include <styleos/native_tea_package.h>
+extern unsigned char styleos_tea_769_package[NTP_MAX_PACKAGE];
+extern unsigned char styleos_tea_769_sector[NTE_PAGE];
+#endif
 /* Only call after the x86 read-only proof of ownership and writable mapping. */
 int tea_768_prepare(void);
 uint64_t tea_768_yield_pc(void);
