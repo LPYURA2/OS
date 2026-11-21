@@ -66,8 +66,8 @@ _Noreturn void kernel_main(const struct boot_info *info)
         arch_puts("STYLEOS RUNTIME SERVICE ERROR\n");
         arch_halt();
     }
-    arch_puts("STYLEOS PROCESS SERVICE READY registered=0\n");
-    arch_puts("STYLEOS WINDOW SERVICE READY registered=0\n");
+    arch_puts("STYLEOS DESKTOP PROCESS SERVICE READY registered=0\n");
+    arch_puts("STYLEOS DESKTOP WINDOW SERVICE READY registered=0\n");
     desktop_v0_run(desktop);
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_DISPLAY
