@@ -5,6 +5,7 @@
 #include <styleos/arch.h>
 #include <styleos/desktop_v0.h>
 #include <styleos/desktop_stylefs.h>
+#include <styleos/desktop_editor_runtime.h>
 
 enum { FILES, NOTES, TASKS, ABOUT, WINDOWS };
 enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
@@ -32,13 +33,21 @@ static struct file_click {
     uint64_t at;
 } last_file_click, current_file_click = {.id = -1};
 static bool second_file_click;
-static unsigned current_folder, doc_folder, input_flags;
+static unsigned current_folder, input_flags;
 static uint32_t data_sectors;
-static int document = -1;
-static char content[DESK_STYLEFS_TEXT_LIMIT], incoming[DESK_STYLEFS_TEXT_LIMIT];
-static size_t length, caret;
-static int scroll;
-static bool dirty, russian;
+/* The editor's draft belongs to its runtime session, not to the shell windows.
+ * A shell rebuild must not reinitialize this storage. */
+static struct desk_editor_runtime *editor_runtime;
+#define doc_folder (editor_runtime->folder)
+#define document (editor_runtime->document)
+#define content (editor_runtime->content)
+#define incoming (editor_runtime->incoming)
+#define length (editor_runtime->length)
+#define caret (editor_runtime->caret)
+#define scroll (editor_runtime->scroll)
+#define dirty (editor_runtime->dirty)
+static bool russian;
+static bool redraw_after_rebuild;
 static const char *notice = "";
 static char clock_text[] = "--:--";
 static struct {
@@ -326,8 +335,11 @@ static void toggle_language(void)
     arch_puts(russian ? "STYLEOS DESKTOP INPUT RU\n" : "STYLEOS DESKTOP INPUT EN\n");
 }
 
+static void shell_rebuild(void);
+
 static bool keyboard(unsigned key, unsigned mods)
 {
+    if (key == 0x44) { shell_rebuild(); return true; } /* F10: reload UI only */
     last_file_click.at = 0;
     current_file_click.id = -1;
     if (key == 0x01 && transfer.id >= 0) { transfer.id = -1; transfer.lifted = false; return true; }
@@ -864,6 +876,35 @@ static void initial_windows(void)
     win[FILES].open = true;
 }
 
+/* Restore the visual shell without stopping the editor session, remounting
+ * storage or modifying a user disk. Unlike a process reboot, this only
+ * reconstructs geometry, input focus and transient window controls. */
+static void shell_rebuild(void)
+{
+    bool opened[WINDOWS], minimized[WINDOWS];
+    for (int i = 0; i < WINDOWS; ++i) {
+        opened[i] = win[i].open;
+        minimized[i] = win[i].minimized;
+        win[i].maximized = false;
+    }
+    initial_windows();
+    for (int i = 0; i < WINDOWS; ++i) {
+        win[i].open = opened[i];
+        win[i].minimized = minimized[i];
+    }
+    menu = false;
+    drag = -1;
+    mouse_down = false;
+    current_file_click.id = -1;
+    last_file_click.at = 0;
+    second_file_click = false;
+    transfer.lifted = false;
+    transfer.id = -1;
+    notice = "Оболочка обновлена; черновик сохранён";
+    redraw_after_rebuild = true;
+    arch_puts("STYLEOS DESKTOP SHELL REBUILT\n");
+}
+
 static bool update_clock(void)
 {
     unsigned h, m;
@@ -885,6 +926,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
         arch_puts("STYLEOS DESKTOP ERROR mode smaller than 800x600\n");
         arch_halt();
     }
+    editor_runtime = desk_editor_runtime_open();
     mx = width / 2;
     my = height * 3 / 4;
     desk_draw_init(surface);
@@ -932,6 +974,11 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
             if (captured) {
                 take_visual(&next);
                 invalidate(&damage, &old, &next, editor, clock);
+                if (redraw_after_rebuild) {
+                    damage.all = true;
+                    damage.count = 0;
+                    redraw_after_rebuild = false;
+                }
                 if (old.x != next.x || old.y != next.y) {
                     cursor_only = !damage.all && !damage.count;
                     desk_damage_add(&damage, (struct desk_box){old.x, old.y, CURSOR_W, CURSOR_H});

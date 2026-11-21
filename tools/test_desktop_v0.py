@@ -242,6 +242,8 @@ def exercise_switch(folder, iso, previous, template, qemu, firmware, data_format
         q.click(64, 172)
         q.key('ctrl-n')
         q.key('a')
+        q.key('f10')
+        q.wait_uart('STYLEOS DESKTOP SHELL REBUILT')
         q.key('ctrl-s')
         q.wait_uart('DOCUMENT SAVE')
     verify_disk(raw_data(data, data_format, folder/'before.img'), b'a')

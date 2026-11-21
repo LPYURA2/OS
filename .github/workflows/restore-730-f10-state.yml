@@ -1,0 +1,62 @@
+name: Restore 730 behavior - persistent editor draft across shell F10
+on:
+  push:
+    branches: [restore/styleos-730-shell-state-1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install build and QEMU tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Prove independent editor session persistence on host
+        run: |
+          set -o pipefail
+          mkdir -p build/restore-f10
+          python3 tools/test_desktop_editor_runtime.py 2>&1 | tee build/restore-f10/session-test.log
+      - name: Compile new native EFI from restored source
+        run: |
+          set -o pipefail
+          python3 tools/build.py --arch x86_64 --desktop-v0 --output build/restore-f10/compiler 2>&1 | tee build/restore-f10/build.log
+          test -s build/restore-f10/compiler/x86_64/BOOTX64.EFI
+      - name: Create bootable ISO
+        run: |
+          set -o pipefail
+          python3 tools/make_desktop_iso.py --efi build/restore-f10/compiler/x86_64/BOOTX64.EFI --output build/restore-f10/StyleOS-Restore-730-F10.iso 2>&1 | tee build/restore-f10/iso.log
+          sha256sum build/restore-f10/StyleOS-Restore-730-F10.iso | tee build/restore-f10/ISO-SHA256.txt
+      - name: Run actual QEMU F10 unsaved-draft and reboot regression
+        run: |
+          set -o pipefail
+          python3 tools/test_desktop_v0.py --boot build/restore-f10/StyleOS-Restore-730-F10.iso --output build/restore-f10/guest-check 2>&1 | tee build/restore-f10/qemu.log
+          grep -q 'DESKTOP V0: PASS' build/restore-f10/qemu.log
+      - name: Run earlier native host regressions
+        run: |
+          set -o pipefail
+          python3 tools/test.py --host --output build/restore-f10/host-check 2>&1 | tee build/restore-f10/host.log
+      - name: Preserve source and test artifacts
+        if: always()
+        run: |
+          mkdir -p build/restore-f10
+          git archive --format=zip --output=build/restore-f10/StyleOS-Source-F10-Restore.zip HEAD
+          sha256sum build/restore-f10/StyleOS-Source-F10-Restore.zip > build/restore-f10/SOURCE-SHA256.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-restored-shell-f10-${{ github.run_number }}
+          path: |
+            build/restore-f10/*.zip
+            build/restore-f10/*.iso
+            build/restore-f10/*.txt
+            build/restore-f10/*.log
+            build/restore-f10/compiler/x86_64/BOOTX64.EFI
+            build/restore-f10/guest-check/results.json
+          retention-days: 30
+          if-no-files-found: warn
