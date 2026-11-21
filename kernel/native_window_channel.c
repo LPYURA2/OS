@@ -51,7 +51,9 @@ static bool selected(const struct nwc_service *s,const struct nwc_port *p)
     if(!valid_port(s,p) || !s->sessions->selected_session ||
        s->sessions->selected_session!=p->session_id)return false;
     const struct usr_session *sess=usr_find(s->sessions,p->session_id);
-    return sess && sess->state==USR_ACTIVE;
+    const struct ws_window *win=ws_find(s->windows,p->window_id);
+    return sess && sess->state==USR_ACTIVE && win &&
+           win->visible && !win->minimized;
 }
 static bool authentic(const struct nwc_port *p,uint32_t pid,uint64_t handle,
                       uint64_t root)

@@ -76,6 +76,11 @@ int main(void)
     assert(tile.generation==2 && tile.width==1 && tile.height==1 && tile.pixel[1]==0);
     assert(ws_compositor_restart(&windows)==2);
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==2);
+    assert(ws_set_minimized(&windows,pid_a,win_a,true)==WS_OK);
+    assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_DENIED);
+    assert(nwc_send_key(&ipc,win_a,'X',0,true)==NWC_DENIED);
+    assert(ws_set_minimized(&windows,pid_a,win_a,false)==WS_OK);
+    assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK);
 
     assert(usr_select(&users,sid_b)==USR_OK);
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_DENIED);
