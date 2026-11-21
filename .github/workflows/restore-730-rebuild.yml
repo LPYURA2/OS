@@ -23,6 +23,9 @@ jobs:
       - name: Build and host-test app session runtime
         run: |
           python3 tools/test_desktop_sessions.py --output build/recovery-730-host
+      - name: Test Notes/Editor independent StyleFS v2 save and remount (ASAN/UBSAN)
+        run: |
+          python3 tools/test_notes_file.py --output build/recovery-730-notes-host
       - name: Compile genuine StyleOS x86-64 UEFI executable
         run: |
           set -o pipefail
@@ -64,5 +67,6 @@ jobs:
             build/recovery-730/notes-f5-qemu/qemu/*.ppm
             build/recovery-730-host/host.log
             build/recovery-730-host/result.json
+            build/recovery-730-notes-host/test.log
           if-no-files-found: warn
           retention-days: 30

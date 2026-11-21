@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import time
 
 from test import firmware_path
 from test_desktop_v0 import command_exists, vm, digest
@@ -15,6 +16,25 @@ def crop(frame, x, y, w, h):
     return b''.join(frame.pixels[(yy * frame.w + x) * 3:
                                  (yy * frame.w + x + w) * 3]
                     for yy in range(y, y + h))
+
+
+def wait_caret(guest, x, y, column, label):
+    """QMP screenshots may overtake PS/2 events: wait for the actual final caret.
+
+    This checks a rendered pixel, not an elapsed delay, so slow QEMU hosts
+    cannot turn a correctly retained draft into a false regression failure.
+    """
+    expected = bytes.fromhex('e6ad63')
+    deadline = time.monotonic() + 8
+    iteration = 0
+    while time.monotonic() < deadline:
+        frame = guest.screen(label + '-' + str(iteration))
+        pos = (frame.w * (y + 5) + x + 11 * column) * 3
+        if frame.pixels[pos:pos + 3] == expected:
+            return crop(frame, x, y, 105, 36)
+        iteration += 1
+        time.sleep(.1)
+    raise AssertionError(f'{label}: final caret at column {column} was not drawn')
 
 
 def exercise(iso, folder):
@@ -37,7 +57,7 @@ def exercise(iso, folder):
         guest.key('ctrl-n')
         blank_editor = crop(guest.screen('blank-editor'), ed_x, ed_y, 105, 36)
         for key in ('a', 'b', 'c'): guest.key(key)
-        editor_before = crop(guest.screen('editor-abc'), ed_x, ed_y, 105, 36)
+        editor_before = wait_caret(guest, ed_x, ed_y, 3, 'editor-abc')
         if editor_before == blank_editor:
             raise AssertionError('editor text not visibly changed by typing')
         guest.key('f5')
@@ -45,7 +65,7 @@ def exercise(iso, folder):
         guest.key('ctrl-n')
         blank_note = crop(guest.screen('blank-notes'), no_x, no_y, 105, 36)
         for key in ('x', 'y', 'z'): guest.key(key)
-        notes_before = crop(guest.screen('notes-xyz'), no_x, no_y, 105, 36)
+        notes_before = wait_caret(guest, no_x, no_y, 3, 'notes-xyz')
         if notes_before == blank_note:
             raise AssertionError('notes text not visibly changed by typing')
         guest.key('f8')
@@ -53,11 +73,11 @@ def exercise(iso, folder):
         guest.key('f10')
         guest.wait_uart('SHELL RESTART')
         guest.key('f3')
-        editor_after = crop(guest.screen('editor-after-f10'), ed_x, ed_y, 105, 36)
+        editor_after = wait_caret(guest, ed_x, ed_y, 3, 'editor-after-f10')
         if editor_after != editor_before:
             raise AssertionError('F10 lost or changed unsaved Editor draft')
         guest.key('f5')
-        notes_after = crop(guest.screen('notes-after-f10'), no_x, no_y, 105, 36)
+        notes_after = wait_caret(guest, no_x, no_y, 3, 'notes-after-f10')
         if notes_after != notes_before:
             import hashlib
             first = next((i for i, (a, b) in enumerate(zip(notes_before, notes_after)) if a != b), -1)
