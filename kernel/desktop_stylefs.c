@@ -1,4 +1,5 @@
 #include <styleos/desktop_stylefs.h>
+#include <styleos/desktop_extra_volume.h>
 #include <styleos/arch.h>
 #ifdef STYLEOS_DESKTOP_UPDATE
 #include <styleos/system_update.h>
@@ -50,6 +51,7 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
         arch_puts("STYLEOS DESKTOP STYLEFS REFUSED\n");
         b->status = "Том StyleFS недоступен. Диск не изменён";
     }
+    desk_extra_volume_mount();
 }
 
 static int find_folder(const struct desk_fs *b, const char *name);

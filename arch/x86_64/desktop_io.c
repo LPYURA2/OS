@@ -241,10 +241,12 @@ bool desk_com2_write(uint8_t byte)
 #endif
 
 enum { BSY = 0x80, DRQ = 8, DF = 0x20, ERR = 1 };
-struct ata_disk { uint16_t port, alt; uint32_t sectors; };
-static struct ata_disk data_disk = {0x170, 0x376, 0};
+struct ata_disk { uint16_t port, alt; uint32_t sectors; uint8_t drive; };
+static struct ata_disk data_disk = {0x170, 0x376, 0, 0};
+/* Optional second independent data drive on secondary IDE slave. */
+static struct ata_disk data2_disk = {0x170, 0x376, 0, 1};
 #ifdef STYLEOS_DESKTOP_UPDATE
-static struct ata_disk primary_disk = {0x1f0, 0x3f6, 0};
+static struct ata_disk primary_disk = {0x1f0, 0x3f6, 0, 0};
 #endif
 static void ata_fault(struct ata_disk *d, const char *where)
 {
@@ -272,7 +274,7 @@ static uint32_t ata_probe(struct ata_disk *d)
 {
     d->sectors = 0;
     out8(d->alt, 2); /* Disable this channel's interrupts. */
-    out8(d->port + 6, 0xa0); /* Select master on this channel. */
+    out8(d->port + 6, (uint8_t)(0xa0 | (d->drive << 4))); /* Explicit device selection. */
     ata_delay(d);
     if (!ata_wait(d, false, false)) { arch_puts("STYLEOS DESKTOP ATA NOT READY\n"); return 0; }
     for (unsigned i = 2; i <= 5; ++i) out8(d->port + i, 0);
@@ -298,7 +300,7 @@ static uint32_t ata_probe(struct ata_disk *d)
 static bool ata_start(struct ata_disk *d, uint32_t lba, uint8_t command)
 {
     if (lba >= d->sectors || lba >= 0x10000000u || !ata_wait(d, false, false)) return false;
-    out8(d->port + 6, 0xe0 | (uint8_t)(lba >> 24));
+    out8(d->port + 6, (uint8_t)(0xe0 | (d->drive << 4) | (lba >> 24)));
     ata_delay(d);
     out8(d->port + 1, 0);
     out8(d->port + 2, 1);
@@ -336,7 +338,10 @@ static bool ata_write(void *context, uint32_t lba, const uint8_t data[512])
 static bool ata_flush(void *context)
 {
     struct ata_disk *d = context;
-    if (!d->sectors || !ata_wait(d, false, false)) return false;
+    if (!d->sectors) return false;
+    out8(d->port + 6, (uint8_t)(0xe0 | (d->drive << 4)));
+    ata_delay(d);
+    if (!ata_wait(d, false, false)) return false;
     out8(d->port + 7, 0xe7);
     ata_delay(d);
     return ata_wait(d, false, true);
@@ -346,6 +351,14 @@ uint32_t desk_ata_probe(void) { return ata_probe(&data_disk); }
 bool desk_ata_read(uint32_t lba, uint8_t data[512]) { return ata_read(&data_disk, lba, data); }
 bool desk_ata_write(uint32_t lba, const uint8_t data[512]) { return ata_write(&data_disk, lba, data); }
 bool desk_ata_flush(void) { return ata_flush(&data_disk); }
+/* Raw optional Data-2 IO; mount policy belongs to the storage service. */
+uint32_t desk_ata_probe_data2(void) { return ata_probe(&data2_disk); }
+bool desk_ata_read_data2(uint32_t lba, uint8_t out[512])
+{ return ata_read(&data2_disk, lba, out); }
+bool desk_ata_write_data2(uint32_t lba, const uint8_t in[512])
+{ return ata_write(&data2_disk, lba, in); }
+bool desk_ata_flush_data2(void) { return ata_flush(&data2_disk); }
+
 
 #ifdef STYLEOS_DESKTOP_UPDATE
 bool desk_update_io(struct upd_io *io)

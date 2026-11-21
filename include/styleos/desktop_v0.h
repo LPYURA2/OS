@@ -54,6 +54,11 @@ uint32_t desk_ata_probe(void);
 bool desk_ata_read(uint32_t lba, uint8_t sector[512]);
 bool desk_ata_write(uint32_t lba, const uint8_t sector[512]);
 bool desk_ata_flush(void);
+/* Optional secondary IDE slave. Never auto-format unknown media. */
+uint32_t desk_ata_probe_data2(void);
+bool desk_ata_read_data2(uint32_t lba, uint8_t sector[512]);
+bool desk_ata_write_data2(uint32_t lba, const uint8_t sector[512]);
+bool desk_ata_flush_data2(void);
 
 enum { DESK_DOCS = 4, DESK_TEXT_LIMIT = 4096 };
 enum { DESK_ROOT, DESK_DOCUMENTS, DESK_PROJECTS };

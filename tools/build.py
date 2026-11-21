@@ -74,7 +74,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if desktop_v0:
         common += ['kernel/desktop_sessions.c', 'kernel/desktop_shell.c', 'kernel/desktop_draw.c',
                    'kernel/desktop_store.c', 'kernel/stylefs.c', 'kernel/desktop_volume_io.c',
-                   'kernel/desktop_stylefs.c',
+                   'kernel/desktop_stylefs.c', 'kernel/desktop_extra_volume.c',
                    'arch/x86_64/desktop_io.c']
     ownership = test_ownership_plan or test_ownership_plan_invalid
     if ownership:
