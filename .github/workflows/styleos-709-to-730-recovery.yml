@@ -77,6 +77,16 @@ jobs:
           set -euo pipefail
           python3 tools/test_stylefs_background_copy.py --output build/recovery-canonical/copy-host 2>&1 | tee build/recovery-canonical/copy-host.log
 
+      - name: Validate strict native .tea package format
+        run: |
+          set -euo pipefail
+          python3 tools/test_tea_package.py --output build/recovery-canonical/tea-host 2>&1 | tee build/recovery-canonical/tea-host.log
+
+      - name: Verify two actual IDE volumes in QEMU without modifying desktop
+        run: |
+          set -euo pipefail
+          python3 tools/test_dual_guest.py --iso build/recovery-canonical/StyleOS-Recovery-Experimental.iso --output build/recovery-canonical/dual-qemu 2>&1 | tee build/recovery-canonical/dual-qemu.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -117,4 +127,8 @@ jobs:
             build/recovery-canonical/f5-host/result.json
             build/recovery-canonical/copy-host/test.log
             build/recovery-canonical/notes-host/test.log
+            build/recovery-canonical/tea-host.log
+            build/recovery-canonical/dual-qemu.log
+            build/recovery-canonical/dual-qemu/results.json
+            build/recovery-canonical/dual-qemu/dual/COM1.log
             build/recovery-canonical/host-check/logs/results.json
