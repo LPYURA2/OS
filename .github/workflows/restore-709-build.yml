@@ -42,12 +42,21 @@ jobs:
         run: |
           set -o pipefail
           python3 tools/test_desktop_v0.py --boot build/recovery-709/StyleOS-709-Recovered.iso --output build/recovery-709/qemu-check 2>&1 | tee build/recovery-709/qemu.log
+      - name: Archive complete restored source tree (independent backup)
+        run: |
+          set -euo pipefail
+          git archive --format=zip -o build/recovery-709/StyleOS-709-Full-Source.zip HEAD
+          unzip -t build/recovery-709/StyleOS-709-Full-Source.zip > build/recovery-709/source-archive-test.log
+          sha256sum build/recovery-709/StyleOS-709-Full-Source.zip | tee build/recovery-709/source-SHA256.txt
       - name: Preserve actual ISO, EFI, manifest and test evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: styleos-709-recovery-${{ github.run_number }}
           path: |
+            build/recovery-709/StyleOS-709-Full-Source.zip
+            build/recovery-709/source-SHA256.txt
+            build/recovery-709/source-archive-test.log
             build/recovery-709/StyleOS-709-Recovered.iso
             build/recovery-709/compiler/x86_64/BOOTX64.EFI
             build/recovery-709/compiler/manifest.json
