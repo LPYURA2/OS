@@ -59,7 +59,15 @@ def exercise(iso, folder):
         guest.key('f5')
         notes_after = crop(guest.screen('notes-after-f10'), no_x, no_y, 105, 36)
         if notes_after != notes_before:
-            raise AssertionError('F10 lost or mixed unsaved Notes draft')
+            import hashlib
+            first = next((i for i, (a, b) in enumerate(zip(notes_before, notes_after)) if a != b), -1)
+            raise AssertionError(
+                f'Notes display mismatch: SHA256 before={hashlib.sha256(notes_before).hexdigest()} '
+                f'after={hashlib.sha256(notes_after).hexdigest()} first_byte={first} '
+                f'after_equals_blank={notes_after == blank_note} '
+                f'editor_equals_notes={notes_after == editor_before} '
+                f'editor_draft_retained={editor_after == editor_before} '
+                f'UART={guest.uart.read_bytes()[-2000:]!r}')
         uart = guest.uart.read_bytes().decode('utf-8', 'replace')
         starts = [int(x) for x in re.findall(r'STYLEOS PROCESS START pid=(\d+)', uart)]
         restarts = [int(x) for x in re.findall(r'STYLEOS SHELL RESTART pid=(\d+)', uart)]

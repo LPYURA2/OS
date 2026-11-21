@@ -61,6 +61,7 @@ jobs:
             build/recovery-730/*.log
             build/recovery-730/f10-qemu/results.json
             build/recovery-730/notes-f5-qemu/results.json
+            build/recovery-730/notes-f5-qemu/qemu/*.ppm
             build/recovery-730-host/host.log
             build/recovery-730-host/result.json
           if-no-files-found: warn
