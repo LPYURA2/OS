@@ -18,6 +18,7 @@ on:
       - feature/styleos-real-pid-user-session-window-770
       - feature/styleos-desktop-window-ipc-771
       - feature/styleos-cpl3-user-copy-772
+      - feature/styleos-returning-cpl3-window-ipc-773
   workflow_dispatch:
 
 permissions:
