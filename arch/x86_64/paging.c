@@ -435,10 +435,16 @@ enum pg_error arch_paging_attest_image_writable(struct pg_experiment *x,
                                                 uint64_t va, uint64_t bytes)
 {
     struct x86_state *s=&saved;
-    if(!x || !s->prepared || !x->evidence || !bytes ||
+    /* arch_paging_activate deliberately consumed 'prepared'.  Here we
+     * require that activation finished AND the inherited root has really
+     * been restored; accepting a stale before-activation flag is unsafe. */
+    if(!x || s->prepared || !x->evidence || !bytes ||
+       x->result.error != PG_OK || !x->result.root ||
+       x->result.root == s->cr3 || x->old_root != s->cr3 ||
        (va | bytes) & (PG_PAGE-1u) ||
-       read_cr3()!=s->cr3 || read_cr4()!=s->cr4 ||
-       read_msr(0xc0000080u)!=s->efer || read_flags() & BIT(9) ||
+       read_cr3()!=s->cr3 || read_cr0()!=(s->cr0 | BIT(16)) ||
+       read_cr4()!=s->cr4 || read_msr(0xc0000080u)!=s->efer ||
+       read_msr(0x277u)!=s->pat || read_flags() & BIT(9) ||
        !writable_identity(s,va,bytes,x->evidence->live.image) ||
        !identity_tables(s)) return PG_PLATFORM;
     return PG_OK;
