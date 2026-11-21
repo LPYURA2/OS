@@ -1,0 +1,59 @@
+name: Restore StyleOS 709 - build ISO and exercise desktop
+on:
+  push:
+    branches:
+      - restore/styleos-709-repro-ci
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-and-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout isolated restored source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install x86 UEFI build and QEMU dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Compile real x86-64 UEFI desktop
+        run: |
+          set -o pipefail
+          mkdir -p build/recovery-709
+          python3 tools/build.py --arch x86_64 --desktop-v0 --output build/recovery-709/compiler 2>&1 | tee build/recovery-709/compile.log
+          test -s build/recovery-709/compiler/x86_64/BOOTX64.EFI
+      - name: Package bootable ISO from restored EFI
+        run: |
+          set -o pipefail
+          python3 tools/make_desktop_iso.py --efi build/recovery-709/compiler/x86_64/BOOTX64.EFI --output build/recovery-709/StyleOS-709-Recovered.iso 2>&1 | tee build/recovery-709/iso.log
+          test -s build/recovery-709/StyleOS-709-Recovered.iso
+          file build/recovery-709/compiler/x86_64/BOOTX64.EFI build/recovery-709/StyleOS-709-Recovered.iso
+          sha256sum build/recovery-709/StyleOS-709-Recovered.iso build/recovery-709/compiler/x86_64/BOOTX64.EFI | tee build/recovery-709/SHA256SUMS.txt
+      - name: Run recovered source host regressions
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python3 tools/test.py --host --output build/recovery-709/host-tests 2>&1 | tee build/recovery-709/host.log
+      - name: Boot recovered ISO in QEMU and test desktop
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python3 tools/test_desktop_v0.py --boot build/recovery-709/StyleOS-709-Recovered.iso --output build/recovery-709/qemu-check 2>&1 | tee build/recovery-709/qemu.log
+      - name: Preserve actual ISO, EFI, manifest and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-709-recovery-${{ github.run_number }}
+          path: |
+            build/recovery-709/StyleOS-709-Recovered.iso
+            build/recovery-709/compiler/x86_64/BOOTX64.EFI
+            build/recovery-709/compiler/manifest.json
+            build/recovery-709/SHA256SUMS.txt
+            build/recovery-709/*.log
+            build/recovery-709/qemu-check/results.json
+            build/recovery-709/host-tests/logs/results.json
+          if-no-files-found: warn
+          retention-days: 30
