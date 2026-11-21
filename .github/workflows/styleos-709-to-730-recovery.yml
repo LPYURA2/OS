@@ -1,0 +1,84 @@
+name: StyleOS 709 to 730 canonical source + guest checks
+
+on:
+  push:
+    branches:
+      - restore/styleos-709-to-730-canonical
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact committed source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install x86 UEFI and QEMU/OVMF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+
+      - name: Compile native x86-64 EFI from checked-out source
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical
+          python3 tools/build.py --arch x86_64 --desktop-v0 --output build/recovery-canonical/compiler 2>&1 | tee build/recovery-canonical/compile.log
+          test -s build/recovery-canonical/compiler/x86_64/BOOTX64.EFI
+
+      - name: Package bootable ISO
+        run: |
+          set -euo pipefail
+          python3 tools/make_desktop_iso.py --efi build/recovery-canonical/compiler/x86_64/BOOTX64.EFI --output build/recovery-canonical/StyleOS-Recovery-Experimental.iso 2>&1 | tee build/recovery-canonical/iso.log
+          test -s build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+
+      - name: Run mandatory host regressions
+        run: |
+          set -euo pipefail
+          python3 tools/test.py --host --output build/recovery-canonical/host-check 2>&1 | tee build/recovery-canonical/host.log
+
+      - name: Run mandatory real QEMU-OVMF guest desktop tests
+        run: |
+          set -euo pipefail
+          python3 tools/test_desktop_v0.py --boot build/recovery-canonical/StyleOS-Recovery-Experimental.iso --output build/recovery-canonical/qemu-check 2>&1 | tee build/recovery-canonical/qemu.log
+
+      - name: Archive complete exact commit and hashes
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical
+          git rev-parse HEAD > build/recovery-canonical/SOURCE_COMMIT.txt
+          git archive --format=zip -o build/recovery-canonical/StyleOS-Full-Source.zip HEAD
+          unzip -t build/recovery-canonical/StyleOS-Full-Source.zip > build/recovery-canonical/source-zip-test.log
+          (
+            cd build/recovery-canonical
+            sha256sum StyleOS-Full-Source.zip > SHA256SUMS-source.txt
+            for f in compiler/x86_64/BOOTX64.EFI StyleOS-Recovery-Experimental.iso; do
+              if test -f "$f"; then sha256sum "$f"; fi
+            done > SHA256SUMS-binaries.txt
+          )
+
+      - name: Upload recoverable source, binaries and evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-recovery-source-iso-${{ github.run_number }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            build/recovery-canonical/SOURCE_COMMIT.txt
+            build/recovery-canonical/StyleOS-Full-Source.zip
+            build/recovery-canonical/SHA256SUMS-source.txt
+            build/recovery-canonical/SHA256SUMS-binaries.txt
+            build/recovery-canonical/source-zip-test.log
+            build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/compiler/x86_64/BOOTX64.EFI
+            build/recovery-canonical/compiler/manifest.json
+            build/recovery-canonical/*.log
+            build/recovery-canonical/qemu-check/results.json
+            build/recovery-canonical/host-check/logs/results.json
