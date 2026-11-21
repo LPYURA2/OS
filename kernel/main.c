@@ -12,6 +12,7 @@
 #include "styleos/window_service.h"
 #include "styleos/desktop_process_runtime.h"
 #include "styleos/user_session_runtime.h"
+#include "styleos/native_window_channel.h"
 #endif
 #ifdef STYLEOS_TEST_DISK_APP
 #include "styleos/disk_app_demo.h"
@@ -80,6 +81,14 @@ _Noreturn void kernel_main(const struct boot_info *info)
         arch_puts("STYLEOS USER SESSION SERVICE ERROR\n");
         arch_halt();
     }
+    /* No fake PIDs, no account selection, no app surface at ordinary boot.
+     * This broker stores only kernel-owned, bounded window IPC state. */
+    if (nwc_global_start() != NWC_OK || !nwc_global() ||
+        nwc_port_count(nwc_global()) != 0) {
+        arch_puts("STYLEOS DESKTOP WINDOW IPC SERVICE ERROR\n");
+        arch_halt();
+    }
+    arch_puts("STYLEOS DESKTOP WINDOW IPC READY ports=0\n");
     arch_puts("STYLEOS DESKTOP USER SESSION SERVICE READY sessions=0\n");
     arch_puts("STYLEOS DESKTOP SCHEDULER READY registered=0\n");
     arch_puts("STYLEOS DESKTOP PROCESS SERVICE READY registered=0\n");

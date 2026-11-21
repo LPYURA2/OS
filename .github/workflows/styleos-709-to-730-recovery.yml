@@ -16,6 +16,7 @@ on:
       - feature/styleos-native-tea-cpl3-768
       - feature/styleos-guest-disk-tea-cpl3-769
       - feature/styleos-real-pid-user-session-window-770
+      - feature/styleos-desktop-window-ipc-771
   workflow_dispatch:
 
 permissions:
@@ -128,6 +129,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/test_native_launch_stage.py --output build/recovery-canonical/native-launch-host 2>&1 | tee build/recovery-canonical/native-launch-host.log
+
+      - name: Verify native window IPC contract, copy-only tiles, isolation and cleanup
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_window_channel.py --output build/recovery-canonical/window-ipc-host 2>&1 | tee build/recovery-canonical/window-ipc-host.log
 
       - name: Verify process and window registry start empty in real UEFI guest
         run: |
@@ -267,6 +273,8 @@ jobs:
             build/recovery-canonical/process-api-host.log
             build/recovery-canonical/desktop-runtime-host.log
             build/recovery-canonical/user-session-host.log
+            build/recovery-canonical/window-ipc-host.log
+            build/recovery-canonical/window-ipc-host/test.log
             build/recovery-canonical/native-launch-host.log
             build/recovery-canonical/native-tea-host.log
             build/recovery-canonical/native-tea-host/test.log
