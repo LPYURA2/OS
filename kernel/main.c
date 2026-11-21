@@ -8,6 +8,8 @@
 #endif
 #ifdef STYLEOS_DESKTOP_V0
 #include "styleos/desktop_v0.h"
+#include "styleos/process_runtime.h"
+#include "styleos/window_service.h"
 #endif
 #ifdef STYLEOS_TEST_DISK_APP
 #include "styleos/disk_app_demo.h"
@@ -57,6 +59,15 @@ _Noreturn void kernel_main(const struct boot_info *info)
         arch_puts("STYLEOS DESKTOP ERROR framebuffer or map\n");
         arch_halt();
     }
+    /* Runtime state outlives shell UI and initially contains ZERO process
+     * entries, until real scheduler admission has been integrated. */
+    if (pr_snapshot(pr_global(), 0, 0, false) != 0 ||
+        ws_snapshot(ws_global(), 0, 0) != 0) {
+        arch_puts("STYLEOS RUNTIME SERVICE ERROR\n");
+        arch_halt();
+    }
+    arch_puts("STYLEOS PROCESS SERVICE READY registered=0\n");
+    arch_puts("STYLEOS WINDOW SERVICE READY registered=0\n");
     desktop_v0_run(desktop);
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_DISPLAY

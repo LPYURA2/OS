@@ -107,6 +107,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_window_service.py --output build/recovery-canonical/window-host 2>&1 | tee build/recovery-canonical/window-host.log
 
+      - name: Verify process and window registry start empty in real UEFI guest
+        run: |
+          set -euo pipefail
+          python3 tools/test_process_guest_boot.py --iso build/recovery-canonical/StyleOS-Recovery-Experimental.iso --output build/recovery-canonical/process-qemu 2>&1 | tee build/recovery-canonical/process-qemu.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -148,6 +153,8 @@ jobs:
             build/recovery-canonical/copy-host/test.log
             build/recovery-canonical/notes-host/test.log
             build/recovery-canonical/text-app-host.log
+            build/recovery-canonical/process-qemu.log
+            build/recovery-canonical/process-qemu/results.json
             build/recovery-canonical/process-host.log
             build/recovery-canonical/window-host.log
             build/recovery-canonical/preinstall-host.log
