@@ -6,6 +6,7 @@ on:
       - restore/styleos-709-to-730-canonical
       - feature/styleos-process-snapshot-api-759
       - feature/styleos-process-runtime-760
+      - feature/styleos-desktop-process-bootstrap-761
   workflow_dispatch:
 
 permissions:
@@ -134,6 +135,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_process_scheduler.py --output build/recovery-canonical/scheduler-host 2>&1 | tee build/recovery-canonical/scheduler-host.log
 
+      - name: Verify desktop-owned process bootstrap, protected snapshots and window lifecycle
+        run: |
+          set -euo pipefail
+          python3 tools/test_desktop_process_runtime.py --output build/recovery-canonical/desktop-runtime-host 2>&1 | tee build/recovery-canonical/desktop-runtime-host.log
+
       - name: Verify real CPL3 and EL0 traps drive registry PIDs in QEMU
         run: |
           set -euo pipefail
@@ -185,6 +191,7 @@ jobs:
             build/recovery-canonical/inspector-host.log
             build/recovery-canonical/process-view-host.log
             build/recovery-canonical/process-api-host.log
+            build/recovery-canonical/desktop-runtime-host.log
             build/recovery-canonical/scheduler-host.log
             build/recovery-canonical/scheduler-guest.log
             build/recovery-canonical/scheduler-guest/results.json

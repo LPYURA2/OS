@@ -10,6 +10,7 @@
 #include "styleos/desktop_v0.h"
 #include "styleos/process_runtime.h"
 #include "styleos/window_service.h"
+#include "styleos/desktop_process_runtime.h"
 #endif
 #ifdef STYLEOS_TEST_DISK_APP
 #include "styleos/disk_app_demo.h"
@@ -66,6 +67,13 @@ _Noreturn void kernel_main(const struct boot_info *info)
         arch_puts("STYLEOS RUNTIME SERVICE ERROR\n");
         arch_halt();
     }
+    if (dpr_global_start(dpr_arch_safe_root()) != DPR_OK ||
+        !dpr_global_state() ||
+        pr_snapshot(dpr_global_state()->dispatcher.registry, 0, 0, false)) {
+        arch_puts("STYLEOS DESKTOP SCHEDULER ERROR\n");
+        arch_halt();
+    }
+    arch_puts("STYLEOS DESKTOP SCHEDULER READY registered=0\n");
     arch_puts("STYLEOS DESKTOP PROCESS SERVICE READY registered=0\n");
     arch_puts("STYLEOS DESKTOP WINDOW SERVICE READY registered=0\n");
     desktop_v0_run(desktop);
