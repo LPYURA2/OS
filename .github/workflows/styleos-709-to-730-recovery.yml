@@ -47,6 +47,26 @@ jobs:
           set -euo pipefail
           python3 tools/test_desktop_v0.py --boot build/recovery-canonical/StyleOS-Recovery-Experimental.iso --output build/recovery-canonical/qemu-check 2>&1 | tee build/recovery-canonical/qemu.log
 
+      - name: Run independent F5 app-session host regression
+        run: |
+          set -euo pipefail
+          python3 tools/test_desktop_sessions.py --output build/recovery-canonical/f5-host 2>&1 | tee build/recovery-canonical/f5-host.log
+
+      - name: Run separate Notes and Editor StyleFS v2 host regression
+        run: |
+          set -euo pipefail
+          python3 tools/test_notes_file.py --output build/recovery-canonical/notes-host 2>&1 | tee build/recovery-canonical/notes-host.log
+
+      - name: Run F8 F10 unsaved text real QEMU guest regression
+        run: |
+          set -euo pipefail
+          python3 tools/test_730_shell_f10.py --iso build/recovery-canonical/StyleOS-Recovery-Experimental.iso --output build/recovery-canonical/f10-qemu 2>&1 | tee build/recovery-canonical/f10-qemu.log
+
+      - name: Run independent F5 Notes guest regression
+        run: |
+          set -euo pipefail
+          python3 tools/test_730_notes_f5.py --iso build/recovery-canonical/StyleOS-Recovery-Experimental.iso --output build/recovery-canonical/f5-qemu 2>&1 | tee build/recovery-canonical/f5-qemu.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -81,4 +101,9 @@ jobs:
             build/recovery-canonical/compiler/manifest.json
             build/recovery-canonical/*.log
             build/recovery-canonical/qemu-check/results.json
+            build/recovery-canonical/f10-qemu/results.json
+            build/recovery-canonical/f5-qemu/results.json
+            build/recovery-canonical/f5-qemu/qemu/*.ppm
+            build/recovery-canonical/f5-host/result.json
+            build/recovery-canonical/notes-host/test.log
             build/recovery-canonical/host-check/logs/results.json
