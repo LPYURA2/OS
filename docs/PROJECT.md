@@ -1,3 +1,14 @@
+## Этап 775 — связь транзакции процессов с оконным IPC
+
+Новая ветка `feature/styleos-native-desktop-launch-775` добавляет отдельный
+kernel-only координатор процесса: реальный PID, подготовленные страницы,
+сеанс, окно и IPC-порт принимаются как одна транзакция **до исполнения**
+пользовательского кода. При отказе выдачи порта готовый к запуску PID
+завершается с отзывом страниц. Принятие требует зелёного полного CI
+и проверки SHA. Это ещё **не** запуск графического `.tea` рядом с Desktop.
+См. [обоснование](architecture/NATIVE_DESKTOP_ADMISSION_775.md) и
+[продолжение](NEXT_CHAT_775.md).
+
 ## StyleOS 772 — isolated x86 CPL3 kernel user-copy boundary
 
 Task branch: `feature/styleos-cpl3-user-copy-772`. Base accepted: 771 (`96834d3b`).

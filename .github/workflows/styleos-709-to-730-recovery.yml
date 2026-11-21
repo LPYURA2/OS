@@ -20,6 +20,7 @@ on:
       - feature/styleos-cpl3-user-copy-772
       - feature/styleos-returning-cpl3-window-ipc-773
       - feature/styleos-native-desktop-presentation-774
+      - feature/styleos-native-desktop-launch-775
   workflow_dispatch:
 
 permissions:
@@ -142,6 +143,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/test_native_desktop_bridge.py --output build/recovery-canonical/native-bridge-774-host 2>&1 | tee build/recovery-canonical/native-bridge-774-host.log
+
+      - name: Verify atomic native process and window IPC admission with sanitizer and compositor pixel proof
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_desktop_launch.py --output build/recovery-canonical/native-admission-775-host 2>&1 | tee build/recovery-canonical/native-admission-775-host.log
 
       - name: Verify process and window registry start empty in real UEFI guest
         run: |
@@ -304,6 +310,8 @@ jobs:
             build/recovery-canonical/window-ipc-host.log
             build/recovery-canonical/window-ipc-host/test.log
             build/recovery-canonical/native-bridge-774-host.log
+            build/recovery-canonical/native-admission-775-host.log
+            build/recovery-canonical/native-admission-775-host/test.log
             build/recovery-canonical/native-bridge-774-host/test.log
             build/recovery-canonical/user-copy-772-host.log
             build/recovery-canonical/user-copy-772-host/test.log
