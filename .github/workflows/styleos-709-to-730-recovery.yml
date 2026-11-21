@@ -117,6 +117,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_process_inspector.py --output build/recovery-canonical/inspector-host 2>&1 | tee build/recovery-canonical/inspector-host.log
 
+      - name: Verify Task Manager sort and search against scheduler-backed process model
+        run: |
+          set -euo pipefail
+          python3 tools/test_process_view.py --output build/recovery-canonical/process-view-host 2>&1 | tee build/recovery-canonical/process-view-host.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -161,6 +166,7 @@ jobs:
             build/recovery-canonical/process-qemu.log
             build/recovery-canonical/process-qemu/results.json
             build/recovery-canonical/inspector-host.log
+            build/recovery-canonical/process-view-host.log
             build/recovery-canonical/process-host.log
             build/recovery-canonical/window-host.log
             build/recovery-canonical/preinstall-host.log
