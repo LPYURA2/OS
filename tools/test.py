@@ -1409,7 +1409,8 @@ def _user_processes_sources(arch):
             .replace('kernel/tasks_demo.c', 'kernel/user_processes_demo.c')
             .replace(f'arch/{arch}/tasks.c', f'arch/{arch}/user_processes.c')
             .replace(f'arch/{arch}/tasks_context.S', f'arch/{arch}/user_processes_entry.S')
-            for source in _tasks_sources(arch)]
+            for source in _tasks_sources(arch)] + [
+                'kernel/process_runtime.c', 'kernel/process_scheduler.c']
 
 
 def verified_user_processes_site(folder, arch):
