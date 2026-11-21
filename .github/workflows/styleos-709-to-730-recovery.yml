@@ -24,6 +24,7 @@ on:
       - feature/styleos-native-disk-staging-776
       - feature/styleos-attested-detached-roots-777
       - feature/styleos-kernel-closure-audit-778
+      - feature/styleos-inherited-kernel-inventory-779
   workflow_dispatch:
 
 permissions:
@@ -222,6 +223,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_kernel_closure_audit.py --output build/recovery-canonical/kernel-closure-778-host 2>&1 | tee build/recovery-canonical/kernel-closure-778-host.log
 
+      - name: Inventory inherited kernel mappings with ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_kernel_mapping_inventory.py --output build/recovery-canonical/kernel-inventory-779-host 2>&1 | tee build/recovery-canonical/kernel-inventory-779-host.log
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
@@ -368,6 +374,8 @@ jobs:
             build/recovery-canonical/native-tea-qemu/compiled/x86_64/BOOTX64.EFI
             build/recovery-canonical/native-tea-qemu/compiled/x86_64/styleos.img
             build/recovery-canonical/native-tea-qemu/compiled/x86_64/tea-768-site.json
+            build/recovery-canonical/kernel-inventory-779-host.log
+            build/recovery-canonical/kernel-inventory-779-host/test.log
             build/recovery-canonical/kernel-closure-778-host.log
             build/recovery-canonical/kernel-closure-778-host/test.log
             build/recovery-canonical/attested-roots-777-host.log

@@ -2,6 +2,7 @@
 """Use real QEMU/OVMF and independently derive the linked PE grant RVAs."""
 import argparse
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -43,6 +44,46 @@ def main():
         elif marker in actual.replace(marker,b'BROKEN MARKER',1):
             status='FAIL';detail='778 marker tamper check invalid'
 
+    if status=='PASS':
+        # Independently bind the 779 inventory to the actual runtime image
+        # and stack extents, and to the CR3 restored by the hardware test.
+        lines=actual.replace(b'\r',b'').splitlines()
+        pattern=(rb'STYLEOS KMI 779 INHERITED cr3=(0x[0-9a-f]{16}) '
+                 rb'image=(0x[0-9a-f]{16}) stack=(0x[0-9a-f]{16}) '
+                 rb'gdt=(0x[0-9a-f]{16}) idt=(0x[0-9a-f]{16}) '
+                 rb'tables=(0x[0-9a-f]{16}) rwx=(0x[0-9a-f]{16}) '
+                 rb'tr=(0x[0-9a-f]{16}) tss-ist=unverified '
+                 rb'devices=unverified wx=unverified active=0')
+        found=[re.fullmatch(pattern,line) for line in lines if line.startswith(b'STYLEOS KMI ')]
+        if len(found)!=1 or found[0] is None:
+            status='FAIL';detail='779 inherited inventory missing, duplicated or malformed'
+        else:
+            observed=[int(v,16) for v in found[0].groups()]
+            def ranges(kind):
+                prefix=b'STYLEOS MEMMAP '+kind+b' '
+                vals=[]
+                for line in lines:
+                    if line.startswith(prefix):
+                        match=re.fullmatch(re.escape(prefix)+rb'(0x[0-9a-f]{16}) (0x[0-9a-f]{16})',line)
+                        if match: vals.append((int(match[1],16),int(match[2],16)))
+                return vals
+            im=ranges(b'IMAGE');st=ranges(b'STACK')
+            restored=re.findall(rb'STYLEOS PAGING X86 RETURN before=(0x[0-9a-f]{16}) '
+                                rb'candidate=(0x[0-9a-f]{16}) after=(0x[0-9a-f]{16})',actual)
+            def pages(start,end):return ((end+4095)//4096)-(start//4096)
+            if (len(im)!=1 or len(st)!=1 or len(restored)!=1 or
+                observed[0]!=int(restored[0][2],16) or
+                observed[0]!=int(restored[0][0],16) or
+                observed[1]!=pages(*im[0]) or observed[2]!=pages(*st[0]) or
+                not all(0<n<=64 for n in observed[3:6]) or
+                not (observed[1]<=observed[6]<=sum(observed[1:6]))):
+                status='FAIL';detail='779 inventory diverges from inherited CR3 or UEFI ranges'
+            elif b'STYLEOS KMI 779 INHERITED' not in actual:
+                status='FAIL';detail='779 hardware evidence absent'
+            else:
+                tampered=actual.replace(b' tss-ist=unverified ',b' tss-ist=verified ',1)
+                if re.fullmatch(pattern,[line for line in tampered.replace(b'\r',b'').splitlines() if line.startswith(b'STYLEOS KMI ')][0]):
+                    status='FAIL';detail='779 proof parser accepted false TSS completion'
     result={'status':status,'details':detail,'branch_scope':'dedicated image-owned frames',
             'candidate_ram_granted':False,'desktop_root_activated':False}
     (a.output/'results.json').write_text(json.dumps(result,indent=2)+'\n')

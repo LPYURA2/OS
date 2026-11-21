@@ -1,5 +1,8 @@
 #include "styleos/arch.h"
 #include "styleos/paging.h"
+#ifdef STYLEOS_TEST_FRAME_GRANTS
+#include "styleos/kernel_mapping_inventory.h"
+#endif
 
 /* T-P1.4 only: the build does not link this file into any historical profile.
  * Old page-table physical reads use the supported UEFI x64 boot contract's
@@ -120,7 +123,7 @@ static int code_descriptor_ok(uint64_t d)
 }
 
 enum walk_status { WALK_OK, WALK_MISSING, WALK_BAD };
-struct old_mapping { uint64_t pa; int writable, executable; unsigned type; };
+struct old_mapping { uint64_t pa; int writable, executable, user; unsigned type; };
 
 static int remember_table(struct x86_state *s, uint64_t page)
 {
@@ -138,7 +141,7 @@ static enum walk_status old_walk(struct x86_state *s, uint64_t va,
 {
     if (va >= LOW_VA_LIMIT) return WALK_BAD;
     uint64_t page = s->cr3 & ENTRY_ADDRESS;
-    int writable = 1, executable = 1;
+    int writable = 1, executable = 1, user = 1;
     for (unsigned level = 0; level < 4; ++level) {
         if (!remember_table(s, page)) return WALK_BAD;
         const volatile uint64_t *table = (const volatile uint64_t *)(uintptr_t)page;
@@ -148,6 +151,7 @@ static enum walk_status old_walk(struct x86_state *s, uint64_t va,
         if ((entry & ENTRY_ADDRESS & ~s->pa_mask) ||
             (entry & UINT64_C(0x7800000000000000))) return WALK_BAD;
         writable = writable && !!(entry & BIT(1));
+        user = user && !!(entry & BIT(2));
         executable = executable && !(entry & BIT(63));
         int large = level < 3 && !!(entry & BIT(7));
         if (large && (level == 0 || (level == 1 && !s->one_gib))) return WALK_BAD;
@@ -161,6 +165,7 @@ static enum walk_status old_walk(struct x86_state *s, uint64_t va,
             unsigned index = (unsigned)((entry >> 3) & 3u) | pat_bit << 2;
             out->pa = base | (va & offset_mask);
             out->writable = writable;
+            out->user = user;
             out->executable = executable;
             out->type = (unsigned)((s->pat >> (index * 8u)) & 255u);
             return WALK_OK;
@@ -429,6 +434,83 @@ enum pg_error arch_paging_activate(struct pg_experiment *x)
 }
 
 #ifdef STYLEOS_TEST_FRAME_GRANTS
+/* Read-only hardware inventory on the *restored inherited* CR3. This walks
+ * every page of the image and active boot stack, plus the actual GDTR/IDTR
+ * ranges and every old page-table frame touched by the walker. TSS, IST,
+ * firmware-runtime and device/MMIO dependencies remain explicitly unknown.
+ * This MUST NOT authorize switching a detached CR3. */
+static int inherited_record(struct x86_state *state, struct kmi_inventory *report,
+                             enum kmi_kind kind, uint64_t va, int identity)
+{
+    struct old_mapping m;
+    if (old_walk(state, va, &m) != WALK_OK) return 0;
+    const struct kmi_observation o={va,m.pa,m.type,
+        !!m.writable,!!m.executable,!!m.user};
+    return kmi_account(report,kind,&o,identity)!=KMI_OK ? 0 : 1;
+}
+static int inherited_range(struct x86_state *state, struct kmi_inventory *report,
+                            enum kmi_kind kind, uint64_t start,uint64_t end,
+                            int identity)
+{
+    if (!start || start>=end || end>LOW_VA_LIMIT ||
+        end > UINT64_MAX-(PG_PAGE-1u)) return 0;
+    const uint64_t first=start&~(uint64_t)(PG_PAGE-1u);
+    const uint64_t last=(end+PG_PAGE-1u)&~(uint64_t)(PG_PAGE-1u);
+    for (uint64_t va=first; va<last; va+=PG_PAGE)
+        if (!inherited_record(state,report,kind,va,identity)) return 0;
+    return 1;
+}
+enum pg_error arch_paging_inventory_inherited(struct pg_experiment *x)
+{
+    struct x86_state *s=&saved;
+    if (!x || !x->evidence || !x->old_root || x->old_root!=s->cr3 ||
+        s->prepared || x->result.error!=PG_OK || x->result.root==s->cr3 ||
+        read_cr3()!=s->cr3 || read_cr0()!=(s->cr0|BIT(16)) ||
+        read_cr4()!=s->cr4 || read_msr(0xc0000080u)!=s->efer ||
+        read_msr(0x277u)!=s->pat || read_flags()&BIT(9)) return PG_PLATFORM;
+    struct x86_state now={0}; read_descriptors(&now);
+    if(now.gdtr.base!=s->gdtr.base || now.gdtr.limit!=s->gdtr.limit ||
+       now.idtr.base!=s->idtr.base || now.idtr.limit!=s->idtr.limit ||
+       now.cs!=s->cs) return PG_PLATFORM;
+    struct kmi_inventory report={0};
+    if(!inherited_range(s,&report,KMI_IMAGE,x->evidence->live.image.start,
+                         x->evidence->live.image.end,1) ||
+       !inherited_range(s,&report,KMI_BOOT_STACK,x->evidence->live.stack.start,
+                         x->evidence->live.stack.end,0) ||
+       !inherited_range(s,&report,KMI_GDT,s->gdtr.base,
+                         s->gdtr.base+(uint64_t)s->gdtr.limit+1u,0) ||
+       !inherited_range(s,&report,KMI_IDT,s->idtr.base,
+                         s->idtr.base+(uint64_t)s->idtr.limit+1u,0))
+        return PG_CONTEXT;
+    /* old_walk may have visited additional pages while inventorying. */
+    for(size_t i=0;i<s->nr_visited;++i)
+        if(!inherited_record(s,&report,KMI_OLD_TABLE,s->visited[i],1))
+            return PG_CONTEXT;
+    if(!report.pages[KMI_IMAGE] || !report.pages[KMI_BOOT_STACK] ||
+       !report.pages[KMI_GDT] || !report.pages[KMI_IDT] ||
+       !report.pages[KMI_OLD_TABLE] || !report.rwx_pages ||
+       report.root_activation_permitted || !identity_tables(s) ||
+       read_cr3()!=s->cr3) return PG_CONTEXT;
+    uint16_t tr=0;
+#ifndef STYLEOS_PAGING_X86_HOST
+    __asm__ volatile("str %0" : "=r"(tr));
+#endif
+    /* All counts below come from live old_walk() PTE translations. RWX is
+     * legacy UEFI image policy, recorded as a blocker, NOT accepted as W^X.
+     * TR is observational only: a selector does not prove a TSS/IST mapping.
+     * No device memory is touched; I/O-port UART does not prove GOP/MMIO. */
+    arch_puts("STYLEOS KMI 779 INHERITED");
+    field(" cr3=",s->cr3);
+    field(" image=",report.pages[KMI_IMAGE]);
+    field(" stack=",report.pages[KMI_BOOT_STACK]);
+    field(" gdt=",report.pages[KMI_GDT]);
+    field(" idt=",report.pages[KMI_IDT]);
+    field(" tables=",report.pages[KMI_OLD_TABLE]);
+    field(" rwx=",report.rwx_pages);
+    field(" tr=",tr);
+    arch_puts(" tss-ist=unverified devices=unverified wx=unverified active=0\n");
+    return PG_OK;
+}
 /* Only while the inherited root is actually active: the old page-table
  * walker assumes firmware's identity physical RAM reads are valid. */
 enum pg_error arch_paging_attest_image_writable(struct pg_experiment *x,

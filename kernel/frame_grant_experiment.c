@@ -109,5 +109,9 @@ void fg_experiment_run(struct pg_experiment *p)
         &inventory,grant_walk,p);
     if(audit!=KCA_MISSING) paging_fail("778 incomplete root accepted");
     arch_puts("STYLEOS KCA 778 REFUSED missing-kernel-closure=1 active=0 no-cr3-switch=1\n");
+    /* Real, read-only inventory of inherited UEFI translations. It is NOT
+     * a proof that these are suitable entries for detached kernel roots. */
+    if (arch_paging_inventory_inherited(p)!=PG_OK)
+        paging_fail("779 inherited hardware inventory");
 
 }
