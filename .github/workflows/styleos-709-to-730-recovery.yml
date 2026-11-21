@@ -275,6 +275,9 @@ jobs:
             build/recovery-canonical/native-tea-769-qemu/results.json
             build/recovery-canonical/native-tea-769-qemu/build.log
             build/recovery-canonical/native-tea-769-qemu/positive/UART.log
+            build/recovery-canonical/native-tea-769-qemu/positive/QEMU.log
+            build/recovery-canonical/native-tea-769-qemu/negative/QEMU.log
+            build/recovery-canonical/native-tea-769-qemu/compiled/x86_64/styleos.img
             build/recovery-canonical/native-tea-769-qemu/negative/UART.log
             build/recovery-canonical/native-tea-769-qemu/compiled/x86_64/minimal.tea
             build/recovery-canonical/native-tea-769-qemu/compiled/x86_64/app.elf

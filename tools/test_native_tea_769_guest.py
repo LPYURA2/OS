@@ -30,7 +30,7 @@ def guest(qemu,firmware_code,firmware_var,efi_disk,package_disk,out,seconds):
          '-drive',f'if=pflash,format=raw,readonly=on,file={firmware_code}',
          '-drive',f'if=pflash,format=raw,file={vars}',
          '-drive',f'if=none,id=styleos,format=raw,readonly=on,file={efi_disk}',
-         '-device','virtio-blk-pci,drive=styleos',
+         '-device','virtio-blk-pci,drive=styleos,bootindex=1',
          '-drive',f'if=ide,index=0,media=disk,format=raw,readonly=on,file={package_disk}']
     trace=b'';start=time.monotonic()
     with stderr.open('wb') as err:
@@ -47,7 +47,9 @@ def guest(qemu,firmware_code,firmware_var,efi_disk,package_disk,out,seconds):
             proc.terminate()
             try:proc.wait(timeout=5)
             except subprocess.TimeoutExpired:proc.kill();proc.wait(timeout=5)
-    if not trace:raise RuntimeError('no guest serial; inspect QEMU.log')
+    if not trace:
+        diagnostics=stderr.read_text(errors='replace') if stderr.exists() else '(no stderr)'
+        raise RuntimeError('no guest serial; QEMU return '+str(proc.returncode)+'; QEMU.log: '+diagnostics[-2500:])
     return trace
 
 def run(output):
