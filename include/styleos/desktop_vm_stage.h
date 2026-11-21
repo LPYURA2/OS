@@ -12,7 +12,7 @@ enum {
     DVM_ROOTS = 3u,            /* 0 = SAFE, 1 and 2 = isolated user roots */
     DVM_USER_SLOTS = 2u,
     DVM_TABLES_PER_ROOT = 24u,
-    DVM_KERNEL_MAX_SPANS = 4u,
+    DVM_KERNEL_MAX_SPANS = 8u, /* bounded closure roles; not an activation grant */
     DVM_USER_PAGES = 3u       /* executable code, stack, private data */
 };
 #define DVM_USER_BEGIN UINT64_C(0x0000400000000000)

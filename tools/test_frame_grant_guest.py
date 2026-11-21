@@ -36,6 +36,13 @@ def main():
                                    b'STYLEOS DGB PASX pages=79',1)
             if serial_frame_grants_ok(altered,'x86_64',site,built/'x86_64'/'kernel.map'):
                 status='FAIL';detail='bridge parser accepted tampered UART'
+    if status=='PASS':
+        marker=b'STYLEOS KCA 778 REFUSED missing-kernel-closure=1 active=0 no-cr3-switch=1'
+        if actual.count(marker)!=1:
+            status='FAIL';detail='778 closure refusal missing or duplicated in real UART'
+        elif marker in actual.replace(marker,b'BROKEN MARKER',1):
+            status='FAIL';detail='778 marker tamper check invalid'
+
     result={'status':status,'details':detail,'branch_scope':'dedicated image-owned frames',
             'candidate_ram_granted':False,'desktop_root_activated':False}
     (a.output/'results.json').write_text(json.dumps(result,indent=2)+'\n')

@@ -2,6 +2,7 @@
 #include <styleos/paging.h>
 #include <styleos/arch.h>
 #include <styleos/desktop_grant_bridge.h>
+#include <styleos/kernel_closure_audit.h>
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -96,4 +97,17 @@ void fg_experiment_run(struct pg_experiment *p)
        roots.user_root[0]==p->old_root || roots.user_root[1]==p->old_root)
         paging_fail("777 detached grant admission");
     arch_puts("STYLEOS DGB PASS pages=79 roots=3 active=0 no-pmm=1\n");
+    /* Hardware test: one diagnostic supervisor page from 777 is NOT a
+     * complete kernel context. Refuse before a CR3 switch; prove the new
+     * audit cannot be bypassed merely by a ready detached root. */
+    struct kca_manifest inventory={0};
+    for(unsigned i=0;i<KCA_ROLE_COUNT;++i) {
+        inventory.role[i].va=e->live.image.start+(uint64_t)i*DVM_PAGE_SIZE;
+        inventory.role[i].pa=inventory.role[i].va;
+    }
+    enum kca_status audit=kca_audit_core(&styleos_grant_owner,
+        &inventory,grant_walk,p);
+    if(audit!=KCA_MISSING) paging_fail("778 incomplete root accepted");
+    arch_puts("STYLEOS KCA 778 REFUSED missing-kernel-closure=1 active=0 no-cr3-switch=1\n");
+
 }
