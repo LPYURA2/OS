@@ -490,6 +490,97 @@ enum sfs_result sfs_copy(struct sfs_volume *v, struct sfs_workspace *w, unsigned
     return r;
 }
 
+/* A copy job never changes the target table before a verified finish.
+ * A cancelled job leaves only unreachable data sectors. The caller must keep
+ * the source, destination and workspace exclusive until the job is inactive.
+ * A failed write/flush makes the destination require a fresh mount. */
+enum sfs_result sfs_copy_job_begin(struct sfs_copy_job *job, struct sfs_volume *source,
+                                   unsigned source_id, struct sfs_volume *destination,
+                                   struct sfs_workspace *w, unsigned target_folder,
+                                   const char *target_name)
+{
+    if (!job || job->active || !source || !destination || source == destination ||
+        source->format != 2 || destination->format != 2 ||
+        !source->mounted || !destination->mounted || !source->io.read ||
+        !w || !can_write(destination, w)) return SFS_STATE;
+    const struct sfs_entry *entry = sfs_entry_at(source, source_id);
+    if (!entry) return SFS_NOT_FOUND;
+    if (entry->type != SFS_FILE) return SFS_TYPE;
+    if (entry->size > sfs_file_limit(destination)) return SFS_RANGE;
+    unsigned target_id;
+    enum sfs_result r = prepare_new(destination, w, target_folder, target_name,
+                                    SFS_FILE, &target_id);
+    if (r != SFS_OK) return r;
+    uint32_t destination_lba = entry->size ? reserve(destination, used_sectors(entry->size)) : 0;
+    if (entry->size && !destination_lba) return SFS_FULL;
+    w->pending[target_id].size = entry->size;
+    w->pending[target_id].start = destination_lba;
+    w->pending[target_id].checksum = entry->checksum;
+    *job = (struct sfs_copy_job){
+        .source = source, .destination = destination, .workspace = w,
+        .source_generation = source->generation,
+        .destination_generation = destination->generation,
+        .source_lba = entry->start, .destination_lba = destination_lba,
+        .size = entry->size, .copied = 0,
+        .source_checksum = entry->checksum, .running_crc = UINT32_MAX,
+        .target_id = target_id, .active = true
+    };
+    return SFS_OK;
+}
+
+void sfs_copy_job_cancel(struct sfs_copy_job *job)
+{
+    if (job) job->active = false;
+}
+
+enum sfs_result sfs_copy_job_step(struct sfs_copy_job *job, unsigned max_sectors,
+                                  bool *completed)
+{
+    if (completed) *completed = false;
+    if (!job || !job->active || !completed || !max_sectors) return SFS_STATE;
+    struct sfs_volume *source = job->source, *destination = job->destination;
+    struct sfs_workspace *w = job->workspace;
+    if (!source || !destination || !w || !source->mounted || !destination->mounted ||
+        source->generation != job->source_generation ||
+        destination->generation != job->destination_generation) {
+        sfs_copy_job_cancel(job);
+        return SFS_STATE;
+    }
+    for (unsigned i = 0; i < max_sectors && job->copied < job->size; ++i) {
+        uint32_t at = job->copied / SECTOR;
+        size_t n = job->size - job->copied < SECTOR ? job->size - job->copied : SECTOR;
+        if (!source->io.read(source->io.context, job->source_lba + at, w->sector)) {
+            /* A vanished source requires re-mount before reuse. */
+            source->mounted = false;
+            sfs_copy_job_cancel(job);
+            return SFS_IO;
+        }
+        job->running_crc = crc(job->running_crc, w->sector, n);
+        zero(w->sector + n, SECTOR - n);
+        if (!destination->io.write(destination->io.context,
+                                   job->destination_lba + at, w->sector)) {
+            sfs_copy_job_cancel(job);
+            return failed_io(destination);
+        }
+        job->copied += (uint32_t)n;
+    }
+    if (job->copied < job->size) return SFS_OK;
+    if (~job->running_crc != job->source_checksum) {
+        sfs_copy_job_cancel(job);
+        return SFS_CORRUPT;
+    }
+    if (!destination->io.flush(destination->io.context)) {
+        sfs_copy_job_cancel(job);
+        return failed_io(destination);
+    }
+    enum sfs_result r = commit(destination, w);
+    sfs_copy_job_cancel(job);
+    if (r == SFS_OK) *completed = true;
+    /* On metadata commit I/O uncertainty, remount before deciding whether the
+     * target was published. Do not delete its source or auto-retry a move. */
+    return r;
+}
+
 enum sfs_result sfs_remove(struct sfs_volume *v, struct sfs_workspace *w, unsigned id)
 {
     if (!can_write(v, w)) return SFS_STATE;

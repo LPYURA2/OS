@@ -82,6 +82,31 @@ enum sfs_result sfs_move(struct sfs_volume *, struct sfs_workspace *, unsigned i
                         unsigned parent, const char *name);
 enum sfs_result sfs_copy(struct sfs_volume *, struct sfs_workspace *, unsigned id,
                         unsigned parent, const char *name, unsigned *new_id);
+/* Incremental, cross-volume StyleFS v2 copy. Caller owns both mounted
+ * volumes, destination workspace and job until completion or cancellation.
+ * Destination data is staged in an unreferenced extent and not published in
+ * the directory until CRC verification + flush + metadata commit succeed.
+ * Only one writer may use the destination workspace during an active job.
+ * The source must not be modified during an active job. Progress can be
+ * polled between steps; a step never exceeds its requested sector budget.
+ */
+struct sfs_copy_job {
+    struct sfs_volume *source, *destination;
+    struct sfs_workspace *workspace;
+    uint32_t source_generation, destination_generation;
+    uint32_t source_lba, destination_lba;
+    uint32_t size, copied, source_checksum, running_crc;
+    unsigned target_id;
+    bool active;
+};
+enum sfs_result sfs_copy_job_begin(struct sfs_copy_job *, struct sfs_volume *source,
+                                   unsigned source_id, struct sfs_volume *destination,
+                                   struct sfs_workspace *, unsigned target_folder,
+                                   const char *target_name);
+enum sfs_result sfs_copy_job_step(struct sfs_copy_job *, unsigned max_sectors,
+                                  bool *completed);
+void sfs_copy_job_cancel(struct sfs_copy_job *);
+
 enum sfs_result sfs_remove(struct sfs_volume *, struct sfs_workspace *, unsigned id);
 const char *sfs_result_name(enum sfs_result);
 
