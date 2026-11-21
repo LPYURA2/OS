@@ -92,6 +92,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_desktop_text_app.py --output build/recovery-canonical/text-app-host 2>&1 | tee build/recovery-canonical/text-app-host.log
 
+      - name: Verify nine mandatory native .tea apps and atomic preinstall staging
+        run: |
+          set -euo pipefail
+          python3 tools/test_preinstall_tea.py --output build/recovery-canonical/preinstall-host 2>&1 | tee build/recovery-canonical/preinstall-host.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -133,6 +138,8 @@ jobs:
             build/recovery-canonical/copy-host/test.log
             build/recovery-canonical/notes-host/test.log
             build/recovery-canonical/text-app-host.log
+            build/recovery-canonical/preinstall-host.log
+            build/recovery-canonical/preinstall-host/result.json
             build/recovery-canonical/tea-host.log
             build/recovery-canonical/dual-qemu.log
             build/recovery-canonical/dual-qemu/results.json
