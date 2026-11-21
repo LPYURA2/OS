@@ -7,6 +7,7 @@ on:
       - feature/styleos-process-snapshot-api-759
       - feature/styleos-process-runtime-760
       - feature/styleos-desktop-process-bootstrap-761
+      - feature/styleos-owned-vm-stage-762
   workflow_dispatch:
 
 permissions:
@@ -140,6 +141,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_desktop_process_runtime.py --output build/recovery-canonical/desktop-runtime-host 2>&1 | tee build/recovery-canonical/desktop-runtime-host.log
 
+      - name: Verify dormant x86-64 W^X and private-table constructor
+        run: |
+          set -euo pipefail
+          python3 tools/test_desktop_vm_stage.py --output build/recovery-canonical/desktop-vm-host 2>&1 | tee build/recovery-canonical/desktop-vm-host.log
+
       - name: Verify real CPL3 and EL0 traps drive registry PIDs in QEMU
         run: |
           set -euo pipefail
@@ -192,6 +198,7 @@ jobs:
             build/recovery-canonical/process-view-host.log
             build/recovery-canonical/process-api-host.log
             build/recovery-canonical/desktop-runtime-host.log
+            build/recovery-canonical/desktop-vm-host.log
             build/recovery-canonical/scheduler-host.log
             build/recovery-canonical/scheduler-guest.log
             build/recovery-canonical/scheduler-guest/results.json
