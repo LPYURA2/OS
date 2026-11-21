@@ -150,7 +150,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
                   '-I', str(folder), '-I', str(vendor)]
         if test_update_fail:
             flags.append('-DSTYLEOS_TEST_UPDATE_FAIL=1')
-        sources += ['kernel/system_update.c', 'boot/x86_64/desktop_update.c',
+        sources += ['kernel/system_update.c', 'kernel/desktop_import.c', 'boot/x86_64/desktop_update.c',
                     'third_party/monocypher/monocypher.c',
                     'third_party/monocypher/monocypher-ed25519.c']
     for rel in sources:

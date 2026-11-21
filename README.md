@@ -64,3 +64,6 @@ Desktop v0.7 в `feature/styleos-offline-update-v1` добавляет отде�
 Сборка 705 исправляет маршрут «Обновления», добавляет двойной щелчок и
 кнопку RU/EN с Alt+Shift.
 [Установка в тестовой ВМ и проверки](docs/test-results/desktop-input-updates/README.md).
+
+Сборка 707 добавляет приём пакета обновления из Windows в запущенной
+StyleOS без перестановки VDI. [Настройка COM2, границы и тест](docs/test-results/live-update-import/README.md).

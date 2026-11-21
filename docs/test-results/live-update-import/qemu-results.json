@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "checks": [
+    "real serial channel COM2 in an active guest",
+    "tampered signature and cancelled partial transfer leave no output file",
+    "signed package imports into existing StyleFS; duplicate does not overwrite",
+    "unrelated data and whole system VDI unchanged by import",
+    "stored byte-for-byte then confirmed through existing updater; boot 708"
+  ]
+}

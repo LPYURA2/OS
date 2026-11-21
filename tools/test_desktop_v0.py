@@ -149,7 +149,7 @@ class Desktop:
 
 
 @contextlib.contextmanager
-def vm(out, image, data, qemu, firmware, *, image_format, data_format, persist_boot=False):
+def vm(out, image, data, qemu, firmware, *, image_format, data_format, persist_boot=False, transfer_pipe=None):
     out.mkdir()
     nvram, uart = out / 'vars.fd', out / 'COM1.log'
     shutil.copyfile(firmware[1], nvram)
@@ -166,6 +166,8 @@ def vm(out, image, data, qemu, firmware, *, image_format, data_format, persist_b
         cmd += ['-drive', f'file={image},format={image_format},if=ide,index=0,{backing}']
     if data is not None:
         cmd += ['-drive', f'file={data},format={data_format},if=ide,index=2,cache=writeback']
+    if transfer_pipe is not None:
+        cmd += ['-serial', f'pipe:{transfer_pipe}']
     if os.environ.get('QEMU_DATA_DIR'):
         cmd += ['-L', os.environ['QEMU_DATA_DIR']]
     with (out / 'QEMU.log').open('wb') as error:

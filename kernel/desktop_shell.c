@@ -1,5 +1,6 @@
 #ifdef STYLEOS_DESKTOP_UPDATE
 #include <styleos/system_update.h>
+#include <styleos/desktop_import.h>
 #endif
 #include <styleos/arch.h>
 #include <styleos/desktop_v0.h>
@@ -873,7 +874,11 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
             else editor |= keyboard(e.key, e.modifiers) && active() == NOTES;
         }
         if (++tick == 20000) { tick = 0; clock = update_clock(); }
-        if (captured || clock) {
+        bool imported = false;
+#ifdef STYLEOS_DESKTOP_UPDATE
+        if (desk_import_active()) imported = desk_import_poll(&filesystem);
+#endif
+        if (captured || clock || imported) {
             struct desk_damage damage = {0};
             bool cursor_only = false;
             if (captured) {
@@ -885,6 +890,10 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                     desk_damage_add(&damage, (struct desk_box){next.x, next.y, CURSOR_W, CURSOR_H});
                 }
             } else desk_damage_add(&damage, (struct desk_box){width - 96, panel_box().y + 14, 96, 24});
+            if (imported && visible(FILES)) {
+                desk_damage_add(&damage, win[FILES].box);
+                cursor_only = false;
+            }
             size_t writes = desk_present(&damage, draw);
             if (!cursor_proven && cursor_only && writes && writes <= 2u * CURSOR_W * CURSOR_H) {
                 arch_puts("STYLEOS DESKTOP CURSOR DAMAGE PASS\n");

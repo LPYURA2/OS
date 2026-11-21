@@ -2,6 +2,7 @@
 #include <styleos/arch.h>
 #ifdef STYLEOS_DESKTOP_UPDATE
 #include <styleos/system_update.h>
+#include <styleos/desktop_import.h>
 #endif
 
 enum { TEXT = 0xf3f0e9, DIM = 0xaeb8c7, AMBER = 0xe6ad63, BUTTON = 0x253143,
@@ -53,6 +54,7 @@ static void show(struct desk_fs *b, unsigned id)
     b->delete_id = -1;
 #ifdef STYLEOS_DESKTOP_UPDATE
     b->update_id = -1;
+    desk_import_cancel(b);
 #endif
     b->first = b->name_edit = b->query_length = 0;
     b->query[0] = 0;
@@ -380,6 +382,10 @@ int desk_fs_key(struct desk_fs *b, struct desk_box area, unsigned key, unsigned 
     if (!b->disk.mounted) return DESK_FS_NONE;
 #ifdef STYLEOS_DESKTOP_UPDATE
     if (b->update_id >= 0) { if (!mods) update_key(b, key); return DESK_FS_NONE; }
+    if (desk_import_active()) {
+        if (key == 1 && !mods) desk_import_cancel(b);
+        return DESK_FS_NONE;
+    }
 #endif
     if (b->computer) {
         if (!mods && (key == 0x1c || key == 0x11c)) browse(b, SFS_ROOT);
@@ -451,7 +457,7 @@ static int row_at(const struct desk_fs *b, struct desk_box a, int x, int y)
     if (b->computer || b->name_edit || b->delete_id >= 0 || x < sidebar(a) + 10 || x >= a.w - 14 ||
         y < FILE_TOP || y >= a.h - FOOT) return DESK_FS_NONE;
 #ifdef STYLEOS_DESKTOP_UPDATE
-    if (b->update_id >= 0) return DESK_FS_NONE;
+    if (b->update_id >= 0 || desk_import_active()) return DESK_FS_NONE;
 #endif
     unsigned row = (unsigned)(y - FILE_TOP) / ROW_H;
     if (b->grid) {
@@ -519,6 +525,12 @@ int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y, int protec
         return DESK_FS_NONE;
     }
     int side = sidebar(a), local = x - side;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    if (desk_import_active()) {
+        if (local >= 152 && local < 257 && y >= 90 && y < 120) desk_import_cancel(b);
+        return DESK_FS_NONE;
+    }
+#endif
     if (b->searching) { b->searching = false; b->status = ""; ++b->revision; }
     if (y >= 48 && y < 79) {
         if (!b->computer && x >= search_left(a) && x < a.w - 14) {
@@ -582,7 +594,12 @@ int desk_fs_click(struct desk_fs *b, struct desk_box a, int x, int y, int protec
             b->first = 0;
             ++b->revision;
         } else if (local >= 13 && local < 145) start_name(b, MAKE_DIR);
-        else if (local >= 152 && local < 260) return DESK_FS_NEW_TEXT;
+        else if (local >= 152 && local < 257) {
+#ifdef STYLEOS_DESKTOP_UPDATE
+            if (b->update_view) { desk_import_begin(b); return DESK_FS_NONE; }
+#endif
+            return DESK_FS_NEW_TEXT;
+        }
         else if (local >= 267 && local < 347) return open_selected(b);
     } else {
         int id = row_at(b, a, x, y);
@@ -806,7 +823,11 @@ void desk_fs_draw(const struct desk_fs *b, struct desk_box a)
             count = system ? 2 : 1;
         } else {
             button(a, side + 13, 91, 132, "+ Новая папка", true);
-            button(a, side + 152, 91, 105, "+ Текст", true);
+#ifdef STYLEOS_DESKTOP_UPDATE
+            if (b->update_view) button(a, side + 152, 91, 105, desk_import_active() ? "Отмена" : "С ПК", true);
+            else
+#endif
+                button(a, side + 152, 91, 105, "+ Текст", true);
             button(a, side + 267, 91, 80, "Открыть", b->selected >= 0);
             view_button(a, false, !b->grid);
             view_button(a, true, b->grid);

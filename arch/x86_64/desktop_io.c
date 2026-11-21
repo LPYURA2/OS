@@ -191,6 +191,55 @@ uint64_t desk_pointer_clock(void)
 bool desk_pointer_near(uint64_t earlier, uint64_t later)
 { return earlier && later > earlier && later - earlier <= double_click_ticks; }
 
+#ifdef STYLEOS_DESKTOP_UPDATE
+#include <styleos/desktop_import.h>
+
+enum { COM2 = 0x2f8 };
+
+bool desk_pointer_idle(uint64_t earlier, uint64_t now, unsigned seconds)
+{ return earlier && now > earlier && now - earlier > (double_click_ticks / 9) * 20 * seconds; }
+
+bool desk_com2_init(void)
+{
+    if (in8(COM2 + 5) == 0xff) return false;
+    uint8_t saved = in8(COM2 + 7);
+    out8(COM2 + 7, 0x3e);
+    bool present = in8(COM2 + 7) == 0x3e;
+    out8(COM2 + 7, saved);
+    if (!present) return false;
+    out8(COM2 + 3, 3);
+    out8(COM2 + 1, 0);
+    out8(COM2 + 3, 0x83);
+    out8(COM2, 1);
+    out8(COM2 + 1, 0);
+    out8(COM2 + 3, 3);
+    out8(COM2 + 2, 7);
+    out8(COM2 + 4, 3);
+    return true;
+}
+
+int desk_com2_read(void)
+{
+    uint8_t s = in8(COM2 + 5);
+    if (s == 0xff || (s & 0x1e)) {
+        if (s != 0xff && (s & 1)) (void)in8(COM2);
+        return -2;
+    }
+    return s & 1 ? in8(COM2) : -1;
+}
+
+bool desk_com2_write(uint8_t byte)
+{
+    for (unsigned i = 0; i < 40000; ++i) {
+        uint8_t s = in8(COM2 + 5);
+        if (s == 0xff) return false;
+        if (s & 0x20) { out8(COM2, byte); return true; }
+        __asm__ volatile ("pause");
+    }
+    return false;
+}
+#endif
+
 enum { BSY = 0x80, DRQ = 8, DF = 0x20, ERR = 1 };
 struct ata_disk { uint16_t port, alt; uint32_t sectors; };
 static struct ata_disk data_disk = {0x170, 0x376, 0};
