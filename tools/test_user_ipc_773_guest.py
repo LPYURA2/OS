@@ -2,9 +2,42 @@
 """Real x86 QEMU hardware proof: returning CPL3 -> NW channel -> CPL3 and denial."""
 import argparse,hashlib,json,re,shutil,subprocess,sys
 from pathlib import Path
-from test_user_syscall_772_guest import guest,field,one_line,verified_stack_pte
+from test_user_syscall_772_guest import qemu_run as guest, val as field, only as one_line
 from test import firmware_path
 ROOT=Path(__file__).resolve().parents[1]
+
+def verified_stack_pte(lines):
+    a=one_line(lines,b'STYLEOS USER ROOT id=A ')
+    b=one_line(lines,b'STYLEOS USER ROOT id=B ')
+    safe=one_line(lines,b'STYLEOS USER ROOT id=SAFE ')
+    root=field(a,b'pa')
+    if len({root,field(b,b'pa'),field(safe,b'pa')})!=3:
+        raise AssertionError('non-isolated CR3 roots')
+    stack=one_line(lines,b'STYLEOS USER OBJECT name=stack_a ')
+    backing=int(stack.split()[-2],16)
+    if int(stack.split()[-1],16)-backing!=4096 or backing&4095:
+        raise AssertionError('private stack not admitted as full page')
+    table={}
+    for row in lines:
+        if not row.startswith(b'STYLEOS USER TABLE id='):continue
+        who=row.split()[3].split(b'=')[1]
+        key=(who,field(row,b'table'),field(row,b'index'))
+        if key in table:raise AssertionError('duplicate PTE')
+        table[key]=field(row,b'entry')
+    def walk(who,base,va):
+        page=base; user=True; rw=True; noexec=True
+        for shift in (39,30,21,12):
+            entry=table.get((who,page,(va>>shift)&511),0)
+            if not entry&1:return None
+            user &= bool(entry&4);rw &= bool(entry&2)
+            noexec &= bool(entry&(1<<63))
+            page=entry&0x000ffffffffff000
+        return page+(va&4095),user,rw,bool(entry&(1<<63))
+    if walk(b'A',root,0x11000000)!=(backing,True,True,True):
+        raise AssertionError('A stack user PTE is not RW/NX')
+    if walk(b'A',root,0x12010000) is not None:
+        raise AssertionError('foreign B page mapped to A user root')
+    return root
 
 def validate(trace,deny):
     lines=trace.splitlines()
