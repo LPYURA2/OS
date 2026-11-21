@@ -19,6 +19,7 @@ on:
       - feature/styleos-desktop-window-ipc-771
       - feature/styleos-cpl3-user-copy-772
       - feature/styleos-returning-cpl3-window-ipc-773
+      - feature/styleos-native-desktop-presentation-774
   workflow_dispatch:
 
 permissions:
@@ -136,6 +137,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/test_native_window_channel.py --output build/recovery-canonical/window-ipc-host 2>&1 | tee build/recovery-canonical/window-ipc-host.log
+
+      - name: Verify native desktop compositor bridge pixel clipping and revocation
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_desktop_bridge.py --output build/recovery-canonical/native-bridge-774-host 2>&1 | tee build/recovery-canonical/native-bridge-774-host.log
 
       - name: Verify process and window registry start empty in real UEFI guest
         run: |
@@ -297,6 +303,8 @@ jobs:
             build/recovery-canonical/user-session-host.log
             build/recovery-canonical/window-ipc-host.log
             build/recovery-canonical/window-ipc-host/test.log
+            build/recovery-canonical/native-bridge-774-host.log
+            build/recovery-canonical/native-bridge-774-host/test.log
             build/recovery-canonical/user-copy-772-host.log
             build/recovery-canonical/user-copy-772-host/test.log
             build/recovery-canonical/user-copy-772-qemu.log

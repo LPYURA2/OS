@@ -1,0 +1,121 @@
+#include <styleos/native_desktop_bridge.h>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+static struct pr_table processes;
+static struct ws_service windows;
+static struct usr_runtime sessions;
+static struct nwc_service ipc;
+static struct ndb_tracker tracked;
+static uint32_t framebuffer[800u*600u];
+static struct desktop_surface surface={
+    (uintptr_t)framebuffer,sizeof(framebuffer),800,600,800,DESKTOP_BGR_BYTES
+};
+static uint32_t pattern[NWC_TILE_PIXELS];
+static void pixel(void *opaque,int x,int y,uint32_t color)
+{
+    unsigned *calls=(unsigned *)opaque;
+    if(calls)++*calls;
+    desk_fill(x,y,1,1,color);
+}
+static void scene(void)
+{
+    desk_fill(0,0,800,600,0x142030);
+    (void)ndb_paint(&ipc,800,540,pixel,0);
+}
+static void update(unsigned expect)
+{
+    struct desk_damage d={0};
+    unsigned n=ndb_track(&ipc,&tracked,800,540,&d);
+    assert(n==expect);
+    if(n)assert(d.all || d.count);
+    if(n)assert(desk_present(&d,scene)!=0);
+}
+static uint32_t create(uint64_t handle,const char *name)
+{
+    uint32_t pid=0;
+    struct pr_admission a={PR_NATIVE_USER,0,handle,handle*4096u,0,name};
+    assert(pr_admit(&processes,&a,&pid)==PR_OK);
+    return pid;
+}
+int main(void)
+{
+    pr_init(&processes);ws_init(&windows);
+    assert(usr_init(&sessions,&processes,&windows)==USR_OK);
+    assert(nwc_start(&ipc,&processes,&sessions,&windows)==NWC_OK);
+    desk_draw_init(&surface);
+    update(0);
+    assert(nwc_port_count(&ipc)==0);
+    assert(ndb_paint(&ipc,800,540,pixel,0)==0);
+    uint32_t s1=0,s2=0;
+    assert(usr_create(&sessions,111,&s1)==USR_OK);
+    assert(usr_create(&sessions,222,&s2)==USR_OK);
+    assert(usr_select(&sessions,s1)==USR_OK);
+    uint32_t p1=create(16,"First.tea"),p2=create(32,"Second.tea");
+    assert(usr_bind(&sessions,s1,p1,16)==USR_OK);
+    uint32_t w1=0,w2=0;
+    assert(ws_open_app(&windows,&processes,p1,"First",
+           (struct ws_bounds){796,538,80,60},&w1)==WS_OK);
+    assert(nwc_claim(&ipc,p1,16,65536,w1)==NWC_OK);
+    for(unsigned i=0;i<NWC_TILE_PIXELS;++i)pattern[i]=0xff446688;
+    assert(nwc_publish_tile(&ipc,p1,16,65536,w1,pattern,16,16)==NWC_OK);
+    update(1);
+    assert(framebuffer[538u*800u+796u]==0x446688);
+    assert(framebuffer[539u*800u+799u]==0x446688);
+    assert(framebuffer[540u*800u+799u]==0);
+    update(0);
+    /* Wrong owner cannot replace a displayed native tile. */
+    pattern[0]=0x112233;
+    assert(nwc_publish_tile(&ipc,p1,999,65536,w1,pattern,16,16)==NWC_DENIED);
+    update(0);
+    assert(framebuffer[538u*800u+796u]==0x446688);
+    /* A correct update invalidates only the old/new visible region. */
+    assert(nwc_publish_tile(&ipc,p1,16,65536,w1,pattern,16,16)==NWC_OK);
+    update(2);
+    assert(framebuffer[538u*800u+796u]==0x112233);
+    /* Window compositor restart must preserve a live process's image. */
+    assert(ws_compositor_restart(&windows)==2);
+    update(0);
+    assert(framebuffer[538u*800u+796u]==0x112233);
+    assert(ws_set_minimized(&windows,p1,w1,true)==WS_OK);
+    update(1);
+    assert(framebuffer[538u*800u+796u]==0x142030);
+    assert(ws_set_minimized(&windows,p1,w1,false)==WS_OK);
+    update(1);
+    assert(framebuffer[538u*800u+796u]==0x112233);
+    /* New user cannot view the previous user's pixels. */
+    assert(usr_select(&sessions,s2)==USR_OK);
+    update(1);
+    assert(framebuffer[538u*800u+796u]==0x142030);
+    assert(usr_bind(&sessions,s2,p2,32)==USR_OK);
+    assert(ws_open_app(&windows,&processes,p2,"Second",
+           (struct ws_bounds){10,16,300,120},&w2)==WS_OK);
+    assert(nwc_claim(&ipc,p2,32,131072,w2)==NWC_OK);
+    for(unsigned i=0;i<NWC_TILE_PIXELS;++i)pattern[i]=0xabcdef;
+    assert(nwc_publish_tile(&ipc,p2,32,131072,w2,pattern,16,16)==NWC_OK);
+    update(1);
+    assert(framebuffer[16u*800u+10u]==0xabcdef);
+    assert(usr_lock(&sessions)==USR_OK);
+    update(1);
+    assert(framebuffer[16u*800u+10u]==0x142030);
+    assert(usr_select(&sessions,s2)==USR_OK);
+    update(1);
+    assert(framebuffer[16u*800u+10u]==0xabcdef);
+    assert(pr_transition(&processes,p2,32,PR_FAULTED)==PR_OK);
+    assert(usr_reconcile(&sessions)==1);
+    assert(nwc_reconcile(&ipc)==1);
+    update(1);
+    assert(framebuffer[16u*800u+10u]==0x142030);
+    assert(nwc_port_count(&ipc)==1);
+    assert(usr_select(&sessions,s1)==USR_OK);
+    update(1);
+    assert(framebuffer[538u*800u+796u]==0x112233);
+    assert(ws_close_app(&windows,p1,w1)==WS_OK);
+    assert(nwc_reconcile(&ipc)==1);
+    update(1);
+    assert(framebuffer[538u*800u+796u]==0x142030);
+    assert(nwc_port_count(&ipc)==0);
+    puts("STYLEOS 774 DESKTOP BRIDGE PASS: authentic pixels, clipping, damage, restart, user switch, lock, fault and stale cleanup");
+    return 0;
+}

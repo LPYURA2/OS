@@ -7,6 +7,7 @@
 #include <styleos/desktop_stylefs.h>
 #include <styleos/desktop_sessions.h>
 #include <styleos/desktop_text_app.h>
+#include <styleos/native_desktop_bridge.h>
 
 enum { FILES, NOTES, TASKS, ABOUT, NOTE_WINDOW, WINDOWS };
 enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
@@ -38,6 +39,10 @@ static unsigned current_folder, input_flags;
 static uint32_t data_sectors;
 static char incoming[DESK_STYLEFS_TEXT_LIMIT];
 static bool russian, shell_refreshed;
+/* No synthetic windows are created: the port registry is empty at boot. */
+static struct ndb_tracker native_view;
+static void native_plot(void *unused,int x,int y,uint32_t rgb)
+{ (void)unused;desk_fill(x,y,1,1,rgb); }
 
 /* Editor and Notes are separate app sessions. Their buffers live outside the
  * compositor; rendering either window never switches the other app's draft. */
@@ -815,6 +820,9 @@ static void draw(void)
     for (unsigned i = 0; i < WINDOWS; ++i)
         if (visible(order[i]) && desk_clip_visible(win[order[i]].box)) draw_window(order[i], top);
 
+    /* Only authenticated kernel-owned tiles, never direct user pointers. */
+    (void)ndb_paint(nwc_global(),width,work_area().h,native_plot,0);
+
     struct desk_box panel = panel_box(), start = start_box();
     desk_fill(panel.x, panel.y, panel.w, panel.h, PANEL);
     desk_fill(panel.x, panel.y, panel.w, 1, 0x2c394d);
@@ -1000,6 +1008,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     }
     mx = width / 2;
     my = height * 3 / 4;
+    native_view=(struct ndb_tracker){0};
     desk_sessions_init(desk_sessions_global());
     desk_draw_init(surface);
     data_sectors = desk_ata_probe();
@@ -1044,8 +1053,10 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 #ifdef STYLEOS_DESKTOP_UPDATE
         if (desk_import_active()) imported = desk_import_poll(&filesystem);
 #endif
-        if (captured || clock || imported || shell_refreshed) {
-            struct desk_damage damage = {0};
+        struct desk_damage damage = {0};
+        unsigned native_changes = ndb_track(nwc_global(), &native_view,
+                                            width, work_area().h, &damage);
+        if (captured || clock || imported || shell_refreshed || native_changes) {
             if (shell_refreshed) { damage.all = true; shell_refreshed = false; }
             bool cursor_only = false;
             if (captured) {
