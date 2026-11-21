@@ -5,6 +5,7 @@
 #include <styleos/arch.h>
 #include <styleos/desktop_v0.h>
 #include <styleos/desktop_stylefs.h>
+#include <styleos/desktop_sessions.h>
 
 enum { FILES, NOTES, TASKS, ABOUT, WINDOWS };
 enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
@@ -32,14 +33,21 @@ static struct file_click {
     uint64_t at;
 } last_file_click, current_file_click = {.id = -1};
 static bool second_file_click;
-static unsigned current_folder, doc_folder, input_flags;
+static unsigned current_folder, input_flags;
 static uint32_t data_sectors;
-static int document = -1;
-static char content[DESK_STYLEFS_TEXT_LIMIT], incoming[DESK_STYLEFS_TEXT_LIMIT];
-static size_t length, caret;
-static int scroll;
-static bool dirty, russian;
-static const char *notice = "";
+static char incoming[DESK_STYLEFS_TEXT_LIMIT];
+static bool russian, shell_refreshed;
+
+/* The compositor owns window geometry. App draft and PID ownership live in
+ * kernel/desktop_sessions.c and survive F10 shell recreation. */
+#define document (desk_sessions_global()->editor.document)
+#define doc_folder (desk_sessions_global()->editor.doc_folder)
+#define content (desk_sessions_global()->editor.content)
+#define length (desk_sessions_global()->editor.length)
+#define caret (desk_sessions_global()->editor.caret)
+#define scroll (desk_sessions_global()->editor.scroll)
+#define dirty (desk_sessions_global()->editor.dirty)
+#define notice (desk_sessions_global()->editor.notice)
 static char clock_text[] = "--:--";
 static struct {
     int id, x, y;
@@ -138,9 +146,35 @@ static void front(int id)
     for (; i + 1 < WINDOWS; ++i) order[i] = order[i + 1];
     order[WINDOWS - 1] = id;
 }
+static enum desk_session_kind session_kind_for(int id)
+{
+    if (id == FILES) return DESK_SESSION_EXPLORER;
+    if (id == NOTES) return DESK_SESSION_EDITOR;
+    if (id == TASKS) return DESK_SESSION_PROCESSES;
+    return DESK_SESSION_COUNT; /* ABOUT is a shell-owned system window */
+}
+
+static void print_pid(const char *prefix, uint32_t pid)
+{
+    char digits[12];
+    unsigned n = 0;
+    do { digits[n++] = (char)('0' + pid % 10); pid /= 10; } while (pid);
+    char readable[12];
+    for (unsigned i = 0; i < n; ++i) readable[i] = digits[n - 1 - i];
+    readable[n] = 0;
+    arch_puts(prefix);
+    arch_puts(readable);
+    arch_puts("\n");
+}
+
 static void open_window(int id)
 {
     bool restore = win[id].minimized, opening = !win[id].open;
+    if (opening && session_kind_for(id) != DESK_SESSION_COUNT) {
+        uint32_t pid = desk_sessions_start(desk_sessions_global(), session_kind_for(id));
+        if (!pid) { arch_puts("STYLEOS PROCESS REFUSED\n"); return; }
+        print_pid("STYLEOS PROCESS START pid=", pid);
+    }
     win[id].open = true;
     win[id].minimized = false;
     front(id);
@@ -326,10 +360,14 @@ static void toggle_language(void)
     arch_puts(russian ? "STYLEOS DESKTOP INPUT RU\n" : "STYLEOS DESKTOP INPUT EN\n");
 }
 
+static void restart_shell(void);
+
 static bool keyboard(unsigned key, unsigned mods)
 {
     last_file_click.at = 0;
     current_file_click.id = -1;
+    if (key == 0x44) { restart_shell(); return true; } /* F10, preserve app state and PIDs */
+    if (key == 0x42) { open_window(TASKS); return true; } /* F8 processes */
     if (key == 0x01 && transfer.id >= 0) { transfer.id = -1; transfer.lifted = false; return true; }
     if (key == 0x40 || key == DESK_KEY_LANGUAGE) { toggle_language(); return true; } /* F6 or Alt+Shift */
     if (key == 0x01 && menu) { menu = false; return true; }
@@ -554,6 +592,8 @@ static void click(int x, int y)
                         notice = "";
                     }
                     w->open = false;
+                    if (session_kind_for(id) != DESK_SESSION_COUNT)
+                        (void)desk_sessions_stop(desk_sessions_global(), session_kind_for(id));
                     arch_puts("STYLEOS DESKTOP WINDOW CLOSE\n");
                 }
             } else if (right < 84) maximize(id);
@@ -692,15 +732,31 @@ static void draw_window(int id, int top)
         }
         desk_text(b.x + 14, b.y + b.h - 24, r - (modern_shell() ? 77 : 12), notice, MUTED);
     } else if (id == TASKS) {
-        desk_text(b.x + 18, b.y + 55, r - 15, "Открытые окна оболочки", GOLD);
-        unsigned row = 0;
-        for (int i = 0; i < WINDOWS; ++i) if (win[i].open) {
-            int blank = modern_shell() ? 267 : 171;
-            desk_text(b.x + 18, b.y + 86 + (int)row * 25, b.x + blank - 8, app_name(i), LIGHT);
-            desk_text(b.x + blank, b.y + 86 + (int)row++ * 25, r - 15,
-                      win[i].minimized ? "Свёрнуто" : "Открыто", MUTED);
+        const struct desk_sessions *sessions = desk_sessions_global();
+        desk_text(b.x + 18, b.y + 55, r - 15, "Процессы StyleOS", GOLD);
+        desk_text(b.x + 18, b.y + 87, b.x + 251, "Оболочка", LIGHT);
+        char pid_text[32];
+        unsigned row = 1;
+        const uint32_t shell_pid = sessions->shell_pid;
+        unsigned number = shell_pid, n = 0;
+        char rev[12];
+        do { rev[n++] = (char)('0' + number % 10); number /= 10; } while (number);
+        pid_text[0] = 'P'; pid_text[1] = 'I'; pid_text[2] = 'D'; pid_text[3] = ' ';
+        for (unsigned j = 0; j < n; ++j) pid_text[4 + j] = rev[n - j - 1];
+        pid_text[4 + n] = 0;
+        desk_text(b.x + 257, b.y + 87, r - 15, pid_text, MUTED);
+        for (int kind = 0; kind < DESK_SESSION_COUNT; ++kind) {
+            uint32_t pid = desk_sessions_pid(sessions, (enum desk_session_kind)kind);
+            if (!pid) continue;
+            int y = b.y + 87 + (int)(row++) * 28;
+            desk_text(b.x + 18, y, b.x + 251, desk_sessions_name((enum desk_session_kind)kind), LIGHT);
+            n = 0; number = pid;
+            do { rev[n++] = (char)('0' + number % 10); number /= 10; } while (number);
+            for (unsigned j = 0; j < n; ++j) pid_text[4 + j] = rev[n - j - 1];
+            pid_text[4 + n] = 0;
+            desk_text(b.x + 257, y, r - 15, pid_text, MUTED);
         }
-        desk_text(b.x + 18, b.y + b.h - 46, r - 15, "Приложения пока не отдельные процессы.", MUTED);
+        desk_text(b.x + 18, b.y + b.h - 27, r - 15, "F10: обновить оболочку, сохранить приложения", MUTED);
     } else {
 #ifdef STYLEOS_DESKTOP_UPDATE
         desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0.7", LIGHT);
@@ -864,6 +920,34 @@ static void initial_windows(void)
     win[FILES].open = true;
 }
 
+/* Recreate only compositor-owned view state. App PIDs, unsaved document text,
+ * file-system and open app sessions are never reinitialized on F10. */
+static void restart_shell(void)
+{
+    struct desk_sessions *sessions = desk_sessions_global();
+    uint32_t new_pid = desk_sessions_restart_shell(sessions);
+    if (!new_pid) { arch_puts("STYLEOS SHELL RESTART REFUSED\n"); return; }
+    bool opened[WINDOWS];
+    for (int i = 0; i < WINDOWS; ++i) {
+        opened[i] = win[i].open;
+        win[i] = (struct window){0};
+    }
+    order[0] = ABOUT; order[1] = TASKS; order[2] = NOTES; order[3] = FILES;
+    menu = false;
+    drag = -1;
+    mouse_down = false;
+    second_file_click = false;
+    last_file_click.at = 0;
+    current_file_click.id = -1;
+    transfer.id = -1;
+    transfer.lifted = false;
+    initial_windows();
+    for (int i = 0; i < WINDOWS; ++i) win[i].open = opened[i];
+    shell_refreshed = true;
+    print_pid("STYLEOS SHELL RESTART pid=", new_pid);
+    arch_puts("STYLEOS DESKTOP SHELL RESTART\n");
+}
+
 static bool update_clock(void)
 {
     unsigned h, m;
@@ -887,6 +971,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     }
     mx = width / 2;
     my = height * 3 / 4;
+    desk_sessions_init(desk_sessions_global());
     desk_draw_init(surface);
     data_sectors = desk_ata_probe();
     desk_fs_mount(&filesystem, data_sectors);
@@ -902,6 +987,8 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     arch_puts(input_flags & 1 ? "STYLEOS DESKTOP KEYBOARD PASS\n" : "STYLEOS DESKTOP KEYBOARD UNAVAILABLE\n");
     arch_puts(input_flags & 2 ? "STYLEOS DESKTOP MOUSE PASS\n" : "STYLEOS DESKTOP MOUSE UNAVAILABLE\n");
     initial_windows();
+    print_pid("STYLEOS PROCESS START pid=",
+              desk_sessions_start(desk_sessions_global(), DESK_SESSION_EXPLORER));
     (void)update_clock();
 #ifdef STYLEOS_DESKTOP_UPDATE
     size_t painted = desk_present(&(struct desk_damage){.all = true}, draw);
@@ -926,8 +1013,9 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 #ifdef STYLEOS_DESKTOP_UPDATE
         if (desk_import_active()) imported = desk_import_poll(&filesystem);
 #endif
-        if (captured || clock || imported) {
+        if (captured || clock || imported || shell_refreshed) {
             struct desk_damage damage = {0};
+            if (shell_refreshed) { damage.all = true; shell_refreshed = false; }
             bool cursor_only = false;
             if (captured) {
                 take_visual(&next);
