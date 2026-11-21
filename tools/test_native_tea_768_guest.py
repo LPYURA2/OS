@@ -135,10 +135,13 @@ def run(output):
         try:
             while time.monotonic()-t<75:
                 if serial.exists():text=serial.read_bytes()
-                if b'STYLEOS KERNEL HALT\n' in text:break
+                # UEFI serial writes CRLF on QEMU/OVMF; match a *whole* line
+                # rather than an LF-only byte sequence, and do not accept a
+                # partial error message containing the same words.
+                if b'STYLEOS KERNEL HALT' in text.splitlines():break
                 if proc.poll() is not None:break
                 time.sleep(.1)
-            if not text or b'STYLEOS KERNEL HALT\n' not in text:
+            if not text or b'STYLEOS KERNEL HALT' not in text.splitlines():
                 raise RuntimeError('hardware guest did not reach terminal halt; inspect UART/QEMU logs')
             verified=check_uart(text,site)
         finally:
