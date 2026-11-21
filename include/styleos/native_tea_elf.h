@@ -1,0 +1,27 @@
+#ifndef STYLEOS_NATIVE_TEA_ELF_H
+#define STYLEOS_NATIVE_TEA_ELF_H
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+/* Deliberately narrow ELF64 loader for the one-page, trusted x86-64 CPL3
+ * diagnostic. A .tea is checked/extracted by build-time tools. This module
+ * consumes the validated ELF bytes, not arbitrary paths or user pointers.
+ * SHA-256 is an integrity check, NOT proof of a signed package. */
+#define NTE_PAGE 4096u
+#define NTE_USER_CODE_VA UINT64_C(0x10000000)
+
+enum nte_status { NTE_OK=0, NTE_ARGUMENT, NTE_FORMAT, NTE_BOUNDS,
+                  NTE_RIGHTS, NTE_HASH };
+struct nte_loaded { uint64_t entry; uint32_t code_bytes, memory_bytes; };
+
+/* No destination or result write on error. Caller must have separately proven
+ * that destination is a writable, reserved, image-owned physical page.
+ * Single CPU, privileged kernel call only, no general ELF/ASLR support. */
+enum nte_status nte_load_x64_page(const uint8_t *elf, size_t elf_bytes,
+                                  const uint8_t expected_sha256[32],
+                                  uint8_t *page, size_t page_bytes,
+                                  struct nte_loaded *loaded);
+
+#endif

@@ -2,6 +2,9 @@
 #include "styleos/boot_pool.h"
 #include "styleos/user_processes.h"
 #include "styleos/process_scheduler.h"
+#ifdef STYLEOS_TEST_NATIVE_TEA
+#include "styleos/tea_768_demo.h"
+#endif
 
 _Alignas(4096) uint64_t styleos_user_tables[UP_ROOTS][UP_TABLE_PAGES][512];
 _Alignas(4096) union up_demo_control styleos_user_control;
@@ -86,6 +89,9 @@ static void admit_common(const struct boot_memory_evidence *e)
         extent(styleos_user_data_a,sizeof styleos_user_data_a),
         extent(styleos_user_data_b,sizeof styleos_user_data_b),
         extent(styleos_user_code_a,UP_PAGE),extent(styleos_user_code_b,UP_PAGE)
+#ifdef STYLEOS_TEST_NATIVE_TEA
+        ,extent(styleos_tea_768_code_b,NTE_PAGE)
+#endif
     };
     const struct boot_range excluded[]={e->live.stack,e->live.handoff,e->live.source,
                                         e->workspace,pool,metadata};
@@ -109,6 +115,9 @@ static void objects(const struct boot_memory_evidence *e)
     up_range_line("OBJECT name=data_b",extent(styleos_user_data_b,sizeof styleos_user_data_b));
     up_range_line("OBJECT name=code_a",extent(styleos_user_code_a,UP_PAGE));
     up_range_line("OBJECT name=code_b",extent(styleos_user_code_b,UP_PAGE));
+#ifdef STYLEOS_TEST_NATIVE_TEA
+    up_range_line("OBJECT name=tea_code_b",extent(styleos_tea_768_code_b,NTE_PAGE));
+#endif
     up_range_line("OBJECT name=stack",e->live.stack);
     up_range_line("OBJECT name=diagnostic",e->workspace);
     up_range_line("OBJECT name=pool",boot_pool_storage_range());
@@ -219,6 +228,11 @@ void up_demo_run(const struct boot_memory_evidence *e)
     pr_init(&observed_registry);
     pscheck(ps_init(&observed_scheduler,&observed_registry,d->platform.roots[UP_ROOT_SAFE]));
     objects(e);tables(&d->platform);
+#ifdef STYLEOS_TEST_NATIVE_TEA
+    if(observed_pid[0]==0 || observed_pid[1]==0 ||
+       observed_pid[0]==observed_pid[1])up_fail("tea PID");
+    tea_768_report(observed_pid[1]);
+#endif
     struct up_machine initial;check(up_arch_observe(&initial));
     if(initial.root!=d->platform.roots[UP_ROOT_SAFE])up_fail("safe activation");
     d->platform.safe=initial;machine_line("SAFE",&initial);
@@ -295,4 +309,7 @@ void up_demo_run(const struct boot_memory_evidence *e)
     struct up_machine final;check(up_arch_observe(&final));
     if(!machine_same(&initial,&final) || dispatcher_cookie!=UP_DISPATCH_COOKIE)up_fail("kernel final check");
     machine_line("FINAL",&final);arch_puts("STYLEOS USER PASS\n");
+#ifdef STYLEOS_TEST_NATIVE_TEA
+    arch_puts("STYLEOS TEA768 CPL3 EXIT PASS\n");
+#endif
 }

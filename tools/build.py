@@ -36,9 +36,13 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, update_build=None, update_public_key=None, test_update_fail=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_native_tea=False, update_build=None, update_public_key=None, test_update_fail=False):
     if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
         raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
+    if test_native_tea and arch != 'x86_64':
+        raise ValueError('native .tea CPL3 test is x86-64 only')
+    if test_native_tea:
+        test_user_processes = True
     if desktop_v0 and arch != 'x86_64':
         raise ValueError('desktop v0 requires x86-64 UEFI')
     if test_desktop_display and arch != 'x86_64':
@@ -50,6 +54,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     cc = tool('CLANG', ['clang', 'clang-19', 'clang-18'])
     folder = output / arch
     folder.mkdir(parents=True, exist_ok=True)
+    if test_native_tea:
+        from build_native_tea_768 import build as build_tea
+        build_tea(folder)
     common = ['kernel/main.c', 'kernel/boot_info.c', 'kernel/runtime.c',
               'kernel/boot_memory.c', 'kernel/boot_memory_diagnostic.c',
               'kernel/exception.c', 'kernel/boot_pool.c']
@@ -61,6 +68,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_user_processes:
         common += ['kernel/process_runtime.c', 'kernel/process_scheduler.c', 'kernel/user_processes.c', 'kernel/user_processes_demo.c',
                    f'arch/{arch}/user_processes.c', f'arch/{arch}/user_processes_entry.S']
+    if test_native_tea:
+        common += ['kernel/native_tea_elf.c', 'kernel/tea_768_demo.c']
     if test_storage:
         common += ['kernel/storage.c', 'kernel/storage_demo.c',
                    'boot/aarch64/storage_fdt.c', 'arch/aarch64/virtio_block.c']
@@ -140,6 +149,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_TASKS=1')
     if test_user_processes:
         flags.append('-DSTYLEOS_TEST_USER_PROCESSES=1')
+    if test_native_tea:
+        flags.append('-DSTYLEOS_TEST_NATIVE_TEA=1')
+        flags += ['-I', str(folder)]
     if test_storage:
         flags.append('-DSTYLEOS_TEST_STORAGE=1')
     if test_disk_app:
@@ -220,7 +232,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         site = describe_disk_app(arch, artifacts[0], raw_path=folder / 'styleos.bin',
                                 compiler_flags=flags)
         (folder / 'disk-app-site.json').write_text(json.dumps(site, indent=2) + '\n')
-    if test_user_processes:
+    if test_user_processes and not test_native_tea:
         from user_processes_site import describe_user_processes
         (folder / 'user-processes-compiler.json').write_text(json.dumps({
             'flags': flags, 'sources': sources}, indent=2) + '\n')
@@ -300,6 +312,8 @@ def main():
                           help='Dedicated image only: two cooperative integer kernel tasks')
     negative.add_argument('--test-user-processes', action='store_true',
                           help='Dedicated image only: CPL3/EL0 fault containment experiment')
+    negative.add_argument('--test-native-tea', action='store_true',
+                          help='Dedicated x86 CPL3 probe: ELF from a canonical build-verified .tea')
     negative.add_argument('--test-storage', action='store_true',
                           help='Dedicated AArch64 image only: persistent test file on VirtIO MMIO')
     negative.add_argument('--test-disk-app', action='store_true',
@@ -320,6 +334,8 @@ def main():
             parser.error('update builds must use a separate output folder')
     elif args.update_public_key or args.test_update_fail:
         parser.error('update key and test require --update-build')
+    if args.test_native_tea and args.arch != 'x86_64':
+        parser.error('--test-native-tea requires --arch x86_64')
     if args.test_storage and args.arch != 'aarch64':
         parser.error('--test-storage requires --arch aarch64')
     if args.test_disk_app and args.arch != 'aarch64':
@@ -341,6 +357,7 @@ def main():
                'ownership-invalid' if args.test_ownership_plan_invalid else
                'tasks' if args.test_tasks else
                'user-processes' if args.test_user_processes else
+               'native-tea' if args.test_native_tea else
                'storage' if args.test_storage else
                'disk-app' if args.test_disk_app else
                'desktop-v0' if args.desktop_v0 else
@@ -348,7 +365,7 @@ def main():
     if (args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
-            args.test_user_processes or args.test_storage or args.test_disk_app or
+            args.test_user_processes or args.test_native_tea or args.test_storage or args.test_disk_app or
             args.test_desktop_display or args.desktop_v0) and output == (ROOT / 'build').resolve():
         parser.error('dedicated tests need a separate directory, e.g. build/bootpool')
     arches = ['x86_64', 'aarch64'] if args.arch == 'all' else [args.arch]
@@ -362,6 +379,7 @@ def main():
                              args.test_user_processes, args.test_storage,
                              args.test_disk_app, **({'test_paging_roundtrip': True} if args.test_paging_roundtrip else {}),
                              **({'test_frame_grants': True} if args.test_frame_grants else {}),
+                             **({'test_native_tea': True} if args.test_native_tea else {}),
                              **({'test_desktop_display': True}
                                                    if args.test_desktop_display else {}),
                              **({'desktop_v0': True} if args.desktop_v0 else {}),
@@ -374,6 +392,7 @@ def main():
                      'StyleOS desktop v0' if args.desktop_v0 else
                      'StyleOS desktop display check' if args.test_desktop_display else
                      'StyleOS T-P1.8B' if args.test_disk_app else
+                     'StyleOS 768 native .tea hardware proof' if args.test_native_tea else
                      'StyleOS T-P1.8A' if args.test_storage else
                      'StyleOS T-P1.7' if args.test_user_processes else 'StyleOS T-P1.6',
         **({'update_build': args.update_build, 'test_update_fail': args.test_update_fail}
@@ -386,6 +405,7 @@ def main():
         'test_paging': args.test_paging, 'test_paging_fault': args.test_paging_fault,
         'test_paging_roundtrip': args.test_paging_roundtrip or args.test_frame_grants,
         'test_frame_grants': args.test_frame_grants,
+        'test_native_tea': args.test_native_tea,
         'test_ownership_plan': args.test_ownership_plan,
         'test_ownership_plan_invalid': args.test_ownership_plan_invalid,
         'test_tasks': args.test_tasks,

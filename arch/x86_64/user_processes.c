@@ -2,6 +2,9 @@
 #include "styleos/boot_pool.h"
 #include "styleos/exception.h"
 #include "styleos/arch.h"
+#ifdef STYLEOS_TEST_NATIVE_TEA
+#include "styleos/tea_768_demo.h"
+#endif
 
 /* Read-only admission for this inherited UEFI x64 profile.  The existing
  * Loaded Image extent is authoritative; each image VA is checked against the
@@ -295,7 +298,11 @@ static int admit_new_objects(struct observation *o)
         object(styleos_user_data_a,UP_PAGE),object(styleos_user_data_b,UP_PAGE),
         object(styleos_user_code_a,UP_PAGE),object(styleos_user_code_b,UP_PAGE),
         object(styleos_user_x86_gdt,UP_PAGE),object(styleos_user_x86_tss,UP_PAGE),
-        object(styleos_user_x86_idt,UP_PAGE)};
+        object(styleos_user_x86_idt,UP_PAGE)
+#ifdef STYLEOS_TEST_NATIVE_TEA
+        ,object(styleos_tea_768_code_b,NTE_PAGE)
+#endif
+    };
     const struct boot_memory_evidence *e=o->evidence;
     struct boot_range excluded[]={e->live.stack,e->live.handoff,e->live.source,
         e->workspace,boot_pool_storage_range(),boot_pool_metadata_range(),
@@ -393,6 +400,9 @@ static int build_roots(const struct boot_memory_evidence *e,struct up_platform *
         if(root){
             unsigned id=root-1u;
             const unsigned char *code=id?styleos_user_code_b:styleos_user_code_a;
+#ifdef STYLEOS_TEST_NATIVE_TEA
+            if(id==1u)code=styleos_tea_768_code_b;
+#endif
             const unsigned char *stack=id?styleos_user_stack_b:styleos_user_stack_a;
             const uint64_t *data=id?styleos_user_data_b:styleos_user_data_a;
             uint64_t stack_va=id?UP_STACK_B_VA:UP_STACK_A_VA;
@@ -495,6 +505,11 @@ enum up_error up_arch_prepare(const struct boot_memory_evidence *e,struct up_pla
     /* This is the first write into arch scratch or any new hardware object. */
     clear_bytes(XCONTROL,sizeof(*XCONTROL));
     clear_bytes(p,sizeof(*p));
+#ifdef STYLEOS_TEST_NATIVE_TEA
+    /* The inherited VA->PA proof and RESERVED/non-CANDIDATE checks have
+     * completed. Only now may the guest copy the verified ELF into BSS. */
+    if(!tea_768_prepare())return UP_CONTEXT;
+#endif
     if(!build_roots(e,p))return UP_MAPPING;
     build_descriptors((uint16_t)old.state.cs);
     struct up_x86_control *s=XCONTROL;
@@ -513,6 +528,11 @@ enum up_error up_arch_prepare(const struct boot_memory_evidence *e,struct up_pla
     }
     p->fault_pc[0]=UP_CODE_VA+(uint64_t)(styleos_user_a_fault-styleos_user_code_a);
     p->exit_pc[1]=UP_CODE_VA+(uint64_t)(styleos_user_b_exit-styleos_user_code_b);
+#ifdef STYLEOS_TEST_NATIVE_TEA
+    p->yield_pc[1]=tea_768_yield_pc();
+    p->resume_pc[1]=tea_768_resume_pc();
+    p->exit_pc[1]=tea_768_exit_pc();
+#endif
     /* All owned destinations and descriptors exist before changing GDTR.
      * IF is0. The tiny ASM interval reloads CS/data/TR and then IDTR under
      * inherited mappings; no fallible firmware operation is called there. */

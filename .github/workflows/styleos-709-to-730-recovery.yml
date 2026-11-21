@@ -13,6 +13,7 @@ on:
       - feature/styleos-physical-grant-attestation-765
       - feature/styleos-user-session-boundary-766
       - feature/styleos-native-launch-transaction-767
+      - feature/styleos-native-tea-cpl3-768
   workflow_dispatch:
 
 permissions:
@@ -186,6 +187,16 @@ jobs:
           set -euo pipefail
           python3 tools/test_frame_grant_guest.py --output build/recovery-canonical/grant-qemu 2>&1 | tee build/recovery-canonical/grant-qemu.log
 
+      - name: Validate narrow ELF64 .tea loader with ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_tea_768_host.py --output build/recovery-canonical/native-tea-host 2>&1 | tee build/recovery-canonical/native-tea-host.log
+
+      - name: Execute ELF64 from a canonical .tea in isolated real x86 CPL3 QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_native_tea_768_guest.py --output build/recovery-canonical/native-tea-qemu 2>&1 | tee build/recovery-canonical/native-tea-qemu.log
+
       - name: Archive complete exact commit and hashes
         if: always()
         run: |
@@ -235,6 +246,18 @@ jobs:
             build/recovery-canonical/desktop-runtime-host.log
             build/recovery-canonical/user-session-host.log
             build/recovery-canonical/native-launch-host.log
+            build/recovery-canonical/native-tea-host.log
+            build/recovery-canonical/native-tea-host/test.log
+            build/recovery-canonical/native-tea-qemu.log
+            build/recovery-canonical/native-tea-qemu/results.json
+            build/recovery-canonical/native-tea-qemu/UART.log
+            build/recovery-canonical/native-tea-qemu/QEMU.log
+            build/recovery-canonical/native-tea-qemu/build.log
+            build/recovery-canonical/native-tea-qemu/compiled/x86_64/minimal.tea
+            build/recovery-canonical/native-tea-qemu/compiled/x86_64/app.elf
+            build/recovery-canonical/native-tea-qemu/compiled/x86_64/BOOTX64.EFI
+            build/recovery-canonical/native-tea-qemu/compiled/x86_64/styleos.img
+            build/recovery-canonical/native-tea-qemu/compiled/x86_64/tea-768-site.json
             build/recovery-canonical/native-launch-host/test.log
             build/recovery-canonical/desktop-vm-host.log
             build/recovery-canonical/frame-owner-host.log
