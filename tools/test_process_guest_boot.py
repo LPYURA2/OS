@@ -20,7 +20,7 @@ def main():
     before=digest(iso)
     with vm(a.output/'qemu',iso,None,qemu,firmware,
             image_format='iso',data_format='raw') as (guest, frame):
-        guest.wait_uart('DESKTOP SCHEDULER READY registered=0')
+        guest.wait_uart('SCHEDULER READY registered=0')
         guest.wait_uart('PROCESS SERVICE READY registered=0')
         guest.wait_uart('WINDOW SERVICE READY registered=0')
         guest.wait_uart('DATA UNAVAILABLE')
