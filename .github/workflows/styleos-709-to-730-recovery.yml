@@ -236,14 +236,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/test_user_syscall_772_guest.py --output build/recovery-canonical/user-copy-772-qemu 2>&1 | tee build/recovery-canonical/user-copy-772-qemu.log
-            build/recovery-canonical/user-ipc-773-host.log
-            build/recovery-canonical/user-ipc-773-host/host.log
-            build/recovery-canonical/user-ipc-773-qemu.log
-            build/recovery-canonical/user-ipc-773-qemu/results.json
-            build/recovery-canonical/user-ipc-773-qemu/success/qemu/UART.log
-            build/recovery-canonical/user-ipc-773-qemu/denial/qemu/UART.log
-            build/recovery-canonical/user-ipc-773-qemu/success/qemu/QEMU.log
-            build/recovery-canonical/user-ipc-773-qemu/denial/qemu/QEMU.log
 
       - name: Check versioned returning IPC 773 with ASAN UBSAN and COFF
         run: |
@@ -308,6 +300,14 @@ jobs:
             build/recovery-canonical/user-copy-772-host.log
             build/recovery-canonical/user-copy-772-host/test.log
             build/recovery-canonical/user-copy-772-qemu.log
+            build/recovery-canonical/user-ipc-773-host.log
+            build/recovery-canonical/user-ipc-773-host/host.log
+            build/recovery-canonical/user-ipc-773-qemu.log
+            build/recovery-canonical/user-ipc-773-qemu/results.json
+            build/recovery-canonical/user-ipc-773-qemu/success/qemu/UART.log
+            build/recovery-canonical/user-ipc-773-qemu/denial/qemu/UART.log
+            build/recovery-canonical/user-ipc-773-qemu/success/qemu/QEMU.log
+            build/recovery-canonical/user-ipc-773-qemu/denial/qemu/QEMU.log
             build/recovery-canonical/user-ipc-773-host.log
             build/recovery-canonical/user-ipc-773-host/host.log
             build/recovery-canonical/user-ipc-773-qemu.log
