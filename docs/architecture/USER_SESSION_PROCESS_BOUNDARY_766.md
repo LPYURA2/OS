@@ -39,7 +39,7 @@ and scheduler handle, independently of the window/compositor and shell lifecycle
 - Fault/exit reconciliation calls `ws_reap_dead_owners` and then removes stale
   PID-to-session links; session close refuses live/uncleared links.
 - Ordinary Desktop initializes this kernel service **empty** after the existing
-  process dispatcher. It emits `STYLEOS USER SESSION SERVICE READY sessions=0`
+  process dispatcher. It emits `STYLEOS DESKTOP USER SESSION SERVICE READY sessions=0`
   and proceeds with the existing desktop unchanged, with no fake accounts.
 
 ## Verification
