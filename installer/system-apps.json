@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "native_format": "styleos.tea",
+  "installation_policy": "required-system-apps",
+  "system_directory": "/System/Applications",
+  "applications": [
+    {
+      "id": "org.styleos.explorer",
+      "name": "Проводник",
+      "filename": "org.styleos.explorer.tea",
+      "required": true
+    },
+    {
+      "id": "org.styleos.settings",
+      "name": "Параметры",
+      "filename": "org.styleos.settings.tea",
+      "required": true
+    },
+    {
+      "id": "org.styleos.notes",
+      "name": "Заметки",
+      "filename": "org.styleos.notes.tea",
+      "required": true
+    },
+    {
+      "id": "org.styleos.editor",
+      "name": "Текстовый редактор",
+      "filename": "org.styleos.editor.tea",
+      "required": true
+    },
+    {
+      "id": "org.styleos.documents",
+      "name": "Документы",
+      "filename": "org.styleos.documents.tea",
+      "required": true
+    },
+    {
+      "id": "org.styleos.spreadsheets",
+      "name": "Таблицы",
+      "filename": "org.styleos.spreadsheets.tea",
+      "required": true
+    },
+    {
+      "id": "org.styleos.presentations",
+      "name": "Презентации",
+      "filename": "org.styleos.presentations.tea",
+      "required": true
+    },
+    {
+      "id": "org.styleos.browser",
+      "name": "Браузер",
+      "filename": "org.styleos.browser.tea",
+      "required": true
+    },
+    {
+      "id": "org.styleos.processes",
+      "name": "Процессы",
+      "filename": "org.styleos.processes.tea",
+      "required": true
+    }
+  ]
+}
