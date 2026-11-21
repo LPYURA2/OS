@@ -36,5 +36,6 @@ int desk_fs_drag_source(const struct desk_fs *, struct desk_box, int x, int y);
 void desk_fs_draw(const struct desk_fs *, struct desk_box);
 bool desk_fs_read_text(struct desk_fs *, unsigned id, char *data, size_t *size);
 bool desk_fs_save_text(struct desk_fs *, unsigned folder, int *id, const char *data, size_t length);
+bool desk_fs_save_note(struct desk_fs *, unsigned folder, int *id, const char *data, size_t length);
 
 #endif

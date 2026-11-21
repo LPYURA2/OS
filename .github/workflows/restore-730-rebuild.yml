@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - restore/styleos-730-reimplementation
+      - restore/styleos-730-notes-f5
   workflow_dispatch:
 permissions:
   contents: read
@@ -37,6 +38,10 @@ jobs:
         run: |
           set -o pipefail
           python3 tools/test_730_shell_f10.py --iso build/recovery-730/StyleOS-730-Rebuild-Experimental.iso --output build/recovery-730/f10-qemu 2>&1 | tee build/recovery-730/f10.log
+      - name: Boot QEMU, validate independent F3 Editor and F5 Notes across F10
+        run: |
+          set -o pipefail
+          python3 tools/test_730_notes_f5.py --iso build/recovery-730/StyleOS-730-Rebuild-Experimental.iso --output build/recovery-730/notes-f5-qemu 2>&1 | tee build/recovery-730/notes-f5.log
       - name: Archive complete restored source from exact Git commit
         if: always()
         run: |
@@ -55,6 +60,7 @@ jobs:
             build/recovery-730/StyleOS-730-Rebuild-Full-Source.zip.sha256
             build/recovery-730/*.log
             build/recovery-730/f10-qemu/results.json
+            build/recovery-730/notes-f5-qemu/results.json
             build/recovery-730-host/host.log
             build/recovery-730-host/result.json
           if-no-files-found: warn

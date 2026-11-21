@@ -922,22 +922,28 @@ bool desk_fs_read_text(struct desk_fs *b, unsigned id, char *data, size_t *size)
     return true;
 }
 
-bool desk_fs_save_text(struct desk_fs *b, unsigned folder, int *id, const char *data, size_t length)
+/* Separate native editor and Notes drafts get separate on-disk names.
+ * Existing documents preserve their own entry IDs and never change names. */
+static bool save_named_text(struct desk_fs *b, unsigned folder, int *id,
+                            const char *data, size_t length, const char *prefix)
 {
     enum sfs_result r = SFS_FULL;
     if (*id >= 0) r = sfs_write(&b->disk, &b->work, (unsigned)*id, (const uint8_t *)data, length);
     else for (unsigned n = 1; n <= SFS_ENTRIES; ++n) {
-        char name[48] = "Текст";
-        unsigned end = sizeof("Текст") - 1;
+        char name[48];
+        unsigned end = 0;
+        for (unsigned k = 0; prefix[k]; ++k) name[end++] = prefix[k];
         if (n > 1) {
             name[end++] = ' ';
             decimal(name + end, n);
             while (name[end]) ++end;
         }
         const char *extension = ".txt";
-        for (unsigned i = 0; extension[i]; ++i) name[end + i] = extension[i];
+        unsigned k = 0;
+        do { name[end + k] = extension[k]; } while (extension[k++]);
         unsigned created;
-        r = sfs_create(&b->disk, &b->work, folder, name, (const uint8_t *)data, length, &created);
+        r = sfs_create(&b->disk, &b->work, folder, name,
+                       (const uint8_t *)data, length, &created);
         if (r == SFS_EXISTS) continue;
         if (r == SFS_OK) *id = (int)created;
         break;
@@ -945,4 +951,14 @@ bool desk_fs_save_text(struct desk_fs *b, unsigned folder, int *id, const char *
     if (r == SFS_OK) ++b->revision;
     else b->status = error_text(r);
     return r == SFS_OK;
+}
+
+bool desk_fs_save_text(struct desk_fs *b, unsigned folder, int *id, const char *data, size_t length)
+{
+    return save_named_text(b, folder, id, data, length, "Текст");
+}
+
+bool desk_fs_save_note(struct desk_fs *b, unsigned folder, int *id, const char *data, size_t length)
+{
+    return save_named_text(b, folder, id, data, length, "Заметка");
 }

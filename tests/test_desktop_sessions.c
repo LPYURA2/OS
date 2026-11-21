@@ -10,6 +10,8 @@ static void basic(void)
     desk_sessions_init(s);
     assert(s->shell_pid == 1 && s->next_pid == 2);
     assert(s->editor.document == -1 && s->editor.notice != NULL);
+    assert(s->notes.document == -1 && s->notes.notice != NULL);
+    assert(!desk_sessions_has_unsaved(s) && !desk_sessions_notes_unsaved(s));
     const uint32_t exp = desk_sessions_start(s, DESK_SESSION_EXPLORER);
     const uint32_t edit = desk_sessions_start(s, DESK_SESSION_EDITOR);
     assert(exp == 2 && edit == 3);
@@ -32,6 +34,7 @@ static void shell_restart_preserves_draft(void)
     const uint32_t explorer = desk_sessions_start(s, DESK_SESSION_EXPLORER);
     const uint32_t editor = desk_sessions_start(s, DESK_SESSION_EDITOR);
     const uint32_t processes = desk_sessions_start(s, DESK_SESSION_PROCESSES);
+    const uint32_t notes = desk_sessions_start(s, DESK_SESSION_NOTES);
     const char *draft = "unsaved \320\277\321\200\320\270\320\262\320\265\321\202";
     const size_t draft_len = strlen(draft);
     memcpy(s->editor.content, draft, draft_len);
@@ -42,19 +45,40 @@ static void shell_restart_preserves_draft(void)
     s->editor.doc_folder = 2;
     s->editor.dirty = true;
     s->editor.notice = "Не сохранено";
+    const char *note = "отдельная заметка: важное";
+    const size_t note_len = strlen(note);
+    memcpy(s->notes.content, note, note_len);
+    s->notes.length = note_len;
+    s->notes.caret = note_len;
+    s->notes.document = 29;
+    s->notes.doc_folder = 3;
+    s->notes.scroll = 4;
+    s->notes.dirty = true;
+    s->notes.notice = "Заметка не сохранена";
+    assert(desk_sessions_has_unsaved(s) && desk_sessions_notes_unsaved(s));
     const uint32_t previous_shell = s->shell_pid;
     const uint32_t fresh_shell = desk_sessions_restart_shell(s);
     assert(fresh_shell != 0 && fresh_shell != previous_shell);
     assert(desk_sessions_pid(s, DESK_SESSION_EDITOR) == editor);
     assert(desk_sessions_pid(s, DESK_SESSION_EXPLORER) == explorer);
     assert(desk_sessions_pid(s, DESK_SESSION_PROCESSES) == processes);
+    assert(desk_sessions_pid(s, DESK_SESSION_NOTES) == notes);
     assert(s->editor.length == draft_len && s->editor.caret == 12);
     assert(s->editor.document == 17 && s->editor.scroll == 3);
     assert(s->editor.doc_folder == 2 && s->editor.dirty);
     assert(memcmp(s->editor.content, draft, draft_len) == 0);
     assert(strcmp(s->editor.notice, "Не сохранено") == 0);
+    assert(s->notes.length == note_len && s->notes.caret == note_len);
+    assert(s->notes.document == 29 && s->notes.doc_folder == 3);
+    assert(s->notes.scroll == 4 && s->notes.dirty);
+    assert(memcmp(s->notes.content, note, note_len) == 0);
+    assert(strcmp(s->notes.notice, "Заметка не сохранена") == 0);
+    s->notes.dirty = false;
+    assert(desk_sessions_has_unsaved(s) && !desk_sessions_notes_unsaved(s));
+    s->editor.dirty = false;
+    assert(!desk_sessions_has_unsaved(s));
     assert(s->shell_restarts == 1);
-    puts("PASS: shell PID refresh preserves app PIDs and unsaved UTF-8 draft");
+    puts("PASS: F10 retains distinct Editor/Notes PID, UTF-8 drafts and cursors");
 }
 
 static void stop_and_reopen(void)

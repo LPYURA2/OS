@@ -25,6 +25,8 @@ void desk_sessions_init(struct desk_sessions *s)
     s->shell_pid = allocate_pid(s);
     s->editor.document = -1;
     s->editor.notice = "";
+    s->notes.document = -1;
+    s->notes.notice = "";
 }
 
 uint32_t desk_sessions_start(struct desk_sessions *s, enum desk_session_kind kind)
@@ -63,6 +65,16 @@ uint32_t desk_sessions_restart_shell(struct desk_sessions *s)
     s->shell_pid = new_pid;
     ++s->shell_restarts;
     return new_pid;
+}
+
+bool desk_sessions_has_unsaved(const struct desk_sessions *s)
+{
+    return s && (s->editor.dirty || s->notes.dirty);
+}
+
+bool desk_sessions_notes_unsaved(const struct desk_sessions *s)
+{
+    return s && s->notes.dirty;
 }
 
 const char *desk_sessions_name(enum desk_session_kind kind)

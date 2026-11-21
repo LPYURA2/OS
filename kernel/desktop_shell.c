@@ -7,16 +7,16 @@
 #include <styleos/desktop_stylefs.h>
 #include <styleos/desktop_sessions.h>
 
-enum { FILES, NOTES, TASKS, ABOUT, WINDOWS };
+enum { FILES, NOTES, TASKS, ABOUT, NOTE_WINDOW, WINDOWS };
 enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
        WINDOW = 0x171f2c, STROKE = 0x586272, PANEL = 0x101822, CELL = 11,
        LINE = 24, TITLE = 42, ROW = 45, CURSOR_W = 10, CURSOR_H = 17 };
 
 static const char processes_name[] = "Процессы";
-static const char *const names[WINDOWS] = {"Файлы", "Заметки", processes_name, "О системе"};
+static const char *const names[WINDOWS] = {"Файлы", "Текстовый редактор", processes_name, "О системе", "Заметки"};
 static const char *const folders[] = {"Файлы", "Документы", "Проекты"};
 static const char *const files[] = {"Заметки.txt", "Заметки 2.txt", "Заметки 3.txt", "Заметки 4.txt"};
-static const uint8_t icons[] = {DESK_FILE_MANAGER, DESK_PAPER, DESK_TASK, DESK_INFO};
+static const uint8_t icons[] = {DESK_FILE_MANAGER, DESK_PAPER, DESK_TASK, DESK_INFO, DESK_APP_NOTES};
 
 static struct window {
     struct desk_box box, previous;
@@ -24,7 +24,7 @@ static struct window {
 } win[WINDOWS];
 static struct desk_store store;
 static struct desk_fs filesystem;
-static int width, height, mx, my, order[WINDOWS] = {ABOUT, TASKS, NOTES, FILES};
+static int width, height, mx, my, order[WINDOWS] = {ABOUT, TASKS, NOTE_WINDOW, NOTES, FILES};
 static int drag = -1, drag_x, drag_y;
 static bool mouse_down, menu, drag_moved;
 static struct file_click {
@@ -38,16 +38,24 @@ static uint32_t data_sectors;
 static char incoming[DESK_STYLEFS_TEXT_LIMIT];
 static bool russian, shell_refreshed;
 
-/* The compositor owns window geometry. App draft and PID ownership live in
- * kernel/desktop_sessions.c and survive F10 shell recreation. */
-#define document (desk_sessions_global()->editor.document)
-#define doc_folder (desk_sessions_global()->editor.doc_folder)
-#define content (desk_sessions_global()->editor.content)
-#define length (desk_sessions_global()->editor.length)
-#define caret (desk_sessions_global()->editor.caret)
-#define scroll (desk_sessions_global()->editor.scroll)
-#define dirty (desk_sessions_global()->editor.dirty)
-#define notice (desk_sessions_global()->editor.notice)
+/* Editor and Notes are separate app sessions. Their buffers live outside the
+ * compositor; rendering either window never switches the other app's draft. */
+static int active(void);
+static struct desk_editor_draft *rendering_draft;
+static struct desk_editor_draft *current_draft(void)
+{
+    if (rendering_draft) return rendering_draft;
+    return active() == NOTE_WINDOW ? &desk_sessions_global()->notes :
+                                     &desk_sessions_global()->editor;
+}
+#define document (current_draft()->document)
+#define doc_folder (current_draft()->doc_folder)
+#define content (current_draft()->content)
+#define length (current_draft()->length)
+#define caret (current_draft()->caret)
+#define scroll (current_draft()->scroll)
+#define dirty (current_draft()->dirty)
+#define notice (current_draft()->notice)
 static char clock_text[] = "--:--";
 static struct {
     int id, x, y;
@@ -88,7 +96,7 @@ static const char *app_name(int id)
 }
 static unsigned app_icon(int id)
 {
-    static const uint8_t new_icons[] = {DESK_APP_EXPLORER, DESK_APP_EDITOR, DESK_APP_PROCESSES, DESK_INFO};
+    static const uint8_t new_icons[] = {DESK_APP_EXPLORER, DESK_APP_EDITOR, DESK_APP_PROCESSES, DESK_INFO, DESK_APP_NOTES};
     return modern_shell() ? new_icons[id] : icons[id];
 }
 
@@ -151,6 +159,7 @@ static enum desk_session_kind session_kind_for(int id)
     if (id == FILES) return DESK_SESSION_EXPLORER;
     if (id == NOTES) return DESK_SESSION_EDITOR;
     if (id == TASKS) return DESK_SESSION_PROCESSES;
+    if (id == NOTE_WINDOW) return DESK_SESSION_NOTES;
     return DESK_SESSION_COUNT; /* ABOUT is a shell-owned system window */
 }
 
@@ -182,20 +191,35 @@ static void open_window(int id)
     else if (opening) arch_puts("STYLEOS DESKTOP WINDOW OPEN\n");
 }
 
-static void new_document(void)
+static void new_draft(int target)
 {
-    open_window(NOTES);
+    open_window(target);
     if (dirty) { notice = "Сначала сохраните текущий текст"; return; }
     document = -1;
     doc_folder = filesystem.mode ? filesystem.folder : current_folder;
     length = caret = 0;
     scroll = 0;
-    notice = filesystem.mode ? "Новый текстовый файл" : "Новая заметка";
+    notice = target == NOTE_WINDOW ? "Новая заметка" :
+             (filesystem.mode ? "Новый текстовый файл" : "Новая заметка");
+}
+static void new_document(void) { new_draft(NOTES); }
+static void new_note(void) { new_draft(NOTE_WINDOW); }
+
+static bool note_filename(const char *name)
+{
+    static const char prefix[] = "Заметка";
+    if (!name) return false;
+    for (size_t i = 0; i < sizeof(prefix) - 1; ++i)
+        if (name[i] != prefix[i]) return false;
+    return true;
 }
 
 static void open_document(unsigned slot)
 {
-    open_window(NOTES);
+    const struct sfs_entry *entry = filesystem.mode ?
+        sfs_entry_at(&filesystem.disk, slot) : 0;
+    int target = entry && note_filename(entry->name) ? NOTE_WINDOW : NOTES;
+    open_window(target);
     if ((int)slot == document) return;
     if (dirty) { notice = "Сначала сохраните текущий текст"; return; }
     size_t bytes;
@@ -217,7 +241,10 @@ static void save(void)
     if (!data_writable()) { notice = "Диск данных недоступен для записи"; return; }
     int slot = document;
     bool saved;
-    if (filesystem.mode) saved = desk_fs_save_text(&filesystem, doc_folder, &slot, content, length);
+    if (filesystem.mode)
+        saved = active() == NOTE_WINDOW ?
+            desk_fs_save_note(&filesystem, doc_folder, &slot, content, length) :
+            desk_fs_save_text(&filesystem, doc_folder, &slot, content, length);
     else {
         if (slot < 0) for (int i = 0; i < DESK_DOCS; ++i)
             if (!store.file[i].generation && !store.file[i].blocked) { slot = i; break; }
@@ -368,6 +395,7 @@ static bool keyboard(unsigned key, unsigned mods)
     current_file_click.id = -1;
     if (key == 0x44) { restart_shell(); return true; } /* F10, preserve app state and PIDs */
     if (key == 0x42) { open_window(TASKS); return true; } /* F8 processes */
+    if (key == 0x3f) { open_window(NOTE_WINDOW); return true; } /* F5 Notes */
     if (key == 0x01 && transfer.id >= 0) { transfer.id = -1; transfer.lifted = false; return true; }
     if (key == 0x40 || key == DESK_KEY_LANGUAGE) { toggle_language(); return true; } /* F6 or Alt+Shift */
     if (key == 0x01 && menu) { menu = false; return true; }
@@ -380,10 +408,13 @@ static bool keyboard(unsigned key, unsigned mods)
     }
     if (key == 0x3c) { open_window(FILES); return true; }
     if (key == 0x3d) { open_window(NOTES); return true; }
-    if (active() != NOTES) return false;
+    if (active() != NOTES && active() != NOTE_WINDOW) return false;
     if (mods & DESK_CTRL) {
         if (key == 0x1f) save();
-        else if (key == 0x31) new_document();
+        else if (key == 0x31) {
+            if (active() == NOTE_WINDOW) new_note();
+            else new_document();
+        }
         else if (key == 0x18 && modern_shell()) open_window(FILES);
         else return false;
     } else if (mods & DESK_ALT) return false;
@@ -518,6 +549,9 @@ static void invalidate(struct desk_damage *d, const struct visual *old,
     if (files && next->shown[FILES]) desk_damage_add(d, next->boxes[FILES]);
     if ((editor || old->stylefs_generation != next->stylefs_generation ||
          old->writable != next->writable) && next->shown[NOTES]) desk_damage_add(d, next->boxes[NOTES]);
+    if ((editor || old->stylefs_generation != next->stylefs_generation ||
+         old->writable != next->writable) && next->shown[NOTE_WINDOW])
+        desk_damage_add(d, next->boxes[NOTE_WINDOW]);
     if (task_state && next->shown[TASKS]) desk_damage_add(d, next->boxes[TASKS]);
     if (old->writable != next->writable && next->shown[ABOUT]) desk_damage_add(d, next->boxes[ABOUT]);
 
@@ -541,7 +575,7 @@ static void maximize(int id)
     if (w->maximized) w->box = w->previous;
     else { w->previous = w->box; w->box = work_area(); }
     w->maximized = !w->maximized;
-    if (id == NOTES) edit_scroll();
+    if (id == NOTES || id == NOTE_WINDOW) edit_scroll();
 }
 
 static void click(int x, int y)
@@ -557,8 +591,10 @@ static void click(int x, int y)
             else if (d < 98 && d >= 58) open_window(ABOUT);
             else if (d < 140 && d >= 98) open_window(TASKS);
             else if (d >= 156 && d < 201) {
-                if (dirty) { open_window(NOTES); notice = "Перед перезагрузкой сохраните текст"; }
-                else { arch_puts("STYLEOS DESKTOP REBOOT\n"); desk_reboot(); }
+                if (desk_sessions_has_unsaved(desk_sessions_global())) {
+                    open_window(desk_sessions_notes_unsaved(desk_sessions_global()) ? NOTE_WINDOW : NOTES);
+                    notice = "Перед перезагрузкой сохраните текст";
+                } else { arch_puts("STYLEOS DESKTOP REBOOT\n"); desk_reboot(); }
             }
             return;
         }
@@ -583,9 +619,10 @@ static void click(int x, int y)
         int dx = x - b.x, dy = y - b.y, right = b.w - dx;
         if (dy < TITLE) {
             if (right < 42) {
-                if (id == NOTES && dirty) notice = "Перед закрытием сохраните текст";
+                if ((id == NOTES || id == NOTE_WINDOW) && dirty)
+                    notice = "Перед закрытием сохраните текст";
                 else {
-                    if (id == NOTES && modern_shell()) {
+                    if ((id == NOTES || id == NOTE_WINDOW) && modern_shell()) {
                         document = -1;
                         length = caret = 0;
                         scroll = 0;
@@ -609,7 +646,7 @@ static void click(int x, int y)
             int items[DESK_DOCS + 2];
             unsigned count = file_rows(items), at = (unsigned)(dy - TITLE - 12) / ROW;
             if (at < count) pick_file(items[at]);
-        } else if (id == NOTES) {
+        } else if (id == NOTES || id == NOTE_WINDOW) {
             if (dy >= 52 && dy < 83 && dx >= 12 && dx < 88) new_document();
             else if (dy >= 52 && dy < 83 && modern_shell() && dx >= 94 && dx < 192) open_window(FILES);
             else if (dy >= 52 && dy < 83 && ((!modern_shell() && dx >= 94 && dx < 195) ||
@@ -650,6 +687,10 @@ static void draw_without_data(struct desk_box b)
 
 static void draw_window(int id, int top)
 {
+    struct desk_editor_draft *previous_draft = rendering_draft;
+    if (id == NOTES) rendering_draft = &desk_sessions_global()->editor;
+    else if (id == NOTE_WINDOW) rendering_draft = &desk_sessions_global()->notes;
+    else rendering_draft = 0;
     struct desk_box b = win[id].box;
     desk_round(b, WINDOW);
     desk_outline(b, STROKE);
@@ -685,7 +726,7 @@ static void draw_window(int id, int top)
         if (!store.writable) desk_text(b.x + 18, foot, r - 10, "Диск данных не доступен для записи", MUTED);
         else if (modern_shell()) desk_text(b.x + 18, foot, r - 10, "Старый диск заметок. Обновления недоступны.", MUTED);
         else if (current_folder != DESK_ROOT) desk_text(b.x + 18, foot, r - 10, folders[current_folder], MUTED);
-    } else if (id == NOTES) {
+    } else if (id == NOTES || id == NOTE_WINDOW) {
         desk_round((struct desk_box){b.x + 12, b.y + 52, 76, 31}, 0x253143);
         desk_text(b.x + 22, b.y + 58, b.x + 84, "Новый", LIGHT);
         if (modern_shell()) {
@@ -771,6 +812,7 @@ static void draw_window(int id, int top)
         desk_text(b.x + 18, b.y + 207, r - 15, desk_update_status(), LIGHT);
 #endif
     }
+    rendering_draft = previous_draft;
 }
 
 static void draw(void)
@@ -910,12 +952,15 @@ static void initial_windows(void)
     int h = work_area().h;
     win[FILES].box = (struct desk_box){width * 688 / 1536, h * 128 / 804, width * 756 / 1536, max(350, h * 419 / 804)};
     win[NOTES].box = (struct desk_box){width * 405 / 1536, h * 175 / 804, width * 900 / 1536, h * 488 / 804};
+    win[NOTE_WINDOW].box = (struct desk_box){width * 435 / 1536, h * 200 / 804,
+                                             width * 830 / 1536, h * 445 / 804};
     win[TASKS].box = (struct desk_box){width / 3, h / 6, min(width / 2, 510), min(h * 4 / 5, 316)};
     win[ABOUT].box = (struct desk_box){width / 3, h / 5, min(width / 2, 490), min(h * 4 / 5, 238)};
     if (modern_shell()) {
         int x = width * 182 / 1536, y = h * 54 / 804;
         win[FILES].box = (struct desk_box){x, y, width - x - 46, h - y - 49};
         win[NOTES].box = (struct desk_box){x + 24, y + 27, width - x - 76, h - y - 75};
+        win[NOTE_WINDOW].box = (struct desk_box){x + 48, y + 43, width - x - 125, h - y - 116};
     }
     win[FILES].open = true;
 }
@@ -932,7 +977,8 @@ static void restart_shell(void)
         opened[i] = win[i].open;
         win[i] = (struct window){0};
     }
-    order[0] = ABOUT; order[1] = TASKS; order[2] = NOTES; order[3] = FILES;
+    order[0] = ABOUT; order[1] = TASKS; order[2] = NOTE_WINDOW;
+    order[3] = NOTES; order[4] = FILES;
     menu = false;
     drag = -1;
     mouse_down = false;
@@ -1005,8 +1051,10 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
         bool captured = false, editor = false, clock = false;
         for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i) {
             if (!captured) { take_visual(&old); captured = true; }
-            if (e.mouse) editor |= mouse(&e) && active() == NOTES;
-            else editor |= keyboard(e.key, e.modifiers) && active() == NOTES;
+            if (e.mouse) editor |= mouse(&e) &&
+                          (active() == NOTES || active() == NOTE_WINDOW);
+            else editor |= keyboard(e.key, e.modifiers) &&
+                           (active() == NOTES || active() == NOTE_WINDOW);
         }
         if (++tick == 20000) { tick = 0; clock = update_clock(); }
         bool imported = false;
