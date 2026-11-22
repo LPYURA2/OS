@@ -16,6 +16,7 @@ struct acpi806_topology {
 };
 /* Pure length-checked readers; caller must supply a readable buffer of the
    passed length. Direct firmware pointers require a trusted OVMF environment. */
+int acpi806_copy_capture(struct acpi806_topology *out); /* isolated UEFI diagnostics only */
 int acpi806_rsdp(const uint8_t *rsdp,size_t supplied,uint64_t *xsdt);
 int acpi806_xsdt(const uint8_t *root,size_t supplied,uint64_t *entries,size_t *count);
 int acpi806_madt(const uint8_t *madt,size_t supplied,struct acpi806_topology *out);

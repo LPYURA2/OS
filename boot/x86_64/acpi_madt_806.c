@@ -46,6 +46,7 @@ void acpi806_capture(const struct efi_system_table *st){
  result.root_entries=(uint32_t)count; result.revision=(uint32_t)rsdp[15];
  captured=result;ready=1;
 }
+int acpi806_copy_capture(struct acpi806_topology *out){if(!ready||!out)return 0;*out=captured;return 1;}
 static _Noreturn void fail(const char *why){arch_puts("STYLEOS S806 FAIL ");arch_puts(why);arch_putc('\n');arch_halt();}
 _Noreturn void acpi806_terminal(const struct boot_info *info){
  if(!info||info->magic!=STYLEOS_BOOT_MAGIC||info->flags!=STYLEOS_BOOT_EXITED_SERVICES)fail("handoff");
