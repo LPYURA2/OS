@@ -67,6 +67,38 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf
 
+      - name: 801 Validate live pagewalk decoder under ASAN UBSAN COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_cache_801_host.py --output build/recovery-canonical/cache-801-host
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('build/recovery-canonical/cache-801-host/results.json').read_text())
+          assert x['stage']==801 and x['status']=='PASS' and x['asan_ubsan'] and x['coff_compilation']
+          assert x['production_cr3_authorized'] is False
+          PYCODE
+
+      - name: 801 Reject forged live pagewalk and cache alias claims
+        run: |
+          set -euo pipefail
+          python3 tools/test_cache_801_negative.py | tee build/recovery-canonical/cache-801-negative.log
+
+      - name: 801 Observe active CR3 PAT PTE translations in real QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_cache_801.py --output build/recovery-canonical/cache-801-qemu
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('build/recovery-canonical/cache-801-qemu/results.json').read_text())
+          assert x['stage']==801 and x['status']=='PASS' and x['qemu_exit_code']==33
+          assert x['live_pagewalk_observed'] and x['mapped_sample_addresses']>=1
+          assert x['all_mmio_aliases_excluded'] is False
+          assert x['effective_mmio_cache_verified'] is False
+          assert x['production_cr3_authorized'] is False
+          PYCODE
+
       - name: 800 Validate conservative physical MTRR evaluator under ASAN UBSAN COFF
         run: |
           set -euo pipefail
@@ -766,6 +798,13 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/cache-801-negative.log
+            build/recovery-canonical/cache-801-host/results.json
+            build/recovery-canonical/cache-801-host/host.log
+            build/recovery-canonical/cache-801-qemu/results.json
+            build/recovery-canonical/cache-801-qemu/serial.log
+            build/recovery-canonical/cache-801-qemu/qemu.log
+            build/recovery-canonical/cache-801-qemu/compile.log
             build/recovery-canonical/cache-800-negative.log
             build/recovery-canonical/cache-800-host/results.json
             build/recovery-canonical/cache-800-host/host.log
