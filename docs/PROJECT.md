@@ -1,3 +1,12 @@
+## Этап 785 — неактивные guard-таблицы для будущего IST
+
+Отдельная ветка `feature/styleos-ist-guard-table-plan-785` от принятого 784.
+Неактивная 4-уровневая схема с одной NX supervisor IST1-страницей и двумя
+отсутствующими PTE; программные ASAN/UBSAN и COFF тесты. Не переключает CR3,
+не активирует IDT/TSS/IST, не меняет обычный Desktop. Аппаратная проверка
+IST/guard — следующая отдельная стадия. [Отчёт](architecture/INACTIVE_IST_GUARD_TABLES_785.md),
+[точка продолжения](NEXT_CHAT_785.md), [сообщение новому чату](MESSAGE_FOR_NEXT_CHAT_785.md).
+
 ## Stage 784 — isolated terminal GDT/TSS install test (candidate)
 
 Branch `feature/styleos-tss-lgdt-ltr-trial-784` from the exact accepted
