@@ -49,6 +49,7 @@ on:
       - feature/styleos-live-pte-pat-evidence-801
       - feature/styleos-cache-crossboot-correlation-802
       - feature/styleos-sameboot-cache-803
+      - feature/styleos-known-mmio-extent-804
   workflow_dispatch:
 
 permissions:
@@ -173,6 +174,35 @@ jobs:
           assert x['all_mmio_aliases_excluded'] is False
           assert x['effective_mmio_cache_verified'] is False
           assert x['production_cr3_authorized'] is False
+          PYCODE
+
+      - name: 804 Validate read-only MMIO extent planner under ASAN UBSAN COFF
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/cache-804-host
+          clang -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -I include kernel/cache_extent_804.c tests/test_cache_extent_804.c -o build/recovery-canonical/cache-804-host/test_extent
+          ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 build/recovery-canonical/cache-804-host/test_extent 2>&1 | tee build/recovery-canonical/cache-804-host/host.log
+          clang --target=x86_64-pc-win32-coff -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -I include -c kernel/cache_extent_804.c -o build/recovery-canonical/cache-804-host/cache_extent_coff.o
+
+      - name: 804 Reject forged full MMIO range and alias claims
+        run: |
+          set -euo pipefail
+          python3 tools/test_cache_804_negative.py 2>&1 | tee build/recovery-canonical/cache-804-negative.log
+
+      - name: 804 Observe full three known MMIO extents in one real QEMU boot
+        run: |
+          set -euo pipefail
+          python3 tools/test_cache_804.py --output build/recovery-canonical/cache-804-qemu
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('build/recovery-canonical/cache-804-qemu/results.json').read_text())
+          assert data['stage']==804 and data['status']=='PASS' and data['qemu_exit_code']==33
+          assert data['validated_4k_pages']==1005 and data['same_boot_full_known_extents'] is True
+          assert len(data['observations']['ranges'])==3
+          assert data['all_mmio_aliases_excluded'] is False
+          assert data['effective_mmio_cache_verified'] is False
+          assert data['production_cr3_authorized'] is False
           PYCODE
 
       - name: Compile native x86-64 EFI from checked-out source
@@ -843,6 +873,12 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/cache-804-host/host.log
+            build/recovery-canonical/cache-804-negative.log
+            build/recovery-canonical/cache-804-qemu/results.json
+            build/recovery-canonical/cache-804-qemu/serial.log
+            build/recovery-canonical/cache-804-qemu/qemu.log
+            build/recovery-canonical/cache-804-qemu/compile.log
             build/recovery-canonical/cache-803-negative.log
             build/recovery-canonical/cache-803-qemu/results.json
             build/recovery-canonical/cache-803-qemu/serial.log

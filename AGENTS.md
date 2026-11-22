@@ -308,3 +308,9 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
   QEMU11.1.3 belongs to an earlier failed host-test attempt. New Android/Termux,
   VirtualBox and native hardware remain SKIPPED until actually run. Stop after
   report/publication; desktop and x86-64 UEFI/VirtualBox are separate discussions.
+
+## Stage 804 gate
+
+The experimental known-MMIO-range audit reads inherited firmware mappings
+only. Do not treat its range coverage as a global alias analysis, full VGA BAR
+scan, or authorization for production CR3. Preserve desktop CI and UI.

@@ -300,3 +300,11 @@ MTRR UC и PAT WB согласуются с UC, но не заменяют гл�
 ## 803 one-boot cache evidence
 
 Terminal QEMU-only PAT/MTRR/PTE sample, same-boot, no global alias proof or production CR3. See `docs/architecture/SAME_BOOT_CACHE_SAMPLE_803.md`.
+
+## Stage 804 — test-only complete-known-MMIO-extent audit
+
+S804 expands S803 single-address cache samples to all 1005 physical 4KiB pages
+of three fixed-QEMU MMIO ranges (GOP pixels, VirtIO Serial BAR1/BAR4).
+Independent UART and host verifiers enforce gapless extent coverage; **no**
+production CR3, global alias proof, other-device policy or normal desktop
+modification is implied. Details: `docs/architecture/MMIO_EXTENT_PAGE_AUDIT_804.md`.
