@@ -1,3 +1,13 @@
+## Stage 794 — Q35 PCI BAR to GOP base correlation (terminal evidence)
+
+New terminal-only PCI configuration mechanism #1 scan of PCI bus zero.
+Correlates a detected display device **memory BAR base** to the observed GOP
+framebuffer physical start. Does not size the BAR, prove aperture coverage,
+resolve PAT/MTRR effective caching, route interrupts, authorize production CR3
+or modify ordinary Desktop. Full validation requires actual CI/QEMU.
+See [report](architecture/PCI_GOP_BAR_OBSERVATION_794.md),
+[handoff](NEXT_CHAT_794.md) and [new chat](MESSAGE_FOR_NEW_CHAT_794.md).
+
 ## Stage 793 — UEFI device/cache observations (terminal evidence)
 
 Stage 793 adds an independent GOP/EFI-descriptor/CPU register diagnostic and
