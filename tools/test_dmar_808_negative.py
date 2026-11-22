@@ -5,7 +5,7 @@ hx=lambda n:'0x'+format(n,'016x')
 S='STYLEOS S808 STATUS present='+hx(1)+' root-entries='+hx(7)
 D='STYLEOS S808 DMAR length='+hx(64)+' revision='+hx(1)+' host-aw='+hx(39)+' flags='+hx(1)+' drhd-count='+hx(1)+' rmrr-count='+hx(0)+' unknown-count='+hx(0)
 H='STYLEOS S808 DRHD index='+hx(0)+' segment='+hx(0)+' flags='+hx(1)+' base='+hx(0xfed90000)+' scope-count='+hx(0)
-P='STYLEOS S808 POLICY dmar-table-verified=yes iommu-registers-observed=no iommu-translation-enabled=no dma-isolation-verified=no dma-access-authorized=no uefi-runtime-verified=no production-cr3=deny'
+P='STYLEOS S808 POLICY dmar-discovery-verified=yes iommu-registers-observed=no iommu-translation-enabled=no dma-isolation-verified=no dma-access-authorized=no uefi-runtime-verified=no production-cr3=deny'
 PASS='STYLEOS S808 PASS'
 def sample(lines):return ('STYLEOS x86_64 UEFI entry\n'+'\n'.join(lines)+'\n').encode()
 valid=sample([S,D,H,P,PASS]);off=sample(['STYLEOS S808 STATUS present='+hx(0)+' root-entries='+hx(6),P,PASS])

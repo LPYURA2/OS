@@ -64,7 +64,7 @@ _Noreturn void dmar808_terminal(const struct boot_info *b){
    field("base",u->base);field("limit",u->limit_inclusive);field("scope-count",u->scope_count);arch_putc('\n');
   }
  }
- arch_puts("STYLEOS S808 POLICY dmar-table-verified=yes iommu-registers-observed=no iommu-translation-enabled=no dma-isolation-verified=no dma-access-authorized=no uefi-runtime-verified=no production-cr3=deny\n");
+ arch_puts("STYLEOS S808 POLICY dmar-discovery-verified=yes iommu-registers-observed=no iommu-translation-enabled=no dma-isolation-verified=no dma-access-authorized=no uefi-runtime-verified=no production-cr3=deny\n");
  arch_puts("STYLEOS S808 PASS\n");
  __asm__ volatile("outl %0,%1"::"a"(0x10u),"Nd"((uint16_t)0xf4u));arch_halt();
 }

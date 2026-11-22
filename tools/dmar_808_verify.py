@@ -20,7 +20,7 @@ def verify(raw,returncode,expect_present):
  status=parse_fields(s[0],'STYLEOS S808 STATUS',['present','root-entries'])
  if not status or status['root-entries']<1 or status['root-entries']>64:return fail('status/root count invalid')
  if status['present'] not in (0,1) or bool(status['present']) != bool(expect_present):return fail('IOMMU configuration or DMAR discovery disagrees')
- policy='STYLEOS S808 POLICY dmar-table-verified=yes iommu-registers-observed=no iommu-translation-enabled=no dma-isolation-verified=no dma-access-authorized=no uefi-runtime-verified=no production-cr3=deny'
+ policy='STYLEOS S808 POLICY dmar-discovery-verified=yes iommu-registers-observed=no iommu-translation-enabled=no dma-isolation-verified=no dma-access-authorized=no uefi-runtime-verified=no production-cr3=deny'
  if s[-2]!=policy:return fail('unsafe DMA or CR3 authorization')
  i=1;topology=None;drhds=[];rmrrs=[]
  if status['present']:
