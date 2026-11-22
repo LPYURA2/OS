@@ -11,6 +11,9 @@
 #ifdef STYLEOS_TEST_IST_HW_786
 #include <styleos/ist_hw_trial_786.h>
 #endif
+#ifdef STYLEOS_TEST_GUARD_PF_787
+#include <styleos/guard_pf_trial_787.h>
+#endif
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -217,5 +220,8 @@ void fg_experiment_run(struct pg_experiment *p)
 #endif
 #ifdef STYLEOS_TEST_IST_HW_786
     s786_terminal_trial(p);
+#endif
+#ifdef STYLEOS_TEST_GUARD_PF_787
+    s787_terminal_trial(p);
 #endif
 }

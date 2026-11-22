@@ -1,3 +1,12 @@
+## Stage 787 — guard page #PF on separate IST2 (experimental)
+
+Task branch `feature/styleos-hardware-guard-pf-787` starts from accepted 786.
+Only isolated terminal `--test-guard-pf-787` may raise the real guard-page
+write page-fault. Does not affect ordinary Desktop. Full acceptance requires
+actual GitHub QEMU/OVMF `#PF` evidence, checked final CI and archive, NOT
+host software checks. See [787 architecture](architecture/HARDWARE_GUARD_PF_IST2_787.md)
+and [handoff](NEXT_CHAT_787.md). #DF/stack exhaustion remain unproved.
+
 ## Этап 786 — аппаратный IST1 в отдельном терминальном QEMU
 
 Ветка `feature/styleos-hardware-ist-entry-786` от принятой 785. Отдельный
