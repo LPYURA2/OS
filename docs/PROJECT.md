@@ -308,3 +308,9 @@ of three fixed-QEMU MMIO ranges (GOP pixels, VirtIO Serial BAR1/BAR4).
 Independent UART and host verifiers enforce gapless extent coverage; **no**
 production CR3, global alias proof, other-device policy or normal desktop
 modification is implied. Details: `docs/architecture/MMIO_EXTENT_PAGE_AUDIT_804.md`.
+
+## Stage 805 (diagnostic task branch)
+
+Read-only, dedicated QEMU/OVMF post-EBS IRQ/APIC CPU snapshot. See
+`docs/architecture/IRQ_APIC_CPU_SNAPSHOT_805.md`. This does **not**
+activate APIC routing in native Desktop or authorize production CR3.

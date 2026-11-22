@@ -5,6 +5,9 @@
 #include "desktop_display.h"
 #endif
 
+#ifdef STYLEOS_TEST_IRQ_APIC_805
+_Noreturn void irq805_terminal(const struct boot_info *);
+#endif
 #ifdef STYLEOS_TEST_HW_PROBE_793
 #include <styleos/desktop_display.h>
 _Noreturn void hw793_terminal(const struct boot_info *, const struct desktop_surface *);
@@ -131,6 +134,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
     /* No UEFI interface may be used below this point. */
     __asm__ volatile ("cli" ::: "memory");
     arch_puts("STYLEOS x86_64 ExitBootServices OK\n");
+#ifdef STYLEOS_TEST_IRQ_APIC_805
+    irq805_terminal(&handoff);
+#endif
 #ifdef STYLEOS_TEST_HW_PROBE_793
     hw793_terminal(&handoff, desktop_platform_surface());
 #endif
