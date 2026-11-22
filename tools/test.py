@@ -706,7 +706,7 @@ def serial_frame_grants_ok(output, arch, site, map_file, ram_mib=128, el2=False)
         return False
     # The paging proof checks the exact linked PE, old root, new root, live
     # PTEs, CR3 readback and restoration. Only remove our known extra lines.
-    stripped=b'\n'.join(line for line in lines if not line.startswith((b'STYLEOS GRANTS ',b'STYLEOS DGB ',b'STYLEOS KCA ',b'STYLEOS KMI ',b'STYLEOS KDI ')))+b'\n'
+    stripped=b'\n'.join(line for line in lines if not line.startswith((b'STYLEOS GRANTS ',b'STYLEOS DGB ',b'STYLEOS KCA ',b'STYLEOS KMI ',b'STYLEOS KDI ',b'STYLEOS DSI ')))+b'\n'
     return serial_paging_roundtrip_ok(stripped,arch,site,ram_mib,el2)
 
 
