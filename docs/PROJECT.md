@@ -314,3 +314,6 @@ modification is implied. Details: `docs/architecture/MMIO_EXTENT_PAGE_AUDIT_804.
 Read-only, dedicated QEMU/OVMF post-EBS IRQ/APIC CPU snapshot. See
 `docs/architecture/IRQ_APIC_CPU_SNAPSHOT_805.md`. This does **not**
 activate APIC routing in native Desktop or authorize production CR3.
+
+### Stage 806 — ACPI MADT/IOAPIC read-only topology
+A separate terminal diagnostic observes trusted QEMU/OVMF RSDP/XSDT/MADT without changing standard Desktop. Only topology and checksums; IRQ routing and delivery unverified. See `docs/architecture/ACPI_MADT_IOAPIC_TOPOLOGY_806.md`.

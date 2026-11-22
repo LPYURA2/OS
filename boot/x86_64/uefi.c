@@ -5,6 +5,10 @@
 #include "desktop_display.h"
 #endif
 
+#ifdef STYLEOS_TEST_ACPI_MADT_806
+void acpi806_capture(const struct efi_system_table *);
+_Noreturn void acpi806_terminal(const struct boot_info *);
+#endif
 #ifdef STYLEOS_TEST_IRQ_APIC_805
 _Noreturn void irq805_terminal(const struct boot_info *);
 #endif
@@ -117,6 +121,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
 #if defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801) || defined(STYLEOS_TEST_CACHE_803) || defined(STYLEOS_TEST_CACHE_804)
     desktop_capture_uefi_mode(table->boot_services);
 #endif
+#ifdef STYLEOS_TEST_ACPI_MADT_806
+    acpi806_capture(table);
+#endif
     arch_puts("STYLEOS x86_64 acquiring memory map\n");
     status = styleos_exit_boot_services(table->boot_services, image, &handoff);
     if (status != EFI_SUCCESS) {
@@ -134,6 +141,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
     /* No UEFI interface may be used below this point. */
     __asm__ volatile ("cli" ::: "memory");
     arch_puts("STYLEOS x86_64 ExitBootServices OK\n");
+#ifdef STYLEOS_TEST_ACPI_MADT_806
+    acpi806_terminal(&handoff);
+#endif
 #ifdef STYLEOS_TEST_IRQ_APIC_805
     irq805_terminal(&handoff);
 #endif
