@@ -5,6 +5,9 @@
 #include <styleos/kernel_closure_audit.h>
 #include <styleos/tss_ist_stage_782.h>
 #include <styleos/tss_descriptor_783.h>
+#ifdef STYLEOS_TEST_TSS_LTR_784
+#include <styleos/tss_ltr_trial_784.h>
+#endif
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -206,6 +209,7 @@ void fg_experiment_run(struct pg_experiment *p)
     put_field(" rsp0-top=",descriptor.rsp0_top);
     put_field(" ist1-top=",descriptor.ist1_top);
     arch_puts(" valid=1 tr=0 lgdt=0 ltr=0 guard=unproven active=0 no-cr3-switch=1\n");
-
-
+#ifdef STYLEOS_TEST_TSS_LTR_784
+    tlt784_terminal_trial(p,&descriptor,tis782_gdt,tis782_tss);
+#endif
 }

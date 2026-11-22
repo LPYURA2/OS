@@ -1,3 +1,13 @@
+## Stage 784 — isolated terminal GDT/TSS install test (candidate)
+
+Branch `feature/styleos-tss-lgdt-ltr-trial-784` from the exact accepted
+783 SHA. Only a separate QEMU-only test image can execute LGDT and LTR,
+read STR and the busy bit, then exit the entire VM without firmware return.
+The ordinary Desktop and 783 frame-grant profile are unchanged. **No IST,
+guard-PTE or production TSS claim.** [784 architectural report](architecture/TERMINAL_GDT_TSS_LTR_784.md)
+and [next-chat handoff](NEXT_CHAT_784.md). Final success requires the exact
+SHA and complete CI run; this text alone is not acceptance.
+
 ## Stage 780 — live PE W^X intent and missing kernel dependencies
 
 Branch `feature/styleos-kernel-dependency-census-780` from accepted 779.

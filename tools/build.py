@@ -36,9 +36,12 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
     if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
         raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
+    if test_tss_ltr:
+        if arch != 'x86_64': raise ValueError('784 hardware-only TSS LTR trial is x86-64 only')
+        test_frame_grants = True
     if test_user_ipc_deny: test_user_ipc=True
     if test_user_ipc:
         if arch != 'x86_64': raise ValueError('773 IPC hardware probe is x86-64 only')
@@ -131,6 +134,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/frame_grant_proof.c', 'kernel/frame_grant_experiment.c',
                    'kernel/desktop_vm_stage.c', 'kernel/desktop_frame_owner.c',
                    'kernel/desktop_grant_bridge.c', 'kernel/kernel_closure_audit.c', 'kernel/kernel_mapping_inventory.c', 'kernel/kernel_dependency_inventory.c', 'kernel/descriptor_state_781.c', 'kernel/tss_ist_stage_782.c', 'kernel/tss_descriptor_783.c', 'kernel/process_runtime.c']
+    if test_tss_ltr:
+        common.append('kernel/tss_ltr_trial_784.c')
     if (test_paging_roundtrip or test_frame_grants) and arch != 'x86_64':
         raise ValueError('CR3 roundtrip is x86-64 only')
     if arch == 'x86_64':
@@ -174,6 +179,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_PAGING_ROUNDTRIP=1')
     if test_frame_grants:
         flags.append('-DSTYLEOS_TEST_FRAME_GRANTS=1')
+    if test_tss_ltr:
+        flags.append('-DSTYLEOS_TEST_TSS_LTR_784=1')
     if ownership:
         flags.append('-DSTYLEOS_TEST_OWNERSHIP=1')
     if test_ownership_plan_invalid:
@@ -347,6 +354,8 @@ def main():
                           help='Dedicated image only: owned tables and real unmapped read')
     negative.add_argument('--test-paging-roundtrip', action='store_true',
                           help='Dedicated x86-64 test only: prove new CR3 and restore inherited CR3')
+    negative.add_argument('--test-tss-ltr-784', action='store_true',
+                          help='784 terminal x86 QEMU-only LGDT/LTR/STR test (no firmware return)')
     negative.add_argument('--test-frame-grants', action='store_true',
                           help='Dedicated x86-64 hardware proof of image-owned frame PA grants')
     negative.add_argument('--test-ownership-plan', action='store_true',
@@ -407,7 +416,7 @@ def main():
         parser.error('--test-storage requires --arch aarch64')
     if args.test_disk_app and args.arch != 'aarch64':
         parser.error('--test-disk-app requires --arch aarch64')
-    if (args.test_paging_roundtrip or args.test_frame_grants) and args.arch != 'x86_64':
+    if (args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784) and args.arch != 'x86_64':
         parser.error('--test-paging-roundtrip requires --arch x86_64')
     if args.test_desktop_display and args.arch != 'x86_64':
         parser.error('--test-desktop-display requires --arch x86_64')
@@ -419,6 +428,7 @@ def main():
                'paging' if args.test_paging else
                'paging-fault' if args.test_paging_fault else
                'paging-roundtrip' if args.test_paging_roundtrip else
+               'tss-ltr-784' if args.test_tss_ltr_784 else
                'frame-grants' if args.test_frame_grants else
                'ownership' if args.test_ownership_plan else
                'ownership-invalid' if args.test_ownership_plan_invalid else
@@ -436,7 +446,7 @@ def main():
                'desktop-v0' if args.desktop_v0 else
                'desktop-display' if args.test_desktop_display else '')).resolve()
     if (args.test_exception or args.test_bootpool or args.test_paging or
-            args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_ownership_plan or
+            args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
             args.test_user_processes or args.test_user_syscall or args.test_user_syscall_deny or args.test_user_ipc or args.test_user_ipc_deny or args.test_native_tea or args.test_native_tea_disk or args.test_native_tea_session or args.test_storage or args.test_disk_app or
             args.test_desktop_display or args.desktop_v0) and output == (ROOT / 'build').resolve():
@@ -452,6 +462,7 @@ def main():
                              args.test_user_processes, args.test_storage,
                              args.test_disk_app, **({'test_paging_roundtrip': True} if args.test_paging_roundtrip else {}),
                              **({'test_frame_grants': True} if args.test_frame_grants else {}),
+                             **({'test_tss_ltr': True} if args.test_tss_ltr_784 else {}),
                              **({'test_user_ipc': True} if args.test_user_ipc else {}),
                              **({'test_user_ipc_deny': True} if args.test_user_ipc_deny else {}),
                              **({'test_user_syscall': True} if args.test_user_syscall else {}),
@@ -486,7 +497,8 @@ def main():
         'test_exception': args.test_exception,
         'test_bootpool': args.test_bootpool,
         'test_paging': args.test_paging, 'test_paging_fault': args.test_paging_fault,
-        'test_paging_roundtrip': args.test_paging_roundtrip or args.test_frame_grants,
+        'test_paging_roundtrip': args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784,
+        'test_tss_ltr_784': args.test_tss_ltr_784,
         'test_frame_grants': args.test_frame_grants,
         'test_native_tea': args.test_native_tea or args.test_native_tea_disk,
         'test_native_tea_disk': args.test_native_tea_disk or args.test_native_tea_session,

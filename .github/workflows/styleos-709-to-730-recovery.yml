@@ -29,6 +29,7 @@ on:
       - feature/styleos-descriptor-provenance-781
       - feature/styleos-tss-ist-reserved-staging-782
       - feature/styleos-tss-descriptor-attestation-783
+      - feature/styleos-tss-lgdt-ltr-trial-784
   workflow_dispatch:
 
 permissions:
@@ -252,10 +253,21 @@ jobs:
           set -euo pipefail
           python3 tools/test_tss_descriptor_783.py --output build/recovery-canonical/tss-783-host 2>&1 | tee build/recovery-canonical/tss-783-host.log
 
+      - name: Verify isolated 784 LTR terminal preflight with ASAN UBSAN COFF and negative parser
+        run: |
+          set -euo pipefail
+          python3 tools/test_tss_ltr_784_host.py --output build/recovery-canonical/tss-784-host --desktop-efi build/recovery-canonical/compiler/x86_64/BOOTX64.EFI 2>&1 | tee build/recovery-canonical/tss-784-host.log
+          python3 tools/test_tss_ltr_784_verify.py 2>&1 | tee build/recovery-canonical/tss-784-parser.log
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
           python3 tools/test_frame_grant_guest.py --output build/recovery-canonical/grant-qemu 2>&1 | tee build/recovery-canonical/grant-qemu.log
+
+      - name: Prove terminal LGDT LTR STR and busy TSS in real QEMU without UEFI return
+        run: |
+          set -euo pipefail
+          python3 tools/test_tss_ltr_784_guest.py --output build/recovery-canonical/tss-784-qemu 2>&1 | tee build/recovery-canonical/tss-784-qemu.log
 
       - name: Validate narrow ELF64 .tea loader with ASAN UBSAN and COFF
         run: |
@@ -450,6 +462,16 @@ jobs:
             build/recovery-canonical/desktop-vm-host.log
             build/recovery-canonical/frame-owner-host.log
             build/recovery-canonical/grant-policy-host.log
+            build/recovery-canonical/tss-784-host.log
+            build/recovery-canonical/tss-784-host/test.log
+            build/recovery-canonical/tss-784-host/disassembly.txt
+            build/recovery-canonical/tss-784-host/tss_ltr_trial_784.obj
+            build/recovery-canonical/tss-784-parser.log
+            build/recovery-canonical/tss-784-qemu.log
+            build/recovery-canonical/tss-784-qemu/results.json
+            build/recovery-canonical/tss-784-qemu/serial.log
+            build/recovery-canonical/tss-784-qemu/qemu.log
+            build/recovery-canonical/tss-784-qemu/compile.log
             build/recovery-canonical/grant-qemu.log
             build/recovery-canonical/grant-qemu/serial.log
             build/recovery-canonical/grant-qemu/results.json
