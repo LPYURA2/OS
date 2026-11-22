@@ -175,6 +175,52 @@ def main():
                     if valid_781(bad):
                         status='FAIL';detail='781 proof verifier accepted tampering'
                         break
+    if status=='PASS':
+        # 782: four *new* PE-owned image pages, each translated and checked by
+        # the old CR3 walker. These are only staged TSS/RSP0/IST structures;
+        # no LTR, installed IST gate, guard PTE or owned kernel root exists yet.
+        lines=actual.replace(b'\r',b'').splitlines()
+        names=(b'GDT',b'TSS',b'RSP0',b'IST1')
+        found={}
+        for name in names:
+            prefix=b'STYLEOS DSI 782 FRAME '+name+b' '
+            entries=[line for line in lines if line.startswith(prefix)]
+            pattern=(re.escape(prefix)+rb'va=(0x[0-9a-f]{16}) '
+                     rb'pa=(0x[0-9a-f]{16}) bytes=(0x[0-9a-f]{16})')
+            match=re.fullmatch(pattern,entries[0]) if len(entries)==1 else None
+            if not match:
+                status='FAIL';detail='782 image-owned page trace absent or malformed';break
+            va,pa,size=(int(x,16) for x in match.groups())
+            if va!=pa or size!=4096 or (va&4095):
+                status='FAIL';detail='782 non-identity/unbounded stage page';break
+            found[name]=va
+        marker=b'STYLEOS DSI 782 STAGED'
+        matches=[line for line in lines if line.startswith(marker)]
+        pat=(rb'STYLEOS DSI 782 STAGED cr3=(0x[0-9a-f]{16}) '
+             rb'rsp0-top=(0x[0-9a-f]{16}) ist1-top=(0x[0-9a-f]{16}) '
+             rb'pages=4 attest=1 refuse=1 tr=0 ltr=0 '
+             rb'guard=unproven active=0 no-cr3-switch=1')
+        parsed=re.fullmatch(pat,matches[0]) if len(matches)==1 else None
+        inherit=re.search(rb'STYLEOS DSI 781 INHERITED cr3=(0x[0-9a-f]{16})',actual)
+        img=re.findall(rb'STYLEOS MEMMAP IMAGE (0x[0-9a-f]{16}) '
+                       rb'(0x[0-9a-f]{16})',actual)
+        if status=='PASS':
+            if not parsed or not inherit or len(img)!=1 or len(found)!=4:
+                status='FAIL';detail='782 TSS candidate claim or inherited context missing'
+            else:
+                cr3,rsp0,ist1=(int(x,16) for x in parsed.groups())
+                istart,iend=(int(x,16) for x in img[0])
+                vals=list(found.values())
+                if (cr3!=int(inherit[1],16) or
+                    len(set(vals))!=4 or
+                    any(not (istart<=v and v+4096<=iend) for v in vals) or
+                    rsp0!=found[b'RSP0']+4080 or
+                    ist1!=found[b'IST1']+4080):
+                    status='FAIL';detail='782 claim/source page/stack top mismatch'
+                else:
+                    mutated=matches[0].replace(b'ltr=0',b'ltr=1',1)
+                    if re.fullmatch(pat,mutated):
+                        status='FAIL';detail='782 proof accepted active LTR tamper'
     result={'status':status,'details':detail,'branch_scope':'dedicated image-owned frames',
             'candidate_ram_granted':False,'desktop_root_activated':False}
     (a.output/'results.json').write_text(json.dumps(result,indent=2)+'\n')

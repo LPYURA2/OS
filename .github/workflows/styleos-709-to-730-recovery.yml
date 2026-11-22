@@ -27,6 +27,7 @@ on:
       - feature/styleos-inherited-kernel-inventory-779
       - feature/styleos-kernel-dependency-census-780
       - feature/styleos-descriptor-provenance-781
+      - feature/styleos-tss-ist-reserved-staging-782
   workflow_dispatch:
 
 permissions:
@@ -240,6 +241,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_descriptor_state_781.py --output build/recovery-canonical/descriptor-781-host 2>&1 | tee build/recovery-canonical/descriptor-781-host.log
 
+      - name: Verify candidate TSS IST frame admission with ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_tss_ist_stage_782.py --output build/recovery-canonical/tss-782-host 2>&1 | tee build/recovery-canonical/tss-782-host.log
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
@@ -390,6 +396,9 @@ jobs:
             build/recovery-canonical/kernel-inventory-779-host/test.log
             build/recovery-canonical/kernel-dependency-780-host.log
             build/recovery-canonical/kernel-dependency-780-host/test.log
+            build/recovery-canonical/tss-782-host.log
+            build/recovery-canonical/tss-782-host/test.log
+            build/recovery-canonical/tss-782-host/tss_ist_stage_782.obj
             build/recovery-canonical/descriptor-781-host.log
             build/recovery-canonical/descriptor-781-host/test.log
             build/recovery-canonical/kernel-closure-778-host.log

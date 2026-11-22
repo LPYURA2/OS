@@ -3,6 +3,7 @@
 #include <styleos/arch.h>
 #include <styleos/desktop_grant_bridge.h>
 #include <styleos/kernel_closure_audit.h>
+#include <styleos/tss_ist_stage_782.h>
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -12,6 +13,12 @@ _Alignas(DVM_PAGE_SIZE) unsigned char
     styleos_grant_users[DVM_USER_SLOTS][DVM_USER_PAGES][DVM_PAGE_SIZE];
 _Static_assert(sizeof styleos_grant_tables == 72u * 4096u,"72 page-table frames");
 _Static_assert(sizeof styleos_grant_users == 6u * 4096u,"six private frames");
+/* Four NEW non-overlapping pages, reserved by the experimental PE image.
+ * This does not furnish hardware guard pages, active TSS or installed GDT. */
+_Alignas(DVM_PAGE_SIZE) static unsigned char tis782_gdt[4096];
+_Alignas(DVM_PAGE_SIZE) static unsigned char tis782_tss[4096];
+_Alignas(DVM_PAGE_SIZE) static unsigned char tis782_rsp0[4096];
+_Alignas(DVM_PAGE_SIZE) static unsigned char tis782_ist1[4096];
 static struct dfo_owner styleos_grant_owner;
 static bool grant_walk(void *ctx,uint64_t pa,uint64_t bytes)
 { return arch_paging_attest_image_writable((struct pg_experiment*)ctx,pa,bytes)==PG_OK; }
@@ -113,5 +120,46 @@ void fg_experiment_run(struct pg_experiment *p)
      * a proof that these are suitable entries for detached kernel roots. */
     if (arch_paging_inventory_inherited(p)!=PG_OK)
         paging_fail("779 inherited hardware inventory");
+    /* 782: only stage a candidate context. No LTR, LGDT, IDT/IST gate
+     * replacement, new CR3, or change to the firmware's active stack. */
+    const struct tis782_claims tclaims={
+        (uint64_t)(uintptr_t)tis782_gdt,
+        (uint64_t)(uintptr_t)tis782_tss,
+        (uint64_t)(uintptr_t)tis782_rsp0,
+        (uint64_t)(uintptr_t)tis782_ist1};
+    struct tis782_plan staged={0};
+    if(tis782_prepare(e,&claims,&tclaims,refuse_walk,p,&staged)!=TIS782_UNATTESTED ||
+       staged.staged || staged.ltr_permitted)
+        paging_fail("782 missing old CR3 physical proof refused");
+    struct tis782_claims tbad=tclaims;
+    tbad.ist1=tclaims.rsp0;
+    if(tis782_prepare(e,&claims,&tbad,grant_walk,p,&staged)!=TIS782_CONFLICT ||
+       staged.staged) paging_fail("782 stack alias refused");
+    tbad=tclaims; tbad.tss=claims.tables;
+    if(tis782_prepare(e,&claims,&tbad,grant_walk,p,&staged)!=TIS782_CONFLICT ||
+       staged.staged) paging_fail("782 old table alias refused");
+    if(tis782_prepare(e,&claims,&tclaims,grant_walk,p,&staged)!=TIS782_OK ||
+       !staged.staged || staged.ltr_permitted ||
+       staged.rsp0_top != tclaims.rsp0+4096u-16u ||
+       staged.ist1_top != tclaims.ist1+4096u-16u ||
+       !tis782_encode(&staged,tis782_tss,TIS782_TSS_SIZE))
+        paging_fail("782 page-backed TSS context staging");
+    uint16_t tr_after=0;
+    __asm__ volatile("str %0":"=r"(tr_after));
+    if(tr_after!=0 || p->old_root==0)
+        paging_fail("782 inherited TR unchanged");
+    const char *tnames[]={"GDT","TSS","RSP0","IST1"};
+    const uint64_t pages[]={tclaims.gdt,tclaims.tss,tclaims.rsp0,tclaims.ist1};
+    for(unsigned j=0;j<4u;++j) {
+        arch_puts("STYLEOS DSI 782 FRAME "); arch_puts(tnames[j]);
+        put_field(" va=",pages[j]);put_field(" pa=",pages[j]);
+        put_field(" bytes=",4096u);arch_putc('\n');
+    }
+    arch_puts("STYLEOS DSI 782 STAGED");
+    put_field(" cr3=",p->old_root);
+    put_field(" rsp0-top=",staged.rsp0_top);
+    put_field(" ist1-top=",staged.ist1_top);
+    arch_puts(" pages=4 attest=1 refuse=1 tr=0 ltr=0 guard=unproven active=0 no-cr3-switch=1\n");
+
 
 }

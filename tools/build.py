@@ -130,7 +130,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_frame_grants:
         common += ['kernel/frame_grant_proof.c', 'kernel/frame_grant_experiment.c',
                    'kernel/desktop_vm_stage.c', 'kernel/desktop_frame_owner.c',
-                   'kernel/desktop_grant_bridge.c', 'kernel/kernel_closure_audit.c', 'kernel/kernel_mapping_inventory.c', 'kernel/kernel_dependency_inventory.c', 'kernel/descriptor_state_781.c', 'kernel/process_runtime.c']
+                   'kernel/desktop_grant_bridge.c', 'kernel/kernel_closure_audit.c', 'kernel/kernel_mapping_inventory.c', 'kernel/kernel_dependency_inventory.c', 'kernel/descriptor_state_781.c', 'kernel/tss_ist_stage_782.c', 'kernel/process_runtime.c']
     if (test_paging_roundtrip or test_frame_grants) and arch != 'x86_64':
         raise ValueError('CR3 roundtrip is x86-64 only')
     if arch == 'x86_64':
