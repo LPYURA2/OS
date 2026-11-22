@@ -766,6 +766,13 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/cache-800-negative.log
+            build/recovery-canonical/cache-800-host/results.json
+            build/recovery-canonical/cache-800-host/host.log
+            build/recovery-canonical/cache-800-qemu/results.json
+            build/recovery-canonical/cache-800-qemu/serial.log
+            build/recovery-canonical/cache-800-qemu/qemu.log
+            build/recovery-canonical/cache-800-qemu/compile.log
             build/recovery-canonical/pci-799-*.log
             build/recovery-canonical/pci-799-host/results.json
             build/recovery-canonical/pci-799-host/host.log
