@@ -34,6 +34,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   verify-and-archive:
@@ -494,3 +495,30 @@ jobs:
             build/recovery-canonical/dual-qemu/results.json
             build/recovery-canonical/dual-qemu/dual/COM1.log
             build/recovery-canonical/host-check/logs/results.json
+
+      - name: Report exact 784 CI status and run URL to commit checks
+        if: ${{ always() && github.ref_name == 'feature/styleos-tss-lgdt-ltr-trial-784' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, urllib.request
+          status={'success':'success','failure':'failure','cancelled':'error'}.get(os.environ['RUN_STATUS'],'pending')
+          repo=os.environ['REPO']; sha=os.environ['SHA']; run=os.environ['RUN_ID']
+          body={'state':status,'context':'styleos/784-hardware',
+                'target_url':f'https://github.com/{repo}/actions/runs/{run}',
+                'description':f'Exact 784 workflow {run}: {status}'}
+          url=f'https://api.github.com/repos/{repo}/statuses/{sha}'
+          request=urllib.request.Request(url,data=json.dumps(body).encode('utf-8'),
+            headers={'Accept':'application/vnd.github+json',
+                     'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+                     'X-GitHub-Api-Version':'2022-11-28',
+                     'Content-Type':'application/json'},method='POST')
+          with urllib.request.urlopen(request,timeout=30) as response:
+              assert response.status==201, response.status
+          print('784 exact CI commit status recorded:',status,'run:',run)
+          PYCODE
