@@ -6,7 +6,15 @@ Base: accepted 785 `50a39e8ec25f62bf9ac239842df718023bb38253`, Actions `45028051
 
 Nine **new** aligned, image-owned frames: PML4, PDPT, PD, PT, IDT, GDT, TSS, RSP0, IST1. Each must independently pass the inherited-root actual-PA image identity + writable walk, and the entire image needs valid admission before any switch. No candidate RAM is granted/reclaimed. The new PML4 is a copy of the inherited root with one exclusively absent slot 128 filled. All other inherited mappings (including the currently executing image, stack, serial, old IDT, firmware) are retained; **no production kernel closure or W^X guarantee is claimed**. A clean new PML4 slot 128 is mandatory. Hardware NXE and CR0.WP must be present; LA57 must be disabled.
 
-IST alias `0x0000400000003000`, exactly one P|RW|NX|supervisor leaf, guard neighbors `[alias-4096, alias)` and `[alias+4096,alias+8192)` with **exactly zero PTEs**. The physical IST page stays image-owned and also accessible by its existing inherited identity mapping; this is not production one-alias stack isolation. A volatile marker written through the alias after CR3 switch must be visible through the physical image address.
+IST alias `0x0000400000003000`, exactly one P|RW|NX|supervisor leaf, guard neighbors `[alias-4096, alias)` and `[alias+4096,alias+8192)` with **exactly zero PTEs**. Once the CPU writes through the alias, the active page-table hierarchy
+**must** have hardware Accessed (A) bits on PML4/PDPT/PD and A|Dirty (D)
+on the IST leaf. These bits are permitted and explicitly required; all other
+entry bits must match the staged layout. The two guard PTEs remain exactly zero.
+The initial trial found an expected QEMU failure when the verifier incorrectly
+required A/D to remain zero after real hardware accesses; it was corrected
+in the same unaccepted 786 branch, with no alteration of inherited 785.
+
+The physical IST page stays image-owned and also accessible by its existing inherited identity mapping; this is not production one-alias stack isolation. A volatile marker written through the alias after CR3 switch must be visible through the physical image address.
 
 Fresh GDT includes an available long-mode TSS descriptor, new TSS has RSP0 in a separate image frame and IST1 pointing into the one mapped alias. Fresh 256-entry IDT duplicates inherited gates, replacing only vector 3 with a ring-0 interrupt gate set to IST=1 targeting a dedicated assembly stub. No other entry, ISR, ordinary Desktop or user ABI is modified.
 

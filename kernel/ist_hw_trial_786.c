@@ -79,11 +79,22 @@ __attribute__((noreturn,noinline,used)) void s786_on_interrupt(uint64_t cpu_rsp)
        gdtr.base!=attested.gdt_base ||
        cpu_rsp<low || cpu_rsp>high-5u*8u ||
        (cpu_rsp & 7u)!=0 ||
-       t->pml4[128]!=(uint64_t)(uintptr_t)frames[IGP785_NEW_PDPT]+3u ||
-       t->pdpt[0]!=(uint64_t)(uintptr_t)frames[IGP785_NEW_PD]+3u ||
-       t->pd[0]!=(uint64_t)(uintptr_t)frames[IGP785_NEW_PT]+3u ||
+       /* The CPU legitimately sets A on all walked levels and A|D on
+        * the IST leaf after the alias write and hardware IST stack push.
+        * Verify all other bits are unchanged and that hardware A/D are set. */
+       (t->pml4[128] & ~UINT64_C(0x20))!=
+           ((uint64_t)(uintptr_t)frames[IGP785_NEW_PDPT]|3u) ||
+       (t->pml4[128] & 0x20u)==0 ||
+       (t->pdpt[0] & ~UINT64_C(0x20))!=
+           ((uint64_t)(uintptr_t)frames[IGP785_NEW_PD]|3u) ||
+       (t->pdpt[0] & 0x20u)==0 ||
+       (t->pd[0] & ~UINT64_C(0x20))!=
+           ((uint64_t)(uintptr_t)frames[IGP785_NEW_PT]|3u) ||
+       (t->pd[0] & 0x20u)==0 ||
        t->pt[2] || t->pt[4] ||
-       t->pt[3]!=((uint64_t)(uintptr_t)frames[IGP785_IST1]|IGP785_STACK_PTE) ||
+       (t->pt[3] & ~UINT64_C(0x60))!=
+           ((uint64_t)(uintptr_t)frames[IGP785_IST1]|IGP785_STACK_PTE) ||
+       (t->pt[3] & 0x60u)!=0x60u ||
        *(volatile uint64_t*)(uintptr_t)(low+0x60u)!=IST_MARKER)
         fail("live-root-or-ist-layout");
     const uint64_t *hardware=(const uint64_t*)(uintptr_t)cpu_rsp;

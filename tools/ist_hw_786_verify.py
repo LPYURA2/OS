@@ -47,8 +47,8 @@ def verify(uart: bytes, returncode: int | None) -> tuple[bool,str]:
         not(ALIAS<=B[2]<=ALIAS+PAGE-5*8) or B[2]&7 or
         B[3]!=B[4] or B[3]==0 or B[3]>=(1<<47) or
         B[5]!=A[6] or B[6]!=A[7] or B[7]!=ALIAS+PAGE-16 or
-        B[8]!=(A[5] | 0x8000000000000003)):
-        return False,'live CR3/TR/IST frame/guard/CS mismatch'
+        B[8]!=(A[5] | 0x8000000000000063)):
+        return False,'live CR3/TR/IST frame/guard/A-D/CS mismatch'
     order=[(i,l.split()[2]) for i,l in enumerate(lines) if l.startswith(b'STYLEOS S786 ')]
     if [x for _,x in order]!=[b'READY',b'TRAP',b'TERMINAL'] or order[-1][0]!=len(lines)-1:
         return False,'wrong hardware marker order or unexpected tail'

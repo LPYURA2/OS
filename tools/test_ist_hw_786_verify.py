@@ -10,7 +10,7 @@ ready=(f'STYLEOS S786 READY old={h(old)} new={h(new)} alias={h(alias)} '
 trap=(f'STYLEOS S786 TRAP old={h(old)} new={h(new)} frame-rsp={h(alias+0xfb0)} '
       f'saved-rip={h(0x5f61234)} expected-rip={h(0x5f61234)} '
       f'saved-cs={h(cs)} tr={h(tr)} ist-top={h(alias+4080)} '
-      f'leaf={h(frame|0x8000000000000003)} '
+      f'leaf={h(frame|0x8000000000000063)} '
       'guard-lo=0 guard-hi=0 pt-count=1 cr3=1 marker=1 hardware-int3=1')
 end='STYLEOS S786 TERMINAL qemu-exit=0x10 firmware-return=0 guard-fault-injected=0'
 uart=('\r\n'.join([ready,trap,end])+'\r\n').encode()
@@ -24,7 +24,8 @@ for src,dst in [
     (' hardware-int3=1',' hardware-int3=0'),
     (' saved-rip='+h(0x5f61234),' saved-rip='+h(0x5f61235)),
     (' tr='+h(tr),' tr='+h(0)),
-    (' leaf='+h(frame|0x8000000000000003),' leaf='+h(frame|3)),
+    (' leaf='+h(frame|0x8000000000000063),' leaf='+h(frame|3)),
+    (' leaf='+h(frame|0x8000000000000063),' leaf='+h(frame|0x8000000000000023)),
     (' nxe=1',' nxe=0'),
     (' qemu-exit=0x10',' qemu-exit=0x11'),
     (' guard-fault-injected=0',' guard-fault-injected=1'),
