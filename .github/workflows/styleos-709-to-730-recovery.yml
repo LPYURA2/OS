@@ -33,6 +33,7 @@ on:
       - feature/styleos-ist-guard-table-plan-785
       - feature/styleos-hardware-ist-entry-786
       - feature/styleos-hardware-guard-pf-787
+      - feature/styleos-hardware-double-fault-788
   workflow_dispatch:
 
 permissions:
@@ -298,6 +299,26 @@ jobs:
           assert result['stack_exhaustion_recovery_verified'] is False
           PYCODE
 
+      - name: Reject counterfeit 788 DF UART, nonzero error codes and false QEMU exits
+        run: |
+          set -euo pipefail
+          python3 tools/test_double_fault_788_verify.py 2>&1 | tee build/recovery-canonical/double-fault-788-parser.log
+
+      - name: Prove genuine nested fault hardware DF on independent IST3 in QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_double_fault_788_guest.py --output build/recovery-canonical/double-fault-788-qemu 2>&1 | tee build/recovery-canonical/double-fault-788-qemu.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('build/recovery-canonical/double-fault-788-qemu/results.json').read_text())
+          assert d['status']=='PASS' and d['hardware_test'] is True
+          assert d['qemu_exit_code']==33 and d['df_error_code_zero_verified'] is True
+          assert d['genuine_double_fault_on_ist3_verified'] is True
+          assert d['pf_gate_absent_while_df_gate_present'] is True
+          assert d['stack_exhaustion_recovery_verified'] is False
+          PYCODE
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
@@ -504,6 +525,13 @@ jobs:
             build/recovery-canonical/ist-guard-785-host.log
             build/recovery-canonical/ist-guard-785-host/test.log
             build/recovery-canonical/ist-guard-785-host/ist_guard_plan_785.obj
+            build/recovery-canonical/double-fault-788-parser.log
+            build/recovery-canonical/double-fault-788-qemu.log
+            build/recovery-canonical/double-fault-788-qemu/results.json
+            build/recovery-canonical/double-fault-788-qemu/serial.log
+            build/recovery-canonical/double-fault-788-qemu/qemu.log
+            build/recovery-canonical/double-fault-788-qemu/compile.log
+            build/recovery-canonical/double-fault-788-qemu/build/x86_64/BOOTX64.EFI
             build/recovery-canonical/guard-pf-787-parser.log
             build/recovery-canonical/guard-pf-787-qemu.log
             build/recovery-canonical/guard-pf-787-qemu/results.json
@@ -650,4 +678,29 @@ jobs:
           with urllib.request.urlopen(request,timeout=30) as response:
               assert response.status==201,response.status
           print('787 exact CI commit status:',status,'run:',run)
+          PYCODE
+
+      - name: Report exact 788 double-fault hardware CI status and run URL
+        if: ${{ always() && github.ref_name == 'feature/styleos-hardware-double-fault-788' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, urllib.request
+          status={'success':'success','failure':'failure','cancelled':'error'}.get(os.environ['RUN_STATUS'],'pending')
+          repo=os.environ['REPO']; sha=os.environ['SHA']; run=os.environ['RUN_ID']
+          body={'state':status,'context':'styleos/788-double-fault-hardware',
+                'target_url':f'https://github.com/{repo}/actions/runs/{run}',
+                'description':f'Exact 788 workflow {run}: {status}'}
+          request=urllib.request.Request(f'https://api.github.com/repos/{repo}/statuses/{sha}',
+            data=json.dumps(body).encode(),headers={'Accept':'application/vnd.github+json',
+                     'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+                     'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},method='POST')
+          with urllib.request.urlopen(request,timeout=30) as response:
+              assert response.status==201,response.status
+          print('788 exact CI commit status:',status,'run:',run)
           PYCODE
