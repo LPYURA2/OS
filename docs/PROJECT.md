@@ -1,3 +1,7 @@
+## Stage 797 — PCI downstream MMIO BAR forwarding base audit
+
+On hardware QEMU/OVMF UART from the same CI, verify each downstream BAR BASE within ancestor bridge forwarding windows. The BAR APERTURE is still unknown; no production CR3 granted. See [technical report](architecture/PCI_MMIO_FORWARDING_BASE_AUDIT_797.md), [handoff](NEXT_CHAT_797.md), [new-chat message](MESSAGE_FOR_NEW_CHAT_797.md).
+
 ## Stage 794 — Q35 PCI BAR to GOP base correlation (terminal evidence)
 
 New terminal-only PCI configuration mechanism #1 scan of PCI bus zero.
