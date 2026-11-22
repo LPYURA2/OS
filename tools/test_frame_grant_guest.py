@@ -221,6 +221,49 @@ def main():
                     mutated=matches[0].replace(b'ltr=0',b'ltr=1',1)
                     if re.fullmatch(pat,mutated):
                         status='FAIL';detail='782 proof accepted active LTR tamper'
+    if status=='PASS':
+        # 783: independently bind the computed non-active GDT/TSS descriptor
+        # to the old GDT/CS and the four individually attested 782 pages.
+        lines=actual.replace(b'\r',b'').splitlines()
+        prefix=b'STYLEOS TGD 783 DESCRIPTOR '
+        entries=[line for line in lines if line.startswith(prefix)]
+        pattern=(rb'STYLEOS TGD 783 DESCRIPTOR cr3=(0x[0-9a-f]{16}) '
+             rb'gdt-origin=(0x[0-9a-f]{16}) old-limit=(0x[0-9a-f]{16}) '
+             rb'gdt-target=(0x[0-9a-f]{16}) tss-base=(0x[0-9a-f]{16}) '
+             rb'cs=(0x[0-9a-f]{16}) tss-selector=(0x[0-9a-f]{16}) '
+             rb'new-limit=(0x[0-9a-f]{16}) rsp0-top=(0x[0-9a-f]{16}) '
+             rb'ist1-top=(0x[0-9a-f]{16}) valid=1 tr=0 lgdt=0 ltr=0 '
+             rb'guard=unproven active=0 no-cr3-switch=1')
+        match=re.fullmatch(pattern,entries[0]) if len(entries)==1 else None
+        old=re.search(rb'STYLEOS PAGING X86 GDT va=(0x[0-9a-f]{16}) '
+            rb'pa=(0x[0-9a-f]{16}) bytes=(0x[0-9a-f]{16}) '
+            rb'cs=(0x[0-9a-f]{16})',actual)
+        stage=re.search(rb'STYLEOS DSI 782 STAGED cr3=(0x[0-9a-f]{16}) '
+            rb'rsp0-top=(0x[0-9a-f]{16}) ist1-top=(0x[0-9a-f]{16})',actual)
+        addr={}
+        for n in (b'GDT',b'TSS',b'RSP0',b'IST1'):
+            m=re.search(rb'STYLEOS DSI 782 FRAME '+n+
+                rb' va=(0x[0-9a-f]{16})',actual)
+            if m:addr[n]=int(m[1],16)
+        if not match or not old or not stage or len(addr)!=4:
+            status='FAIL';detail='783 GDT proof absent, duplicated or malformed'
+        else:
+            cr3,orig,limit,target,tss,cs,sel,newlim,rsp,ist=(
+                int(x,16) for x in match.groups())
+            if (cr3!=int(stage[1],16) or
+                rsp!=int(stage[2],16) or ist!=int(stage[3],16) or
+                orig!=int(old[1],16) or orig!=int(old[2],16) or
+                limit+1!=int(old[3],16) or cs!=int(old[4],16) or
+                target!=addr[b'GDT'] or tss!=addr[b'TSS'] or
+                sel!=limit+1 or newlim!=sel+15 or sel%8 or
+                newlim>=4096):
+                status='FAIL';detail='783 descriptor differs from hardware GDT or 782 pages'
+            else:
+                for fragment in (b'valid=1',b'lgdt=0',b'ltr=0',b'active=0'):
+                    forged=entries[0].replace(fragment,fragment[:-1]+b'2',1)
+                    if re.fullmatch(pattern,forged):
+                        status='FAIL';detail='783 UART verifier accepted false activation'
+                        break
     result={'status':status,'details':detail,'branch_scope':'dedicated image-owned frames',
             'candidate_ram_granted':False,'desktop_root_activated':False}
     (a.output/'results.json').write_text(json.dumps(result,indent=2)+'\n')

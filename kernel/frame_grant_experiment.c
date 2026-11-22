@@ -4,6 +4,7 @@
 #include <styleos/desktop_grant_bridge.h>
 #include <styleos/kernel_closure_audit.h>
 #include <styleos/tss_ist_stage_782.h>
+#include <styleos/tss_descriptor_783.h>
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -160,6 +161,51 @@ void fg_experiment_run(struct pg_experiment *p)
     put_field(" rsp0-top=",staged.rsp0_top);
     put_field(" ist1-top=",staged.ist1_top);
     arch_puts(" pages=4 attest=1 refuse=1 tr=0 ltr=0 guard=unproven active=0 no-cr3-switch=1\n");
+
+    /* 783: inherited descriptors already passed the 781 audit. The four
+     * PE-image pages passed 782 per-frame attestation. Construct a fresh,
+     * NON-ACTIVE GDT; no firmware state or interrupt gates are changed. */
+    struct { uint16_t limit; uint64_t base; } __attribute__((packed)) gdtr={0};
+    uint16_t cs783=0,tr783=0;
+    __asm__ volatile("sgdt %0" : "=m"(gdtr));
+    __asm__ volatile("mov %%cs,%0" : "=r"(cs783));
+    __asm__ volatile("str %0" : "=r"(tr783));
+    if(!gdtr.base || gdtr.base>=(UINT64_C(1)<<47) ||
+       gdtr.limit>=4096u || (gdtr.base&7u) || tr783 ||
+       gdtr.limit+1u>4096u-16u || (gdtr.limit&7u)!=7u || !cs783)
+        paging_fail("783 inherited GDT bounds");
+    const uint8_t *inherited_gdt=(const uint8_t*)(uintptr_t)gdtr.base;
+    struct tgd783_result descriptor={0};
+    if(tgd783_build(inherited_gdt,(size_t)gdtr.limit+1u,cs783,1u,
+         tclaims.tss,tis782_tss,TIS782_TSS_SIZE,&staged,
+         tis782_gdt,sizeof tis782_gdt,&descriptor)!=TGD783_ARGUMENT ||
+       descriptor.descriptor_valid)
+        paging_fail("783 nonzero TR refusal");
+    if(tgd783_build(inherited_gdt,(size_t)gdtr.limit+1u,cs783,tr783,
+         tclaims.tss,tis782_tss,TIS782_TSS_SIZE,&staged,
+         tis782_gdt,sizeof tis782_gdt,&descriptor)!=TGD783_OK ||
+       !descriptor.descriptor_valid || descriptor.active ||
+       descriptor.guard_verified ||
+       !tgd783_verify(tis782_gdt,sizeof tis782_gdt,tis782_tss,
+                     TIS782_TSS_SIZE,&descriptor) ||
+       descriptor.tss_selector!=(uint16_t)(gdtr.limit+1u))
+        paging_fail("783 TSS GDT descriptor audit");
+    uint16_t tr_check=0;
+    __asm__ volatile("str %0" : "=r"(tr_check));
+    if(tr_check!=tr783 || !p->old_root)
+        paging_fail("783 TR changed");
+    arch_puts("STYLEOS TGD 783 DESCRIPTOR");
+    put_field(" cr3=",p->old_root);
+    put_field(" gdt-origin=",gdtr.base);
+    put_field(" old-limit=",gdtr.limit);
+    put_field(" gdt-target=",tclaims.gdt);
+    put_field(" tss-base=",descriptor.tss_base);
+    put_field(" cs=",cs783);
+    put_field(" tss-selector=",descriptor.tss_selector);
+    put_field(" new-limit=",descriptor.new_gdt_limit);
+    put_field(" rsp0-top=",descriptor.rsp0_top);
+    put_field(" ist1-top=",descriptor.ist1_top);
+    arch_puts(" valid=1 tr=0 lgdt=0 ltr=0 guard=unproven active=0 no-cr3-switch=1\n");
 
 
 }
