@@ -107,7 +107,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
     status = desk_update_boot(image, table->boot_services, loaded, &loaded_image_guid);
     if (status != EFI_SUCCESS) return status;
 #endif
-#if defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801)
+#if defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801) || defined(STYLEOS_TEST_CACHE_803)
     desktop_capture_uefi_mode(table->boot_services);
 #endif
     arch_puts("STYLEOS x86_64 acquiring memory map\n");
