@@ -68,3 +68,9 @@ _Noreturn void dmar808_terminal(const struct boot_info *b){
  arch_puts("STYLEOS S808 PASS\n");
  __asm__ volatile("outl %0,%1"::"a"(0x10u),"Nd"((uint16_t)0xf4u));arch_halt();
 }
+
+/* Validated ACPI snapshot, only for the separate read-only S809 VT-d probe. */
+int dmar808_get_info(struct dmar808_info *out){
+ if(observed==1 && out)*out=saved;
+ return observed==1 && !out ? -1 : observed;
+}

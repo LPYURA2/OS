@@ -14,5 +14,6 @@ struct dmar808_info {
  struct dmar808_drhd drhd[DMAR808_MAX_DRHD];
  struct dmar808_rmrr rmrr[DMAR808_MAX_RMRR];
 };
+int dmar808_get_info(struct dmar808_info *out);
 int dmar808_parse(const uint8_t *p,size_t len,struct dmar808_info *out);
 #endif
