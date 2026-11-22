@@ -46,6 +46,7 @@ on:
       - feature/styleos-pci-mmio-extent-attestation-798
       - feature/styleos-downstream-bar-measurement-799
       - feature/styleos-cache-evidence-800
+      - feature/styleos-live-pte-pat-evidence-801
   workflow_dispatch:
 
 permissions:
