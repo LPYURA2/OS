@@ -30,6 +30,7 @@ on:
       - feature/styleos-tss-ist-reserved-staging-782
       - feature/styleos-tss-descriptor-attestation-783
       - feature/styleos-tss-lgdt-ltr-trial-784
+      - feature/styleos-ist-guard-table-plan-785
   workflow_dispatch:
 
 permissions:
@@ -260,6 +261,11 @@ jobs:
           python3 tools/test_tss_ltr_784_host.py --output build/recovery-canonical/tss-784-host --desktop-efi build/recovery-canonical/compiler/x86_64/BOOTX64.EFI 2>&1 | tee build/recovery-canonical/tss-784-host.log
           python3 tools/test_tss_ltr_784_verify.py 2>&1 | tee build/recovery-canonical/tss-784-parser.log
 
+      - name: Verify inactive 785 IST guard PTE layout with ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_ist_guard_plan_785_host.py --output build/recovery-canonical/ist-guard-785-host 2>&1 | tee build/recovery-canonical/ist-guard-785-host.log
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
@@ -463,6 +469,9 @@ jobs:
             build/recovery-canonical/desktop-vm-host.log
             build/recovery-canonical/frame-owner-host.log
             build/recovery-canonical/grant-policy-host.log
+            build/recovery-canonical/ist-guard-785-host.log
+            build/recovery-canonical/ist-guard-785-host/test.log
+            build/recovery-canonical/ist-guard-785-host/ist_guard_plan_785.obj
             build/recovery-canonical/tss-784-host.log
             build/recovery-canonical/tss-784-host/test.log
             build/recovery-canonical/tss-784-host/disassembly.txt
