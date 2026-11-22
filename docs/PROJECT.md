@@ -296,3 +296,7 @@ MTRR UC и PAT WB согласуются с UC, но не заменяют гл�
 алиасов или hardware same-boot proof. Production CR3 остаётся запрещённым.
 См. [архитектуру](architecture/CROSS_BOOT_CACHE_RECONCILIATION_802.md),
 [точку продолжения](NEXT_CHAT_802.md) и [сообщение](MESSAGE_FOR_NEW_CHAT_802.md).
+
+## 803 one-boot cache evidence
+
+Terminal QEMU-only PAT/MTRR/PTE sample, same-boot, no global alias proof or production CR3. See `docs/architecture/SAME_BOOT_CACHE_SAMPLE_803.md`.
