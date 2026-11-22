@@ -37,6 +37,7 @@ on:
       - feature/styleos-pml4-root-pruning-789
       - feature/styleos-owned-low-tables-wx-790
       - feature/styleos-hardware-wx-pf-791
+      - feature/styleos-production-closure-preflight-792
   workflow_dispatch:
 
 permissions:
@@ -374,6 +375,21 @@ jobs:
           assert d['stack_exhaustion_recovery_verified'] is False
           PYCODE
 
+      - name: Check 792 production closure preflight, source anchors and denial policy
+        run: |
+          set -euo pipefail
+          python3 tools/test_production_closure_792.py --output build/recovery-canonical/closure-792-host 2>&1 | tee build/recovery-canonical/closure-792-host.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('build/recovery-canonical/closure-792-host/results.json').read_text())
+          assert d['status']=='PASS' and d['stage']==792
+          assert d['hardware_closure_verified'] is False
+          assert d['production_cr3_authorized'] is False
+          assert d['ordinary_desktop_changed'] is False
+          assert len(d['source_anchors']) >= 9
+          PYCODE
+
       - name: Reject forged 791 hardware W-X fault records
         run: |
           set -euo pipefail
@@ -623,6 +639,9 @@ jobs:
             build/recovery-canonical/owned-low-790-qemu/qemu.log
             build/recovery-canonical/owned-low-790-qemu/compile.log
             build/recovery-canonical/owned-low-790-qemu/build/x86_64/BOOTX64.EFI
+            build/recovery-canonical/closure-792-host.log
+            build/recovery-canonical/closure-792-host/results.json
+            build/recovery-canonical/closure-792-host/test.log
             build/recovery-canonical/wx-791-parser.log
             build/recovery-canonical/wx-write-791-qemu.log
             build/recovery-canonical/wx-write-791-qemu/results.json
