@@ -40,6 +40,7 @@ on:
       - feature/styleos-production-closure-preflight-792
       - feature/styleos-uefi-hardware-observation-793
       - feature/styleos-pci-gop-bar-observation-794
+      - feature/styleos-pci-bar-aperture-795
   workflow_dispatch:
 
 permissions:
@@ -443,6 +444,37 @@ jobs:
           assert d['production_cr3_authorized'] is False
           PYCODE
 
+      - name: 795 Validate reversible PCI BAR mask decoding under ASAN UBSAN COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_pci_aperture_795_host.py --output build/recovery-canonical/pci-795-host 2>&1 | tee build/recovery-canonical/pci-795-host.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('build/recovery-canonical/pci-795-host/results.json').read_text())
+          assert d['stage']==795 and d['status']=='PASS'
+          assert d['production_cr3_authorized'] is False
+          PYCODE
+
+      - name: 795 Reject forged or incomplete PCI BAR sizing UART logs
+        run: |
+          set -euo pipefail
+          python3 tools/test_pci_aperture_795_negative.py 2>&1 | tee build/recovery-canonical/pci-795-negative.log
+
+      - name: 795 Measure and restore real QEMU VGA BAR aperture
+        run: |
+          set -euo pipefail
+          python3 tools/test_pci_aperture_795.py --output build/recovery-canonical/pci-795-qemu 2>&1 | tee build/recovery-canonical/pci-795-qemu.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('build/recovery-canonical/pci-795-qemu/results.json').read_text())
+          assert d['stage']==795 and d['status']=='PASS' and d['qemu_exit_code']==33
+          assert d['bar_probe_restored'] is True and d['framebuffer_aperture_covered'] is True
+          assert d['bar_aperture_size_verified'] is True
+          assert d['irq_routing_verified'] is False and d['production_cr3_authorized'] is False
+          PYCODE
+
       - name: Check 792 production closure preflight, source anchors and denial policy
         run: |
           set -euo pipefail
@@ -581,6 +613,12 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/pci-795-*.log
+            build/recovery-canonical/pci-795-host/results.json
+            build/recovery-canonical/pci-795-host/host.log
+            build/recovery-canonical/pci-795-qemu/results.json
+            build/recovery-canonical/pci-795-qemu/serial.log
+            build/recovery-canonical/pci-795-qemu/qemu.log
             build/recovery-canonical/pci-794-*.log
             build/recovery-canonical/pci-794-host/results.json
             build/recovery-canonical/pci-794-host/host.log
