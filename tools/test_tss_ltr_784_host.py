@@ -27,8 +27,8 @@ def main():
         '-ffreestanding','-fno-builtin','-fno-stack-protector',
         '-mno-red-zone','-mno-sse','-mno-mmx','-msoft-float',
         '-DSTYLEOS_TEST_TSS_LTR_784=1','-DSTYLEOS_TEST_FRAME_GRANTS=1','-c',str(sources[0]),'-o',str(obj)],check=True)
-    disassembler=shutil.which('llvm-objdump')
-    if not disassembler:raise RuntimeError('llvm-objdump required for hardware opcode audit')
+    disassembler=shutil.which('llvm-objdump') or shutil.which('objdump')
+    if not disassembler:raise RuntimeError('LLVM or GNU objdump required for hardware opcode audit')
     machine=subprocess.check_output([disassembler,'-d',str(obj)],text=True).lower()
     for mnemonic in ('lgdt','ltr','str','sgdt','sidt','out'):
         if mnemonic not in machine:raise AssertionError('missing hardware instruction '+mnemonic)
