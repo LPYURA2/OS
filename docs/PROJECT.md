@@ -1,8 +1,16 @@
-## Stage 797 — PCI downstream MMIO BAR forwarding base audit
+## Stage 798 — same-CI measured-versus-unmeasured PCI MMIO range census
 
-On hardware QEMU/OVMF UART from the same CI, verify each downstream BAR BASE within ancestor bridge forwarding windows. The BAR APERTURE is still unknown; no production CR3 granted. See [technical report](architecture/PCI_MMIO_FORWARDING_BASE_AUDIT_797.md), [handoff](NEXT_CHAT_797.md), [new-chat message](MESSAGE_FOR_NEW_CHAT_797.md).
+Read-only evidence audit correlates S795's measured VGA BAR0 aperture with
+independent S796 topologies and S797 route verification. It **never** treats
+bridge window room as measured BAR size or authorizes production CR3. See
+[architecture](architecture/PCI_MMIO_EXTENT_CENSUS_798.md),
+[handoff](NEXT_CHAT_798.md), [new chat](MESSAGE_FOR_NEW_CHAT_798.md).
 
 ## Stage 794 — Q35 PCI BAR to GOP base correlation (terminal evidence)
+
+## Stage 797 — audit PCI bridge MMIO base forwarding
+
+На аппаратных UART двух QEMU конфигураций 796 проверяются начальные адреса downstream BAR через окна мостов (не размер!). Запрещены ложное одобрение production CR3 и выводы о полной MMIO карте. [Отчёт](architecture/PCI_MMIO_FORWARDING_BASE_AUDIT_797.md), [handoff](NEXT_CHAT_797.md).
 
 New terminal-only PCI configuration mechanism #1 scan of PCI bus zero.
 Correlates a detected display device **memory BAR base** to the observed GOP
