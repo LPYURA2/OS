@@ -51,6 +51,23 @@ int main(void)
     assert(low.ready && low.code_pages==2 && low.readonly_pages==2 &&
            low.writable_pages==36 && low.stack_pages==2 && low.built.used<=PG_TABLE_PAGES);
     assert(s790_audit_owned_low(&low,r.required_exec,r.required_write,r.required_rsp));
+    /* Real QEMU OVMF entry stack is embedded in loaded PE .data/.bss.
+     * Its pages must be reused without a duplicate VA mapping. */
+    struct s790_low_request embedded=request();
+    embedded.boot_stack=(struct boot_range){
+        (uint64_t)(uintptr_t)(image+10u*P+16u),
+        (uint64_t)(uintptr_t)(image+12u*P+16u)};
+    embedded.required_rsp=(uint64_t)(uintptr_t)(image+11u*P+24u);
+    assert(s790_prepare_owned_low(&embedded,&low));
+    assert(low.stack_pages==3 && low.plan.count==4 &&
+           s790_audit_owned_low(&low,embedded.required_exec,
+                                embedded.required_write,embedded.required_rsp));
+    embedded.boot_stack=(struct boot_range){
+        (uint64_t)(uintptr_t)(image+P+16u),
+        (uint64_t)(uintptr_t)(image+2u*P+16u)};
+    embedded.required_rsp=(uint64_t)(uintptr_t)(image+P+32u);
+    assert(!s790_prepare_owned_low(&embedded,&low)); /* RX stack forbidden */
+    r=request();assert(s790_prepare_owned_low(&r,&low));
     low.plan.tables[0][0]^=2u;
     assert(!s790_audit_owned_low(&low,r.required_exec,r.required_write,r.required_rsp));
     low.plan.tables[0][0]^=2u;

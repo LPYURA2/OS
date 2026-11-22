@@ -11,7 +11,7 @@ by `pg_build`, not the UEFI PDPT. Only three kinds of low mapping survive:
 
 - the loaded PE image, mapped by its *loaded* RVA section permissions:
   executable RX, writable RW/NX, headers and read-only RO/NX;
-- the existing boot stack (RW/NX); and
+- the existing boot stack (RW/NX), including when fully embedded in the PE writable .data/.bss (no duplicated mapping); and
 - no other inherited low-half identity mapping, including no inherited old
   page-table pages, firmware GDT, IDT or firmware services.
 
@@ -23,6 +23,15 @@ owned GDT/TSS/IDT, owned code and image-owned data. It never calls firmware
 and never returns or attempts an LTR(0).
 
 ## Fail-closed staging
+
+The first QEMU run failed closed with `cannot-stage-owned-pe-low-hierarchy`:
+OVMF's boot stack resides inside the PE `.data/.bss`. The original builder
+wrongly required stack/image disjointness, so it rejected a valid owner
+layout. The corrected builder accepts either **complete containment**
+(all stack pages independently verified RW/NX) or complete disjointness;
+partial overlaps and stacks crossing RX/RO sections are still rejected.
+No duplicate page mappings are created for embedded stacks. This fix requires
+re-running actual CI before stage acceptance.
 
 The builder requires a valid PE32+ image with exact loaded `SizeOfImage`, a
 bounded section table, no 4-KiB page that mixes executable and writable

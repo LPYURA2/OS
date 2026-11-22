@@ -56,8 +56,15 @@ bool s790_prepare_owned_low(const struct s790_low_request *req,
         return false;
     const uint64_t stack_start=req->boot_stack.start&~(PAGE-1u);
     const uint64_t stack_end=(req->boot_stack.end+PAGE-1u)&~(PAGE-1u);
+    /* OVMF's live entry stack may be backed by the writable .data/.bss of
+     * the loaded PE itself. Never double-map that physical range: its page
+     * rights are already assigned by PE sections. Permit only FULL
+     * containment (with every stack page RW/NX) or FULL disjointness. */
+    const bool embedded_stack=(stack_start>=req->image.start &&
+                               stack_end<=req->image.end);
     if(stack_start>=stack_end || stack_end>=LIMIT ||
-       !disjoint(stack_start,stack_end,req->image.start,req->image.end) ||
+       (!embedded_stack &&
+        !disjoint(stack_start,stack_end,req->image.start,req->image.end)) ||
        req->owned_tables_pa<req->image.start ||
        PG_TABLE_BYTES>req->image.end-req->owned_tables_pa)
         return false;
@@ -101,7 +108,8 @@ bool s790_prepare_owned_low(const struct s790_low_request *req,
         else if(rights&PG_WRITE)++tmp.writable_pages;
         else ++tmp.readonly_pages;
     }
-    if(!append_mapping(&tmp.plan,stack_start,stack_end-stack_start,PG_WRITE))
+    if(!embedded_stack &&
+       !append_mapping(&tmp.plan,stack_start,stack_end-stack_start,PG_WRITE))
         return false;
     tmp.stack_pages=(uint32_t)((stack_end-stack_start)/PAGE);
     tmp.built=pg_build(&tmp.plan);
@@ -120,6 +128,8 @@ bool s790_prepare_owned_low(const struct s790_low_request *req,
         for(uint64_t at=m->va;at<m->va+m->bytes;at+=PAGE)
             if(!expected(&tmp.plan,at,m->flags))return false;
     }
+    for(uint64_t at=stack_start;at<stack_end;at+=PAGE)
+        if(!expected(&tmp.plan,at,PG_WRITE))return false;
     tmp.new_low_slot=tmp.plan.tables[0][0];
     tmp.ready=true;
     *out=tmp;
