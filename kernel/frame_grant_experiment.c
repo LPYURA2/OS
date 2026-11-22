@@ -17,6 +17,9 @@
 #ifdef STYLEOS_TEST_DOUBLE_FAULT_788
 #include <styleos/double_fault_trial_788.h>
 #endif
+#ifdef STYLEOS_TEST_ROOT_SLOTS_789
+#include <styleos/root_slot_trial_789.h>
+#endif
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -229,5 +232,8 @@ void fg_experiment_run(struct pg_experiment *p)
 #endif
 #ifdef STYLEOS_TEST_DOUBLE_FAULT_788
     s788_terminal_trial(p);
+#endif
+#ifdef STYLEOS_TEST_ROOT_SLOTS_789
+    s789_terminal_trial(p);
 #endif
 }

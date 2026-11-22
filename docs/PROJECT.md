@@ -1,3 +1,13 @@
+## Этап 789 — ограниченный унаследованный PML4, только терминальный эксперимент
+
+Ветка `feature/styleos-pml4-root-pruning-789`. Отдельный `--test-root-slots-789`
+удаляет все унаследованные PML4-слоты за исключением низкого slot 0 и
+отдельного собственного slot 128 для IST, проверяет настоящий INT3/#PF/#DF
+в QEMU. Таблицы ниже PML4[0] остаются унаследованными. Не работает в
+обычном Desktop и **не** доказывает полное W^X. Принятие только по CI точного
+коммита. [Отчёт](architecture/TERMINAL_RESTRICTED_PML4_789.md),
+[продолжение](NEXT_CHAT_789.md), [сообщение](MESSAGE_FOR_NEW_CHAT_789.md).
+
 ## Stage 787 — guard page #PF on separate IST2 (experimental)
 
 Task branch `feature/styleos-hardware-guard-pf-787` starts from accepted 786.

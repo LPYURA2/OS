@@ -34,6 +34,7 @@ on:
       - feature/styleos-hardware-ist-entry-786
       - feature/styleos-hardware-guard-pf-787
       - feature/styleos-hardware-double-fault-788
+      - feature/styleos-pml4-root-pruning-789
   workflow_dispatch:
 
 permissions:
@@ -319,6 +320,31 @@ jobs:
           assert d['stack_exhaustion_recovery_verified'] is False
           PYCODE
 
+      - name: Verify fail-closed restricted PML4 host planner with ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_root_minimization_789_host.py --output build/recovery-canonical/root-slot-789-host 2>&1 | tee build/recovery-canonical/root-slot-789-host.log
+
+      - name: Reject falsified 789 PML4 slot and hardware exception UART
+        run: |
+          set -euo pipefail
+          python3 tools/test_root_slot_789_verify.py 2>&1 | tee build/recovery-canonical/root-slot-789-parser.log
+
+      - name: Prove only one inherited PML4 slot remains in genuine QEMU nested fault
+        run: |
+          set -euo pipefail
+          python3 tools/test_root_slot_789_guest.py --output build/recovery-canonical/root-slot-789-qemu 2>&1 | tee build/recovery-canonical/root-slot-789-qemu.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          p=Path('build/recovery-canonical/root-slot-789-qemu/results.json')
+          d=json.loads(p.read_text())
+          assert d['status']=='PASS' and d['hardware_test'] is True
+          assert d['qemu_exit_code']==33 and d['pml4_only_two_slots_hardware_verified'] is True
+          assert d['genuine_double_fault_on_ist3_verified'] is True
+          assert d['lower_level_tables_independent'] is False
+          PYCODE
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
@@ -525,6 +551,16 @@ jobs:
             build/recovery-canonical/ist-guard-785-host.log
             build/recovery-canonical/ist-guard-785-host/test.log
             build/recovery-canonical/ist-guard-785-host/ist_guard_plan_785.obj
+            build/recovery-canonical/root-slot-789-host.log
+            build/recovery-canonical/root-slot-789-host/test.log
+            build/recovery-canonical/root-slot-789-host/root789.obj
+            build/recovery-canonical/root-slot-789-parser.log
+            build/recovery-canonical/root-slot-789-qemu.log
+            build/recovery-canonical/root-slot-789-qemu/results.json
+            build/recovery-canonical/root-slot-789-qemu/serial.log
+            build/recovery-canonical/root-slot-789-qemu/qemu.log
+            build/recovery-canonical/root-slot-789-qemu/compile.log
+            build/recovery-canonical/root-slot-789-qemu/build/x86_64/BOOTX64.EFI
             build/recovery-canonical/double-fault-788-parser.log
             build/recovery-canonical/double-fault-788-qemu.log
             build/recovery-canonical/double-fault-788-qemu/results.json
