@@ -3,7 +3,7 @@
 Продолжаем разработку StyleOS в репозитории `LPYURA2/OS`. Изучи `AGENTS.md`,
 `docs/PROJECT.md`, `docs/NEXT_CHAT_785.md`,
 `docs/architecture/INACTIVE_IST_GUARD_TABLES_785.md` и утверждённые макеты
-`docs/design/APPROVED_UI_REFERENCES.md`.
+`docs/design/APPROVED_UI_REFERENCES.md` (Explorer: `StyleOS-Explorer-Mockups.pdf`; вход/блокировка: `StyleOS-Welcome-and-Lock-Screens.pdf`).
 
 Сохраняй принятые ветки, `main`, прежнюю историю и существующий отработанный
 рабочий стол без изменений. Каждому новому этапу отдельная ветка от точного
