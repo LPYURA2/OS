@@ -26,6 +26,7 @@ on:
       - feature/styleos-kernel-closure-audit-778
       - feature/styleos-inherited-kernel-inventory-779
       - feature/styleos-kernel-dependency-census-780
+      - feature/styleos-descriptor-provenance-781
   workflow_dispatch:
 
 permissions:
@@ -234,6 +235,11 @@ jobs:
           set -euo pipefail
           python3 tools/test_kernel_dependency_inventory.py --output build/recovery-canonical/kernel-dependency-780-host 2>&1 | tee build/recovery-canonical/kernel-dependency-780-host.log
 
+      - name: Prove descriptor and active boot-stack read-only audit with ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_descriptor_state_781.py --output build/recovery-canonical/descriptor-781-host 2>&1 | tee build/recovery-canonical/descriptor-781-host.log
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
@@ -384,6 +390,8 @@ jobs:
             build/recovery-canonical/kernel-inventory-779-host/test.log
             build/recovery-canonical/kernel-dependency-780-host.log
             build/recovery-canonical/kernel-dependency-780-host/test.log
+            build/recovery-canonical/descriptor-781-host.log
+            build/recovery-canonical/descriptor-781-host/test.log
             build/recovery-canonical/kernel-closure-778-host.log
             build/recovery-canonical/kernel-closure-778-host/test.log
             build/recovery-canonical/attested-roots-777-host.log

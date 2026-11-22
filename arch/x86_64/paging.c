@@ -3,6 +3,7 @@
 #ifdef STYLEOS_TEST_FRAME_GRANTS
 #include "styleos/kernel_mapping_inventory.h"
 #include "styleos/kernel_dependency_inventory.h"
+#include "styleos/descriptor_state_781.h"
 #endif
 
 /* T-P1.4 only: the build does not link this file into any historical profile.
@@ -546,6 +547,37 @@ enum pg_error arch_paging_inventory_inherited(struct pg_experiment *x)
     field(" blockers=",dep_report.blockers);
     arch_puts(" framebuffer=unprovided mmio=unproven runtime=unproven");
     arch_puts(" tss-ist=unverified active=0 no-cr3-switch=1\n");
+    /* 781: the inherited IDT pages, including its unaligned second page,
+     * were already verified by inherited_range() above. descriptors_ok()
+     * verified the full live IDT before the protected CR3 roundtrip. The
+     * fresh read is bounded to those same 4096 bytes on the restored CR3.
+     * TR=0 is normal in this firmware profile; it proves NO TSS/IST mapping.
+     * Do not ever dereference TSS.RSP0 or IST addresses from this census. */
+    struct dsi781_report descriptors={0};
+    if (!dsi781_audit_idt((const uint8_t*)(uintptr_t)s->idtr.base,
+                          (size_t)s->idtr.limit+1u,s->cs,tr,s->gdtr.limit,
+                          &descriptors) || descriptors.activation_permitted ||
+        !descriptors.tss_descriptor_unresolved ||
+        !descriptors.tss_stack_unresolved) return PG_CONTEXT;
+    uint64_t current_rsp=0;
+#ifndef STYLEOS_PAGING_X86_HOST
+    __asm__ volatile("mov %%rsp, %0" : "=r"(current_rsp));
+#endif
+    if (!dsi781_current_rsp_in_boot_stack(current_rsp,
+            x->evidence->live.stack.start,x->evidence->live.stack.end) ||
+        read_cr3()!=s->cr3) return PG_CONTEXT;
+    arch_puts("STYLEOS DSI 781 INHERITED");
+    field(" cr3=",s->cr3);
+    field(" cs=",descriptors.cs);
+    field(" tr=",descriptors.tr);
+    field(" gdt-limit=",s->gdtr.limit);
+    field(" idt-limit=",s->idtr.limit);
+    field(" gates=",descriptors.gates);
+    field(" ist-gates=",descriptors.ist_gates);
+    field(" ist-mask=",descriptors.ist_index_mask);
+    field(" boot-rsp=",current_rsp);
+    arch_puts(" boot-rsp-in-range=1 tss=unverified ist=unverified");
+    arch_puts(" active=0 no-cr3-switch=1\n");
     return PG_OK;
 }
 /* Only while the inherited root is actually active: the old page-table

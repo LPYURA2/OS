@@ -128,6 +128,53 @@ def main():
                 tampered=kdi_lines[0].replace(b'active=0',b'active=1',1)
                 if re.fullmatch(pattern,tampered):
                     status='FAIL';detail='780 active-root tamper accepted'
+    if status=='PASS':
+        # 781 hardware provenance: verify the IDT sample against the already
+        # printed inherited GDTR/IDTR and the live UEFI boot-stack range.
+        lines=actual.replace(b'\r',b'').splitlines()
+        prefix=b'STYLEOS DSI 781 INHERITED'
+        matches=[v for v in lines if v.startswith(prefix)]
+        pattern=(rb'STYLEOS DSI 781 INHERITED cr3=(0x[0-9a-f]{16}) '
+                 rb'cs=(0x[0-9a-f]{16}) tr=(0x[0-9a-f]{16}) '
+                 rb'gdt-limit=(0x[0-9a-f]{16}) idt-limit=(0x[0-9a-f]{16}) '
+                 rb'gates=(0x[0-9a-f]{16}) ist-gates=(0x[0-9a-f]{16}) '
+                 rb'ist-mask=(0x[0-9a-f]{16}) boot-rsp=(0x[0-9a-f]{16}) '
+                 rb'boot-rsp-in-range=1 tss=unverified ist=unverified '
+                 rb'active=0 no-cr3-switch=1')
+        match=(re.fullmatch(pattern,matches[0]) if len(matches)==1 else None)
+        gdt=re.search(rb'STYLEOS PAGING X86 GDT va=0x[0-9a-f]{16} '
+                      rb'pa=0x[0-9a-f]{16} bytes=(0x[0-9a-f]{16}) '
+                      rb'cs=(0x[0-9a-f]{16})',actual)
+        idt=re.search(rb'STYLEOS PAGING X86 IDT va=0x[0-9a-f]{16} '
+                      rb'bytes=(0x[0-9a-f]{16})',actual)
+        kdi=re.search(rb'STYLEOS KDI 780 INHERITED cr3=(0x[0-9a-f]{16}) '
+                      rb'tr=(0x[0-9a-f]{16})',actual)
+        stacks=re.findall(rb'STYLEOS MEMMAP STACK (0x[0-9a-f]{16}) '
+                          rb'(0x[0-9a-f]{16})',actual)
+        if not match or not gdt or not idt or not kdi or len(stacks)!=1:
+            status='FAIL';detail='781 descriptor provenance trace missing or malformed'
+        else:
+            st,en=[int(v,16) for v in stacks[0]]
+            def valid_781(line):
+                proof=re.fullmatch(pattern,line)
+                if not proof:return False
+                cr3,cs,tr,gdtlim,idtlim,gates,ists,mask,rsp=[int(v,16) for v in proof.groups()]
+                return (cr3==int(kdi[1],16) and tr==int(kdi[2],16) and
+                    cs==int(gdt[2],16) and gdtlim+1==int(gdt[1],16) and
+                    idtlim+1==int(idt[1],16) and gates==256 and
+                    st<=rsp<en and tr==0 and ists==0 and mask==0)
+            if not valid_781(matches[0]):
+                status='FAIL';detail='781 IDT/boot-RSP differs from hardware proof'
+            else:
+                # Test the full semantic verifier, not merely its regex.
+                for bad in [matches[0].replace(b'active=0',b'active=1',1),
+                            matches[0].replace(b'ist-gates=0x0000000000000000',
+                                               b'ist-gates=0x0000000000000001',1),
+                            matches[0].replace(b'boot-rsp-in-range=1',
+                                               b'boot-rsp-in-range=0',1)]:
+                    if valid_781(bad):
+                        status='FAIL';detail='781 proof verifier accepted tampering'
+                        break
     result={'status':status,'details':detail,'branch_scope':'dedicated image-owned frames',
             'candidate_ram_granted':False,'desktop_root_activated':False}
     (a.output/'results.json').write_text(json.dumps(result,indent=2)+'\n')
