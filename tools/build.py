@@ -36,11 +36,13 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
     if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
         raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
     if test_hw_probe_793 and arch != 'x86_64':
         raise ValueError('793 terminal firmware/device observation requires x86-64')
+    if test_pci_range_799 and arch != 'x86_64':
+        raise ValueError('799 isolated bridge BAR measurement requires x86-64')
     if test_pci_topology_796 and arch != 'x86_64':
         raise ValueError('796 PCI topology terminal diagnostic requires x86_64')
     if test_pci_aperture_795 and arch != 'x86_64':
@@ -139,7 +141,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
                    'kernel/disk_app.c', 'kernel/disk_app_demo.c',
                    'boot/aarch64/disk_app_fdt.c', 'arch/aarch64/disk_app.c',
                    'arch/aarch64/disk_app_entry.S']
-    if test_desktop_display or desktop_v0 or test_hw_probe_793 or test_pci_probe_794 or test_pci_aperture_795 or test_pci_topology_796:
+    if test_desktop_display or desktop_v0 or test_hw_probe_793 or test_pci_probe_794 or test_pci_aperture_795 or test_pci_topology_796 or test_pci_range_799:
         common += ['kernel/desktop_display.c', 'boot/x86_64/desktop_display.c']
     if desktop_v0:
         common += ['kernel/process_runtime.c', 'kernel/process_scheduler.c', 'kernel/desktop_process_runtime.c', 'kernel/desktop_vm_stage.c', 'kernel/desktop_frame_owner.c', 'kernel/window_service.c', 'kernel/user_session_runtime.c', 'kernel/native_launch_stage.c', 'kernel/native_window_channel.c', 'kernel/native_desktop_launch.c', 'kernel/native_tea_elf.c', 'kernel/native_tea_package.c', 'kernel/native_tea_staging.c', 'kernel/native_desktop_bridge.c', 'kernel/process_inspector.c', 'kernel/process_view.c', 'kernel/process_api.c', 'kernel/system_apps.c', 'kernel/desktop_sessions.c', 'kernel/desktop_text_app.c', 'kernel/desktop_shell.c', 'kernel/desktop_draw.c',
@@ -162,6 +164,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
                    'kernel/desktop_grant_bridge.c', 'kernel/kernel_closure_audit.c', 'kernel/kernel_mapping_inventory.c', 'kernel/kernel_dependency_inventory.c', 'kernel/descriptor_state_781.c', 'kernel/tss_ist_stage_782.c', 'kernel/tss_descriptor_783.c', 'kernel/process_runtime.c']
     if test_hw_probe_793:
         common += ['kernel/hardware_probe_793.c', 'boot/x86_64/hardware_probe_793.c']
+    if test_pci_range_799:
+        common += ['kernel/pci_range_799.c', 'kernel/pci_probe_794.c', 'kernel/pci_topology_796.c',
+                   'boot/x86_64/pci_range_799.c']
     if test_pci_topology_796:
         common += ['kernel/hardware_probe_793.c', 'kernel/pci_probe_794.c',
                    'kernel/pci_topology_796.c', 'boot/x86_64/pci_topology_796.c']
@@ -240,6 +245,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_ROOT_SLOTS_789=1')
     if test_hw_probe_793:
         flags.append('-DSTYLEOS_TEST_HW_PROBE_793=1')
+    if test_pci_range_799:
+        flags.append('-DSTYLEOS_TEST_PCI_RANGE_799=1')
     if test_pci_topology_796:
         flags.append('-DSTYLEOS_TEST_PCI_TOPOLOGY_796=1')
     if test_pci_aperture_795:
@@ -426,6 +433,8 @@ def main():
                           help='Dedicated x86-64 test only: prove new CR3 and restore inherited CR3')
     negative.add_argument('--test-hw-probe-793', action='store_true',
                           help='793 dedicated terminal UEFI GOP/memory and CPU cache-state observation')
+    negative.add_argument('--test-pci-range-799', action='store_true',
+                          help='799 terminal reversible QEMU downstream PCI BAR measurement')
     negative.add_argument('--test-pci-topology-796', action='store_true',
                           help='796 isolated read-only PCI hierarchy and BAR-base census')
     negative.add_argument('--test-pci-aperture-795', action='store_true',
@@ -512,6 +521,8 @@ def main():
         parser.error('--test-paging-roundtrip requires --arch x86_64')
     if args.test_hw_probe_793 and args.arch != 'x86_64':
         parser.error('--test-hw-probe-793 requires --arch x86_64')
+    if args.test_pci_range_799 and args.arch != 'x86_64':
+        parser.error('--test-pci-range-799 requires --arch x86_64')
     if args.test_pci_topology_796 and args.arch != 'x86_64':
         parser.error('--test-pci-topology-796 requires --arch x86_64')
     if args.test_pci_aperture_795 and args.arch != 'x86_64':
@@ -529,6 +540,7 @@ def main():
                'paging-fault' if args.test_paging_fault else
                'paging-roundtrip' if args.test_paging_roundtrip else
                'hw-probe-793' if args.test_hw_probe_793 else
+               'pci-range-799' if args.test_pci_range_799 else
                'pci-topology-796' if args.test_pci_topology_796 else
                'pci-aperture-795' if args.test_pci_aperture_795 else
                'pci-probe-794' if args.test_pci_probe_794 else
@@ -556,7 +568,7 @@ def main():
                'disk-app' if args.test_disk_app else
                'desktop-v0' if args.desktop_v0 else
                'desktop-display' if args.test_desktop_display else '')).resolve()
-    if (args.test_pci_topology_796 or args.test_pci_aperture_795 or args.test_pci_probe_794 or args.test_hw_probe_793 or args.test_exception or args.test_bootpool or args.test_paging or
+    if (args.test_pci_range_799 or args.test_pci_topology_796 or args.test_pci_aperture_795 or args.test_pci_probe_794 or args.test_hw_probe_793 or args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789 or args.test_owned_low_790 or args.test_wx_write_791 or args.test_wx_exec_791 or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
             args.test_user_processes or args.test_user_syscall or args.test_user_syscall_deny or args.test_user_ipc or args.test_user_ipc_deny or args.test_native_tea or args.test_native_tea_disk or args.test_native_tea_session or args.test_storage or args.test_disk_app or
@@ -584,6 +596,7 @@ def main():
                              **({'test_pci_probe_794': True} if args.test_pci_probe_794 else {}),
                              **({'test_pci_aperture_795': True} if args.test_pci_aperture_795 else {}),
                              **({'test_pci_topology_796': True} if args.test_pci_topology_796 else {}),
+                             **({'test_pci_range_799': True} if args.test_pci_range_799 else {}),
                              **({'test_user_ipc': True} if args.test_user_ipc else {}),
                              **({'test_user_ipc_deny': True} if args.test_user_ipc_deny else {}),
                              **({'test_user_syscall': True} if args.test_user_syscall else {}),

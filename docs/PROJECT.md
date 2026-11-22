@@ -1,3 +1,11 @@
+## Stage 799 — isolated downstream PCI BAR aperture measurements
+
+Dedicated QEMU test probes and restores two selected VirtIO Serial MMIO BARs
+behind a PCIe bridge, checking whole extents against forwarding windows;
+never enables production CR3 or changes normal Desktop. See
+[architecture](architecture/PCI_DOWNSTREAM_BAR_MEASUREMENT_799.md),
+[handoff](NEXT_CHAT_799.md) and [new-chat message](MESSAGE_FOR_NEW_CHAT_799.md).
+
 ## Stage 798 — same-CI measured-versus-unmeasured PCI MMIO range census
 
 Read-only evidence audit correlates S795's measured VGA BAR0 aperture with
