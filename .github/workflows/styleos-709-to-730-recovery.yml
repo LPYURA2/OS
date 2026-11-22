@@ -531,3 +531,29 @@ jobs:
               assert response.status==201, response.status
           print('784 exact CI commit status recorded:',status,'run:',run)
           PYCODE
+      - name: Report exact 785 structural CI status and run URL to commit checks
+        if: ${{ always() && github.ref_name == 'feature/styleos-ist-guard-table-plan-785' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, urllib.request
+          status={'success':'success','failure':'failure','cancelled':'error'}.get(os.environ['RUN_STATUS'],'pending')
+          repo=os.environ['REPO']; sha=os.environ['SHA']; run=os.environ['RUN_ID']
+          body={'state':status,'context':'styleos/785-structural',
+                'target_url':f'https://github.com/{repo}/actions/runs/{run}',
+                'description':f'Exact 785 workflow {run}: {status}'}
+          url=f'https://api.github.com/repos/{repo}/statuses/{sha}'
+          request=urllib.request.Request(url,data=json.dumps(body).encode('utf-8'),
+            headers={'Accept':'application/vnd.github+json',
+                     'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+                     'X-GitHub-Api-Version':'2022-11-28',
+                     'Content-Type':'application/json'},method='POST')
+          with urllib.request.urlopen(request,timeout=30) as response:
+              assert response.status==201, response.status
+          print('785 exact CI commit status recorded:',status,'run:',run)
+          PYCODE
