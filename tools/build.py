@@ -36,9 +36,12 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
     if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
         raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
+    if test_owned_low:
+        if arch != 'x86_64': raise ValueError('790 detached low hierarchy hardware test requires x86-64')
+        test_frame_grants = True
     if test_root_slots:
         if arch != 'x86_64': raise ValueError('789 restricted inherited PML4 hardware test requires x86-64')
         test_frame_grants = True
@@ -156,6 +159,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/ist_guard_plan_785.c', 'kernel/double_fault_trial_788.c']
     if test_root_slots:
         common += ['kernel/ist_guard_plan_785.c', 'kernel/root_minimization_789.c', 'kernel/root_slot_trial_789.c']
+    if test_owned_low:
+        common += ['kernel/ist_guard_plan_785.c', 'kernel/owned_low_790.c', 'kernel/owned_low_trial_790.c']
     if (test_paging_roundtrip or test_frame_grants) and arch != 'x86_64':
         raise ValueError('CR3 roundtrip is x86-64 only')
     if arch == 'x86_64':
@@ -209,6 +214,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_DOUBLE_FAULT_788=1')
     if test_root_slots:
         flags.append('-DSTYLEOS_TEST_ROOT_SLOTS_789=1')
+    if test_owned_low:
+        flags.append('-DSTYLEOS_TEST_OWNED_LOW_790=1')
     if ownership:
         flags.append('-DSTYLEOS_TEST_OWNERSHIP=1')
     if test_ownership_plan_invalid:
@@ -382,6 +389,8 @@ def main():
                           help='Dedicated image only: owned tables and real unmapped read')
     negative.add_argument('--test-paging-roundtrip', action='store_true',
                           help='Dedicated x86-64 test only: prove new CR3 and restore inherited CR3')
+    negative.add_argument('--test-owned-low-790', action='store_true',
+                          help='790 terminal true detached low 4KiB page tables and PE RX/RW/NX fault chain')
     negative.add_argument('--test-root-slots-789', action='store_true',
                           help='789 terminal two-slot PML4 plus genuine nested #DF hardware test')
     negative.add_argument('--test-double-fault-788', action='store_true',
@@ -452,7 +461,7 @@ def main():
         parser.error('--test-storage requires --arch aarch64')
     if args.test_disk_app and args.arch != 'aarch64':
         parser.error('--test-disk-app requires --arch aarch64')
-    if (args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789) and args.arch != 'x86_64':
+    if (args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789 or args.test_owned_low_790) and args.arch != 'x86_64':
         parser.error('--test-paging-roundtrip requires --arch x86_64')
     if args.test_desktop_display and args.arch != 'x86_64':
         parser.error('--test-desktop-display requires --arch x86_64')
@@ -464,6 +473,7 @@ def main():
                'paging' if args.test_paging else
                'paging-fault' if args.test_paging_fault else
                'paging-roundtrip' if args.test_paging_roundtrip else
+               'owned-low-790' if args.test_owned_low_790 else
                'root-slots-789' if args.test_root_slots_789 else
                'double-fault-788' if args.test_double_fault_788 else
                'guard-pf-787' if args.test_guard_pf_787 else
@@ -486,7 +496,7 @@ def main():
                'desktop-v0' if args.desktop_v0 else
                'desktop-display' if args.test_desktop_display else '')).resolve()
     if (args.test_exception or args.test_bootpool or args.test_paging or
-            args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789 or args.test_ownership_plan or
+            args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789 or args.test_owned_low_790 or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
             args.test_user_processes or args.test_user_syscall or args.test_user_syscall_deny or args.test_user_ipc or args.test_user_ipc_deny or args.test_native_tea or args.test_native_tea_disk or args.test_native_tea_session or args.test_storage or args.test_disk_app or
             args.test_desktop_display or args.desktop_v0) and output == (ROOT / 'build').resolve():
@@ -507,6 +517,7 @@ def main():
                              **({'test_guard_pf': True} if args.test_guard_pf_787 else {}),
                              **({'test_double_fault': True} if args.test_double_fault_788 else {}),
                              **({'test_root_slots': True} if args.test_root_slots_789 else {}),
+                             **({'test_owned_low': True} if args.test_owned_low_790 else {}),
                              **({'test_user_ipc': True} if args.test_user_ipc else {}),
                              **({'test_user_ipc_deny': True} if args.test_user_ipc_deny else {}),
                              **({'test_user_syscall': True} if args.test_user_syscall else {}),
@@ -541,11 +552,11 @@ def main():
         'test_exception': args.test_exception,
         'test_bootpool': args.test_bootpool,
         'test_paging': args.test_paging, 'test_paging_fault': args.test_paging_fault,
-        'test_paging_roundtrip': args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789,
+        'test_paging_roundtrip': args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789 or args.test_owned_low_790,
         'test_tss_ltr_784': args.test_tss_ltr_784,
         'test_ist_hw_786': args.test_ist_hw_786,
         'test_guard_pf_787': args.test_guard_pf_787,
-        'test_double_fault_788': args.test_double_fault_788 or args.test_root_slots_789,
+        'test_double_fault_788': args.test_double_fault_788 or args.test_root_slots_789 or args.test_owned_low_790,
         'test_root_slots_789': args.test_root_slots_789,
         'test_frame_grants': args.test_frame_grants,
         'test_native_tea': args.test_native_tea or args.test_native_tea_disk,

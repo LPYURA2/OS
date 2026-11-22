@@ -35,6 +35,7 @@ on:
       - feature/styleos-hardware-guard-pf-787
       - feature/styleos-hardware-double-fault-788
       - feature/styleos-pml4-root-pruning-789
+      - feature/styleos-owned-low-tables-wx-790
   workflow_dispatch:
 
 permissions:
@@ -345,6 +346,33 @@ jobs:
           assert d['lower_level_tables_independent'] is False
           PYCODE
 
+      - name: Verify 790 owned low PE page rights and refusal paths with ASAN UBSAN
+        run: |
+          set -euo pipefail
+          python3 tools/test_owned_low_790_host.py --output build/recovery-canonical/owned-low-790-host 2>&1 | tee build/recovery-canonical/owned-low-790-host.log
+
+      - name: Reject counterfeit 790 independent lower tables and WX UART claims
+        run: |
+          set -euo pipefail
+          python3 tools/test_owned_low_790_verify.py 2>&1 | tee build/recovery-canonical/owned-low-790-parser.log
+
+      - name: Prove independent PE W-X low tables under true CR3 and IST3 nested DF QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_owned_low_790_guest.py --output build/recovery-canonical/owned-low-790-qemu 2>&1 | tee build/recovery-canonical/owned-low-790-qemu.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          p=Path('build/recovery-canonical/owned-low-790-qemu/results.json')
+          d=json.loads(p.read_text())
+          assert d['status']=='PASS' and d['hardware_test'] is True
+          assert d['qemu_exit_code']==33
+          assert d['genuine_double_fault_on_ist3_verified'] is True
+          assert d['lower_level_tables_independent'] is True
+          assert d['pe_page_wx_partition_verified'] is True
+          assert d['stack_exhaustion_recovery_verified'] is False
+          PYCODE
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
@@ -551,6 +579,16 @@ jobs:
             build/recovery-canonical/ist-guard-785-host.log
             build/recovery-canonical/ist-guard-785-host/test.log
             build/recovery-canonical/ist-guard-785-host/ist_guard_plan_785.obj
+            build/recovery-canonical/owned-low-790-host.log
+            build/recovery-canonical/owned-low-790-host/test.log
+            build/recovery-canonical/owned-low-790-host/owned790.obj
+            build/recovery-canonical/owned-low-790-parser.log
+            build/recovery-canonical/owned-low-790-qemu.log
+            build/recovery-canonical/owned-low-790-qemu/results.json
+            build/recovery-canonical/owned-low-790-qemu/serial.log
+            build/recovery-canonical/owned-low-790-qemu/qemu.log
+            build/recovery-canonical/owned-low-790-qemu/compile.log
+            build/recovery-canonical/owned-low-790-qemu/build/x86_64/BOOTX64.EFI
             build/recovery-canonical/root-slot-789-host.log
             build/recovery-canonical/root-slot-789-host/test.log
             build/recovery-canonical/root-slot-789-host/root789.obj

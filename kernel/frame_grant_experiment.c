@@ -20,6 +20,9 @@
 #ifdef STYLEOS_TEST_ROOT_SLOTS_789
 #include <styleos/root_slot_trial_789.h>
 #endif
+#ifdef STYLEOS_TEST_OWNED_LOW_790
+#include <styleos/owned_low_trial_790.h>
+#endif
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -235,5 +238,8 @@ void fg_experiment_run(struct pg_experiment *p)
 #endif
 #ifdef STYLEOS_TEST_ROOT_SLOTS_789
     s789_terminal_trial(p);
+#endif
+#ifdef STYLEOS_TEST_OWNED_LOW_790
+    s790_terminal_trial(p);
 #endif
 }
