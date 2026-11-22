@@ -23,6 +23,9 @@
 #ifdef STYLEOS_TEST_OWNED_LOW_790
 #include <styleos/owned_low_trial_790.h>
 #endif
+#ifdef STYLEOS_TEST_WX_FAULT_791
+#include <styleos/wx_fault_trial_791.h>
+#endif
 
 /* Only present in the independent --test-frame-grants PE image.
  * Neither storage nor the six data pages are acquired from candidate RAM.
@@ -241,5 +244,8 @@ void fg_experiment_run(struct pg_experiment *p)
 #endif
 #ifdef STYLEOS_TEST_OWNED_LOW_790
     s790_terminal_trial(p);
+#endif
+#ifdef STYLEOS_TEST_WX_FAULT_791
+    s791_terminal_trial(p);
 #endif
 }
