@@ -314,3 +314,6 @@ StyleOS; historical MATRYOSHKA instructions belong to Portable-os.
 The experimental known-MMIO-range audit reads inherited firmware mappings
 only. Do not treat its range coverage as a global alias analysis, full VGA BAR
 scan, or authorization for production CR3. Preserve desktop CI and UI.
+
+
+S808 independent DMA/IOMMU observation: read-only ACPI DMAR parser and dual-mode QEMU/OVMF regression in `feature/styleos-dmar-iommu-discovery-808`; no DMA isolation authorized; production CR3 remains denied.

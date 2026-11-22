@@ -5,6 +5,10 @@
 #include "desktop_display.h"
 #endif
 
+#ifdef STYLEOS_TEST_DMAR_808
+void dmar808_capture(const struct efi_system_table *);
+_Noreturn void dmar808_terminal(const struct boot_info *);
+#endif
 #ifdef STYLEOS_TEST_IRQ_DELIVERY_807
 void acpi806_capture(const struct efi_system_table *);
 _Noreturn void irq807_terminal(const struct boot_info *);
@@ -128,6 +132,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
 #if defined(STYLEOS_TEST_ACPI_MADT_806) || defined(STYLEOS_TEST_IRQ_DELIVERY_807)
     acpi806_capture(table);
 #endif
+#ifdef STYLEOS_TEST_DMAR_808
+    dmar808_capture(table);
+#endif
     arch_puts("STYLEOS x86_64 acquiring memory map\n");
     status = styleos_exit_boot_services(table->boot_services, image, &handoff);
     if (status != EFI_SUCCESS) {
@@ -145,6 +152,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
     /* No UEFI interface may be used below this point. */
     __asm__ volatile ("cli" ::: "memory");
     arch_puts("STYLEOS x86_64 ExitBootServices OK\n");
+#ifdef STYLEOS_TEST_DMAR_808
+    dmar808_terminal(&handoff);
+#endif
 #ifdef STYLEOS_TEST_IRQ_DELIVERY_807
     irq807_terminal(&handoff);
 #endif

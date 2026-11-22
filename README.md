@@ -70,3 +70,6 @@ StyleOS без перестановки VDI. [Настройка COM2, гран�
 
 Сборка 709 сохраняет новый рабочий стол независимо от состояния диска
 данных. [Причина, исправление и проверка](docs/test-results/stable-desktop-shell/README.md).
+
+
+S808 adds a terminal ACPI DMAR discovery / IOMMU-absent-vs-present QEMU test. It does **not** activate IOMMU protection, modify the Desktop, or authorize DMA to untrusted buffers.
