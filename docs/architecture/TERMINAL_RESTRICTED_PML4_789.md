@@ -26,7 +26,9 @@ hardware CR3 transition only after the pruning audit. The terminal sequence
 reuses 788 nested real `INT3 -> IST1 -> #PF guard -> unavailable #PF gate -> #DF IST3`.
 Live #DF handler reads back the active PML4, verifies every other
 entry exactly zero and matching PML4[0], the IST entry PML4[128], TR, CR2,
-CPU error code and frame. UART carries measured root entries (not only success
+CPU error code and frame. The CPU may set Accessed (bit 5) on PML4 entries after CR3; only that
+architecturally permitted mutation is accepted in the live readback. UART
+carries measured root entries (not only success
 markers); QEMU exit must be 33. Negative parser tests reject changes to entry
 values, slot count, RIP, stack or exit code. No synthetic UART can establish
 hardware acceptance.

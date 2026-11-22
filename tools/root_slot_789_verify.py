@@ -68,7 +68,10 @@ def verify(uart:bytes,returncode:int|None)->tuple[bool,str]:
         d[8]!=(a[5]|0x8000000000000063) or
         (d[9]&~0x60)!=(a[11]|0x8000000000000003) or
         d[10]!=(a[13]|0x8000000000000063) or
-        a[14]!=d[11] or a[15]!=d[12] or
+        ((a[14]^d[11])&~0x20)!=0 or
+        ((a[15]^d[12])&~0x20)!=0 or
+        ((d[11]&0x20)<(a[14]&0x20)) or
+        (a[15]&0x20)!=0 or (d[12]&0x20)==0 or
         (a[14]&1)==0 or (a[15]&3)!=3 or
         (a[14]&0x000ffffffffff000)==0 or
         (a[15]&0x000ffffffffff000)==0):

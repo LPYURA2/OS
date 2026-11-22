@@ -121,7 +121,9 @@ __attribute__((noreturn,noinline,used)) void s789_on_df(uint64_t cpu_rsp) {
     if(attested.ready!=IST_MARKER || attested.bp_verified!=1 ||
        cr3()!=attested.new_cr3 || current_tr()!=attested.tr_selector ||
        !r789_audit_restricted_root(t->pml4,(const uint64_t*)(uintptr_t)attested.old_cr3) ||
-       t->pml4[0]!=attested.inherited_low_entry ||
+       ((t->pml4[0]^attested.inherited_low_entry)&~UINT64_C(0x20)) ||
+       ((t->pml4[0]&UINT64_C(0x20)) < (attested.inherited_low_entry&UINT64_C(0x20))) ||
+       (t->pml4[128]&UINT64_C(0x20))==0 ||
        current_cs()!=attested.cs || (rflags()&(1u<<9u)) ||
        idtr.base!=attested.idt_base || idtr.limit!=4095u ||
        gdtr.base!=attested.gdt_base ||

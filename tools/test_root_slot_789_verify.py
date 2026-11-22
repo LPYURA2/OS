@@ -13,7 +13,7 @@ bp=(f'STYLEOS S789 BP cr3={h(new)} rsp={h(b+0xfb0)} saved-rip={h(0x5f61234)} '
 df=(f'STYLEOS S789 DF cr2={h(g)} err={h(0)} rsp={h(i3+0xfa0)} '
  f'saved-rip={h(0x5f61298)} expected-rip={h(0x5f61298)} old-rsp={h(b+0xf88)} '
  f'cs={h(cs)} tr={h(tr)} leaf1={h(f1|0x8000000000000063)} '
- f'leaf2={h(f2|0x8000000000000003)} leaf3={h(f3|0x8000000000000063)} root0={h(0x100003)} root128={h(0x770003)} '
+ f'leaf2={h(f2|0x8000000000000003)} leaf3={h(f3|0x8000000000000063)} root0={h(0x100003)} root128={h(0x770023)} '
  'inherited-root-slots=1 root-present-slots=2 pf-gate-present=0 df-ist3=1 hardware-df=1')
 end=('STYLEOS S789 TERMINAL qemu-exit=0x10 firmware-return=0 '
  'pf-handler-entered=0 df-hardware=1 pml4-pruned=1 independent-low-tables=0 stack-overflow-recovery=0')
@@ -31,6 +31,7 @@ for before,after in [
  (' df-ist3=1',' df-ist3=0'),(' pf-gate-present=0',' pf-gate-present=1'),
  (' root0='+h(0x100003),' root0='+h(0x100000)),
  (' root128='+h(0x770003),' root128='+h(0x770000)),
+ (' root128='+h(0x770023),' root128='+h(0x770003)),
  (' root-present-slots=2',' root-present-slots=3'),
  (' pml4-pruned=1',' pml4-pruned=0'),
  (' qemu-exit=0x10',' qemu-exit=0x11'),(' stack-overflow-recovery=0',' stack-overflow-recovery=1'),

@@ -12,6 +12,9 @@ int main(void){
     const uint64_t need[]={UINT64_C(0x10000),UINT64_C(0x5f00000), UINT64_C(0x7fff1000)};
     assert(r789_prune_inherited_root(staged,old,need,3));
     assert(r789_audit_restricted_root(staged,old));
+    staged[0]|=0x20u; /* CPU Accessed bit is an allowed hardware update. */
+    assert(r789_audit_restricted_root(staged,old));
+    staged[0]&=~UINT64_C(0x20);
     assert(staged[0]==base && staged[R789_ALIAS_SLOT]==alias);
     for(unsigned i=1;i<512;i++)if(i!=128)assert(staged[i]==0);
     staged[23]=old[23];assert(!r789_audit_restricted_root(staged,old));staged[23]=0;

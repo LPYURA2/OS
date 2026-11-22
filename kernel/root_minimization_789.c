@@ -7,7 +7,8 @@ bool r789_audit_restricted_root(const uint64_t *staged,
 {
     if (!staged || !inherited || staged == inherited ||
         (inherited[0] & UINT64_C(1)) == 0 || inherited[R789_ALIAS_SLOT] ||
-        (staged[0] != inherited[0]) ||
+        ((staged[0]^inherited[0]) & ~UINT64_C(0x20)) != 0 ||
+        ((staged[0]&UINT64_C(0x20)) < (inherited[0]&UINT64_C(0x20))) ||
         (staged[R789_ALIAS_SLOT] & UINT64_C(0x3)) != UINT64_C(0x3) ||
         (staged[R789_ALIAS_SLOT] & UINT64_C(0x000ffffffffff000)) == 0)
         return false;
