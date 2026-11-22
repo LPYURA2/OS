@@ -31,7 +31,7 @@ GDT/TSS/IDT, вызвать настоящее исключение через I
    ядро/IPC/окна, приложения не в `desktop_shell`.
 4. Пользователи, выбор пользователя и вход — **только по утверждённым макетам**.
 5. StyleFS, права/две дисковые области/безопасные файловые операции;
-   Проводник по `docs/design/APPROVED_UI_REFERENCES.md`, раздел
+   Проводник по `docs/design/APPROVED_UI_REFERENCES.md` (Explorer: `StyleOS-Explorer-Mockups.pdf`; вход/блокировка: `StyleOS-Welcome-and-Lock-Screens.pdf`), раздел
    «Быстрый доступ» (не «Рекомендованное»).
 6. Позднее пакетный установщик `.tea`, App World, сеть, звук и VPN.
 
