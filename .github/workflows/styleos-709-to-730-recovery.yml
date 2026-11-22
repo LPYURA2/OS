@@ -38,6 +38,7 @@ on:
       - feature/styleos-owned-low-tables-wx-790
       - feature/styleos-hardware-wx-pf-791
       - feature/styleos-production-closure-preflight-792
+      - feature/styleos-uefi-hardware-observation-793
   workflow_dispatch:
 
 permissions:
@@ -375,6 +376,38 @@ jobs:
           assert d['stack_exhaustion_recovery_verified'] is False
           PYCODE
 
+      - name: Verify 793 UEFI descriptor bounds with ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_hardware_probe_793_host.py --output build/recovery-canonical/hw-793-host 2>&1 | tee build/recovery-canonical/hw-793-host.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('build/recovery-canonical/hw-793-host/results.json').read_text())
+          assert d['stage']==793 and d['status']=='PASS'
+          assert d['production_cr3_authorized'] is False
+          PYCODE
+
+      - name: Reject forged 793 UEFI observations
+        run: |
+          set -euo pipefail
+          python3 tools/test_hardware_probe_793_negative.py 2>&1 | tee build/recovery-canonical/hw-793-negative.log
+
+      - name: Observe real 793 GOP EFI descriptors PAT MTRR and IRQ in QEMU OVMF
+        run: |
+          set -euo pipefail
+          python3 tools/test_hardware_probe_793.py --output build/recovery-canonical/hw-793-qemu 2>&1 | tee build/recovery-canonical/hw-793-qemu.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('build/recovery-canonical/hw-793-qemu/results.json').read_text())
+          assert d['stage']==793 and d['status']=='PASS'
+          assert d['qemu_exit_code']==33 and d['qemu_hardware_observed'] is True
+          assert d['production_cr3_authorized'] is False
+          assert d['effective_pat_mtrr_verified'] is False
+          assert d['all_irq_routes_verified'] is False
+          PYCODE
+
       - name: Check 792 production closure preflight, source anchors and denial policy
         run: |
           set -euo pipefail
@@ -639,6 +672,16 @@ jobs:
             build/recovery-canonical/owned-low-790-qemu/qemu.log
             build/recovery-canonical/owned-low-790-qemu/compile.log
             build/recovery-canonical/owned-low-790-qemu/build/x86_64/BOOTX64.EFI
+            build/recovery-canonical/hw-793-host.log
+            build/recovery-canonical/hw-793-host/results.json
+            build/recovery-canonical/hw-793-host/test.log
+            build/recovery-canonical/hw-793-negative.log
+            build/recovery-canonical/hw-793-qemu.log
+            build/recovery-canonical/hw-793-qemu/results.json
+            build/recovery-canonical/hw-793-qemu/serial.log
+            build/recovery-canonical/hw-793-qemu/qemu.log
+            build/recovery-canonical/hw-793-qemu/compile.log
+            build/recovery-canonical/hw-793-qemu/build/x86_64/BOOTX64.EFI
             build/recovery-canonical/closure-792-host.log
             build/recovery-canonical/closure-792-host/results.json
             build/recovery-canonical/closure-792-host/test.log

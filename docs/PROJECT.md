@@ -1,3 +1,11 @@
+## Stage 793 — UEFI device/cache observations (terminal evidence)
+
+Stage 793 adds an independent GOP/EFI-descriptor/CPU register diagnostic and
+strict guest log verifier; ordinary Desktop, boot_info v1 and production CR3
+are unchanged. See [architecture](architecture/UEFI_HARDWARE_OBSERVATION_793.md),
+[handoff](NEXT_CHAT_793.md), [new-chat message](MESSAGE_FOR_NEW_CHAT_793.md).
+Hardware claims require exact successful CI.
+
 ## Этап 790 — собственные low-half таблицы и W^X-границы (эксперимент)
 
 Отдельная ветка `feature/styleos-owned-low-tables-wx-790` от принятого 789.
