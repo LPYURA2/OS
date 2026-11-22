@@ -29,6 +29,18 @@ def main():
         assert found,field
         replacement=found.group(1)+(b'0000000000000000' if field in (b'covered',b'pat',b'mtrr-supported',b'base',b'bytes',b'overlaps',b'cr3') else b'ffffffffffffffff')
         muts.append((raw[:found.start()]+replacement+raw[found.end():],33))
+    # A real firmware may omit a PCI GOP BAR from GetMemoryMap. The parser must
+    # preserve that gap as explicit evidence and NEVER claim full coverage.
+    gapped=raw.replace(b'overlaps=0x0000000000000001',b'overlaps=0x0000000000000000')
+    gapped=gapped.replace(b'covered=0x0000000000200000',b'covered=0x0000000000000000')
+    gapped=gapped.replace(b'complete=0x0000000000000001',b'complete=0x0000000000000000')
+    gapped=gapped.replace(b'type=0x000000000000000b',b'type=0x0000000000000000')
+    gapped=gapped.replace(b'attributes=0x0000000000000001',b'attributes=0x0000000000000000')
+    gapped=gapped.replace(b'STYLEOS S793 PASS',b'STYLEOS S793 GAP framebuffer-descriptor-absent\nSTYLEOS S793 PASS')
+    assert verify(gapped,33)[0],verify(gapped,33)
+    muts.append((gapped.replace(b'STYLEOS S793 GAP framebuffer-descriptor-absent\n',b''),33))
+    muts.append((gapped.replace(b'complete=0x0000000000000000',b'complete=0x0000000000000001'),33))
+    muts.append((raw.replace(b'STYLEOS S793 PASS',b'STYLEOS S793 GAP framebuffer-descriptor-absent\nSTYLEOS S793 PASS'),33))
     for bad,rc in muts:assert not verify(bad,rc)[0],(rc,bad)
     print(f'STYLEOS 793 UART negative tests: {len(muts)} corrupted fixtures rejected; not hardware evidence')
 if __name__=='__main__':main()

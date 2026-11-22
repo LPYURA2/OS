@@ -80,7 +80,11 @@ _Noreturn void hw793_terminal(const struct boot_info *info,
     field("if",!!(flags&(1u<<9)));
     arch_putc('\n');
     arch_puts("STYLEOS S793 POLICY cache-effective=unknown mmio-bars=unverified irq-routing=unverified firmware-runtime=unverified production-cr3=deny\n");
-    if(!report.overlaps){arch_puts("STYLEOS S793 FAIL no-framebuffer-descriptor\n");arch_halt();}
+    /* An absent UEFI descriptor for a PCI framebuffer is an important factual
+     * finding, not permission to invent a MMIO mapping. Emit a mandatory GAP
+     * marker, keep production CR3 denied, and complete the observation test. */
+    if(!report.overlaps)
+        arch_puts("STYLEOS S793 GAP framebuffer-descriptor-absent\n");
     arch_puts("STYLEOS S793 PASS\n");
     __asm__ volatile("outl %0,%1"::"a"(0x10u),"Nd"((uint16_t)0xf4u));
     arch_halt();

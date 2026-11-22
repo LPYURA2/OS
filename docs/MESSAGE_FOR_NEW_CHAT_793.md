@@ -9,6 +9,11 @@
 `docs/architecture/UEFI_HARDWARE_OBSERVATION_793.md` и
 `docs/design/APPROVED_UI_REFERENCES.md`.
 
+Первый QEMU 45042996026 обнаружил реальный GAP: GOP BAR 0x80000000,
+размер 0x003e8000, но ни один EFI memory-map descriptor его не покрывает.
+Первый запуск FAIL; исправленный отдельный эксперимент обязан подтвердить GAP
+без подмены фактов. Это НЕ разрешение на production mapping.
+
 793: отдельная терминальная загрузка QEMU/OVMF наблюдает GOP framebuffer,
 записи UEFI memory map и доступность физических страниц, сырые IA32_PAT и
 MTRR_DEFAULT MSR, CR0/CR3/IF и PIC masks. Никаких изменений boot_info v1,

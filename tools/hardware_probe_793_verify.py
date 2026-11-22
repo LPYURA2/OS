@@ -37,12 +37,19 @@ def verify(raw:bytes,exit_code):
         g['page-end']==(g['base']+g['bytes']+4095)&~4095 and
         g['page-end']<=1<<52 and g['base']+g['bytes']<=g['page-end']):
         return False,'invalid GOP geometry'
-    if not (0<m['descriptors']<=4096 and 0<m['overlaps']<=m['descriptors'] and
+    if not (0<m['descriptors']<=4096 and 0<=m['overlaps']<=m['descriptors'] and
         0<=m['covered']<=g['page-end']-g['page-start'] and
         m['complete'] in (0,1) and m['mixed'] in (0,1) and
         (m['complete']==1)==(m['covered']==g['page-end']-g['page-start']) and
         m['type']<32 and m['runtime']<=m['descriptors']):
         return False,'invalid UEFI descriptor facts'
+    gap=b'STYLEOS S793 GAP framebuffer-descriptor-absent'
+    if m['overlaps']==0:
+        if (lines.count(gap)!=1 or m['covered']!=0 or m['complete']!=0 or
+            m['mixed']!=0 or m['type']!=0 or m['attributes']!=0):
+            return False,'missing/contradictory UEFI framebuffer gap'
+    elif gap in lines:
+        return False,'forged framebuffer gap'
     if not (c['cr0']&(1<<31) and c['cr3'] and c['cpuid-edx']&(1<<5) and
         c['mtrr-supported']==int(bool(c['cpuid-edx']&(1<<12))) and
         c['pat'] and c['rflags']&(1<<1) and not c['rflags']&(1<<9)):
@@ -53,7 +60,9 @@ def verify(raw:bytes,exit_code):
         return False,'invalid port/IRQ observation'
     positions=[lines.index(b'STYLEOS x86_64 ExitBootServices OK')]
     positions += [next(i for i,line in enumerate(lines) if line.startswith(b'STYLEOS S793 '+n.encode()+b' ')) for n in FIELDS]
-    positions += [lines.index(POLICY),lines.index(b'STYLEOS S793 PASS')]
-    if positions!=sorted(set(positions)) or len(positions)!=7:
+    positions += [lines.index(POLICY)]
+    if m['overlaps']==0: positions.append(lines.index(gap))
+    positions.append(lines.index(b'STYLEOS S793 PASS'))
+    if positions!=sorted(set(positions)) or len(positions)!=(8 if m['overlaps']==0 else 7):
         return False,'order'
     return True,result

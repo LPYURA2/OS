@@ -6,6 +6,11 @@ Stage 793 branch `feature/styleos-uefi-hardware-observation-793`.
 `verify-and-archive` success, real QEMU observation `results.json` with
 `qemu_exit_code=33`, original UART and source/ISO artifact from that run.
 
+First QEMU run 45042996026 FAILED and timed out because the GOP BAR
+(`0x80000000`, `0x003e8000` bytes) did not overlap any EFI memory-map
+descriptor. Corrective revision records this as a **GAP**, not fake MMIO
+coverage. Only a separate successful rerun can accept the stage.
+
 793 implements a terminal-only UEFI GOP/descriptor/CPU observation:
 actual GOP aperture and intersecting EFI descriptors, raw IA32_PAT and
 conditional MTRR_DEF_TYPE, current CR0/CR3/RFLAGS, legacy PIC masks and

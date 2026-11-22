@@ -49,3 +49,15 @@ production Desktop address-space closure. **Production CR3 activation remains
 disallowed.** Follow-up should explicitly audit actual device BAR ranges,
 interrupt routing and firmware runtime services before considering a
 production-map integration experiment.
+
+## First QEMU observation (run 45042996026, NOT accepted)
+
+In real OVMF with `-vga std` the GOP aperture was `0x80000000` for
+`0x003e8000` bytes (1280x800) but **no corresponding descriptor appeared in
+GetMemoryMap** (`overlaps=0`, `covered=0`, 128 EFI descriptors). The original
+test failed and timed out because it treated that absence as fatal. This is a
+real and important gap, not evidence that the framebuffer does not exist. The
+probe was changed to emit a mandatory `GAP` marker while keeping every
+production-memory authorization denied. QEMU observation PASS may establish
+that the gap was *observed*, never that its missing MMIO coverage is resolved.
+The complete physical BAR and cache provenance remain for stage 794.
