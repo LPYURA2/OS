@@ -1,3 +1,15 @@
+## Этап 786 — аппаратный IST1 в отдельном терминальном QEMU
+
+Ветка `feature/styleos-hardware-ist-entry-786` от принятой 785. Отдельный
+`--test-ist-hw-786` включает унаследованный клонированный CR3, NX supervisor
+IST1 с двумя нулевыми guard PTE, свежие GDT/TSS/IDT, реальный `INT3`
+и безвозвратный выход из VM. Не подключено к обычному Desktop; результат
+доказывается только финальным GitHub Actions. Не доказаны переполнение
+стека, guard-page #PF, двойной fault, production memory closure и совместный
+Desktop + независимый .tea. [Отчёт](architecture/HARDWARE_IST_GUARD_ENTRY_786.md),
+[точка продолжения](NEXT_CHAT_786.md),
+[сообщение для нового чата](MESSAGE_FOR_NEW_CHAT_786.md).
+
 ## Этап 785 — неактивные guard-таблицы для будущего IST
 
 Отдельная ветка `feature/styleos-ist-guard-table-plan-785` от принятого 784.

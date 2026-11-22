@@ -31,6 +31,7 @@ on:
       - feature/styleos-tss-descriptor-attestation-783
       - feature/styleos-tss-lgdt-ltr-trial-784
       - feature/styleos-ist-guard-table-plan-785
+      - feature/styleos-hardware-ist-entry-786
   workflow_dispatch:
 
 permissions:
@@ -266,6 +267,16 @@ jobs:
           set -euo pipefail
           python3 tools/test_ist_guard_plan_785_host.py --output build/recovery-canonical/ist-guard-785-host 2>&1 | tee build/recovery-canonical/ist-guard-785-host.log
 
+      - name: Reject forged 786 IST UART and wrong exit codes
+        run: |
+          set -euo pipefail
+          python3 tools/test_ist_hw_786_verify.py 2>&1 | tee build/recovery-canonical/ist-786-parser.log
+
+      - name: Prove live CR3 switch IST1 INT3 trap and absent active guard PTEs in QEMU
+        run: |
+          set -euo pipefail
+          python3 tools/test_ist_hw_786_guest.py --output build/recovery-canonical/ist-786-qemu 2>&1 | tee build/recovery-canonical/ist-786-qemu.log
+
       - name: Attest 78 image-owned physical frames with real inherited CR3 walk in QEMU
         run: |
           set -euo pipefail
@@ -472,6 +483,13 @@ jobs:
             build/recovery-canonical/ist-guard-785-host.log
             build/recovery-canonical/ist-guard-785-host/test.log
             build/recovery-canonical/ist-guard-785-host/ist_guard_plan_785.obj
+            build/recovery-canonical/ist-786-parser.log
+            build/recovery-canonical/ist-786-qemu.log
+            build/recovery-canonical/ist-786-qemu/results.json
+            build/recovery-canonical/ist-786-qemu/serial.log
+            build/recovery-canonical/ist-786-qemu/qemu.log
+            build/recovery-canonical/ist-786-qemu/compile.log
+            build/recovery-canonical/ist-786-qemu/build/x86_64/BOOTX64.EFI
             build/recovery-canonical/tss-784-host.log
             build/recovery-canonical/tss-784-host/test.log
             build/recovery-canonical/tss-784-host/disassembly.txt
@@ -556,4 +574,28 @@ jobs:
           with urllib.request.urlopen(request,timeout=30) as response:
               assert response.status==201, response.status
           print('785 exact CI commit status recorded:',status,'run:',run)
+          PYCODE
+      - name: Report exact 786 hardware IST CI status and run URL
+        if: ${{ always() && github.ref_name == 'feature/styleos-hardware-ist-entry-786' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, urllib.request
+          status={'success':'success','failure':'failure','cancelled':'error'}.get(os.environ['RUN_STATUS'],'pending')
+          repo=os.environ['REPO']; sha=os.environ['SHA']; run=os.environ['RUN_ID']
+          body={'state':status,'context':'styleos/786-ist-hardware',
+                'target_url':f'https://github.com/{repo}/actions/runs/{run}',
+                'description':f'Exact 786 workflow {run}: {status}'}
+          request=urllib.request.Request(f'https://api.github.com/repos/{repo}/statuses/{sha}',
+            data=json.dumps(body).encode(),headers={'Accept':'application/vnd.github+json',
+                     'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+                     'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},method='POST')
+          with urllib.request.urlopen(request,timeout=30) as response:
+              assert response.status==201,response.status
+          print('786 exact CI commit status:',status,'run:',run)
           PYCODE
