@@ -41,6 +41,7 @@ on:
       - feature/styleos-uefi-hardware-observation-793
       - feature/styleos-pci-gop-bar-observation-794
       - feature/styleos-pci-bar-aperture-795
+      - feature/styleos-pci-topology-inventory-796
   workflow_dispatch:
 
 permissions:
@@ -444,6 +445,40 @@ jobs:
           assert d['production_cr3_authorized'] is False
           PYCODE
 
+      - name: 796 Verify PCI topology decoder under ASAN UBSAN COFF
+        run: |
+          set -euo pipefail
+          python3 tools/test_pci_topology_796_host.py --output build/recovery-canonical/pci-796-host 2>&1 | tee build/recovery-canonical/pci-796-host.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('build/recovery-canonical/pci-796-host/results.json').read_text())
+          assert d['stage']==796 and d['status']=='PASS' and d['production_cr3_authorized'] is False
+          PYCODE
+
+      - name: 796 Reject forged PCI hierarchy UART records
+        run: |
+          set -euo pipefail
+          python3 tools/test_pci_topology_796_negative.py 2>&1 | tee build/recovery-canonical/pci-796-negative.log
+
+      - name: 796 Read actual PCI devices in default QEMU and through PCIe root port
+        run: |
+          set -euo pipefail
+          python3 tools/test_pci_topology_796.py --output build/recovery-canonical/pci-796-qemu 2>&1 | tee build/recovery-canonical/pci-796-qemu.log
+          python3 tools/test_pci_topology_796.py --bridge --output build/recovery-canonical/pci-796-bridge 2>&1 | tee build/recovery-canonical/pci-796-bridge.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          for name in ('pci-796-qemu','pci-796-bridge'):
+              d=json.loads(Path('build/recovery-canonical',name,'results.json').read_text())
+              assert d['stage']==796 and d['status']=='PASS' and d['qemu_exit_code']==33
+              assert d['production_cr3_authorized'] is False and d['unknown_bar_sizes_remain'] is True
+          d=json.loads(Path('build/recovery-canonical/pci-796-bridge/results.json').read_text())
+          assert d['bridge_enumeration_verified'] is True
+          assert d['observations']['inventory']['bridges']>=1
+          assert d['observations']['inventory']['buses']>=2
+          PYCODE
+
       - name: 795 Validate reversible PCI BAR mask decoding under ASAN UBSAN COFF
         run: |
           set -euo pipefail
@@ -613,6 +648,15 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/pci-796-*.log
+            build/recovery-canonical/pci-796-host/results.json
+            build/recovery-canonical/pci-796-host/host.log
+            build/recovery-canonical/pci-796-qemu/results.json
+            build/recovery-canonical/pci-796-qemu/serial.log
+            build/recovery-canonical/pci-796-qemu/qemu.log
+            build/recovery-canonical/pci-796-bridge/results.json
+            build/recovery-canonical/pci-796-bridge/serial.log
+            build/recovery-canonical/pci-796-bridge/qemu.log
             build/recovery-canonical/pci-795-*.log
             build/recovery-canonical/pci-795-host/results.json
             build/recovery-canonical/pci-795-host/host.log
