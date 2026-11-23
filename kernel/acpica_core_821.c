@@ -8,7 +8,8 @@
 #include <styleos/acpica_efi_prelude_821.h>
 #include <acpi.h>
 #include <accommon.h>
-#include <styleos/acpica_bridge_819.h>
+/* The stage-819 diagnostic DMA gate has a stable independent C ABI. */
+int styleos819_dma_grant(uint16_t requester);
 
 int pci821_get_dsdt(const uint8_t **table,uint32_t *length);
 extern UINT8 AcpiUtChecksum(UINT8 *Buffer,UINT32 Length);
