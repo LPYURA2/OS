@@ -60,7 +60,7 @@ def build(source, manifest, output, cc, ar, objdump):
                '-ffreestanding', '-fno-builtin', '-fno-stack-protector',
                '-fno-asynchronous-unwind-tables', '-mno-red-zone',
                '-ffunction-sections', '-fdata-sections',
-               '-DACPI_MACHINE_WIDTH=64', '-I', str(source/'include'),
+               '-D_GNU_EFI', '-DACPI_MACHINE_WIDTH=64', '-I', str(source/'include'),
                '-c', str(f), '-o', str(obj)]
         p = subprocess.run(cmd, capture_output=True, text=True)
         if p.returncode:

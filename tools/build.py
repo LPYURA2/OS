@@ -346,7 +346,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_acpica_bridge_819:
         flags.append('-DSTYLEOS_TEST_ACPICA_BRIDGE_819=1')
     if test_acpica_core_821:
-        flags += ['-DSTYLEOS_TEST_ACPICA_CORE_821=1', '-I', str(Path(acpica_core_include).resolve())]
+        flags += ['-DSTYLEOS_TEST_ACPICA_CORE_821=1', '-D_GNU_EFI', '-I', str(Path(acpica_core_include).resolve())]
     if test_acpi_hostbridge_815:
         flags.append('-DSTYLEOS_TEST_ACPI_HOSTBRIDGE_815=1')
     if test_pci_rootbridge_814:
