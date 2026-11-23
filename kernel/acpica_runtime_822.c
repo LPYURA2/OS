@@ -162,7 +162,7 @@ ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE t,ACPI_OSD_EXEC_CALLBACK f,void *p){
  (void)t;(void)f;(void)p;return AE_SUPPORT;
 }
 void AcpiOsWaitEventsComplete(void){}
-void AcpiOsEnterSleep(UINT8 x,UINT32 a,UINT32 b){(void)x;(void)a;(void)b;}
+ACPI_STATUS AcpiOsEnterSleep(UINT8 x,UINT32 a,UINT32 b){(void)x;(void)a;(void)b;return AE_ACCESS;}
 BOOLEAN AcpiOsReadable(void *p,ACPI_SIZE n){return p!=0&&n!=0;}
 BOOLEAN AcpiOsWritable(void *p,ACPI_SIZE n){return p!=0&&n!=0;}
 int styleos819_dma_grant(uint16_t requester){(void)requester;return 0;}
