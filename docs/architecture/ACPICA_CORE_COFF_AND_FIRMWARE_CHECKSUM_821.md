@@ -72,3 +72,13 @@ real fault isolation and deny-all hardware access. Do not enable the AML engine
 on an untrusted physical PC without controlling OperationRegion requests.
 
 **The StyleOS foundation is NOT COMPLETE.**
+
+## Diagnostic OSL logging boundary (821)
+
+The static ACPICA checksum object has dependencies on `AcpiOsPrintf` and
+`AcpiOsVprintf`. The isolated guest provides bounded serial-only wrappers:
+format arguments are deliberately not expanded, and any unexpected diagnostic
+is visible in UART. These wrappers are **not** a production printf/OSL and
+must not be used to claim general AML support. The selected 162 upstream
+release-mode components compile as COFF; guest linkage and runtime evidence
+still require exact-HEAD QEMU/OVMF and complete CI SUCCESS.
