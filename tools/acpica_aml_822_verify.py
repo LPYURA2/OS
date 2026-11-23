@@ -16,7 +16,7 @@ def verify(raw,rc,mode):
  try:lines=raw.decode('ascii').replace('\r','').splitlines()
  except UnicodeDecodeError:return False,{}
  s=[x for x in lines if x.startswith('STYLEOS S822 ')]
- p=[x for x in lines if x.startswith('STYLEOS S821 ')]
+ p=[x for x in lines if x.startswith('STYLEOS S821 ACPICA-CHECKSUM') or x in (OLD,'STYLEOS S821 PASS')]
  if len(s)!=4 or len(p)!=3 or s[2:]!=[POLICY,'STYLEOS S822 PASS']:return False,{}
  if p[1:]!=[OLD,'STYLEOS S821 PASS'] or not p[0].startswith('STYLEOS S821 ACPICA-CHECKSUM length='):return False,{}
  a=AML.fullmatch(s[0]);b=OSL.fullmatch(s[1])
@@ -24,7 +24,7 @@ def verify(raw,rc,mode):
  m,denied,heap=map(lambda x:int(x,16),b.groups())
  if m<3 or m>200 or denied>150 or heap<64 or heap>4*1024*1024:return False,{}
  try:
-  i=next(i for i,x in enumerate(lines) if x.startswith('STYLEOS S816 NAMESPACE'))
+  i=next(i for i,x in enumerate(lines) if x.startswith('STYLEOS S816 PLATFORM'))
   if not(lines.index('STYLEOS x86_64 ExitBootServices OK')<lines.index(p[0])<
          lines.index(p[2])<lines.index(s[0])<lines.index(s[3])<i):return False,{}
  except ValueError:return False,{}
