@@ -31,7 +31,7 @@ for mode in ('disabled','intel','amd','bridge-intel','bridge-two-hop-intel'):
  deny(mode,good.replace(b'pci-bridge-walk=bounded',b'pci-bridge-walk=complete'))
  deny(mode,good.replace(b'collisions=0x0000000000000000',b'collisions=0x0000000000000001'))
  deny(mode,good.replace(b'functions=0x0000000000000005',b'functions=0x0000000000000000'))
- deny(mode,good.replace(b'bridges='+H(1).encode(),b'bridges='+H(0).encode())) if mode in ('bridge-intel','bridge-two-hop-intel') else deny(mode,good.replace(b'buses='+H(1).encode(),b'buses='+H(0).encode()))
+ deny(mode,good.replace(b'bridges='+H(2 if mode=='bridge-two-hop-intel' else 1).encode(),b'bridges='+H(0).encode())) if mode in ('bridge-intel','bridge-two-hop-intel') else deny(mode,good.replace(b'buses='+H(1).encode(),b'buses='+H(0).encode()))
  deny(mode,good.replace(b'unresolved='+H(5-('disabled'!=mode)).encode(),b'unresolved='+H(0).encode()))
  deny(mode,good.replace((POLICY+'\n').encode(),b''))
 print(f'STYLEOS S812 NEGATIVE PASS {count}/{count}')
