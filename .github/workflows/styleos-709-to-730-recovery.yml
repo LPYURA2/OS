@@ -62,6 +62,7 @@ on:
       - feature/styleos-uefi-rootbridge-audit-814
       - feature/styleos-acpi-static-namespace-815
       - feature/styleos-acpi-literal-namespace-816
+      - feature/styleos-acpica-replay-817
   workflow_dispatch:
 
 permissions:
@@ -81,7 +82,29 @@ jobs:
       - name: Install x86 UEFI and QEMU/OVMF tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf
+          sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf acpica-tools
+
+      - name: 817 Reject fabricated ACPICA AML evidence and permission claims
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpica-817
+          python3 tools/test_acpica_replay_817_negative.py 2>&1 | tee build/recovery-canonical/acpica-817/negative.log
+
+      - name: 817 Run actual ACPICA interpreter against QEMU firmware AML in sandbox
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpica_replay_817.py --output build/recovery-canonical/acpica-817 2>&1 | tee build/recovery-canonical/acpica-817-run.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          from tools.acpica_replay_817_verify import check_results
+          r=json.loads(Path('build/recovery-canonical/acpica-817/results.json').read_text())
+          assert check_results(r)
+          for mode in ('disabled','intel','bridge-intel','bridge-two-hop-intel'):
+              assert r['modes'][mode]['status']=='REPLAY_ONLY'
+              assert r['modes'][mode]['qemu_exit_code']==33
+          assert r['modes']['amd']['status'] in ('REPLAY_ONLY','SKIPPED')
+          PYCODE
 
       - name: 816 Check literal AML DSDT SSDT merge under ASAN UBSAN and COFF
         run: |
@@ -1253,6 +1276,8 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/acpica-817-run.log
+            build/recovery-canonical/acpica-817/**
             build/recovery-canonical/acpi-816-host/host.log
             build/recovery-canonical/acpi-816-negative.log
             build/recovery-canonical/acpi-816-qemu.log
