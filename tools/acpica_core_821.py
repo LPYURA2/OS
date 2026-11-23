@@ -17,7 +17,9 @@ CORE_DIRS = (
 )
 MINIMUM = {"dispatcher": 15, "events": 14, "executer": 26,
            "hardware": 9, "namespace": 21, "parser": 10,
-           "resources": 13, "tables": 8, "utilities": 39}
+           "resources": 12, "tables": 8, "utilities": 39}
+# ACPICA resource dump tables are built only for debug/disassembly modes.
+OPTIONAL_DEBUG_ONLY = {"resources/rsdump.c", "resources/rsdumpinfo.c"}
 ENTRYPOINTS = (
     'AcpiInitializeSubsystem', 'AcpiLoadTables', 'AcpiEvaluateObject',
     'AcpiGetDevices', 'AcpiUtChecksum',
@@ -37,7 +39,8 @@ def select(source: Path, manifest: dict):
     result = []
     for directory in CORE_DIRS:
         p = source / 'components' / directory
-        files = sorted(p.glob('*.c'))
+        files = [f for f in sorted(p.glob('*.c'))
+                 if f.relative_to(source/'components').as_posix() not in OPTIONAL_DEBUG_ONLY]
         if len(files) < MINIMUM[directory]:
             raise ValueError('incomplete component directory: ' + directory)
         for f in files:
