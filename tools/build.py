@@ -36,9 +36,11 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
     if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
         raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
+    if test_acpica_bridge_819:
+        test_acpi_osl_818 = True
     if test_acpi_osl_818:
         if arch != 'x86_64': raise ValueError('818 OSL guest profile requires x86_64')
         test_acpi_namespace_816 = True
@@ -201,6 +203,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/hardware_probe_793.c', 'boot/x86_64/hardware_probe_793.c']
     if test_acpi_osl_818:
         common.append('kernel/acpi_osl_818.c')
+    if test_acpica_bridge_819:
+        common.append('kernel/acpica_bridge_819.c')
     if test_acpi_namespace_816:
         common += ['kernel/acpi_madt_806.c','kernel/dmar_808.c','kernel/iommu_platform_810.c',
                    'kernel/pci_requester_812.c','kernel/pci_mcfg_813.c','kernel/pci_rootbridge_814.c',
@@ -333,6 +337,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_ACPI_NAMESPACE_816=1')
     if test_acpi_osl_818:
         flags.append('-DSTYLEOS_TEST_ACPI_OSL_818=1')
+    if test_acpica_bridge_819:
+        flags.append('-DSTYLEOS_TEST_ACPICA_BRIDGE_819=1')
     if test_acpi_hostbridge_815:
         flags.append('-DSTYLEOS_TEST_ACPI_HOSTBRIDGE_815=1')
     if test_pci_rootbridge_814:
@@ -551,6 +557,8 @@ def main():
                           help='Dedicated x86-64 test only: prove new CR3 and restore inherited CR3')
     negative.add_argument('--test-hw-probe-793', action='store_true',
                           help='793 dedicated terminal UEFI GOP/memory and CPU cache-state observation')
+    negative.add_argument('--test-acpica-bridge-819', action='store_true',
+                        help='819 test-only ACPICA-style callbacks and validated table-copy maps')
     negative.add_argument('--test-acpi-osl-818', action='store_true',
                           help='Isolated ACPICA OSL operation-region deny-by-default guest')
     negative.add_argument('--test-acpi-namespace-816', action='store_true',
@@ -673,6 +681,8 @@ def main():
         parser.error('--test-paging-roundtrip requires --arch x86_64')
     if args.test_hw_probe_793 and args.arch != 'x86_64':
         parser.error('--test-hw-probe-793 requires --arch x86_64')
+    if args.test_acpica_bridge_819 and args.arch != 'x86_64':
+        parser.error('--test-acpica-bridge-819 requires x86_64')
     if args.test_acpi_osl_818 and args.arch != 'x86_64':
         parser.error('--test-acpi-osl-818 requires x86_64')
     if args.test_acpi_namespace_816 and args.arch != 'x86_64':
@@ -725,6 +735,7 @@ def main():
                'paging' if args.test_paging else
                'paging-fault' if args.test_paging_fault else
                'paging-roundtrip' if args.test_paging_roundtrip else
+               'acpica-bridge-819' if args.test_acpica_bridge_819 else
                'acpi-osl-818' if args.test_acpi_osl_818 else
                'acpi-namespace-816' if args.test_acpi_namespace_816 else
                'acpi-hostbridge-815' if args.test_acpi_hostbridge_815 else
@@ -771,7 +782,7 @@ def main():
                'disk-app' if args.test_disk_app else
                'desktop-v0' if args.desktop_v0 else
                'desktop-display' if args.test_desktop_display else '')).resolve()
-    if (args.test_acpi_osl_818 or args.test_acpi_namespace_816 or args.test_acpi_hostbridge_815 or args.test_pci_rootbridge_814 or args.test_pci_mcfg_813 or args.test_pci_requester_812 or args.test_pci_requester_811 or args.test_iommu_810 or args.test_vtd_809 or args.test_dmar_808 or args.test_irq_delivery_807 or args.test_acpi_madt_806 or args.test_irq_apic_805 or args.test_cache_804 or args.test_cache_803 or args.test_cache_801 or args.test_cache_800 or args.test_pci_range_799 or args.test_pci_topology_796 or args.test_pci_aperture_795 or args.test_pci_probe_794 or args.test_hw_probe_793 or args.test_exception or args.test_bootpool or args.test_paging or
+    if (args.test_acpica_bridge_819 or args.test_acpi_osl_818 or args.test_acpi_namespace_816 or args.test_acpi_hostbridge_815 or args.test_pci_rootbridge_814 or args.test_pci_mcfg_813 or args.test_pci_requester_812 or args.test_pci_requester_811 or args.test_iommu_810 or args.test_vtd_809 or args.test_dmar_808 or args.test_irq_delivery_807 or args.test_acpi_madt_806 or args.test_irq_apic_805 or args.test_cache_804 or args.test_cache_803 or args.test_cache_801 or args.test_cache_800 or args.test_pci_range_799 or args.test_pci_topology_796 or args.test_pci_aperture_795 or args.test_pci_probe_794 or args.test_hw_probe_793 or args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789 or args.test_owned_low_790 or args.test_wx_write_791 or args.test_wx_exec_791 or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
             args.test_user_processes or args.test_user_syscall or args.test_user_syscall_deny or args.test_user_ipc or args.test_user_ipc_deny or args.test_native_tea or args.test_native_tea_disk or args.test_native_tea_session or args.test_storage or args.test_disk_app or
@@ -801,6 +812,7 @@ def main():
                              **({'test_pci_topology_796': True} if args.test_pci_topology_796 else {}),
                              **({'test_pci_range_799': True} if args.test_pci_range_799 else {}),
                              **({'test_acpi_osl_818': True} if args.test_acpi_osl_818 else {}),
+                             **({'test_acpica_bridge_819': True} if args.test_acpica_bridge_819 else {}),
                              **({'test_acpi_namespace_816': True} if args.test_acpi_namespace_816 else {}),
                              **({'test_acpi_hostbridge_815': True} if args.test_acpi_hostbridge_815 else {}),
                              **({'test_pci_rootbridge_814': True} if args.test_pci_rootbridge_814 else {}),

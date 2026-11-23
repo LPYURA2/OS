@@ -7,6 +7,9 @@
 #ifdef STYLEOS_TEST_ACPI_OSL_818
 #include <styleos/acpi_osl_818.h>
 #endif
+#ifdef STYLEOS_TEST_ACPICA_BRIDGE_819
+#include <styleos/acpica_bridge_819.h>
+#endif
 #include <styleos/dmar_808.h>
 #include <styleos/iommu_platform_810.h>
 #include <styleos/acpi_madt_806.h>
@@ -31,6 +34,12 @@ static enum iommu810_backend backend=IOMMU810_REFUSED;
 static int valid;
 static uint8_t dsdt_copy[ACPI815_MAX_DSDT];
 static uint32_t dsdt_length;
+#ifdef STYLEOS_TEST_ACPICA_BRIDGE_819
+static uint64_t dsdt_physical_819;
+static uint64_t ssdt_physical_819[ACPI816_MAX_SSDT];
+static struct styleos819_gate osl819;
+static struct styleos819_table tables819[STYLEOS819_MAX_TABLES];
+#endif
 static unsigned fadt_seen,ssdt_seen;
 static struct acpi815_report aml815;
 static uint8_t ssdt_copy[ACPI816_MAX_SSDT][ACPI816_MAX_TABLE];
@@ -150,6 +159,9 @@ void pci816_capture(const struct efi_system_table *st){
    }
    if(checksum)return;
    dsdt_length=length;
+#ifdef STYLEOS_TEST_ACPICA_BRIDGE_819
+   dsdt_physical_819=dsdt_address;
+#endif
   }else if(p[0]=='S'&&p[1]=='S'&&p[2]=='D'&&p[3]=='T'){
    if(ssdt_seen>=ACPI816_MAX_SSDT)return;
    unsigned size=u32(p+4);
@@ -160,6 +172,9 @@ void pci816_capture(const struct efi_system_table *st){
     ssdt_copy[ssdt_seen][k]=b;
    }
    if(checksum)return;
+#ifdef STYLEOS_TEST_ACPICA_BRIDGE_819
+   ssdt_physical_819[ssdt_seen]=entries[i];
+#endif
    ssdt_length[ssdt_seen++]=size;
   }else if(p[0]=='M'&&p[1]=='C'&&p[2]=='F'&&p[3]=='G'){
    if(mcfg_seen++)return;
@@ -266,6 +281,43 @@ _Noreturn void pci816_terminal(const struct boot_info *boot){
  f("budget",ACPI818_MAX_QUERIES);arch_putc('\n');
  arch_puts("STYLEOS S818 POLICY acpica-linked=no acpi-table=private-copy operationregion=deny-all hardware-io=none ecam=not-read dma-grants=no acpi-namespace-evaluated=no production-cr3=deny\n");
  arch_puts("STYLEOS S818 PASS\n");
+#endif
+#ifdef STYLEOS_TEST_ACPICA_BRIDGE_819
+ if(ssdt_seen+1u>STYLEOS819_MAX_TABLES)die("819-too-many-ssdts");
+ tables819[0]=(struct styleos819_table){dsdt_physical_819,dsdt_copy,dsdt_length};
+ for(unsigned i=0;i<ssdt_seen;i++)
+  tables819[i+1u]=(struct styleos819_table){ssdt_physical_819[i],ssdt_copy[i],ssdt_length[i]};
+ if(!styleos819_prepare(&osl819,tables819,1u+ssdt_seen,0x819u)||
+    !styleos819_activate(&osl819,0x819u))die("819-prepare");
+ const uint8_t *dsdt_header=AcpiOsMapMemory(dsdt_physical_819,4u);
+ if(!dsdt_header||dsdt_header[0]!='D'||dsdt_header[1]!='S'||
+    dsdt_header[2]!='D'||dsdt_header[3]!='T')die("819-map-dsdt");
+ AcpiOsUnmapMemory((void *)dsdt_header,4u);
+ for(unsigned i=0;i<ssdt_seen;i++){
+  const uint8_t *hdr=AcpiOsMapMemory(ssdt_physical_819[i],4u);
+  if(!hdr||hdr[0]!='S'||hdr[1]!='S'||hdr[2]!='D'||hdr[3]!='T')
+   die("819-map-ssdt");
+  AcpiOsUnmapMemory((void *)hdr,4u);
+ }
+ if(AcpiOsMapMemory(0xe0000000u,4u))die("819-ecam-mapped");
+ uint64_t sentinel=UINT64_C(0x1122334455667788);uint32_t ports=0xaabbccdd;
+ STYLEOS819_PCI_ID id={0,0,0,0};
+ if(AcpiOsReadMemory(0xe0000000u,&sentinel,32u)!=STYLEOS819_AE_ACCESS||
+    AcpiOsWriteMemory(0xe0000000u,sentinel,32u)!=STYLEOS819_AE_ACCESS||
+    AcpiOsReadPort(0xcf8u,&ports,32u)!=STYLEOS819_AE_ACCESS||
+    AcpiOsWritePort(0xcf8u,ports,32u)!=STYLEOS819_AE_ACCESS||
+    AcpiOsReadPciConfiguration(&id,0u,&sentinel,32u)!=STYLEOS819_AE_ACCESS||
+    AcpiOsWritePciConfiguration(&id,0u,sentinel,32u)!=STYLEOS819_AE_ACCESS||
+    ports!=UINT32_C(0xaabbccdd)||sentinel!=UINT64_C(0x1122334455667788)||
+    osl819.denied_io!=6u||osl819.denied_maps!=1u||
+    osl819.mapped!=1u+ssdt_seen||styleos819_dma_grant(0xffffu))
+  die("819-deny-and-snapshot");
+ arch_puts("STYLEOS S819 TABLES");f("registered",osl819.count);
+ f("maps",osl819.mapped);f("denied-maps",osl819.denied_maps);
+ f("denied-hardware",osl819.denied_io);f("ssdts",ssdt_seen);arch_putc('\n');
+ styleos819_deactivate(&osl819);
+ arch_puts("STYLEOS S819 POLICY acpica-linked=no acpi-mapping=checked-copy-only operationregion=deny-all ecam=not-read dma-grants=no production-cr3=deny\n");
+ arch_puts("STYLEOS S819 PASS\n");
 #endif
  scan_pci();
  if(!pci813_correlate_bus0(&mcfg813,&topo,&live813))die("ecam-bus-coverage");
