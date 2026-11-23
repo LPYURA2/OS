@@ -68,7 +68,7 @@ def main():
   print('S815 QEMU',mode,observations[mode],flush=True)
  if not amd:observations['amd']={'status':'SKIPPED','reason':'QEMU lacks amd-iommu; AMD hardware not verified'}
  required=('disabled','intel','bridge-intel','bridge-two-hop-intel')
- success=all(observations[m]['status']=='PASS' and observations[m]['observations'].get('firmware_uncovered_observed_buses',1)==0 for m in required) and observations['amd']['status']!='FAIL' and observations['bridge-two-hop-intel']['observations'].get('bridges',0)>=2
+ success=all(observations[m]['status']=='PASS' and observations[m]['observations'].get('mcfg_covered_buses')==observations[m]['observations'].get('buses') and observations[m]['observations'].get('uefi_covered_buses')==observations[m]['observations'].get('buses') for m in required) and observations['amd']['status']!='FAIL' and observations['bridge-two-hop-intel']['observations'].get('bridges',0)>=2
  result={'stage':815,'status':'PASS' if success else 'FAIL',
   'qemu_version':ver.splitlines()[0],'amd_qemu_supported':amd,
   'amd_hardware_verified':observations['amd']['status']=='PASS',
