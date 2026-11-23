@@ -66,6 +66,7 @@ on:
       - feature/styleos-acpica-osl-guard-818
       - feature/styleos-acpica-guest-table-gate-819
       - feature/styleos-acpica-upstream-abi-820
+      - feature/styleos-acpica-core-link-821
   workflow_dispatch:
 
 permissions:
@@ -87,7 +88,7 @@ jobs:
           timeout 900s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 update
           timeout 900s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf acpica-tools
 
-      - name: 820 Check SHA-pinned genuine ACPICA interpreter source and COFF ABI
+      - name: 820 Verify pinned genuine ACPICA source and compile interpreter components for x86 COFF
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpica-820
@@ -101,23 +102,23 @@ jobs:
             --archive build/recovery-canonical/acpica-820/upstream.tar.gz \
             --output build/recovery-canonical/acpica-820/source-manifest.json \
             --extract-to build/recovery-canonical/acpica-820/verified \
-            | tee build/recovery-canonical/acpica-820/source-verify.log
+            2>&1 | tee build/recovery-canonical/acpica-820/source-verify.log
           SRC=build/recovery-canonical/acpica-820/verified/source
           clang -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined \
-            -fno-omit-frame-pointer -isystem "$SRC/include" -I include \
+            -fno-omit-frame-pointer -I "$SRC/include" -I include \
             kernel/acpica_bridge_819.c tests/test_acpica_abi_820.c \
             -o build/recovery-canonical/acpica-820/abi-host
           ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 \
             build/recovery-canonical/acpica-820/abi-host \
             2>&1 | tee build/recovery-canonical/acpica-820/abi-host.log
           clang --target=x86_64-pc-win32-coff -std=c11 -O2 -ffreestanding \
-            -fno-builtin -D_AED_EFI -include tools/acpica_efi_types_820.h -isystem "$SRC/include" -I include \
+            -fno-builtin -I "$SRC/include" -I include \
             -c tests/test_acpica_abi_820.c \
             -o build/recovery-canonical/acpica-820/abi-coff.o
           for name in utilities/utxfinit namespace/nsxfname parser/psparse; do
             dest="build/recovery-canonical/acpica-820/$(basename "$name").obj"
             clang --target=x86_64-pc-win32-coff -std=c11 -O2 -ffreestanding \
-              -fno-builtin -D_AED_EFI -include tools/acpica_efi_types_820.h -isystem "$SRC/include" \
+              -fno-builtin -DACPI_MACHINE_WIDTH=64 -I "$SRC/include" \
               -c "$SRC/components/$name.c" -o "$dest"
           done
           file build/recovery-canonical/acpica-820/*.o build/recovery-canonical/acpica-820/*.obj \
@@ -125,14 +126,64 @@ jobs:
           python3 - <<'PYCODE'
           import json
           from pathlib import Path
-          j=json.loads(Path('build/recovery-canonical/acpica-820/source-manifest.json').read_text())
+          p=Path('build/recovery-canonical/acpica-820/source-manifest.json')
+          j=json.loads(p.read_text())
           assert j['version']=='20260930' and j['all_sources_verified']
           assert not j['guest_acpica_linked'] and not j['dma_authorized']
           assert not j['foundation_complete']
-          print('STYLEOS S820 GATE PASS: authentic upstream COFF, ABI, NO guest engine')
+          print('STYLEOS S820 GATE PASS: verified core COFF, ABI, NO guest interpreter')
           PYCODE
 
-      - name: 820 Reject malicious ACPICA source archives and forged claims
+      - name: 821 Build real complete ACPICA COFF core and execute upstream checksum in QEMU
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpica-821
+          python3 - <<'PYCODE'
+          import hashlib, tarfile
+          from pathlib import Path
+          origin=Path('build/recovery-canonical/acpica-820/upstream.tar.gz')
+          assert hashlib.sha256(origin.read_bytes()).hexdigest()=='aa18901b92e30749be0edc3081c8d550c61fce4fa37546fc6a65d367a4ae71a5'
+          with tarfile.open(origin,'r:gz') as tar:
+              members=[m for m in tar.getmembers() if m.isfile() and m.name.endswith('/LICENSE.BSD-3-Clause')]
+              assert len(members)==1 and 200 < members[0].size < 10000
+              data=tar.extractfile(members[0]).read()
+          assert b'Redistribution' in data and b'copyright' in data.lower()
+          Path('build/recovery-canonical/acpica-821/LICENSE.BSD-3-Clause').write_bytes(data)
+          print('S821 pinned ACPICA BSD license retained in binary evidence')
+          PYCODE
+          python3 tools/test_acpica_core_821.py \
+            --verified-source build/recovery-canonical/acpica-820/verified/source \
+            --source-manifest build/recovery-canonical/acpica-820/source-manifest.json \
+            --output build/recovery-canonical/acpica-821/qemu \
+            2>&1 | tee build/recovery-canonical/acpica-821/run.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          root=Path('build/recovery-canonical/acpica-821/qemu')
+          core=json.loads((root/'upstream-core/core-manifest.json').read_text())
+          evidence=json.loads((root/'results.json').read_text())
+          assert core['core_source_count']>=160 and core['target']=='x86_64-pc-win32-coff'
+          assert core['upstream_sha256']=='aa18901b92e30749be0edc3081c8d550c61fce4fa37546fc6a65d367a4ae71a5'
+          assert {'AcpiEvaluateObject','AcpiInitializeSubsystem','AcpiLoadTables','AcpiUtChecksum'}<=set(core['entrypoints_present'])
+          assert evidence['stage']==821 and evidence['status']=='PASS'
+          assert evidence['guest_acpica_linked'] and not evidence['guest_aml_executed']
+          for m in ('disabled','intel','bridge-intel','bridge-two-hop-intel'):
+              d=evidence['modes'][m]
+              assert d['status']=='PASS' and d['qemu_exit_code']==33
+              assert d['observations']['acpica821_core_checksum_real_guest']
+              assert not d['observations']['acpica821_guest_aml_evaluated']
+          assert not evidence['dma_access_authorized'] and not evidence['production_cr3_authorized']
+          print('STYLEOS S821 REAL ACPICA CORE COFF + GUEST CHECKSUM PASS; AML NOT RUN')
+          PYCODE
+
+      - name: 821 Reject forged ACPICA native checksum, AML and DMA records
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpica_core_821_negative.py \
+            --qemu-dir build/recovery-canonical/acpica-821/qemu \
+            2>&1 | tee build/recovery-canonical/acpica-821/negative.log
+
+      - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
           set -euo pipefail
           python3 tools/test_acpica_source_820_negative.py \
@@ -1396,6 +1447,19 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/acpica-821/LICENSE.BSD-3-Clause
+            build/recovery-canonical/acpica-821/*.log
+            build/recovery-canonical/acpica-821/qemu/results.json
+            build/recovery-canonical/acpica-821/qemu/*.log
+            build/recovery-canonical/acpica-821/qemu/qemu-version.txt
+            build/recovery-canonical/acpica-821/qemu/qemu-device-help.log
+            build/recovery-canonical/acpica-821/qemu/upstream-core/core-manifest.json
+            build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
+            build/recovery-canonical/acpica-821/qemu/disabled/**
+            build/recovery-canonical/acpica-821/qemu/intel/**
+            build/recovery-canonical/acpica-821/qemu/bridge-intel/**
+            build/recovery-canonical/acpica-821/qemu/bridge-two-hop-intel/**
+            build/recovery-canonical/acpica-821/qemu/amd/**
             build/recovery-canonical/acpica-820/*.json
             build/recovery-canonical/acpica-820/*.log
             build/recovery-canonical/acpica-820/*.o

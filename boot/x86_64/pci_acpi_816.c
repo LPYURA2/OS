@@ -392,3 +392,11 @@ _Noreturn void pci816_terminal(const struct boot_info *boot){
  arch_puts("STYLEOS S816 PASS\n");
  port_out(0xf4u,0x10u);arch_halt();
 }
+
+#ifdef STYLEOS_TEST_ACPICA_CORE_821
+/* Snapshot was copied before EBS. No firmware pointer is exposed. */
+int pci821_get_dsdt(const uint8_t **table,uint32_t *length){
+ if(!table||!length||!valid||!dsdt_length||dsdt_length>ACPI815_MAX_DSDT)return 0;
+ *table=dsdt_copy;*length=dsdt_length;return 1;
+}
+#endif
