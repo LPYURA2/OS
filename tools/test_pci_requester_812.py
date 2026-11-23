@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Stage 812: isolated real QEMU/OVMF PCI bridge and IOMMU observation."""
+import argparse,hashlib,json,shutil,subprocess,sys
+from pathlib import Path
+from pci_requester_812_verify import verify
+from test import firmware_path
+ROOT=Path(__file__).resolve().parents[1]
+def main():
+ ap=argparse.ArgumentParser();ap.add_argument('--output',required=True,type=Path)
+ output=ap.parse_args().output;output.mkdir(parents=True,exist_ok=True)
+ build=output/'build'
+ with (output/'compile.log').open('w') as log:
+  subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',
+   '--test-pci-requester-812','--output',str(build)],
+   stdout=log,stderr=subprocess.STDOUT,check=True)
+ qemu=shutil.which('qemu-system-x86_64')
+ code=firmware_path('OVMF_CODE','OVMF_CODE')
+ nvram=firmware_path('OVMF_VARS','OVMF_VARS')
+ if not(qemu and code and nvram):
+  raise RuntimeError('S812 requires real QEMU x86_64 and OVMF firmware')
+ ver=subprocess.run([qemu,'--version'],text=True,capture_output=True,check=True).stdout
+ helpresult=subprocess.run([qemu,'-device','help'],text=True,capture_output=True,check=True)
+ helptext=helpresult.stdout+'\n'+helpresult.stderr
+ amd='amd-iommu' in helptext
+ bridge='pcie-root-port' in helptext
+ (output/'qemu-version.txt').write_text(ver)
+ (output/'qemu-device-help.log').write_text(helptext)
+ if not bridge:raise RuntimeError('S812 hardware bridge test requires pcie-root-port')
+ modes=[('disabled',[]),('intel',['-device','intel-iommu,intremap=on']),
+        ('bridge-intel',['-device','intel-iommu,intremap=on'])]
+ if amd:modes.append(('amd',['-device','amd-iommu']))
+ observations={}
+ for mode,extra in modes:
+  dst=output/mode;dst.mkdir(exist_ok=True)
+  shutil.copyfile(nvram,dst/'OVMF_VARS.fd')
+  serial=dst/'serial.log'
+  drive=['-device','virtio-blk-pci,drive=styleos']
+  if mode=='bridge-intel':
+   drive=['-device','pcie-root-port,id=rp812,chassis=1,slot=3',
+          '-device','virtio-blk-pci,drive=styleos,bus=rp812']
+  cmd=[qemu,'-machine','q35','-accel','tcg,thread=single','-m','128M',
+   '-display','none','-vga','std','-serial',f'file:{serial}',
+   '-monitor','none','-net','none','-no-reboot',
+   '-device','isa-debug-exit,iobase=0xf4,iosize=0x04',
+   '-drive',f'if=pflash,format=raw,readonly=on,file={code}',
+   '-drive',f'if=pflash,format=raw,file={dst/"OVMF_VARS.fd"}',
+   '-drive',f'if=none,id=styleos,format=raw,readonly=on,file={build/"x86_64"/"styleos.img"}',
+   *drive,*extra]
+  try:
+   r=subprocess.run(cmd,timeout=115,capture_output=True)
+   rc=r.returncode
+   (dst/'qemu.log').write_bytes(r.stdout+r.stderr)
+  except subprocess.TimeoutExpired as e:
+   rc=None;(dst/'qemu.log').write_text('TIMEOUT '+str(e))
+  raw=serial.read_bytes() if serial.exists() else b''
+  good,details=verify(raw,rc,mode)
+  observations[mode]={'status':'PASS' if good else 'FAIL','qemu_exit_code':rc,
+   'uart_sha256':hashlib.sha256(raw).hexdigest(),'observations':details}
+  print('S812 QEMU',mode,observations[mode],flush=True)
+ if not amd:observations['amd']={'status':'SKIPPED','reason':'QEMU lacks amd-iommu; AMD hardware not verified'}
+ required=('disabled','intel','bridge-intel')
+ success=all(observations[m]['status']=='PASS' for m in required) and observations['amd']['status']!='FAIL'
+ result={'stage':812,'status':'PASS' if success else 'FAIL',
+  'qemu_version':ver.splitlines()[0],'amd_qemu_supported':amd,
+  'amd_hardware_verified':observations['amd']['status']=='PASS',
+  'real_bridge_sample_verified':observations['bridge-intel']['status']=='PASS',
+  'modes':observations,'all_pci_segments_verified':False,
+  'general_iommu_ownership_verified':False,'dma_domains_verified':False,
+  'dma_access_authorized':False,'dma_isolation_verified':False,
+  'uefi_runtime_verified':False,'production_cr3_authorized':False,
+  'efi_sha256':hashlib.sha256((build/'x86_64'/'BOOTX64.EFI').read_bytes()).hexdigest()}
+ (output/'results.json').write_text(json.dumps(result,indent=2)+'\n')
+ if not success:raise SystemExit(1)
+if __name__=='__main__':main()
