@@ -33,9 +33,12 @@ def synthetic_evaluation_ok(log: str) -> bool:
     if not isinstance(log, str) or len(log)>500000: return False
     norm=log.lower()
     for name,value in EXPECTED.items():
-        pattern=r'evaluation of[^\n]*'+name.lower()+r'[^\n]*returned object'
+        # ACPICA 20230628 prints 16 hex digits without a 0x prefix on the
+        # next line. Bind the value to its method, not arbitrary log text.
+        pattern=(r'evaluation of[^\n]*'+name.lower()+
+                 r'[^\n]*returned object[^\n]*\n\s*\[integer\]\s*=\s*0*'+
+                 format(value,'x')+r'\b')
         if not re.search(pattern,norm):return False
-        if not re.search(r'\b0x0*'+format(value,'x')+r'\b',norm):return False
     return True
 
 def check_results(result:dict)->bool:
