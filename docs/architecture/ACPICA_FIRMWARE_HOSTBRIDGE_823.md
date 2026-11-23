@@ -59,3 +59,11 @@ and real DMA tests still follow. Finally UEFI runtime, production CR3 and
 joint **ordinary** kernel+Desktop+Processes+native `.tea`+StyleFS acceptance.
 
 User-approved product plan is unchanged. **STYLEOS FOUNDATION NOT COMPLETE.**
+
+## Timeout and AML iteration budget
+
+The dedicated QEMU harness applies a 30-second limit per VM. Before loading
+firmware AML, the guest lowers upstream ACPICA `AcpiGbl_MaxLoopIterations`
+to 64. This is an experiment-specific fail-closed budget, **not** an
+untrusted-code sandbox or production watchdog. Limit violations cannot
+be promoted to successful hardware observations.

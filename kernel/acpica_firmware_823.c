@@ -211,6 +211,9 @@ void acpi823_terminal(const struct boot_info *boot){
  if(!build_tables())fail("snapshot",AE_BAD_PARAMETER);
  ACPI_STATUS s=AcpiInitializeSubsystem();if(s!=AE_OK)fail("init-subsystem",s);
  s=AcpiInitializeTables(NULL,16,TRUE);if(s!=AE_OK)fail("init-tables",s);
+ /* Bound AML While loops before any firmware namespace load. */
+ extern UINT32 AcpiGbl_MaxLoopIterations;
+ AcpiGbl_MaxLoopIterations=64u;
  s=AcpiLoadTables();if(s!=AE_OK)fail("load-tables",s);
  uint64_t hid=0,seg=0,bbn=0;
  unsigned hidp=eval_number("\\_SB.PCI0._HID",&hid);

@@ -56,7 +56,7 @@ def main():
    '-drive',f'if=none,id=styleos,format=raw,readonly=on,file={build/"x86_64"/"styleos.img"}',
    *drive,*extra]
   try:
-   r=subprocess.run(cmd,timeout=115,capture_output=True)
+   r=subprocess.run(cmd,timeout=30,capture_output=True)
    rc=r.returncode
    (dst/'qemu.log').write_bytes(r.stdout+r.stderr)
   except subprocess.TimeoutExpired as e:
