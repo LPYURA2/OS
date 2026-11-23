@@ -58,6 +58,7 @@ on:
       - feature/styleos-cross-vendor-iommu-810
       - feature/styleos-requester-scope-811
       - feature/styleos-pci-bridge-ivhd-812
+      - feature/styleos-mcfg-segment-audit-813
   workflow_dispatch:
 
 permissions:
@@ -78,6 +79,36 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf
+
+      - name: 813 Validate MCFG segment and ECAM arithmetic with ASAN UBSAN COFF
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/pci-813-host
+          clang -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -I include kernel/pci_mcfg_813.c kernel/pci_requester_812.c kernel/dmar_808.c kernel/iommu_platform_810.c tests/test_pci_mcfg_813.c -o build/recovery-canonical/pci-813-host/test
+          ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 build/recovery-canonical/pci-813-host/test 2>&1 | tee build/recovery-canonical/pci-813-host/host.log
+          clang --target=x86_64-pc-win32-coff -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -I include -c kernel/pci_mcfg_813.c -o build/recovery-canonical/pci-813-host/model-coff.o
+          clang --target=x86_64-pc-win32-coff -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -I include -I boot/x86_64 -c boot/x86_64/pci_mcfg_813.c -o build/recovery-canonical/pci-813-host/uefi-coff.o
+
+      - name: 813 Reject forged MCFG region, bus coverage and DMA authorization
+        run: |
+          set -euo pipefail
+          python3 tools/test_pci_mcfg_813_negative.py 2>&1 | tee build/recovery-canonical/pci-813-negative.log
+
+      - name: 813 Observe real ACPI MCFG across IOMMU and PCI bridge QEMU modes
+        run: |
+          set -euo pipefail
+          python3 tools/test_pci_mcfg_813.py --output build/recovery-canonical/pci-813-qemu 2>&1 | tee build/recovery-canonical/pci-813-qemu.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('build/recovery-canonical/pci-813-qemu/results.json').read_text())
+          assert r['stage']==813 and r['status']=='PASS'
+          assert r['mcfg_firmware_observed'] and r['live_pci_buses_mcfg_covered']
+          assert all(r['modes'][m]['status']=='PASS' and r['modes'][m]['qemu_exit_code']==33 for m in ('disabled','intel','bridge-intel','bridge-two-hop-intel'))
+          assert r['modes']['bridge-two-hop-intel']['observations']['bridges']>=2
+          assert r['modes']['amd']['status']==('PASS' if r['amd_qemu_supported'] else 'SKIPPED')
+          assert not any(r[k] for k in ('ecam_registers_read','hostbridge_crs_verified','all_pci_segments_verified','general_iommu_ownership_verified','dma_domains_verified','dma_access_authorized','dma_isolation_verified','uefi_runtime_verified','production_cr3_authorized'))
+          PYCODE
 
       - name: 812 Validate PCI bridge and AMD IVHD model with ASAN UBSAN COFF
         run: |
@@ -1118,6 +1149,23 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/pci-813-host/host.log
+            build/recovery-canonical/pci-813-negative.log
+            build/recovery-canonical/pci-813-qemu.log
+            build/recovery-canonical/pci-813-qemu/results.json
+            build/recovery-canonical/pci-813-qemu/compile.log
+            build/recovery-canonical/pci-813-qemu/qemu-version.txt
+            build/recovery-canonical/pci-813-qemu/qemu-device-help.log
+            build/recovery-canonical/pci-813-qemu/disabled/serial.log
+            build/recovery-canonical/pci-813-qemu/disabled/qemu.log
+            build/recovery-canonical/pci-813-qemu/intel/serial.log
+            build/recovery-canonical/pci-813-qemu/intel/qemu.log
+            build/recovery-canonical/pci-813-qemu/bridge-intel/serial.log
+            build/recovery-canonical/pci-813-qemu/bridge-intel/qemu.log
+            build/recovery-canonical/pci-813-qemu/bridge-two-hop-intel/serial.log
+            build/recovery-canonical/pci-813-qemu/bridge-two-hop-intel/qemu.log
+            build/recovery-canonical/pci-813-qemu/amd/serial.log
+            build/recovery-canonical/pci-813-qemu/amd/qemu.log
             build/recovery-canonical/pci-812-host/host.log
             build/recovery-canonical/pci-812-negative.log
             build/recovery-canonical/pci-812-qemu.log
