@@ -67,6 +67,7 @@ on:
       - feature/styleos-acpica-guest-table-gate-819
       - feature/styleos-acpica-upstream-abi-820
       - feature/styleos-acpica-core-link-821
+      - feature/styleos-acpica-namespace-init-822
   workflow_dispatch:
 
 permissions:
