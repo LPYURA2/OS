@@ -150,7 +150,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         if test_native_tea_disk:
             from build_native_tea_769 import build as build_disk_tea
             build_disk_tea(folder)
-    common = ['kernel/main.c', 'kernel/boot_info.c', 'kernel/runtime.c',
+    # S822 uses verified upstream ACPICA COFF's memcpy/memset; avoid duplicate
+    # freestanding runtime symbols in this isolated guest profile only.
+    common = ['kernel/main.c', 'kernel/boot_info.c'] + ([] if test_acpica_aml_822 else ['kernel/runtime.c']) + [
               'kernel/boot_memory.c', 'kernel/boot_memory_diagnostic.c',
               'kernel/exception.c', 'kernel/boot_pool.c']
     if test_bootpool:
