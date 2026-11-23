@@ -112,13 +112,13 @@ jobs:
             build/recovery-canonical/acpica-820/abi-host \
             2>&1 | tee build/recovery-canonical/acpica-820/abi-host.log
           clang --target=x86_64-pc-win32-coff -std=c11 -O2 -ffreestanding -D_GNU_EFI \
-            -fno-builtin -I "$SRC/include" -I include \
+            -fno-builtin -include include/styleos/acpica_efi_prelude_821.h -I "$SRC/include" -I include \
             -c tests/test_acpica_abi_820.c \
             -o build/recovery-canonical/acpica-820/abi-coff.o
           for name in utilities/utxfinit namespace/nsxfname parser/psparse; do
             dest="build/recovery-canonical/acpica-820/$(basename "$name").obj"
             clang --target=x86_64-pc-win32-coff -std=c11 -O2 -ffreestanding -D_GNU_EFI \
-              -fno-builtin -DACPI_MACHINE_WIDTH=64 -I "$SRC/include" \
+              -fno-builtin -DACPI_MACHINE_WIDTH=64 -include include/styleos/acpica_efi_prelude_821.h -I "$SRC/include" \
               -c "$SRC/components/$name.c" -o "$dest"
           done
           file build/recovery-canonical/acpica-820/*.o build/recovery-canonical/acpica-820/*.obj \

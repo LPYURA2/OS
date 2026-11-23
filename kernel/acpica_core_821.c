@@ -5,6 +5,7 @@
 #include <styleos/arch.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <styleos/acpica_efi_prelude_821.h>
 #include <acpi.h>
 #include <accommon.h>
 #include <styleos/acpica_bridge_819.h>
