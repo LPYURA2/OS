@@ -81,8 +81,8 @@ jobs:
 
       - name: Install x86 UEFI and QEMU/OVMF tools
         run: |
-          timeout 150s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 update
-          timeout 150s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf acpica-tools
+          timeout 900s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 update
+          timeout 900s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf acpica-tools
 
       - name: 817 Reject fabricated ACPICA AML evidence and permission claims
         run: |
