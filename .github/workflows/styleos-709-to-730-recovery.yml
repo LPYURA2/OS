@@ -61,6 +61,7 @@ on:
       - feature/styleos-mcfg-segment-audit-813
       - feature/styleos-uefi-rootbridge-audit-814
       - feature/styleos-acpi-static-namespace-815
+      - feature/styleos-acpi-literal-namespace-816
   workflow_dispatch:
 
 permissions:
@@ -81,6 +82,40 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf
+
+      - name: 816 Check literal AML DSDT SSDT merge under ASAN UBSAN and COFF
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpi-816-host
+          clang -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -I include kernel/acpi_namespace_816.c tests/test_acpi_namespace_816.c -o build/recovery-canonical/acpi-816-host/test
+          ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 build/recovery-canonical/acpi-816-host/test 2>&1 | tee build/recovery-canonical/acpi-816-host/host.log
+          clang --target=x86_64-pc-win32-coff -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -I include -c kernel/acpi_namespace_816.c -o build/recovery-canonical/acpi-816-host/model-coff.o
+          clang --target=x86_64-pc-win32-coff -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -I include -I boot/x86_64 -c boot/x86_64/pci_acpi_816.c -o build/recovery-canonical/acpi-816-host/efi-coff.o
+
+      - name: 816 Reject forged AML evaluated and DMA UART claims
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpi_namespace_816_negative.py 2>&1 | tee build/recovery-canonical/acpi-816-negative.log
+
+      - name: 816 Inspect real DSDT SSDT in QEMU OVMF with isolated namespace audit
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpi_namespace_816.py --output build/recovery-canonical/acpi-816-qemu 2>&1 | tee build/recovery-canonical/acpi-816-qemu.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('build/recovery-canonical/acpi-816-qemu/results.json').read_text())
+          assert x['stage']==816 and x['status']=='PASS'
+          for mode in ('disabled','intel','bridge-intel','bridge-two-hop-intel'):
+            o=x['modes'][mode]
+            assert o['status']=='PASS' and o['qemu_exit_code']==33
+            assert o['observations']['fadt_dsdt_table_checksums_valid']
+            assert not o['observations']['aml_namespace_fully_evaluated']
+            assert not o['observations']['dma_access_authorized']
+          assert x['modes']['amd']['status']==('PASS' if x['amd_qemu_supported'] else 'SKIPPED')
+          assert x['real_two_hop_bridge_sample_verified']
+          assert not any(x[k] for k in ('acpi_namespace_evaluated','acpi_crs_evaluated','acpi_seg_evaluated','acpi_bbn_evaluated','ecam_reservation_verified','ecam_registers_read','hostbridge_crs_verified','general_iommu_ownership_verified','dma_domains_verified','dma_access_authorized','dma_isolation_verified','uefi_runtime_verified','production_cr3_authorized'))
+          PYCODE
 
       - name: 815 Validate bounded FADT DSDT static AML under ASAN UBSAN COFF
         run: |
@@ -1218,6 +1253,29 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/acpi-816-host/host.log
+            build/recovery-canonical/acpi-816-negative.log
+            build/recovery-canonical/acpi-816-qemu.log
+            build/recovery-canonical/acpi-816-qemu/results.json
+            build/recovery-canonical/acpi-816-qemu/compile.log
+            build/recovery-canonical/acpi-816-qemu/qemu-version.txt
+            build/recovery-canonical/acpi-816-qemu/qemu-device-help.log
+            build/recovery-canonical/acpi-816-qemu/disabled/serial.log
+            build/recovery-canonical/acpi-816-qemu/disabled/qemu.log
+            build/recovery-canonical/acpi-816-qemu/disabled/dsdt.aml
+            build/recovery-canonical/acpi-816-qemu/intel/serial.log
+            build/recovery-canonical/acpi-816-qemu/intel/qemu.log
+            build/recovery-canonical/acpi-816-qemu/intel/dsdt.aml
+            build/recovery-canonical/acpi-816-qemu/bridge-intel/serial.log
+            build/recovery-canonical/acpi-816-qemu/bridge-intel/qemu.log
+            build/recovery-canonical/acpi-816-qemu/bridge-intel/dsdt.aml
+            build/recovery-canonical/acpi-816-qemu/bridge-two-hop-intel/serial.log
+            build/recovery-canonical/acpi-816-qemu/bridge-two-hop-intel/qemu.log
+            build/recovery-canonical/acpi-816-qemu/bridge-two-hop-intel/dsdt.aml
+            build/recovery-canonical/acpi-816-qemu/amd/serial.log
+            build/recovery-canonical/acpi-816-qemu/amd/qemu.log
+            build/recovery-canonical/acpi-816-qemu/amd/dsdt.aml
+            build/recovery-canonical/acpi-816-qemu/*/ssdt-*.aml
             build/recovery-canonical/acpi-815-host/host.log
             build/recovery-canonical/acpi-815-negative.log
             build/recovery-canonical/acpi-815-qemu.log
