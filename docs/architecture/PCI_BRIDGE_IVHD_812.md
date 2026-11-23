@@ -68,10 +68,12 @@ are mutually exclusive according to the S810 selector.
 - Alias, RMRR, IVMD, INCLUDE_ALL, unsupported special records, nonzero segments,
   bridge subhierarchies and unknown records **never** authorize DMA.
 - No-IOMMU mode is diagnostic only; it must not permit untrusted bus-mastering.
-- The accepted QEMU bridge setup proves the traverser can observe at least one
-  downstream PCI bus, but QEMU firmware may not publish a multihop DMAR
-  endpoint scope. Synthetic host fixtures test explicit three-hop paths,
-  *not* same-boot hardware ownership.
+- The dedicated QEMU/OVMF bridge trials require one PCIe root-port and a
+  real two-level chain (PCIe root-port followed by PCIe-to-PCI bridge),
+  demonstrating bounded observation of multiple downstream buses. QEMU
+  firmware does not necessarily publish an explicit multi-hop Intel endpoint
+  scope; a synthetic host fixture separately verifies its three-pair DMAR
+  path semantics. Neither proves same-boot IOMMU ownership.
 - A complete AMD specification implementation, hardware alias tests, multiple
   controllers/segments, ECAM/MCFG, IOMMU root/context/device tables,
   invalidation, fault handling and real forbidden DMA tests remain outstanding.
@@ -106,7 +108,7 @@ python3 tools/test_pci_requester_812.py --output build/pci-812-qemu
 
 The workflow additionally requires x86 COFF compilation, the complete old
 regression suite, the unchanged ordinary ISO, reproducible source archive,
-QEMU serial logs, JSON, SHA256, and the exact CI head. Do **not** mark this
+QEMU disabled/Intel/one-bridge/two-bridge/AMD serial logs, JSON, SHA256, and the exact CI head. Do **not** mark this
 stage accepted if the full workflow fails or if results are only host fixtures.
 
 Original acceptance base: S811 SUCCESS

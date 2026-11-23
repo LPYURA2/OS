@@ -21,10 +21,11 @@ SHA256SUMS; не принимай этап, если последняя пров
 обход PCI-мостов и многоступенчатых путей Intel DMAR, bounded AMD
 IVHD SELECT/RANGE/ALIAS/EXT и учёт IVMD-исключений,
 модель аппаратной топологии, проверка входных данных, настоящие QEMU
-Intel/AMD/без IOMMU и QEMU с PCIe root-port, negative UART и
-ASAN/UBSAN/COFF. Это диагностическая модель; многоступенчатые пути
-проверены модельным хостовым тестом, но полная физическая принадлежность
-Requester ID контроллеру IOMMU НЕ подтверждена.
+Intel/AMD/без IOMMU, QEMU с PCIe root-port и отдельный реальный
+двухуровневый мост (root-port → PCIe-to-PCI bridge), negative UART и
+ASAN/UBSAN/COFF. Многоступенчатый Intel DMAR device scope проверен
+синтетическим модельным тестом; полный аппаратный маршрут Requester ID
+к контроллеру IOMMU НЕ подтверждён.
 
 DMA-домены, реальные аппаратные deny/allow, fault logging,
 инвалидации, все PCI-сегменты, полный AMD IVHD, UEFI runtime,
