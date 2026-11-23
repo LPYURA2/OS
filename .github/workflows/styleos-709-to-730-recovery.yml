@@ -65,6 +65,7 @@ on:
       - feature/styleos-acpica-replay-817
       - feature/styleos-acpica-osl-guard-818
       - feature/styleos-acpica-guest-table-gate-819
+      - feature/styleos-acpica-upstream-abi-820
   workflow_dispatch:
 
 permissions:
@@ -85,6 +86,57 @@ jobs:
         run: |
           timeout 900s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 update
           timeout 900s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf acpica-tools
+
+      - name: 820 Check SHA-pinned genuine ACPICA interpreter source and COFF ABI
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpica-820
+          curl -fL --retry 4 --retry-delay 3 --connect-timeout 15 --max-time 180 \
+            'https://github.com/open-acpica/acpica/releases/download/20260930/acpica-unix-20260930.tar.gz' \
+            -o build/recovery-canonical/acpica-820/upstream.tar.gz
+          printf '%s  %s\n' \
+            'aa18901b92e30749be0edc3081c8d550c61fce4fa37546fc6a65d367a4ae71a5' \
+            'build/recovery-canonical/acpica-820/upstream.tar.gz' | sha256sum -c -
+          python3 tools/acpica_source_820.py \
+            --archive build/recovery-canonical/acpica-820/upstream.tar.gz \
+            --output build/recovery-canonical/acpica-820/source-manifest.json \
+            --extract-to build/recovery-canonical/acpica-820/verified \
+            | tee build/recovery-canonical/acpica-820/source-verify.log
+          SRC=build/recovery-canonical/acpica-820/verified/source
+          clang -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -I "$SRC/include" -I include \
+            kernel/acpica_bridge_819.c tests/test_acpica_abi_820.c \
+            -o build/recovery-canonical/acpica-820/abi-host
+          ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 \
+            build/recovery-canonical/acpica-820/abi-host \
+            2>&1 | tee build/recovery-canonical/acpica-820/abi-host.log
+          clang --target=x86_64-pc-win32-coff -std=c11 -O2 -ffreestanding \
+            -fno-builtin -DACPI_MACHINE_WIDTH=64 -I "$SRC/include" -I include \
+            -c tests/test_acpica_abi_820.c \
+            -o build/recovery-canonical/acpica-820/abi-coff.o
+          for name in utilities/utxfinit namespace/nsxfname parser/psparse; do
+            dest="build/recovery-canonical/acpica-820/$(basename "$name").obj"
+            clang --target=x86_64-pc-win32-coff -std=c11 -O2 -ffreestanding \
+              -fno-builtin -DACPI_MACHINE_WIDTH=64 -I "$SRC/include" \
+              -c "$SRC/components/$name.c" -o "$dest"
+          done
+          file build/recovery-canonical/acpica-820/*.o build/recovery-canonical/acpica-820/*.obj \
+            | tee build/recovery-canonical/acpica-820/coff-objects.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('build/recovery-canonical/acpica-820/source-manifest.json').read_text())
+          assert j['version']=='20260930' and j['all_sources_verified']
+          assert not j['guest_acpica_linked'] and not j['dma_authorized']
+          assert not j['foundation_complete']
+          print('STYLEOS S820 GATE PASS: authentic upstream COFF, ABI, NO guest engine')
+          PYCODE
+
+      - name: 820 Reject malicious ACPICA source archives and forged claims
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpica_source_820_negative.py \
+            2>&1 | tee build/recovery-canonical/acpica-820/negative.log
 
       - name: 819 Prove image-owned ACPI mapping and ACPICA-style guest callbacks ASAN UBSAN COFF
         run: |
@@ -1344,6 +1396,10 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/acpica-820/*.json
+            build/recovery-canonical/acpica-820/*.log
+            build/recovery-canonical/acpica-820/*.o
+            build/recovery-canonical/acpica-820/*.obj
             build/recovery-canonical/osl-819-host/**
             build/recovery-canonical/osl-819-qemu.log
             build/recovery-canonical/osl-819-qemu/**
