@@ -63,6 +63,7 @@ on:
       - feature/styleos-acpi-static-namespace-815
       - feature/styleos-acpi-literal-namespace-816
       - feature/styleos-acpica-replay-817
+      - feature/styleos-acpica-osl-guard-818
   workflow_dispatch:
 
 permissions:
@@ -83,6 +84,37 @@ jobs:
         run: |
           timeout 900s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 update
           timeout 900s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=35 install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-system-arm qemu-utils ovmf acpica-tools
+
+      - name: 818 Verify freestanding ACPI OSL deny substrate with ASAN UBSAN COFF
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/osl-818-host
+          clang -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -I include kernel/acpi_osl_818.c tests/test_acpi_osl_818.c -o build/recovery-canonical/osl-818-host/host
+          ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 build/recovery-canonical/osl-818-host/host 2>&1 | tee build/recovery-canonical/osl-818-host/host.log
+          clang --target=x86_64-pc-win32-coff -std=c11 -O2 -ffreestanding -fno-builtin -Wall -Wextra -Werror -I include -c kernel/acpi_osl_818.c -o build/recovery-canonical/osl-818-host/host-coff.o
+          clang --target=x86_64-pc-win32-coff -std=c11 -O2 -ffreestanding -fno-builtin -Wall -Wextra -Werror -I include -I boot/x86_64 -DSTYLEOS_TEST_ACPI_OSL_818=1 -c boot/x86_64/pci_acpi_816.c -o build/recovery-canonical/osl-818-host/uefi-coff.o
+
+      - name: 818 Reject forged OSL permissions and QEMU evidence
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpi_osl_818_negative.py 2>&1 | tee build/recovery-canonical/osl-818-host/negative.log
+
+      - name: 818 Deny AML hardware regions inside real QEMU OVMF guest
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpi_osl_818.py --output build/recovery-canonical/osl-818-qemu 2>&1 | tee build/recovery-canonical/osl-818-qemu.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('build/recovery-canonical/osl-818-qemu/results.json').read_text())
+          assert x['stage']==818 and x['status']=='PASS'
+          assert x['guest_acpica_linked'] is False and x['operationregion_ever_granted'] is False
+          for mode in ('disabled','intel','bridge-intel','bridge-two-hop-intel'):
+              d=x['modes'][mode];assert d['status']=='PASS' and d['qemu_exit_code']==33
+              o=d['observations'];assert o['osl818_region_denied']==12 and o['osl818_snapshot_reads']==1
+              assert o['osl818_dma_access_authorized'] is False
+          a=x['modes']['amd'];assert a['status'] in ('PASS','SKIPPED')
+          PYCODE
 
       - name: 817 Reject fabricated ACPICA AML evidence and permission claims
         run: |
@@ -1276,6 +1308,9 @@ jobs:
             build/recovery-canonical/SHA256SUMS-binaries.txt
             build/recovery-canonical/source-zip-test.log
             build/recovery-canonical/StyleOS-Recovery-Experimental.iso
+            build/recovery-canonical/osl-818-host/**
+            build/recovery-canonical/osl-818-qemu.log
+            build/recovery-canonical/osl-818-qemu/**
             build/recovery-canonical/acpica-817-run.log
             build/recovery-canonical/acpica-817/**
             build/recovery-canonical/acpi-816-host/host.log

@@ -4,6 +4,9 @@
 #include <styleos/pci_rootbridge_814.h>
 #include <styleos/acpi_hostbridge_815.h>
 #include <styleos/acpi_namespace_816.h>
+#ifdef STYLEOS_TEST_ACPI_OSL_818
+#include <styleos/acpi_osl_818.h>
+#endif
 #include <styleos/dmar_808.h>
 #include <styleos/iommu_platform_810.h>
 #include <styleos/acpi_madt_806.h>
@@ -241,6 +244,29 @@ _Noreturn void pci816_terminal(const struct boot_info *boot){
  ns_tables[0]=(struct acpi816_table){dsdt_copy,dsdt_length};
  for(unsigned i=0;i<ssdt_seen;i++)ns_tables[i+1]=(struct acpi816_table){ssdt_copy[i],ssdt_length[i]};
  if(!acpi816_inspect(ns_tables,1+ssdt_seen,&ns816))die("namespace-table");
+#ifdef STYLEOS_TEST_ACPI_OSL_818
+ struct acpi818_gate gate={0};uint64_t cell=0;
+ if(!acpi818_open(&gate,dsdt_copy,dsdt_length,0x818u) ||
+    acpi818_table_read(&gate,0x818u,0u,32u,&cell)!=ACPI818_OK||
+    cell!=UINT32_C(0x54445344))die("osl818-table");
+ cell=UINT64_C(0xaabbccddeeff0011);
+ if(acpi818_table_read(&gate,0x819u,0u,32u,&cell)!=ACPI818_INVALID ||
+    acpi818_table_read(&gate,0x818u,dsdt_length,8u,&cell)!=ACPI818_INVALID ||
+    cell!=UINT64_C(0xaabbccddeeff0011))die("osl818-stale-or-bounds");
+ static const unsigned spaces[]={0,1,2,3,0x7f,0xff};
+ for(unsigned s=0;s<sizeof spaces/sizeof spaces[0];s++){
+  if(acpi818_region(&gate,spaces[s],0xe0000000u,32u,0,&cell)!=ACPI818_DENIED||
+     acpi818_region(&gate,spaces[s],0xe0000000u,32u,1,&cell)!=ACPI818_DENIED||
+     cell!=UINT64_C(0xaabbccddeeff0011))die("osl818-region");
+ }
+ if(acpi818_dma_grant(&gate,0)||acpi818_dma_grant(&gate,0xffffu) ||
+    gate.denied!=12u||gate.copied_reads!=1u||gate.queries!=15u)die("osl818-grant");
+ arch_puts("STYLEOS S818 OSL");f("dsdt-bytes",gate.length);
+ f("snapshot-reads",gate.copied_reads);f("region-denied",gate.denied);
+ f("budget",ACPI818_MAX_QUERIES);arch_putc('\n');
+ arch_puts("STYLEOS S818 POLICY acpica-linked=no acpi-table=private-copy operationregion=deny-all hardware-io=none ecam=not-read dma-grants=no acpi-namespace-evaluated=no production-cr3=deny\n");
+ arch_puts("STYLEOS S818 PASS\n");
+#endif
  scan_pci();
  if(!pci813_correlate_bus0(&mcfg813,&topo,&live813))die("ecam-bus-coverage");
  if(!pci814_correlate(roots,bridge_count,&mcfg813,&topo,&root_report))
