@@ -183,6 +183,38 @@ jobs:
             --qemu-dir build/recovery-canonical/acpica-821/qemu \
             2>&1 | tee build/recovery-canonical/acpica-821/negative.log
 
+      - name: 822 Execute real ACPICA AML on synthetic DSDT and SSDT in QEMU OVMF
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpica-822
+          python3 tools/test_acpica_aml_822.py \
+            --core-lib build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib \
+            --core-include build/recovery-canonical/acpica-820/verified/source/include \
+            --output build/recovery-canonical/acpica-822/qemu \
+            2>&1 | tee build/recovery-canonical/acpica-822/run.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('build/recovery-canonical/acpica-822/qemu/results.json').read_text())
+          assert r['stage']==822 and r['status']=='PASS'
+          assert r['guest_real_acpica_evaluate_object'] and r['synthetic_dsdt_ssdt_only']
+          assert r['hardware_operationregion_permissions']=='deny-all'
+          assert not r['dma_access_authorized'] and not r['foundation_complete']
+          for mode in ('disabled','intel','bridge-intel','bridge-two-hop-intel'):
+              d=r['modes'][mode]
+              assert d['status']=='PASS' and d['qemu_exit_code']==33
+              assert d['observations']['acpica822_real_aml_evaluated']
+              assert not d['observations']['acpica822_real_firmware_methods_evaluated']
+          print('STYLEOS S822 REAL SYNTHETIC DSDT/SSDT AML PASS; NOT FIRMWARE AML')
+          PYCODE
+
+      - name: 822 Reject forged AML, DMA grants and missing UART
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpica_aml_822_negative.py \
+            --parent-uart build/recovery-canonical/acpica-821/qemu/disabled/serial.log \
+            2>&1 | tee build/recovery-canonical/acpica-822/negative.log
+
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
           set -euo pipefail
@@ -1455,6 +1487,16 @@ jobs:
             build/recovery-canonical/acpica-821/qemu/qemu-device-help.log
             build/recovery-canonical/acpica-821/qemu/upstream-core/core-manifest.json
             build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
+            build/recovery-canonical/acpica-822/*.log
+            build/recovery-canonical/acpica-822/qemu/results.json
+            build/recovery-canonical/acpica-822/qemu/*.log
+            build/recovery-canonical/acpica-822/qemu/qemu-version.txt
+            build/recovery-canonical/acpica-822/qemu/qemu-device-help.log
+            build/recovery-canonical/acpica-822/qemu/disabled/**
+            build/recovery-canonical/acpica-822/qemu/intel/**
+            build/recovery-canonical/acpica-822/qemu/bridge-intel/**
+            build/recovery-canonical/acpica-822/qemu/bridge-two-hop-intel/**
+            build/recovery-canonical/acpica-822/qemu/amd/**
             build/recovery-canonical/acpica-821/qemu/disabled/**
             build/recovery-canonical/acpica-821/qemu/intel/**
             build/recovery-canonical/acpica-821/qemu/bridge-intel/**
