@@ -25,7 +25,7 @@ def verify(raw:bytes,rc:int|None,mode:str):
  buses,functions,bridges=(int(x,16) for x in m[1].groups())
  units,exact,unresolved,bridge_scopes,aliases,extended,includes,exceptions,segments,collisions=(int(x,16) for x in m[2].groups())
  matched,unknown,alias_present=(int(x,16) for x in m[3].groups())
- if backend!={'disabled':0,'intel':1,'amd':2,'bridge-intel':1}.get(mode):return False,{}
+ if backend!={'disabled':0,'intel':1,'amd':2,'bridge-intel':1,'bridge-two-hop-intel':1}.get(mode):return False,{}
  if not 1<=roots<=64 or not 1<=buses<=256 or not 1<=functions<=4096:return False,{}
  if bridges>buses-1 or buses!=bridges+1:return False,{}
  if any((units>16,exact>256,aliases>256,extended>1024,unresolved>1024,
@@ -35,12 +35,13 @@ def verify(raw:bytes,rc:int|None,mode:str):
                            extended or includes or exceptions or segments or matched):return False,{}
  if mode!='disabled' and units==0:return False,{}
  if mode=='bridge-intel' and (buses<2 or bridges<1):return False,{}
+ if mode=='bridge-two-hop-intel' and (buses<3 or bridges<2):return False,{}
  return True,{'backend':mode,'root_entries':roots,'buses':buses,'functions':functions,
   'bridges':bridges,'units':units,'explicit_scopes':exact,'explicit_matches':matched,
   'unknown_live_requesters':unknown,'bridge_scopes':bridge_scopes,'aliases':aliases,
   'aliases_on_live_functions':alias_present,'extended_records':extended,
   'include_all':includes,'memory_exceptions':exceptions,'nonzero_segments':segments,
-  'bridge_walk_observed':mode=='bridge-intel','global_hierarchy_verified':False,
+  'bridge_walk_observed':mode in ('bridge-intel','bridge-two-hop-intel'),'global_hierarchy_verified':False,
   'device_ownership_complete':False,'iommu_domains_verified':False,
   'dma_isolation_verified':False,'dma_access_authorized':False,
   'production_cr3_authorized':False}
