@@ -71,6 +71,8 @@ def main():
   observations[mode]={'status':'PASS' if good else 'FAIL','qemu_exit_code':rc,
    'uart_sha256':hashlib.sha256(raw).hexdigest(),'observations':details}
   print('S823 QEMU',mode,observations[mode],flush=True)
+  if not good:
+   raise SystemExit('S823 fail-closed: first failing QEMU mode '+mode)
  if not amd:observations['amd']={'status':'SKIPPED','reason':'QEMU lacks amd-iommu; AMD hardware not verified'}
  required=('disabled','intel','bridge-intel','bridge-two-hop-intel')
  success=all(observations[m]['status']=='PASS' and observations[m]['observations'].get('mcfg_covered_buses')==observations[m]['observations'].get('buses') and observations[m]['observations'].get('uefi_covered_buses')==observations[m]['observations'].get('buses') for m in required) and observations['amd']['status']!='FAIL' and observations['bridge-two-hop-intel']['observations'].get('bridges',0)>=2

@@ -28,7 +28,7 @@ MCFG/PCI observations from earlier stages remain independent.
 
 - Only image-local ACPI table snapshot ranges can be mapped. All arbitrary
   physical memory/MMIO/ECAM, SystemIO, and PCI configuration callbacks deny.
-- Freestanding OSL has a bounded 4-MiB monotonic arena, fixed allocations,
+- Freestanding OSL has a bounded 16-MiB monotonic arena, fixed allocations,
   a single CPU, interrupts disabled, no generic scheduler or reclamation.
 - The firmware AML itself is not a trusted input. This restricted QEMU
   diagnostic does not establish safe production interpretation of arbitrary
@@ -67,3 +67,15 @@ firmware AML, the guest lowers upstream ACPICA `AcpiGbl_MaxLoopIterations`
 to 64. This is an experiment-specific fail-closed budget, **not** an
 untrusted-code sandbox or production watchdog. Limit violations cannot
 be promoted to successful hardware observations.
+
+## Real DSDT memory-pressure incident
+
+First QEMU/OVMF attempts failed: upstream ACPICA could not complete DSDT
+loading and `AcpiEvaluateObject` returned `AE_NO_MEMORY`. The synthetic-only
+822 allocation budget (4 MiB and 4096 allocations, no free) is a plausible
+cause but not yet proven. This test revision raises the finite budget to
+16 MiB and 65536 allocations and logs allocated count/used bytes on refusal.
+It also stops at the first failing QEMU profile instead of wasting the rest
+of the CI slot. A real production OSL **must implement actual reclamation**
+and audit every shared kernel allocator. No operation is authorized on
+physical hardware by this experiment.

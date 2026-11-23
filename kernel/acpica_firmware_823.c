@@ -12,7 +12,7 @@
 #include <stdarg.h>
 #include <acpi.h>
 
-#define HEAP_822 (4u*1024u*1024u)
+#define HEAP_822 (16u*1024u*1024u)
 static _Alignas(16) unsigned char heap[HEAP_822];
 static size_t used;
 static unsigned allocated, maps, denied_maps, denied_hw;
@@ -64,7 +64,7 @@ static int build_tables(void){
  return 1;
 }
 static void *take(size_t n){
- if(!n||n>HEAP_822||allocated>=4096u)return 0;
+ if(!n||n>HEAP_822||allocated>=65536u)return 0;
  n=(n+15u)&~15u;if(n>HEAP_822-used)return 0;
  void *p=heap+used;used+=n;allocated++;zero(p,n);return p;
 }
@@ -180,6 +180,9 @@ static void hex(uint64_t v){
 }
 static _Noreturn void fail(const char *stage,ACPI_STATUS result){
  arch_puts("STYLEOS S823 FAIL ");arch_puts(stage);arch_putc(' ');hex(result);
+ arch_puts(" alloc-count=");hex(allocated);
+ arch_puts(" heap-bytes=");hex(used);
+ arch_puts(" hardware-denials=");hex(denied_hw);
  arch_putc('\n');arch_halt();
 }
 /* Never evaluate an arbitrary path. Only specific PCI0 identity and resource
