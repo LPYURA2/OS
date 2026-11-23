@@ -91,6 +91,7 @@ def main():
   'all_pci_segments_verified':False,
   'general_iommu_ownership_verified':False,'dma_domains_verified':False,
   'dma_access_authorized':False,'dma_isolation_verified':False,
+  'foundation_complete':False,
   'uefi_runtime_verified':False,'production_cr3_authorized':False,
   'upstream_version':'20260930','full_core_compiled':True,
   'efi_sha256':hashlib.sha256((build/'x86_64'/'BOOTX64.EFI').read_bytes()).hexdigest()}
