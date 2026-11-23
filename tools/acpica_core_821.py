@@ -100,7 +100,7 @@ def main():
     ap.add_argument('--output',required=True,type=Path)
     args=ap.parse_args()
     tools=[]
-    for name, options in [('compiler',['clang']),('archive',['llvm-ar']),('symbols',['llvm-objdump','objdump'])]:
+    for name, options in [('compiler',['clang']),('archive',['llvm-ar','llvm-ar-19','llvm-ar-18','llvm-ar-17','llvm-ar-16','ar']),('symbols',['llvm-objdump','llvm-objdump-19','llvm-objdump-18','objdump'])]:
         tool=next((shutil.which(x) for x in options if shutil.which(x)),None)
         if not tool:raise SystemExit('missing '+name)
         tools.append(tool)
