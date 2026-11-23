@@ -63,7 +63,7 @@ static void *take(size_t n){
 ACPI_STATUS AcpiOsInitialize(void){return AE_OK;}
 ACPI_STATUS AcpiOsTerminate(void){return AE_OK;}
 void *AcpiOsAllocate(ACPI_SIZE n){return take((size_t)n);}
-void *AcpiOsAllocateZeroed(ACPI_SIZE n){return take((size_t)n);}
+/* Upstream ACPICA core provides AcpiOsAllocateZeroed; do not shadow it. */
 void AcpiOsFree(void *p){(void)p;}
 ACPI_STATUS AcpiOsCreateCache(char *name,UINT16 size,UINT16 depth,ACPI_CACHE_T **out){
  (void)name;(void)depth;if(!out||!size)return AE_BAD_PARAMETER;
