@@ -36,16 +36,16 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False):
     if update_build is not None and (not desktop_v0 or arch != 'x86_64' or not update_public_key):
         raise ValueError('updatable guest requires x86-64 desktop and an Ed25519 public key')
-    if test_acpica_aml_822:
+    if test_acpica_aml_822 or test_acpica_firmware_823:
         test_acpica_core_821 = True
         test_acpi_namespace_816 = True
     if test_acpica_core_821:
         if arch != "x86_64" or not acpica_core_lib or not acpica_core_include:
             raise ValueError("S821 requires x86-64 and verified ACPICA core paths")
-        if not test_acpica_aml_822: test_acpica_bridge_819 = True
+        if not (test_acpica_aml_822 or test_acpica_firmware_823): test_acpica_bridge_819 = True
     if test_acpica_bridge_819:
         test_acpi_osl_818 = True
     if test_acpi_osl_818:
@@ -218,6 +218,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common.append('kernel/acpica_core_821.c')
     if test_acpica_aml_822:
         common.append('kernel/acpica_runtime_822.c')
+    if test_acpica_firmware_823:
+        common.append('kernel/acpica_firmware_823.c')
     if test_acpi_namespace_816:
         common += ['kernel/acpi_madt_806.c','kernel/dmar_808.c','kernel/iommu_platform_810.c',
                    'kernel/pci_requester_812.c','kernel/pci_mcfg_813.c','kernel/pci_rootbridge_814.c',
@@ -354,6 +356,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_ACPICA_BRIDGE_819=1')
     if test_acpica_aml_822:
         flags.append('-DSTYLEOS_TEST_ACPICA_AML_822=1')
+    if test_acpica_firmware_823:
+        flags.append('-DSTYLEOS_TEST_ACPICA_FIRMWARE_823=1')
     if test_acpica_core_821:
         flags += ['-DSTYLEOS_TEST_ACPICA_CORE_821=1', '-D_GNU_EFI', '-I', str(Path(acpica_core_include).resolve())]
     if test_acpi_hostbridge_815:
@@ -576,6 +580,8 @@ def main():
                           help='Dedicated x86-64 test only: prove new CR3 and restore inherited CR3')
     negative.add_argument('--test-hw-probe-793', action='store_true',
                           help='793 dedicated terminal UEFI GOP/memory and CPU cache-state observation')
+    negative.add_argument('--test-acpica-firmware-823', action='store_true',
+                        help='823 isolated QEMU-only ACPICA on real captured firmware DSDT; no hardware')
     negative.add_argument('--test-acpica-aml-822', action='store_true',
                         help='822 isolated real ACPICA on synthetic DSDT/SSDT, deny all hardware')
     negative.add_argument('--test-acpica-core-821', action='store_true',
@@ -706,11 +712,13 @@ def main():
         parser.error('--test-paging-roundtrip requires --arch x86_64')
     if args.test_hw_probe_793 and args.arch != 'x86_64':
         parser.error('--test-hw-probe-793 requires --arch x86_64')
+    if args.test_acpica_firmware_823 and args.arch != 'x86_64':
+        parser.error('--test-acpica-firmware-823 requires x86_64')
     if args.test_acpica_aml_822 and args.arch != 'x86_64':
         parser.error('--test-acpica-aml-822 requires x86_64')
     if args.test_acpica_core_821 and args.arch != 'x86_64':
         parser.error('--test-acpica-core-821 requires x86_64')
-    if (args.test_acpica_core_821 or args.test_acpica_aml_822) and (not args.acpica_core_lib or not args.acpica_core_include):
+    if (args.test_acpica_core_821 or args.test_acpica_aml_822 or args.test_acpica_firmware_823) and (not args.acpica_core_lib or not args.acpica_core_include):
         parser.error('--test-acpica-core-821 needs verified library and include directory')
     if args.test_acpica_bridge_819 and args.arch != 'x86_64':
         parser.error('--test-acpica-bridge-819 requires x86_64')
@@ -766,6 +774,7 @@ def main():
                'paging' if args.test_paging else
                'paging-fault' if args.test_paging_fault else
                'paging-roundtrip' if args.test_paging_roundtrip else
+               'acpica-firmware-823' if args.test_acpica_firmware_823 else
                'acpica-aml-822' if args.test_acpica_aml_822 else
                'acpica-core-821' if args.test_acpica_core_821 else
                'acpica-bridge-819' if args.test_acpica_bridge_819 else
@@ -815,7 +824,7 @@ def main():
                'disk-app' if args.test_disk_app else
                'desktop-v0' if args.desktop_v0 else
                'desktop-display' if args.test_desktop_display else '')).resolve()
-    if (args.test_acpica_aml_822 or args.test_acpica_core_821 or args.test_acpica_bridge_819 or args.test_acpi_osl_818 or args.test_acpi_namespace_816 or args.test_acpi_hostbridge_815 or args.test_pci_rootbridge_814 or args.test_pci_mcfg_813 or args.test_pci_requester_812 or args.test_pci_requester_811 or args.test_iommu_810 or args.test_vtd_809 or args.test_dmar_808 or args.test_irq_delivery_807 or args.test_acpi_madt_806 or args.test_irq_apic_805 or args.test_cache_804 or args.test_cache_803 or args.test_cache_801 or args.test_cache_800 or args.test_pci_range_799 or args.test_pci_topology_796 or args.test_pci_aperture_795 or args.test_pci_probe_794 or args.test_hw_probe_793 or args.test_exception or args.test_bootpool or args.test_paging or
+    if (args.test_acpica_firmware_823 or args.test_acpica_aml_822 or args.test_acpica_core_821 or args.test_acpica_bridge_819 or args.test_acpi_osl_818 or args.test_acpi_namespace_816 or args.test_acpi_hostbridge_815 or args.test_pci_rootbridge_814 or args.test_pci_mcfg_813 or args.test_pci_requester_812 or args.test_pci_requester_811 or args.test_iommu_810 or args.test_vtd_809 or args.test_dmar_808 or args.test_irq_delivery_807 or args.test_acpi_madt_806 or args.test_irq_apic_805 or args.test_cache_804 or args.test_cache_803 or args.test_cache_801 or args.test_cache_800 or args.test_pci_range_799 or args.test_pci_topology_796 or args.test_pci_aperture_795 or args.test_pci_probe_794 or args.test_hw_probe_793 or args.test_exception or args.test_bootpool or args.test_paging or
             args.test_paging_fault or args.test_paging_roundtrip or args.test_frame_grants or args.test_tss_ltr_784 or args.test_ist_hw_786 or args.test_guard_pf_787 or args.test_double_fault_788 or args.test_root_slots_789 or args.test_owned_low_790 or args.test_wx_write_791 or args.test_wx_exec_791 or args.test_ownership_plan or
             args.test_ownership_plan_invalid or args.test_tasks or
             args.test_user_processes or args.test_user_syscall or args.test_user_syscall_deny or args.test_user_ipc or args.test_user_ipc_deny or args.test_native_tea or args.test_native_tea_disk or args.test_native_tea_session or args.test_storage or args.test_disk_app or
@@ -845,7 +854,7 @@ def main():
                              **({'test_pci_topology_796': True} if args.test_pci_topology_796 else {}),
                              **({'test_pci_range_799': True} if args.test_pci_range_799 else {}),
                              **({'test_acpi_osl_818': True} if args.test_acpi_osl_818 else {}),
-                             **({'test_acpica_core_821': args.test_acpica_core_821, 'test_acpica_aml_822': args.test_acpica_aml_822, 'acpica_core_lib': args.acpica_core_lib, 'acpica_core_include': args.acpica_core_include} if args.test_acpica_core_821 or args.test_acpica_aml_822 else {}),
+                             **({'test_acpica_core_821': args.test_acpica_core_821, 'test_acpica_aml_822': args.test_acpica_aml_822, 'test_acpica_firmware_823': args.test_acpica_firmware_823, 'acpica_core_lib': args.acpica_core_lib, 'acpica_core_include': args.acpica_core_include} if args.test_acpica_core_821 or args.test_acpica_aml_822 or args.test_acpica_firmware_823 else {}),
                              **({'test_acpica_bridge_819': True} if args.test_acpica_bridge_819 else {}),
                              **({'test_acpi_namespace_816': True} if args.test_acpi_namespace_816 else {}),
                              **({'test_acpi_hostbridge_815': True} if args.test_acpi_hostbridge_815 else {}),

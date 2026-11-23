@@ -15,6 +15,9 @@ void acpi821_terminal(const struct boot_info *);
 #ifdef STYLEOS_TEST_ACPICA_AML_822
 void acpi822_terminal(const struct boot_info *);
 #endif
+#ifdef STYLEOS_TEST_ACPICA_FIRMWARE_823
+void acpi823_terminal(const struct boot_info *);
+#endif
 #ifdef STYLEOS_TEST_ACPI_NAMESPACE_816
 void pci816_capture(const struct efi_system_table *);
 _Noreturn void pci816_terminal(const struct boot_info *);
@@ -218,6 +221,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
 #endif
 #ifdef STYLEOS_TEST_ACPICA_AML_822
     acpi822_terminal(&handoff);
+#endif
+#ifdef STYLEOS_TEST_ACPICA_FIRMWARE_823
+    acpi823_terminal(&handoff);
 #endif
 #ifdef STYLEOS_TEST_ACPI_NAMESPACE_816
     pci816_terminal(&handoff);

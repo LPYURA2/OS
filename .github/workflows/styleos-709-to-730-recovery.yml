@@ -216,6 +216,38 @@ jobs:
             --parent-uart build/recovery-canonical/acpica-821/qemu/disabled/serial.log \
             2>&1 | tee build/recovery-canonical/acpica-822/negative.log
 
+      - name: 823 Evaluate guarded genuine firmware PCI0 _HID _CRS in QEMU OVMF
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpica-823
+          python3 tools/test_acpica_firmware_823.py \
+            --core-lib build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib \
+            --core-include build/recovery-canonical/acpica-820/verified/source/include \
+            --output build/recovery-canonical/acpica-823/qemu \
+            2>&1 | tee build/recovery-canonical/acpica-823/run.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('build/recovery-canonical/acpica-823/qemu/results.json').read_text())
+          assert r['stage']==823 and r['status']=='PASS'
+          assert r['guest_real_acpica_evaluate_object'] and r['firmware_dsdt_readonly']
+          assert not r['dma_access_authorized'] and not r['foundation_complete']
+          assert not r['ecam_reservation_verified'] and not r['production_cr3_authorized']
+          for mode in ('disabled','intel','bridge-intel','bridge-two-hop-intel'):
+              d=r['modes'][mode]
+              assert d['status']=='PASS' and d['qemu_exit_code']==33
+              assert d['observations']['acpica823_firmware_hid_evaluated']
+              assert d['observations']['acpica823_firmware_crs_evaluated']
+          print('STYLEOS S823 GUARDED REAL FIRMWARE HOSTBRIDGE PASS; ECAM DMA DENY')
+          PYCODE
+
+      - name: 823 Reject forged real firmware AML and hardware authority
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpica_firmware_823_negative.py \
+            --parent-uart build/recovery-canonical/acpica-821/qemu/disabled/serial.log \
+            2>&1 | tee build/recovery-canonical/acpica-823/negative.log
+
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
           set -euo pipefail
@@ -1488,6 +1520,16 @@ jobs:
             build/recovery-canonical/acpica-821/qemu/qemu-device-help.log
             build/recovery-canonical/acpica-821/qemu/upstream-core/core-manifest.json
             build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
+            build/recovery-canonical/acpica-823/*.log
+            build/recovery-canonical/acpica-823/qemu/results.json
+            build/recovery-canonical/acpica-823/qemu/*.log
+            build/recovery-canonical/acpica-823/qemu/qemu-version.txt
+            build/recovery-canonical/acpica-823/qemu/qemu-device-help.log
+            build/recovery-canonical/acpica-823/qemu/disabled/**
+            build/recovery-canonical/acpica-823/qemu/intel/**
+            build/recovery-canonical/acpica-823/qemu/bridge-intel/**
+            build/recovery-canonical/acpica-823/qemu/bridge-two-hop-intel/**
+            build/recovery-canonical/acpica-823/qemu/amd/**
             build/recovery-canonical/acpica-822/*.log
             build/recovery-canonical/acpica-822/qemu/results.json
             build/recovery-canonical/acpica-822/qemu/*.log

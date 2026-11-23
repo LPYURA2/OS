@@ -14,6 +14,9 @@
 #include <styleos/iommu_platform_810.h>
 #include <styleos/acpi_madt_806.h>
 #include <styleos/boot_info.h>
+#ifdef STYLEOS_TEST_ACPICA_FIRMWARE_823
+#include <styleos/acpi_firmware_823.h>
+#endif
 #include <styleos/arch.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -202,6 +205,20 @@ void pci816_capture(const struct efi_system_table *st){
  backend=iommu810_select(dm,dv,iv,ivv);
  valid=(backend!=IOMMU810_REFUSED&&mcfg_seen==1u&&mcfg_size!=0u&&fadt_seen==1u&&dsdt_length!=0u);
 }
+#ifdef STYLEOS_TEST_ACPICA_FIRMWARE_823
+int styleos823_get_firmware(struct styleos823_firmware *out){
+ if(!out||!valid||!root_capture_ok||dsdt_length<37u||
+    dsdt_length>ACPI815_MAX_DSDT||ssdt_seen>STYLEOS823_MAX_SSDT)return 0;
+ struct styleos823_firmware x={0};
+ x.dsdt=dsdt_copy;x.dsdt_len=dsdt_length;
+ for(unsigned i=0;i<ssdt_seen;i++){
+  if(ssdt_length[i]<36u||ssdt_length[i]>ACPI816_MAX_TABLE)return 0;
+  x.ssdt[i]=ssdt_copy[i];x.ssdt_len[i]=ssdt_length[i];
+ }
+ x.ssdt_count=ssdt_seen;x.mcfg_len=mcfg_size;x.root_count=bridge_count;
+ *out=x;return 1;
+}
+#endif
 static uint32_t port_in(uint16_t port){
  uint32_t out;__asm__ volatile("inl %%dx,%0":"=a"(out):"d"(port):"memory");return out;
 }
