@@ -14,6 +14,27 @@ int styleos819_dma_grant(uint16_t requester);
 int pci821_get_dsdt(const uint8_t **table,uint32_t *length);
 extern UINT8 AcpiUtChecksum(UINT8 *Buffer,UINT32 Length);
 
+/* Early ACPICA error reporting (single-threaded, no formatting engine yet).
+ * Never interpret AML-controlled format strings or perform hardware I/O.
+ * This stage is a checksum-only probe, not a production ACPICA OSL.
+ */
+void AcpiOsVprintf(const char *Format, va_list Args){
+ (void)Args;
+ arch_puts("STYLEOS S821 ACPICA-DIAGNOSTIC (arguments suppressed): ");
+ if(!Format){arch_puts("(null)\n");return;}
+ for(unsigned i=0;i<160u&&Format[i]!='\0';i++){
+  unsigned char c=(unsigned char)Format[i];
+  arch_putc(c>=32u&&c<127u?(char)c:'?');
+ }
+ arch_putc('\n');
+}
+void AcpiOsPrintf(const char *Format,...){
+ va_list args;
+ va_start(args,Format);
+ AcpiOsVprintf(Format,args);
+ va_end(args);
+}
+
 static void hex(uint64_t n){
  arch_puts("0x");
  for(int i=60;i>=0;i-=4) arch_putc("0123456789abcdef"[(n>>(unsigned)i)&15u]);
