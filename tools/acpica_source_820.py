@@ -10,7 +10,7 @@ VERSION = "20260930"
 SHA256 = "aa18901b92e30749be0edc3081c8d550c61fce4fa37546fc6a65d367a4ae71a5"
 REQUIRED = (
  "source/include/acpi.h", "source/include/acpiosxf.h",
- "source/include/acexcep.h", "source/include/acenv.h",
+ "source/include/acexcep.h", "source/include/platform/acenv.h",
  "source/components/utilities/utxfinit.c",
  "source/components/namespace/nsxfname.c",
  "source/components/parser/psparse.c",
