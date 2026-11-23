@@ -9,6 +9,10 @@
 void dmar808_capture(const struct efi_system_table *);
 _Noreturn void dmar808_terminal(const struct boot_info *);
 #endif
+#ifdef STYLEOS_TEST_PCI_REQUESTER_812
+void pci812_capture(const struct efi_system_table *);
+_Noreturn void pci812_terminal(const struct boot_info *);
+#endif
 #ifdef STYLEOS_TEST_PCI_REQUESTER_811
 void pci811_capture(const struct efi_system_table *);
 _Noreturn void pci811_terminal(const struct boot_info *);
@@ -149,6 +153,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
 #ifdef STYLEOS_TEST_IOMMU_810
     iommu810_capture(table);
 #endif
+#ifdef STYLEOS_TEST_PCI_REQUESTER_812
+    pci812_capture(table);
+#endif
 #ifdef STYLEOS_TEST_PCI_REQUESTER_811
     pci811_capture(table);
 #endif
@@ -171,6 +178,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
     arch_puts("STYLEOS x86_64 ExitBootServices OK\n");
 #ifdef STYLEOS_TEST_IOMMU_810
     iommu810_terminal(&handoff);
+#endif
+#ifdef STYLEOS_TEST_PCI_REQUESTER_812
+    pci812_terminal(&handoff);
 #endif
 #ifdef STYLEOS_TEST_PCI_REQUESTER_811
     pci811_terminal(&handoff);
