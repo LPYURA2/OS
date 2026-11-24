@@ -213,6 +213,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
     /* No UEFI interface may be used below this point. */
     __asm__ volatile ("cli" ::: "memory");
     arch_puts("STYLEOS x86_64 ExitBootServices OK\n");
+#ifdef STYLEOS_TEST_GUEST_PLAN_837
+    styleos_enter_kernel(&handoff);
+#endif
 #ifdef STYLEOS_TEST_IOMMU_810
     iommu810_terminal(&handoff);
 #endif

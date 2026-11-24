@@ -25,6 +25,9 @@
 #endif
 #ifdef STYLEOS_TEST_IOMMU_QUARANTINE_835
 #include <styleos/iommu_fixture_835.h>
+#ifdef STYLEOS_TEST_GUEST_PLAN_837
+#include <styleos/iommu_guest_837.h>
+#endif
 #endif
 /* Terminal S816 only. ACPI MCFG and requester tables are validated and copied
  * into fixed image-owned BSS BEFORE EBS. After EBS only legacy CF8/CFC PCI
@@ -305,7 +308,11 @@ int s835_guest_report(const struct boot_info *boot,const uint8_t *crs,size_t cn,
  range835("APERTURE",report835.aperture);range835("COVER",report835.cover);
  for(size_t i=0;i<report835.diagnostic.nr_reserved;i++)range835("RESERVED",report835.diagnostic.reserved[i]);
  for(size_t i=0;i<report835.diagnostic.nr_candidates;i++)range835("CANDIDATE",report835.diagnostic.candidates[i]);
- arch_puts("STYLEOS S835 POLICY fixture-only=yes detached-map=yes ram-grants=no mmio=not-read dma-grants=no production-cr3=deny\n");return 1;
+ arch_puts("STYLEOS S835 POLICY fixture-only=yes detached-map=yes ram-grants=no mmio=not-read dma-grants=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_GUEST_PLAN_837
+ if(!s837_guest_compose(boot,&report835))return 0;
+#endif
+ return 1;
 }
 #endif
 static uint32_t port_in(uint16_t port){

@@ -793,7 +793,7 @@ def _ownership_subtract(candidates, protected):
     return _ownership_union(result)
 
 
-def serial_ownership_ok(output, arch, site, invalid=False, ram_mib=128, el2=False):
+def serial_ownership_ok(output, arch, site, invalid=False, ram_mib=128, el2=False, terminal=True):
     """Reconstruct the whole declared read-only plan from binary and UART facts.
 
     Claims are dependencies, never grants. Inherited x86 table coverage remains
@@ -801,12 +801,12 @@ def serial_ownership_ok(output, arch, site, invalid=False, ram_mib=128, el2=Fals
     checked, and no claim turns firmware reservations into reviewable RAM.
     """
     try:
-        return _serial_ownership_ok(output, arch, site, invalid, ram_mib, el2)
+        return _serial_ownership_ok(output, arch, site, invalid, ram_mib, el2, terminal)
     except (KeyError, TypeError, ValueError, IndexError, OverflowError):
         return False
 
 
-def _serial_ownership_ok(output, arch, site, invalid, ram_mib, el2):
+def _serial_ownership_ok(output, arch, site, invalid, ram_mib, el2, terminal):
     if (not isinstance(site, dict) or site.get('arch') != arch or
             arch not in ('x86_64', 'aarch64') or type(invalid) is not bool or
             site.get('invalid') is not invalid or site.get('page_size') != 4096 or
@@ -1069,7 +1069,7 @@ def _serial_ownership_ok(output, arch, site, invalid, ram_mib, el2):
             all(after[k] == state[k] for k in state if k != 'rflags') and
             not (after['rflags'] ^ state['rflags']) & ~0x8d5 and
             not after['rflags'] & ((1 << 9) | (1 << 10)) and
-            (arch == 'x86_64' or after['rflags'] == 0) and tail[cursor + 3:] == [b'STYLEOS OWNERSHIP PASS', b'STYLEOS KERNEL HALT'])
+            (arch == 'x86_64' or after['rflags'] == 0) and tail[cursor + 3:] == ([b'STYLEOS OWNERSHIP PASS', b'STYLEOS KERNEL HALT'] if terminal else [b'STYLEOS OWNERSHIP PASS']))
 
 
 def ownership_report(output, arch):
@@ -1117,7 +1117,7 @@ def ownership_report(output, arch):
     return report
 
 
-def verified_ownership_site(folder, arch, invalid=False):
+def verified_ownership_site(folder, arch, invalid=False, guest_plan_837=False):
     """Rebuild the binary proof and bind modes and artifacts actually booted."""
     target = folder / arch
     site = json.loads((target / 'ownership-site.json').read_text())
@@ -1132,7 +1132,16 @@ def verified_ownership_site(folder, arch, invalid=False):
     expected_modes = {'invalid_boot_info': False, 'invalid_memory_map': False,
                       'test_exception': False, 'test_bootpool': False,
                       'test_paging': False, 'test_paging_fault': False,
-                      'test_ownership_plan': not invalid, 'test_ownership_plan_invalid': invalid}
+                      'test_ownership_plan': not invalid and not guest_plan_837, 'test_ownership_plan_invalid': invalid}
+    if not isinstance(manifest, dict):
+        raise ValueError('ownership manifest is not an object')
+    if guest_plan_837:
+        if arch != 'x86_64' or invalid:
+            raise ValueError('unsupported S837 profile')
+        expected_modes.update(test_guest_plan_837=True, test_iommu_quarantine_835=True,
+                              test_post_ebs_834=True, test_irq_sources_830=True)
+    elif manifest.get('test_guest_plan_837'):
+        raise ValueError('S837 is not the ordinary ownership profile')
     if (not isinstance(manifest, dict) or
             any(type(manifest.get(key)) is not bool or manifest[key] != value
                 for key, value in expected_modes.items())):

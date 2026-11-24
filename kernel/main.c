@@ -29,6 +29,11 @@
 #ifdef STYLEOS_TEST_OWNERSHIP
 #include "styleos/ownership.h"
 #endif
+#ifdef STYLEOS_TEST_GUEST_PLAN_837
+void acpi821_terminal(const struct boot_info *);
+void acpi823_terminal(const struct boot_info *);
+_Noreturn void pci816_terminal(const struct boot_info *);
+#endif
 #ifdef STYLEOS_TEST_PAGING
 #include "styleos/paging.h"
 #endif
@@ -117,6 +122,11 @@ _Noreturn void kernel_main(const struct boot_info *info)
 #endif
 #ifdef STYLEOS_TEST_OWNERSHIP
     ownership_plan_run(info,evidence);
+#ifdef STYLEOS_TEST_GUEST_PLAN_837
+    acpi821_terminal(info);
+    acpi823_terminal(info);
+    pci816_terminal(info);
+#endif
 #endif
 #ifdef STYLEOS_TEST_PAGING
     paging_experiment(evidence);
