@@ -11,10 +11,12 @@ def main():
  capture=ap.add_mutually_exclusive_group()
  capture.add_argument('--capture-mtree-833',action='store_true')
  capture.add_argument('--capture-post-ebs-834',action='store_true')
+ ap.add_argument('--native-quarantine-835',action='store_true')
  ap.add_argument('--output',required=True,type=Path)
  ap.add_argument('--core-lib',required=True,type=Path)
  ap.add_argument('--core-include',required=True,type=Path)
  args=ap.parse_args()
+ if args.native_quarantine_835 and not args.capture_post_ebs_834:ap.error('S835 requires paired snapshots')
  if (args.capture_mtree_833 or args.capture_post_ebs_834) and not args.irq_sources_830:ap.error('QMP capture requires S830 profile')
  output=args.output;output.mkdir(parents=True,exist_ok=True)
  if args.irq_sources_830:
@@ -38,7 +40,7 @@ def main():
  build=output/'build'
  with (output/'compile.log').open('w') as log:
   subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',
-   ('--test-post-ebs-834' if args.capture_post_ebs_834 else '--test-irq-sources-830' if args.irq_sources_830 else '--test-iommu-evidence-828' if args.iommu_evidence_828 else '--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
+   ('--test-iommu-quarantine-835' if args.native_quarantine_835 else '--test-post-ebs-834' if args.capture_post_ebs_834 else '--test-irq-sources-830' if args.irq_sources_830 else '--test-iommu-evidence-828' if args.iommu_evidence_828 else '--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
    stdout=log,stderr=subprocess.STDOUT,check=True)
  qemu=shutil.which('qemu-system-x86_64')
  code=firmware_path('OVMF_CODE','OVMF_CODE')
@@ -97,6 +99,9 @@ def main():
    from post_ebs_aperture_834 import ungate,replay
    trace=(dst/'qmp-834.json').read_bytes()
    replay(raw,rc,mode,json.loads(trace))
+   if args.native_quarantine_835:
+    from iommu_quarantine_835_verify import verify_native
+    verify_native(raw,rc,mode,json.loads(trace))
    gated_sha=hashlib.sha256(raw).hexdigest();raw=ungate(raw)
    (dst/'serial.log').write_bytes(raw)
   good,details=check(raw,rc,mode)
@@ -151,6 +156,7 @@ def main():
   'efi_sha256':hashlib.sha256((build/'x86_64'/'BOOTX64.EFI').read_bytes()).hexdigest()}
  if args.capture_mtree_833:result['qmp_833_capture']=True
  if args.capture_post_ebs_834:result['qmp_834_capture']=True
+ if args.native_quarantine_835:result['native_quarantine_835']=True
  (output/'results.json').write_text(json.dumps(result,indent=2)+'\n')
  if not success:raise SystemExit(1)
 if __name__=='__main__':main()

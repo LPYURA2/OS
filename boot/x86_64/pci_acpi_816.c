@@ -23,6 +23,9 @@
 #ifdef STYLEOS_TEST_POST_EBS_834
 #include "gate_834.h"
 #endif
+#ifdef STYLEOS_TEST_IOMMU_QUARANTINE_835
+#include <styleos/iommu_fixture_835.h>
+#endif
 /* Terminal S816 only. ACPI MCFG and requester tables are validated and copied
  * into fixed image-owned BSS BEFORE EBS. After EBS only legacy CF8/CFC PCI
  * config reads are performed; computed ECAM addresses are NEVER dereferenced. */
@@ -283,6 +286,26 @@ int styleos823_get_firmware(struct styleos823_firmware *out){
  x.mcfg=mcfg_copy;
 #endif
  *out=x;return 1;
+}
+#endif
+#ifdef STYLEOS_TEST_IOMMU_QUARANTINE_835
+static struct s835_input input835;
+static struct s835_report report835;
+static struct s835_work work835;
+static void range835(const char *name,struct boot_range r){
+ arch_puts("STYLEOS S835 ");arch_puts(name);f("start",r.start);f("end",r.end);arch_putc('\n');
+}
+int s835_guest_report(const struct boot_info *boot,const uint8_t *crs,size_t cn,const uint8_t *drac,size_t dn){
+ if(!boot||!valid||!root_capture_ok||bridge_count!=1||resources_segment[0]!=0)return 0;
+ const uint8_t *table=backend==IOMMU810_INTEL?dmar_copy:ivrs_copy;
+ size_t tn=backend==IOMMU810_INTEL?dmar_size:backend==IOMMU810_AMD?ivrs_size:0;
+ if(!s835_input_from_tables((unsigned)backend,table,tn,madt830_copy,madt830_size,crs,cn,resources_copy[0],resources_len[0],&input835))return 0;
+ if(!s835_quarantine(&input835,mcfg_copy,mcfg_size,drac,dn,(const void *)(uintptr_t)boot->memory_map,boot->memory_map_size,boot->descriptor_size,boot->descriptor_version,&report835,&work835))return 0;
+ arch_puts("STYLEOS S835 SUMMARY");f("backend",backend);f("explicit-pages",report835.explicit_pages);f("gap-pages",report835.gap_pages);arch_putc('\n');
+ range835("APERTURE",report835.aperture);range835("COVER",report835.cover);
+ for(size_t i=0;i<report835.diagnostic.nr_reserved;i++)range835("RESERVED",report835.diagnostic.reserved[i]);
+ for(size_t i=0;i<report835.diagnostic.nr_candidates;i++)range835("CANDIDATE",report835.diagnostic.candidates[i]);
+ arch_puts("STYLEOS S835 POLICY fixture-only=yes detached-map=yes ram-grants=no mmio=not-read dma-grants=no production-cr3=deny\n");return 1;
 }
 #endif
 static uint32_t port_in(uint16_t port){

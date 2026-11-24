@@ -11,6 +11,11 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <acpi.h>
+#ifdef STYLEOS_TEST_IOMMU_QUARANTINE_835
+#include <styleos/iommu_fixture_835.h>
+static uint8_t crs835[1024];
+static size_t crs835_len;
+#endif
 #ifdef STYLEOS_TEST_ECAM_826
 #include <styleos/ecam_map_capture_826.h>
 #endif
@@ -222,6 +227,10 @@ static unsigned eval_crs(void){
  }
  arch_putc('\n');
 #endif
+#ifdef STYLEOS_TEST_IOMMU_QUARANTINE_835
+ crs835_len=o->Buffer.Length;
+ for(size_t i=0;i<crs835_len;i++)crs835[i]=o->Buffer.Pointer[i];
+#endif
  /* A resource buffer is evidence only, NEVER permission for ECAM/MMIO/DMA. */
  return o->Buffer.Length;
 }
@@ -271,6 +280,9 @@ static void eval_drac826(const struct boot_info *boot){
  arch_puts("STYLEOS S826 POLICY observation-only=yes ecam=not-read dma-grants=no production-cr3=deny\n");
 #ifdef STYLEOS_TEST_ECAM_QUARANTINE_827
  quarantine827(boot,o->Buffer.Pointer,o->Buffer.Length);
+#endif
+#ifdef STYLEOS_TEST_IOMMU_QUARANTINE_835
+ if(!s835_guest_report(boot,crs835,crs835_len,o->Buffer.Pointer,o->Buffer.Length))fail("835-quarantine",AE_ACCESS);
 #endif
 }
 #endif
