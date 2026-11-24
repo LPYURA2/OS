@@ -1,3 +1,7 @@
+## Stage 854 — terminal RTC under owned Desktop root (candidate)
+
+Accepted S853 2609bd486222d4024d52dc644344ce1ce5960310, CI 45479050123 SUCCESS. See [architecture](architecture/DESKTOP_RTC_854.md), [handoff](NEXT_CHAT_854.md), [new chat](MESSAGE_FOR_NEW_CHAT_854.md). RTC diagnostic only; no production admission or monotonic time yet.
+
 ## Stage 853 — polled PS/2 and bounded cursor damage candidate
 
 See [architecture](architecture/DESKTOP_INPUT_853.md), [handoff](NEXT_CHAT_853.md), [new chat](MESSAGE_FOR_NEW_CHAT_853.md). Terminal fixture only; acceptance requires exact successful CI and independent evidence review.

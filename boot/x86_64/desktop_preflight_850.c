@@ -6,6 +6,10 @@
 #ifdef STYLEOS_TEST_DESKTOP_FRAME_852
 #include <styleos/desktop_v0.h>
 #endif
+#ifdef STYLEOS_TEST_DESKTOP_RTC_854
+#include <styleos/rtc_x86_854.h>
+static struct rtc_x86_854 rtc854;
+#endif
 static _Alignas(4096) uint64_t tables[PG_TABLE_PAGES][512];
 static struct s850_desktop_root composed;
 static uint64_t read_cr3(void){uint64_t v;__asm__ volatile("mov %%cr3,%0":"=r"(v));return v;}
@@ -158,6 +162,29 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(after==hash||read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("853-readback");
  arch_puts("STYLEOS S853 MOUSE");field("root",target);field("dx",event.dx);field("dy",event.dy);field("buttons",event.buttons);field("writes",moved);field("fnv",after);arch_putc('\n');
  arch_puts("STYLEOS S853 POLICY polling=yes irq=no storage=no clock=no reset=no app-admission=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_DESKTOP_RTC_854
+ /* Dedicated single-vCPU terminal Q35 fixture: firmware already exited,
+  * IF remains clear, no other live CMOS users, unexpected vectors fail-stop.
+  * Establish a NEW index/NMI shadow; inherited port-70 state is unknown.
+  * Legacy NMI mask remains set through terminal VM exit. No firmware return. */
+ if(!identity((uintptr_t)rtc_x86_bind_854,PG_EXEC)||!identity((uintptr_t)rtc_x86_read_854,PG_EXEC)||
+    !identity((uintptr_t)&rtc854,PG_WRITE)||read_cr3()!=target||flags()&0x200)fail("854-closure");
+ const uint8_t initial_index=0x8d;
+ __asm__ volatile("outb %0,$0x70"::"a"(initial_index):"memory");
+ const struct rtc_x86_contract_854 contract={.expected_root=target,.known_index=initial_index,
+     .terminal_fixture=true,.exclusive_cmos=true,.known_shadow=true,.post_ebs=true};
+ if(!rtc_x86_bind_854(&rtc854,&contract))fail("854-bind");
+ struct rtc_time_854 time={0};bool observed=false;
+ for(unsigned i=0;i<4096;i++){
+    if(rtc_x86_read_854(&rtc854,&time)){observed=true;break;}
+    if(rtc854.owner.quarantined)break;
+    __asm__ volatile("pause":::"memory");
+ }
+ if(!observed||rtc854.owner.held||rtc854.owner.quarantined||rtc854.owner.shadow!=initial_index||
+    time.hour>23||time.min>59||time.sec>59||read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("854-rtc");
+ arch_puts("STYLEOS S854 RTC");field("root",target);field("hour",time.hour);field("minute",time.min);field("second",time.sec);field("shadow",rtc854.owner.shadow);arch_putc('\n');
+ arch_puts("STYLEOS S854 POLICY terminal=yes rtc-read=yes data-write=no shadow=software nmi-mask=fixture irq=no storage=no production-cr3=deny\n");
+#endif
 #endif
 #endif
  out32(0xf4,0x10);arch_halt();
