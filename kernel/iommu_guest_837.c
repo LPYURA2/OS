@@ -1,5 +1,8 @@
 #include <styleos/iommu_guest_837.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_TEST_GUEST_OBSERVATION_840
+int s840_observe_guest(const struct boot_info *,const struct op_input *,const struct op_output *,struct boot_range);
+#endif
 static struct s836_work work837;
 static struct op_output result837;
 static struct op_snapshot after837;
@@ -20,5 +23,9 @@ int s837_guest_compose(const struct boot_info *boot,const struct s835_report *q)
  for(size_t i=0;i<result837.nr_protected;i++)range("PROTECTED",result837.protected_ranges[i]);
  for(size_t i=0;i<result837.nr_review;i++)range("REVIEW",result837.review[i]);
  arch_puts("STYLEOS S837 TOTAL");field(" protected=",result837.protected_pages);field(" review=",result837.review_pages);field(" granted=",result837.granted);arch_putc('\n');
- arch_puts("STYLEOS S837 POLICY detached=yes allocator-integrated=no\n");return 1;
+ arch_puts("STYLEOS S837 POLICY detached=yes allocator-integrated=no\n");
+#ifdef STYLEOS_TEST_GUEST_OBSERVATION_840
+ if(!s840_observe_guest(boot,in,&result837,q->cover))return 0;
+#endif
+ return 1;
 }
