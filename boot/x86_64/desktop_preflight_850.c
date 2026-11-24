@@ -30,6 +30,31 @@ static uint32_t cfg(unsigned dev,unsigned fn,unsigned off){out32(0xcf8,cfgaddr(d
 static void cfgwrite(unsigned dev,unsigned fn,unsigned off,uint32_t v){out32(0xcf8,cfgaddr(dev,fn,off));out32(0xcfc,v);}
 static uint16_t cmd(unsigned dev,unsigned fn){out32(0xcf8,cfgaddr(dev,fn,4));return in16(0xcfc);}
 static void cmdwrite(unsigned dev,unsigned fn,uint16_t v){out32(0xcf8,cfgaddr(dev,fn,4));out16(0xcfc,v);}
+#ifdef STYLEOS_TEST_STORAGE_ATA_READ_857
+#include <styleos/ata_diag_857.h>
+struct ata857_live {uint64_t root;unsigned ops;};
+static bool ata857_live_check(struct ata857_live *x){
+ uint16_t cs;__asm__ volatile("mov %%cs,%0":"=r"(cs));
+ if(!x||!x->root||read_cr3()!=x->root||(flags()&0x200)||(cs&3)||x->ops>=200000u)return false;
+ ++x->ops;
+ uint32_t old=in32(0xcf8);
+ bool ok=cfg(5,0,0)==0x70108086u&&cfg(5,0,4)==0x02800003u&&cfg(5,0,8)==0x01018000u&&cfg(5,0,12)==0&&cfg(5,0,0x40)==0&&cfg(5,0,0x20)==0x60e1u;
+ for(unsigned i=0;i<4;i++)if(cfg(5,0,0x10+4*i)!=0)ok=false;
+ out32(0xcf8,old);if(!ok||in32(0xcf8)!=old||read_cr3()!=x->root||(flags()&0x200))return false;
+ const uint16_t ports[4]={0x60e0,0x60e2,0x60e8,0x60ea};
+ for(unsigned i=0;i<4;i++){uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):"Nd"(ports[i]):"memory");if(v)return false;}
+ return true;
+}
+static bool ata857_alt(void *ctx,uint8_t *v){if(!v||!ata857_live_check(ctx))return false;__asm__ volatile("inb %1,%0":"=a"(*v):"Nd"((uint16_t)0x376):"memory");return true;}
+static bool ata857_data(void *ctx,uint16_t *v){if(!v||!ata857_live_check(ctx))return false;*v=in16(0x170);return true;}
+static bool ata857_write(void *ctx,unsigned reg,uint8_t v){
+ if(!ata857_allowed(reg,v)||!ata857_live_check(ctx))return false;
+ uint16_t port=reg==8?0x376:(uint16_t)(0x170+reg);
+ __asm__ volatile("outb %0,%1"::"a"(v),"Nd"(port):"memory");return true;
+}
+static const struct ata857_ops ata857_io={ata857_alt,ata857_write,ata857_data};
+static void ata857_hex(const uint16_t *w){static const char hex[]="0123456789abcdef";for(unsigned i=0;i<ATA857_WORDS;i++){for(unsigned b=0;b<2;b++){unsigned v=(w[i]>>(8*b))&255u;arch_putc(hex[v>>4]);arch_putc(hex[v&15]);}}}
+#endif
 static void field(const char *k,uint64_t v){arch_putc(' ');arch_puts(k);arch_putc('=');paging_hex(v);}
 static _Noreturn void fail(const char *s){arch_puts("STYLEOS S850 FAIL ");arch_puts(s);arch_putc('\n');out32(0xf4,0x11);arch_halt();}
 /* Same narrow reversible S795 probe, restricted further to the standard
@@ -295,6 +320,31 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(!bm857_confirm(&post,target)||read_cr3()!=target||(flags()&0x200)||in32(0xcf8)!=old857||!same_cache(cache))fail("857-busmaster-post");
  arch_puts("STYLEOS S857 BUSMASTER");field("root",target);field("bdf",40);field("before",before.command_status);field("after",post.command_status);field("bar4",post.bar4);field("primary-command",post.bm[0]);field("primary-status",post.bm[1]);field("secondary-command",post.bm[2]);field("secondary-status",post.bm[3]);arch_putc('\n');
  arch_puts("STYLEOS S857 BUSMASTER-POLICY pci-master-cleared=yes ata-access=no dma-admission=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_STORAGE_ATA_READ_857
+ /* Explicit Q35/TCG disposable fixture experiment. No generic ATA grant.
+  * Host checks topology/attachment/ports before sending input; guest rechecks
+  * PCI and BMIDE before each operation. Timing=0 is accepted ONLY here. */
+ struct ata857_live io857={target,0};struct ata857_state ata857={0};uint16_t words857[ATA857_WORDS];
+ if(!ata857_identify(&ata857,&ata857_io,&io857,words857))fail("857-ata-identify");
+ arch_puts("STYLEOS S857 ATA-IDENTIFY");field("root",target);arch_puts(" bytes=");ata857_hex(words857);arch_putc('\n');
+ const uint32_t lbas857[]={0,1,2048,4095};
+ for(unsigned i=0;i<4;i++){
+   if(!ata857_read(&ata857,&ata857_io,&io857,lbas857[i],words857))fail("857-ata-read");
+   arch_puts("STYLEOS S857 ATA-SECTOR");field("root",target);field("lba",lbas857[i]);arch_puts(" bytes=");ata857_hex(words857);arch_putc('\n');
+ }
+ unsigned count857=io857.ops;for(unsigned i=0;i<ATA857_WORDS;i++)words857[i]=0xa5a5;
+ if(ata857_read(&ata857,&ata857_io,&io857,4096,words857)||io857.ops!=count857)fail("857-ata-oob");
+ for(unsigned i=0;i<ATA857_WORDS;i++)if(words857[i]!=0xa5a5)fail("857-ata-oob-buffer");
+ if(!ata857_live_check(&io857)||!same_cache(cache))fail("857-ata-final");
+ arch_puts("STYLEOS S857 ATA-REFUSE");field("root",target);field("lba",4096);field("io",0);field("unchanged",1);arch_putc('\n');
+ arch_puts("STYLEOS S857 ATA-READY");field("root",target);arch_putc('\n');
+ bool ack857=false;for(unsigned i=0;i<20000000u;i++){
+   struct desk_event ev857={0};if(!desk_input_next(&ev857)){__asm__ volatile("pause");continue;}
+   if(ev857.mouse||ev857.key!=0x30||ev857.modifiers)fail("857-ata-ack");ack857=true;break;
+ }
+ if(!ack857||!ata857_live_check(&io857)||!same_cache(cache))fail("857-ata-final-ack");
+ arch_puts("STYLEOS S857 ATA-POLICY fixture-only=yes identify=yes read=yes data-write=no dma=no production-cr3=deny\n");
+#endif
 #endif
 #endif
 #endif

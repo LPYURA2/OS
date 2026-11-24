@@ -1,0 +1,39 @@
+name: StyleOS 857 first ATA PIO read probe
+on:
+  push:
+    branches: [test/styleos-storage-ata-read-857]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU and OVMF build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: ATA protocol and failure injection model
+        run: |
+          set -euo pipefail
+          mkdir -p build/s857-ata-tests
+          for cc in gcc clang; do
+            "$cc" -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -Iinclude tests/test_ata_diag_857.c kernel/ata_diag_857.c -o "build/s857-ata-tests/$cc"
+            "build/s857-ata-tests/$cc" | tee "build/s857-ata-tests/$cc.log"
+          done
+      - name: Observe prior bus master transition and replay synthetic ATA transcript
+        run: |
+          python3 tools/test_busmaster_boot_857.py --output build/s857-prior
+          python3 tools/test_ata_read_857_verify.py build/s857-prior
+      - name: Read actual ATA sectors under owned CR3
+        run: python3 tools/test_ata_read_boot_857.py --output build/s857-ata
+      - name: Preserve raw evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-857-ata-read-probe
+          path: |
+            build/s857-prior/
+            build/s857-ata/
+            build/s857-ata-tests/*.log
+          if-no-files-found: warn
