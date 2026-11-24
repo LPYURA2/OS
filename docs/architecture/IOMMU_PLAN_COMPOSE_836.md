@@ -1,0 +1,7 @@
+# S836 — detached ownership-plan composition
+
+Accepted S835 REV2 e4c13f3111eda579eec9b05be21c38872f0468ba, CI 45388774519 SUCCESS (181 PASS, 5 SKIPPED). Branch feature/styleos-ownership-compose-836.
+
+Add a host-tested C composition contract for ADR-0008 and the S835 diagnostic map. The input map is normalized again; union protected ranges, preserve all existing REVIEW intervals, refuse invalid counts, inconsistent ranges or overlapping workspaces before publishing. Zero grants. No change to guest execution, allocator, hardware access or ordinary boot. The C function alone does not prove provenance. CI first repeats all S835 guest scenarios, independently replays their original artifacts and compares the saved report, then tests the composition with synthetic prior plans based on those same maps. No claim of a genuine same-boot ADR-0008 live ownership plan.
+
+Local: GCC 119/119 and UBSan 119/119 (including 20 new alias refusals); five original S835 modes replayed; results match. COFF compilation PASS. Ordinary and Desktop EFI/IMG byte-identical to S835. Full exact-SHA CI and independent artifact replay required. Next build a separate guest profile that gathers actual ADR-0008 live claims and S835 evidence in one boot, with strict provenance and unchanged grants. Then controller ownership, hardware isolation, UEFI Runtime, production CR3, ordinary kernel/Desktop/processes/independent .tea/StyleFS. FOUNDATION NOT COMPLETE.
