@@ -1,0 +1,7 @@
+# S832 — bounded IOMMU register first-page census, no ownership
+
+Accepted S831 51a58f93e9d79c3e755b2d96ecac903702d03405, CI 45370435801 SUCCESS (174 PASS, 5 SKIPPED). Original S830 evidence and S831 associations independently replayed, ordinary EFI/ISO unchanged.
+
+Branch feature/styleos-iommu-base-page-832. Host-only first-page census replays the same-boot S830 evidence, verifies S831 results and compares the 4 KiB starting page of each validated Intel/AMD unit against final UEFI descriptors, detached RAM candidates, ECAM, observed PCI memory windows and IOAPIC base pages. Distinguishes EXPLICIT_NON_RAM_COVERAGE, GAP and CONFLICT. A gap is not proof of reservation. Neither the starting page nor an observed non-overlap proves the complete register aperture, protection, ownership or safe mapping. No register access, interrupt-remapping, DMA or production CR3 grants. No guest changes.
+
+Local: 25/25 synthetic cases, 20/20 negative UART mutations, five original S831 replays PASS. No IOMMU: no units. Intel 0xfed90000 and AMD 0xfed80000: GAP, no reported intersections with checked intervals. Require fresh exact-SHA CI and independent artifact replay. Next establish vendor-specific full aperture extents and explicit deny-only quarantine; do not infer full aperture from one page or assume a gap authorizes MMIO. Then prove controller protection and actual DMA deny/allow/fault/invalidation, UEFI runtime, production CR3, ordinary kernel/Desktop/processes/independent .tea/StyleFS. FOUNDATION NOT COMPLETE.
