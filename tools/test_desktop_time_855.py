@@ -15,6 +15,8 @@ def verify(raw,rc,rva,ref,post,base):
     if not ok:return False,obs
     try:
         obs['monotonic']=verify_record(raw,obs['active']['root'],base)
+        if not obs['monotonic']['min_hz']<=1_000_000_000<=obs['monotonic']['max_hz']:
+            raise ValueError('855 icount reference 1GHz outside measured interval')
         return True,obs
     except ValueError as e:return False,str(e)
 
@@ -28,7 +30,7 @@ def main():
     q=shutil.which('qemu-system-x86_64');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and code and vars):raise RuntimeError('real QEMU/OVMF mandatory')
     shutil.copyfile(vars,out/'OVMF_VARS.fd');serial=out/'serial.log';serial.unlink(missing_ok=True)
-    cmd=[q,'-machine','q35','-accel','tcg,thread=single','-smp','1','-m','128M','-rtc',f'base=2026-11-24T{args.hour:02d}:34:00,clock=vm','-display','none','-vga','std','-serial',f'file:{serial}','-monitor','none','-qmp','stdio','-net','none','-no-reboot','-device','isa-debug-exit,iobase=0xf4,iosize=0x04','-drive',f'if=pflash,format=raw,readonly=on,file={code}','-drive',f'if=pflash,format=raw,file={out/"OVMF_VARS.fd"}','-drive',f'if=none,id=styleos,format=raw,readonly=on,file={build/"x86_64"/"styleos.img"}','-device','virtio-blk-pci,drive=styleos']
+    cmd=[q,'-machine','q35','-accel','tcg,thread=single','-icount','shift=3,align=off,sleep=off','-smp','1','-m','128M','-rtc',f'base=2026-11-24T{args.hour:02d}:34:00,clock=vm','-display','none','-vga','std','-serial',f'file:{serial}','-monitor','none','-qmp','stdio','-net','none','-no-reboot','-device','isa-debug-exit,iobase=0xf4,iosize=0x04','-drive',f'if=pflash,format=raw,readonly=on,file={code}','-drive',f'if=pflash,format=raw,file={out/"OVMF_VARS.fd"}','-drive',f'if=none,id=styleos,format=raw,readonly=on,file={build/"x86_64"/"styleos.img"}','-device','virtio-blk-pci,drive=styleos']
     (out/'command.json').write_text(json.dumps(cmd)+'\n')
     with (out/'qemu.log').open('wb') as log:
         proc=subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log)
@@ -38,11 +40,11 @@ def main():
             d.call('human-monitor-command',**{'command-line':'sendkey a 40'})
             wait(proc,serial,b'STYLEOS S853 KEY ')
             d.call('input-send-event',events=[{'type':'rel','data':{'axis':'x','value':20}}])
-            rc=proc.wait(timeout=30)
+            rc=proc.wait(timeout=120)
         finally:
             if proc.poll() is None:proc.kill();proc.wait()
     raw=serial.read_bytes();ok,obs=verify(raw,rc,site['rva'],ref,post,base)
-    result={'status':'PASS' if ok else 'FAIL','exit':rc,'site':site,'reference':ref,'cursor_reference':post,'uart_sha256':hashlib.sha256(raw).hexdigest(),'efi_sha256':hashlib.sha256(efi.read_bytes()).hexdigest(),'map_sha256':hashlib.sha256(mp.read_bytes()).hexdigest(),'rtc_fixture_base':base,'observations':obs}
+    result={'status':'PASS' if ok else 'FAIL','exit':rc,'site':site,'reference':ref,'cursor_reference':post,'uart_sha256':hashlib.sha256(raw).hexdigest(),'efi_sha256':hashlib.sha256(efi.read_bytes()).hexdigest(),'map_sha256':hashlib.sha256(mp.read_bytes()).hexdigest(),'rtc_fixture_base':base,'clock_fixture':'icount-shift-3','observations':obs}
     (out/'results.json').write_text(json.dumps(result,indent=2)+'\n')
     if not ok:raise RuntimeError(obs)
     record=next(x for x in raw.splitlines() if x.startswith(b'STYLEOS S855 MONO '))

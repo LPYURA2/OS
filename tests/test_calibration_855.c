@@ -39,5 +39,15 @@ int main(void){
         reject(w,3);
     }
     memcpy(w,base,sizeof w);w[1].start_before=w[0].end_after-1;reject(w,3);
+    /* Raw windows from failed run 45486414027, artifact 14964004983.
+     * serial.log sha256 17ca1c84cb21c3c380107505dccecabdbcb4eb7cb7520d2bce29ad9058704604.
+     * Keep this real non-icount failure rejected. Never silently widen bounds. */
+    const struct calibration_window_855 failed[3]={
+        {0x111a6b178ULL,0x111aa6a4cULL,0x119ade194ULL,0x119ade6b0ULL,0xe909,0xe90d},
+        {0x119bdd404ULL,0x119bde7d8ULL,0x1202d803aULL,0x1202d854cULL,0xba6d,0xba71},
+        {0x120357c00ULL,0x1203580f6ULL,0x1290c407eULL,0x1290c458eULL,0xfffd,0x10000}
+    };
+    reject(failed,3);
+    puts("Original non-icount QEMU calibration failure replay: refusal PASS");
     puts("Calibration: 100000 independent-oracle and monotonic integration cases PASS; 36 refusal cases PASS");
 }
