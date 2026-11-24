@@ -11,6 +11,9 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <acpi.h>
+#ifdef STYLEOS_TEST_ECAM_826
+#include <styleos/ecam_map_capture_826.h>
+#endif
 
 #define HEAP_822 (16u*1024u*1024u)
 static _Alignas(16) unsigned char heap[HEAP_822];
@@ -217,6 +220,35 @@ static unsigned eval_crs(void){
  /* A resource buffer is evidence only, NEVER permission for ECAM/MMIO/DMA. */
  return o->Buffer.Length;
 }
+#ifdef STYLEOS_TEST_ECAM_826
+static int extent826(const unsigned char *buf, size_t capacity, size_t used,
+                     const void *ptr, size_t count){
+ uintptr_t p=(uintptr_t)ptr, v=(uintptr_t)buf;
+ return used<=capacity && used>=sizeof(ACPI_OBJECT) && ptr && p>=v &&
+        p-v>=sizeof(ACPI_OBJECT) && p-v<=used && count<=used-(p-v);
+}
+static void eval_drac826(const struct boot_info *boot){
+ if(!styleos826_emit_final_map(boot))fail("826-final-map",AE_BAD_PARAMETER);
+ _Alignas(16) unsigned char buf[2048]={0};ACPI_BUFFER b={sizeof buf,buf};
+ ACPI_STATUS s=AcpiEvaluateObject(NULL,(ACPI_STRING)"\\_SB.DRAC._HID",NULL,&b);
+ if(s!=AE_OK)fail("826-eval-hid",s);
+ ACPI_OBJECT *o=(ACPI_OBJECT *)(void *)buf;
+ if(o->Type!=ACPI_TYPE_STRING||o->String.Length!=7||
+    !extent826(buf,sizeof buf,b.Length,o->String.Pointer,8))fail("826-hid-type",AE_TYPE);
+ for(unsigned i=0;i<8;i++)if(o->String.Pointer[i]!="PNP0C01"[i])fail("826-hid-value",AE_TYPE);
+ zero(buf,sizeof buf);b.Length=sizeof buf;b.Pointer=buf;
+ s=AcpiEvaluateObject(NULL,(ACPI_STRING)"\\_SB.DRAC._CRS",NULL,&b);
+ if(s!=AE_OK)fail("826-eval-crs",s);
+ if(o->Type!=ACPI_TYPE_BUFFER||o->Buffer.Length!=28||
+    !extent826(buf,sizeof buf,b.Length,o->Buffer.Pointer,28))fail("826-crs-type",AE_TYPE);
+ arch_puts("STYLEOS S826 DRAC path=\\_SB.DRAC hid=PNP0C01 crs=");
+ for(unsigned i=0;i<28;i++){
+  unsigned x=o->Buffer.Pointer[i];arch_putc("0123456789abcdef"[x>>4]);arch_putc("0123456789abcdef"[x&15u]);
+ }
+ arch_putc('\n');
+ arch_puts("STYLEOS S826 POLICY observation-only=yes ecam=not-read dma-grants=no production-cr3=deny\n");
+}
+#endif
 void acpi823_terminal(const struct boot_info *boot){
  if(!boot||boot->magic!=STYLEOS_BOOT_MAGIC||
     boot->flags!=STYLEOS_BOOT_EXITED_SERVICES)fail("handoff",AE_BAD_PARAMETER);
@@ -235,6 +267,9 @@ void acpi823_terminal(const struct boot_info *boot){
   fail("hid",AE_TYPE);
  if((segp&&seg)||(bbnp&&bbn))fail("segment-or-bus",AE_ACCESS);
  unsigned crs=eval_crs();
+#ifdef STYLEOS_TEST_ECAM_826
+ eval_drac826(boot);
+#endif
  if(denied_hw||!maps||styleos819_dma_grant(0))fail("policy",AE_ACCESS);
  UINT64 sentinel=UINT64_MAX;
  if(AcpiOsReadMemory(0xe0000000u,&sentinel,32)!=AE_ACCESS||sentinel!=UINT64_MAX)

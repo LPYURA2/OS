@@ -71,6 +71,7 @@ on:
       - feature/styleos-acpica-real-hostbridge-823
       - feature/styleos-acpi-resources-824
       - feature/styleos-acpi-windows-825
+      - feature/styleos-ecam-evidence-826
   workflow_dispatch:
 
 permissions:
@@ -252,7 +253,7 @@ jobs:
             2>&1 | tee build/recovery-canonical/acpica-823/negative.log
 
       - name: 824 Refuse malformed resource descriptors and forged UART
-        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825'
+        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-824
@@ -260,7 +261,7 @@ jobs:
             2>&1 | tee build/recovery-canonical/acpi-824/negative.log
 
       - name: 824 Capture evaluated PCI0 CRS and correlate UEFI MCFG live buses
-        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825'
+        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-824
@@ -283,12 +284,45 @@ jobs:
           PYCODE
 
       - name: 825 Audit same-boot allocated UEFI windows against AML producer windows and ECAM exclusion
-        if: github.ref_name == 'feature/styleos-acpi-windows-825'
+        if: github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-825
           python3 tools/test_acpi_windows_825.py --input build/recovery-canonical/acpi-824/qemu \
             --output build/recovery-canonical/acpi-825 2>&1 | tee build/recovery-canonical/acpi-825/run.log
+
+      - name: 826 Test final map capture and replay guards on authentic parent UART with synthetic records
+        if: github.ref_name == 'feature/styleos-ecam-evidence-826'
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpi-826
+          clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -I include kernel/ecam_map_capture_826.c kernel/boot_info.c tests/test_map_capture_826.c -o build/recovery-canonical/acpi-826/host
+          build/recovery-canonical/acpi-826/host | tee build/recovery-canonical/acpi-826/map-host.log
+          clang --target=x86_64-pc-windows-msvc -ffreestanding -fno-stack-protector -Wall -Wextra -Werror -I include -c kernel/ecam_map_capture_826.c -o build/recovery-canonical/acpi-826/map-capture.coff.o
+          python3 tools/uefi_map_826.py --selftest | tee build/recovery-canonical/acpi-826/map-parser.log
+          python3 tools/test_acpi_ecam_826_verify.py build/recovery-canonical/acpi-824/qemu/disabled | tee build/recovery-canonical/acpi-826/negative.log
+
+      - name: 826 Evaluate DRAC native AML and capture exact final UEFI map in QEMU
+        if: github.ref_name == 'feature/styleos-ecam-evidence-826'
+        run: |
+          set -euo pipefail
+          python3 tools/test_acpica_firmware_823.py --ecam-826 \
+            --core-lib build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib \
+            --core-include build/recovery-canonical/acpica-820/verified/source/include \
+            --output build/recovery-canonical/acpi-826/qemu 2>&1 | tee build/recovery-canonical/acpi-826/run.log
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('build/recovery-canonical/acpi-826/qemu/results.json').read_text())
+          assert r['stage']==826 and r['status']=='PASS'
+          for mode,d in r['modes'].items():
+              if mode=='amd' and d['status']=='SKIPPED': continue
+              assert d['status']=='PASS' and d['qemu_exit_code']==33
+              o=d['observations']; assert o['s826_drac_native_evaluated'] and o['s826_final_map_capture']
+              assert o['s826_map_audit']['status'] in ('GAP','EXPLICIT_NON_RAM_COVERAGE')
+              assert not o['s826_ecam_reservation_verified'] and not o['s826_dma_authorized']
+          assert not r['ecam_reservation_verified'] and not r['dma_access_authorized'] and not r['production_cr3_authorized']
+          PYCODE
 
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
@@ -1562,6 +1596,16 @@ jobs:
             build/recovery-canonical/acpica-821/qemu/qemu-device-help.log
             build/recovery-canonical/acpica-821/qemu/upstream-core/core-manifest.json
             build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
+            build/recovery-canonical/acpi-826/*.log
+            build/recovery-canonical/acpi-826/qemu/results.json
+            build/recovery-canonical/acpi-826/qemu/*.log
+            build/recovery-canonical/acpi-826/qemu/qemu-version.txt
+            build/recovery-canonical/acpi-826/qemu/qemu-device-help.log
+            build/recovery-canonical/acpi-826/qemu/disabled/**
+            build/recovery-canonical/acpi-826/qemu/intel/**
+            build/recovery-canonical/acpi-826/qemu/bridge-intel/**
+            build/recovery-canonical/acpi-826/qemu/bridge-two-hop-intel/**
+            build/recovery-canonical/acpi-826/qemu/amd/**
             build/recovery-canonical/acpi-825/*.log
             build/recovery-canonical/acpi-825/results.json
             build/recovery-canonical/acpi-824/*.log
