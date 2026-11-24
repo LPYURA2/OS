@@ -122,11 +122,11 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  arch_puts("STYLEOS S852 POLICY first-frame=yes input=no storage=no app-admission=no production-cr3=deny\n");
 #ifdef STYLEOS_TEST_DESKTOP_INPUT_853
  /* This is a fixed Q35/TCG terminal fixture, not general ACPI resource admission. */
- uint32_t a,b,c,d;
- __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
- if(!(c&(1u<<31)))fail("853-hypervisor");
- __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(0x40000000),"2"(0));
- if(b!=0x54474354u||c!=0x43544743u||d!=0x47435447u)fail("853-tcg");
+ uint32_t cp_a,cp_b,cp_c,cp_d;
+ __asm__ volatile("cpuid":"=a"(cp_a),"=b"(cp_b),"=c"(cp_c),"=d"(cp_d):"0"(1),"2"(0));
+ if(!(cp_c&(1u<<31)))fail("853-hypervisor");
+ __asm__ volatile("cpuid":"=a"(cp_a),"=b"(cp_b),"=c"(cp_c),"=d"(cp_d):"0"(0x40000000),"2"(0));
+ if(cp_b!=0x54474354u||cp_c!=0x43544743u||cp_d!=0x47435447u)fail("853-tcg");
  uint32_t cf8=in32(0xcf8),lpc=cfg(31,0,0),classreg=cfg(31,0,8);
  out32(0xcf8,cf8);
  if(in32(0xcf8)!=cf8||lpc!=0x29188086u||(classreg>>16)!=0x0601||
