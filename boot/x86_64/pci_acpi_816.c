@@ -125,6 +125,26 @@ static void h(uint64_t n){
 static void f(const char *key,uint64_t n){
  arch_putc(' ');arch_puts(key);arch_putc('=');h(n);
 }
+#ifdef STYLEOS_TEST_ACPI_RESOURCES_824
+static void bytes824(const uint8_t *p,unsigned n){
+ for(unsigned i=0;i<n;i++){
+  unsigned x=p[i];arch_putc("0123456789abcdef"[x>>4]);
+  arch_putc("0123456789abcdef"[x&15u]);
+ }
+ arch_putc('\n');
+}
+static void resources824(void){
+ uint8_t bitmap[32]={0};
+ for(unsigned b=0;b<256u;b++)if(topo.seen[b])bitmap[b/8u]|=(uint8_t)(1u<<(b%8u));
+ arch_puts("STYLEOS S824 MCFG data=");bytes824(mcfg_copy,mcfg_size);
+ for(unsigned r=0;r<bridge_count;r++){
+  arch_puts("STYLEOS S824 UEFI");f("index",r);f("segment",resources_segment[r]);
+  arch_puts(" data=");bytes824(resources_copy[r],resources_len[r]);
+ }
+ arch_puts("STYLEOS S824 BUSES data=");bytes824(bitmap,sizeof bitmap);
+ arch_puts("STYLEOS S824 POLICY observation-only=yes ecam=not-read dma-grants=no production-cr3=deny\n");
+}
+#endif
 void pci816_capture(const struct efi_system_table *st){
  static const struct efi_guid guid={
   0x8868e871,0xe4f1,0x11d3,{0xbc,0x22,0x00,0x80,0xc7,0x3c,0x88,0x81}};
@@ -351,6 +371,9 @@ _Noreturn void pci816_terminal(const struct boot_info *boot){
   if(found==1)matched++;else unknown++;
   for(unsigned j=0;j<audit.aliases;j++)if(audit.alias[j].from==rid)alias_present++;
  }
+#ifdef STYLEOS_TEST_ACPI_RESOURCES_824
+ resources824();
+#endif
  arch_puts("STYLEOS S816 PLATFORM");f("backend",(uint64_t)backend);f("root-entries",root_count);arch_putc('\n');
  arch_puts("STYLEOS S816 TOPOLOGY");f("buses",topo.buses);f("functions",topo.functions);
  f("bridges",topo.bridges);arch_putc('\n');

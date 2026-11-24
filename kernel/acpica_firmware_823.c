@@ -205,6 +205,15 @@ static unsigned eval_crs(void){
  uintptr_t p=(uintptr_t)o->Buffer.Pointer,v=(uintptr_t)buf;
  if(p<v||p-v>sizeof buf||o->Buffer.Length>sizeof buf-(p-v))
   fail("crs-bounds",AE_ACCESS);
+#ifdef STYLEOS_TEST_ACPI_RESOURCES_824
+ /* Capture the actual returned buffer, before the local stack buffer expires. */
+ arch_puts("STYLEOS S824 CRS data=");
+ for(unsigned i=0;i<o->Buffer.Length;i++){
+  unsigned x=o->Buffer.Pointer[i];
+  arch_putc("0123456789abcdef"[x>>4]);arch_putc("0123456789abcdef"[x&15u]);
+ }
+ arch_putc('\n');
+#endif
  /* A resource buffer is evidence only, NEVER permission for ECAM/MMIO/DMA. */
  return o->Buffer.Length;
 }

@@ -6,15 +6,21 @@ from acpica_firmware_823_verify import verify
 from test import firmware_path
 ROOT=Path(__file__).resolve().parents[1]
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--output',required=True,type=Path)
+ ap=argparse.ArgumentParser();ap.add_argument('--resources-824',action='store_true')
+ ap.add_argument('--output',required=True,type=Path)
  ap.add_argument('--core-lib',required=True,type=Path)
  ap.add_argument('--core-include',required=True,type=Path)
  args=ap.parse_args();output=args.output;output.mkdir(parents=True,exist_ok=True)
+ if args.resources_824:
+  from acpi_resources_824_verify import verify as check
+ else:
+  check=verify
+ stage=824 if args.resources_824 else 823
  if not args.core_lib.is_file() or not (args.core_include/'acpi.h').is_file():raise RuntimeError('verified ACPICA core/header missing')
  build=output/'build'
  with (output/'compile.log').open('w') as log:
   subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',
-   '--test-acpica-firmware-823','--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
+   ('--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
    stdout=log,stderr=subprocess.STDOUT,check=True)
  qemu=shutil.which('qemu-system-x86_64')
  code=firmware_path('OVMF_CODE','OVMF_CODE')
@@ -62,21 +68,24 @@ def main():
   except subprocess.TimeoutExpired as e:
    rc=None;(dst/'qemu.log').write_text('TIMEOUT '+str(e))
   raw=serial.read_bytes() if serial.exists() else b''
-  good,details=verify(raw,rc,mode)
+  good,details=check(raw,rc,mode)
   if good:
    (dst/'dsdt.aml').write_bytes(details.pop('_original_dsdt_bytes'))
    for i,blob in enumerate(details.pop('_original_ssdt_bytes')):
     (dst/f'ssdt-{i}.aml').write_bytes(blob)
+   if args.resources_824:
+    for name,data in details.pop('_s824_raw').items():
+     (dst/name).write_bytes(data)
    details['dsdt_sha256']=hashlib.sha256((dst/'dsdt.aml').read_bytes()).hexdigest()
   observations[mode]={'status':'PASS' if good else 'FAIL','qemu_exit_code':rc,
    'uart_sha256':hashlib.sha256(raw).hexdigest(),'observations':details}
-  print('S823 QEMU',mode,observations[mode],flush=True)
+  print(f'S{stage} QEMU',mode,observations[mode],flush=True)
   if not good:
-   raise SystemExit('S823 fail-closed: first failing QEMU mode '+mode)
+   raise SystemExit(f'S{stage} fail-closed: first failing QEMU mode '+mode)
  if not amd:observations['amd']={'status':'SKIPPED','reason':'QEMU lacks amd-iommu; AMD hardware not verified'}
  required=('disabled','intel','bridge-intel','bridge-two-hop-intel')
  success=all(observations[m]['status']=='PASS' and observations[m]['observations'].get('mcfg_covered_buses')==observations[m]['observations'].get('buses') and observations[m]['observations'].get('uefi_covered_buses')==observations[m]['observations'].get('buses') for m in required) and observations['amd']['status']!='FAIL' and observations['bridge-two-hop-intel']['observations'].get('bridges',0)>=2
- result={'stage':823,'status':'PASS' if success else 'FAIL',
+ result={'stage':stage,'status':'PASS' if success else 'FAIL',
   'qemu_version':ver.splitlines()[0],'amd_qemu_supported':amd,
   'amd_hardware_verified':observations['amd']['status']=='PASS',
   'uefi_rootbridge_bus_ranges_observed':True,
