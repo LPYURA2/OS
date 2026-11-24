@@ -5,7 +5,7 @@ GPRS=('rax','rbx','rcx','rdx','rsi','rdi','rbp','r8','r9','r10','r11','r12','r13
 CODE=0x10000000
 IST=0x400000003000
 ORDER=(0,1,0,1,0,1,0,1,1,1)
-POLICY=b'STYLEOS S848 POLICY cpl3-timer=yes integer-only=yes single-cpu=yes production-cr3=deny'
+POLICY=b'STYLEOS S848 POLICY cpl3-timer=yes integer-only=yes single-cpu=yes firmware-timer-phase=discarded production-cr3=deny'
 
 def parse(line,tag,keys):
     prefix=('STYLEOS S848 '+tag+' ').encode()
@@ -16,11 +16,15 @@ def parse(line,tag,keys):
 
 def verify_stage(lines,obs):
     rec=[x for x in lines if x.startswith(b'STYLEOS S848 ')]
-    if len(rec)!=23 or rec[-1]!=POLICY:raise ValueError('S848 record count/policy')
+    if len(rec)!=25 or rec[-1]!=POLICY:raise ValueError('S848 record count/policy')
     parent=obs['child_roots'];safe=parent['safe'];sel=obs['process_selectors']
-    r=parse(rec[0],'READY',('safe','a','b','lapic','cs','ss','a-loop-end','b-loop-end','a-fault','b-exit','count'))
+    admit=parse(rec[0],'ADMIT',('lvt','initial','current','div','isr','irr'))
+    if any(v>0xffffffff for v in admit.values()) or not admit['lvt']&0x10000 or admit['lvt']&~0x300ff or admit['div']&~0xb or admit['current']>admit['initial'] or admit['isr'] or admit['irr']:raise ValueError('S848 timer admission')
+    stop=parse(rec[1],'STOP',('lvt','initial','current','isr','irr'))
+    if tuple(stop.values())!=(admit['lvt'],0,0,0,0):raise ValueError('S848 timer quiescence')
+    r=parse(rec[2],'READY',('safe','a','b','lapic','cs','ss','a-loop-end','b-loop-end','a-fault','b-exit','count'))
     if tuple(r.values())!=(safe,parent['a'],parent['b'],0xfee00000,sel['cs'],sel['ss'],CODE+10,CODE+10,CODE+20,CODE+19,5000000):raise ValueError('S848 roots/sites')
-    i=1;ticks=0;local=[0,0];progress=[0,0];seen=[];backs=[];ends=[]
+    i=3;ticks=0;local=[0,0];progress=[0,0];seen=[];backs=[];ends=[]
     for step,id in enumerate(ORDER):
         terminal=step in (6,9)
         if terminal:
@@ -40,13 +44,13 @@ def verify_stage(lines,obs):
         if (b['step'],b['id'],b['safe'],b['state'],b['stack-same'])!=(step,id,safe,(4 if id else 3) if terminal else 1,1):raise ValueError('S848 return')
         if b['ab'[1-id]]!=progress[1-id] or b['ab'[id]]<progress[id] or (not terminal and b['ab'[id]]!=progress[id]):raise ValueError('S848 cross-process write')
         progress[id]=b['ab'[id]];backs.append(b)
-    total=parse(rec[i],'TOTAL',('ticks','a','b','restored'));i+=1
-    if i!=22 or tuple(total.values())!=(8,3,5,1) or ticks!=8 or local!=[3,5]:raise ValueError('S848 totals')
+    total=parse(rec[i],'TOTAL',('ticks','a','b','config-restored','timer-stopped'));i+=1
+    if i!=24 or tuple(total.values())!=(8,3,5,1,1) or ticks!=8 or local!=[3,5]:raise ValueError('S848 totals')
     before=next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S847 POLICY '))
     after=next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S846 CLEAN '))
     indices=[before]+[lines.index(x) for x in rec]+[after]
     if any(x>=y for x,y in zip(indices,indices[1:])):raise ValueError('S848 phase order')
-    return dict(user_preempt_verified=True,user_preempt_ready=r,user_preempt_ticks=seen,user_preempt_returns=backs,user_preempt_ends=ends,user_preempt_total=total)
+    return dict(user_preempt_verified=True,user_preempt_admission=admit,user_preempt_stop=stop,user_preempt_ready=r,user_preempt_ticks=seen,user_preempt_returns=backs,user_preempt_ends=ends,user_preempt_total=total)
 
 def verify(raw,rc):
     try:

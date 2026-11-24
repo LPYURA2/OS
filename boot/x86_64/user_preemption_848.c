@@ -20,6 +20,7 @@ static uint64_t root848(void){uint64_t v;__asm__ volatile("mov %%cr3,%0":"=r"(v)
 static uint64_t flags848(void){uint64_t v;__asm__ volatile("pushfq;popq %0":"=r"(v));return v;}
 static uint64_t msr848(uint32_t n){uint32_t a,d;__asm__ volatile("rdmsr":"=a"(a),"=d"(d):"c"(n));return ((uint64_t)d<<32)|a;}
 static uint32_t rd848(unsigned off){return *(volatile uint32_t *)(uintptr_t)(lapic848+off);}
+static uint32_t pending848(unsigned base){uint32_t v=0;for(unsigned i=0;i<8;i++)v|=rd848(base+16*i);return v;}
 static void wr848(unsigned off,uint32_t n){*(volatile uint32_t *)(uintptr_t)(lapic848+off)=n;}
 static uint8_t in848(uint16_t p){uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):"Nd"(p));return v;}
 static uint64_t word848(uint64_t p){return *(volatile uint64_t *)(uintptr_t)p;}
@@ -58,8 +59,15 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
  __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3":"=m"(g0),"=m"(i0),"=r"(tr),"=r"(cs));
  for(unsigned i=0;i<2;i++)if(!writable848(&child[i],lapic848,P)||!writable848(&child[i],g0.base,P)||!writable848(&child[i],(uintptr_t)idt848,sizeof idt848))fail848("mapping");
  uint32_t lvt=rd848(0x320),div=rd848(0x3e0),tpr=rd848(0x80),svr=rd848(0xf0);
- /* Refuse a running or unmasked firmware timer. */
- if(!(lvt&BIT)||rd848(0x380)||rd848(0x390)||(rd848(0x120)&BIT)||(rd848(0x220)&BIT))fail848("timer-busy");
+ /* Post-EBS, terminal trial only: retire a masked firmware timer without
+  * restoring its elapsed phase. Refuse unmasked/deadline/pending sources. */
+ uint32_t initial=rd848(0x380),current=rd848(0x390),isr=pending848(0x100),irr=pending848(0x200);
+ arch_puts("STYLEOS S848 ADMIT");fld848("lvt",lvt);fld848("initial",initial);fld848("current",current);fld848("div",div);fld848("isr",isr);fld848("irr",irr);arch_putc('\n');
+ if(!s848_timer_admit(lvt,initial,current,div,isr,irr)||rd848(0x320)!=lvt)fail848("timer-busy");
+ wr848(0x380,0);
+ initial=rd848(0x380);current=rd848(0x390);isr=pending848(0x100);irr=pending848(0x200);
+ arch_puts("STYLEOS S848 STOP");fld848("lvt",rd848(0x320));fld848("initial",initial);fld848("current",current);fld848("isr",isr);fld848("irr",irr);arch_putc('\n');
+ if(initial||current||isr||irr||rd848(0x320)!=lvt)fail848("timer-stop");
  const unsigned char *start[2]={s848_a_start,s848_b_start},*loop[2]={s848_a_loop_end,s848_b_loop_end},*end[2]={s848_a_end,s848_b_end},*term[2]={s848_a_fault,s848_b_exit};
  for(unsigned i=0;i<2;i++){
   uintptr_t lo=(uintptr_t)start[i],hi=(uintptr_t)end[i],mid=(uintptr_t)loop[i],last=(uintptr_t)term[i];if(lo>=mid||mid>last||last>=hi||hi-lo>P)fail848("code-extent");
@@ -93,7 +101,7 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
  unsigned id;struct up_context ctx;if(ticks848!=8||local848[0]!=3||local848[1]!=5||s848_user_dispatch(&ctl848,safe,&id,&ctx))fail848("final");
  active848=false;wr848(0x320,BIT|V);wr848(0x380,0);wr848(0x3e0,div);wr848(0x320,lvt);wr848(0x80,tpr);wr848(0xf0,svr);
  __asm__ volatile("lidt %0;lgdt %1"::"m"(i0),"m"(g0):"memory");volatile unsigned char *tail=(void *)(uintptr_t)(g0.base+g0.limit+1);for(unsigned i=0;i<16;i++)tail[i]=0;
- __asm__ volatile("sgdt %0":"=m"(check));if(check.base!=g0.base||check.limit!=g0.limit)fail848("restore-gdt");__asm__ volatile("sidt %0":"=m"(check));if(check.base!=i0.base||check.limit!=i0.limit||rd848(0x320)!=lvt||rd848(0x380)||rd848(0x390)||rd848(0x3e0)!=div||rd848(0x80)!=tpr||rd848(0xf0)!=svr||(rd848(0x120)&BIT)||(rd848(0x220)&BIT))fail848("restore-apic");
- arch_puts("STYLEOS S848 TOTAL");fld848("ticks",ticks848);fld848("a",local848[0]);fld848("b",local848[1]);fld848("restored",1);arch_putc('\n');
- arch_puts("STYLEOS S848 POLICY cpl3-timer=yes integer-only=yes single-cpu=yes production-cr3=deny\n");
+ __asm__ volatile("sgdt %0":"=m"(check));if(check.base!=g0.base||check.limit!=g0.limit)fail848("restore-gdt");__asm__ volatile("sidt %0":"=m"(check));if(check.base!=i0.base||check.limit!=i0.limit||rd848(0x320)!=lvt||rd848(0x380)||rd848(0x390)||rd848(0x3e0)!=div||rd848(0x80)!=tpr||rd848(0xf0)!=svr||pending848(0x100)||pending848(0x200))fail848("restore-apic");
+ arch_puts("STYLEOS S848 TOTAL");fld848("ticks",ticks848);fld848("a",local848[0]);fld848("b",local848[1]);fld848("config-restored",1);fld848("timer-stopped",1);arch_putc('\n');
+ arch_puts("STYLEOS S848 POLICY cpl3-timer=yes integer-only=yes single-cpu=yes firmware-timer-phase=discarded production-cr3=deny\n");
 }

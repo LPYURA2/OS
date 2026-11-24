@@ -7,7 +7,22 @@ static unsigned n;
 #define C(x) do{assert(x);++n;}while(0)
 static struct s847_raw frame(struct up_context c){struct s847_raw f={.vector=0x50,.rip=c.pc,.rsp=c.sp,.cs=c.cs,.ss=c.ss,.rflags=c.status};for(unsigned i=0;i<15;i++)f.gpr[i]=c.gpr[i];return f;}
 static void reject(struct s847_control *c,struct s847_raw f,struct s848_irq_evidence e){struct s847_control old=*c;struct s847_raw before=f;C(!s848_timer_suspend(c,&f,&e));C(!memcmp(c,&old,sizeof old));C(!memcmp(&f,&before,sizeof f));}
-int main(void){struct s847_control c={0};struct up_context ctx;unsigned id;struct s847_decision d;const uint64_t va=S846_IST+4096-16-sizeof(struct s847_raw);
+int main(void){
+ C(s848_timer_admit(0x10000,0,0,0,0,0));
+ C(s848_timer_admit(0x10020,500,0,3,0,0));
+ C(s848_timer_admit(0x30020,500,299,0xb,0,0));
+ C(s848_timer_admit(0x30020,500,500,0,0,0));
+ C(!s848_timer_admit(0x20020,500,0,3,0,0));
+ C(!s848_timer_admit(0x50020,500,0,3,0,0));
+ C(!s848_timer_admit(0x70020,500,0,3,0,0));
+ C(!s848_timer_admit(0x31020,500,0,3,0,0));
+ C(!s848_timer_admit(0x10020,500,501,3,0,0));
+ C(!s848_timer_admit(0x10020,0,1,3,0,0));
+ C(!s848_timer_admit(0x10020,500,0,4,0,0));
+ C(!s848_timer_admit(0x10020,500,0,3,1,0));
+ C(!s848_timer_admit(0x10020,500,0,3,0,1));
+ C(!s848_timer_admit(0x80010020,500,0,3,0,0));
+ struct s847_control c={0};struct up_context ctx;unsigned id;struct s847_decision d;const uint64_t va=S846_IST+4096-16-sizeof(struct s847_raw);
  C(s847_init(&c,0x1000,0x2000,0x3000,0x5b,0x63));C(s848_user_dispatch(&c,0x1000,&id,&ctx)&&id==0&&ctx.status==0x202);
  struct s847_raw f=frame(ctx);struct s848_irq_evidence e={.root=0x2000,.frame_va=va,.live_flags=2,.isr=0x10000};
  for(unsigned i=0;i<15;i++)f.gpr[i]=0x848000+i;
