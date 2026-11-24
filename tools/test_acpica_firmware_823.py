@@ -8,12 +8,14 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
  ap=argparse.ArgumentParser();profile=ap.add_mutually_exclusive_group()
  profile.add_argument('--resources-824',action='store_true');profile.add_argument('--ecam-826',action='store_true');profile.add_argument('--ecam-quarantine-827',action='store_true');profile.add_argument('--iommu-evidence-828',action='store_true');profile.add_argument('--irq-sources-830',action='store_true')
- ap.add_argument('--capture-mtree-833',action='store_true')
+ capture=ap.add_mutually_exclusive_group()
+ capture.add_argument('--capture-mtree-833',action='store_true')
+ capture.add_argument('--capture-post-ebs-834',action='store_true')
  ap.add_argument('--output',required=True,type=Path)
  ap.add_argument('--core-lib',required=True,type=Path)
  ap.add_argument('--core-include',required=True,type=Path)
  args=ap.parse_args()
- if args.capture_mtree_833 and not args.irq_sources_830:ap.error('S833 requires S830 profile')
+ if (args.capture_mtree_833 or args.capture_post_ebs_834) and not args.irq_sources_830:ap.error('QMP capture requires S830 profile')
  output=args.output;output.mkdir(parents=True,exist_ok=True)
  if args.irq_sources_830:
   args.iommu_evidence_828=True;args.ecam_826=True;args.resources_824=True
@@ -36,7 +38,7 @@ def main():
  build=output/'build'
  with (output/'compile.log').open('w') as log:
   subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',
-   ('--test-irq-sources-830' if args.irq_sources_830 else '--test-iommu-evidence-828' if args.iommu_evidence_828 else '--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
+   ('--test-post-ebs-834' if args.capture_post_ebs_834 else '--test-irq-sources-830' if args.irq_sources_830 else '--test-iommu-evidence-828' if args.iommu_evidence_828 else '--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
    stdout=log,stderr=subprocess.STDOUT,check=True)
  qemu=shutil.which('qemu-system-x86_64')
  code=firmware_path('OVMF_CODE','OVMF_CODE')
@@ -60,7 +62,7 @@ def main():
  for mode,extra in modes:
   dst=output/mode;dst.mkdir(exist_ok=True)
   shutil.copyfile(nvram,dst/'OVMF_VARS.fd')
-  serial=dst/'serial.log'
+  serial=dst/('serial-gated.log' if args.capture_post_ebs_834 else 'serial.log')
   drive=['-device','virtio-blk-pci,drive=styleos']
   if mode in ('bridge-intel','bridge-two-hop-intel'):
    drive=['-device','pcie-root-port,id=rp812,chassis=1,slot=3',
@@ -78,7 +80,10 @@ def main():
    '-drive',f'if=none,id=styleos,format=raw,readonly=on,file={build/"x86_64"/"styleos.img"}',
    *drive,*extra]
   try:
-   if args.capture_mtree_833:
+   if args.capture_post_ebs_834:
+    from post_ebs_aperture_834 import capture
+    rc=capture(cmd,dst,serial)
+   elif args.capture_mtree_833:
     from qmp_aperture_833 import capture
     rc=capture(cmd,dst)
    else:
@@ -88,6 +93,12 @@ def main():
   except subprocess.TimeoutExpired as e:
    rc=None;(dst/'qemu.log').write_text('TIMEOUT '+str(e))
   raw=serial.read_bytes() if serial.exists() else b''
+  if args.capture_post_ebs_834:
+   from post_ebs_aperture_834 import ungate,replay
+   trace=(dst/'qmp-834.json').read_bytes()
+   replay(raw,rc,mode,json.loads(trace))
+   gated_sha=hashlib.sha256(raw).hexdigest();raw=ungate(raw)
+   (dst/'serial.log').write_bytes(raw)
   good,details=check(raw,rc,mode)
   if good:
    (dst/'dsdt.aml').write_bytes(details.pop('_original_dsdt_bytes'))
@@ -108,6 +119,8 @@ def main():
    details['dsdt_sha256']=hashlib.sha256((dst/'dsdt.aml').read_bytes()).hexdigest()
   observations[mode]={'status':'PASS' if good else 'FAIL','qemu_exit_code':rc,
    'uart_sha256':hashlib.sha256(raw).hexdigest(),'observations':details}
+  if args.capture_post_ebs_834:
+   observations[mode].update(qmp_834_sha256=hashlib.sha256(trace).hexdigest(),gated_uart_sha256=gated_sha)
   if args.capture_mtree_833:observations[mode]['qmp_833_sha256']=hashlib.sha256((dst/'qmp-833.json').read_bytes()).hexdigest()
   print(f'S{stage} QEMU',mode,observations[mode],flush=True)
   if not good:
@@ -137,6 +150,7 @@ def main():
   'firmware_acpi_root_reconciled':False,'upstream_version':'20260930','full_core_compiled':True,
   'efi_sha256':hashlib.sha256((build/'x86_64'/'BOOTX64.EFI').read_bytes()).hexdigest()}
  if args.capture_mtree_833:result['qmp_833_capture']=True
+ if args.capture_post_ebs_834:result['qmp_834_capture']=True
  (output/'results.json').write_text(json.dumps(result,indent=2)+'\n')
  if not success:raise SystemExit(1)
 if __name__=='__main__':main()

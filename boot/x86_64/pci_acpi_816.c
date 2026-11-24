@@ -20,6 +20,9 @@
 #include <styleos/arch.h>
 #include <stdint.h>
 #include <stddef.h>
+#ifdef STYLEOS_TEST_POST_EBS_834
+#include "gate_834.h"
+#endif
 /* Terminal S816 only. ACPI MCFG and requester tables are validated and copied
  * into fixed image-owned BSS BEFORE EBS. After EBS only legacy CF8/CFC PCI
  * config reads are performed; computed ECAM addresses are NEVER dereferenced. */
@@ -482,6 +485,9 @@ _Noreturn void pci816_terminal(const struct boot_info *boot){
  }
  arch_puts("STYLEOS S816 POLICY acpi-dsdt=checksummed acpi-aml=literal-subset-only acpi-namespace-complete=no ssdt=checksummed-no-side-effects acpi-crs-evaluated=no acpi-seg-evaluated=no acpi-bbn-evaluated=no ecam-reservation-verified=no ecam-dereference=no iommu-ownership-complete=no dma-domains-verified=no dma-access-authorized=no dma-isolation-verified=no production-cr3=deny\n");
  arch_puts("STYLEOS S816 PASS\n");
+#ifdef STYLEOS_TEST_POST_EBS_834
+ if(!s834_gate())die("834-gate");
+#endif
  port_out(0xf4u,0x10u);arch_halt();
 }
 
