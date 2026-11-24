@@ -14,6 +14,7 @@ static inline uint8_t in8(uint16_t port)
     __asm__ volatile ("inb %1,%0" : "=a"(v) : "Nd"(port));
     return v;
 }
+#ifndef STYLEOS_TEST_DESKTOP_INPUT_853
 static inline void out16(uint16_t port, uint16_t value)
 {
     __asm__ volatile ("outw %0,%1" :: "a"(value), "Nd"(port));
@@ -24,6 +25,8 @@ static inline uint16_t in16(uint16_t port)
     __asm__ volatile ("inw %1,%0" : "=a"(v) : "Nd"(port));
     return v;
 }
+
+#endif
 
 enum { KDATA = 0x60, KSTAT = 0x64, POLLS = 60000 };
 static bool ps_write(uint16_t port, uint8_t byte)
