@@ -10,7 +10,8 @@ struct s844_arena {
  struct s844_lease slots[S844_PAGES];
  bool ready;
 };
-/* Single CPU, kernel-only, serialized calls. The caller must own and map the
+/* Metadata must be zero-initialized before first init and kept outside arena.
+ * Single CPU, kernel-only, serialized calls. The caller must own and map the
  * entire identity arena RW/NX/WB BEFORE init. No general RAM discovery or
  * mapping, no revocation of previously copied kernel pointers, no DMA claim. */
 bool s844_init(struct s844_arena *,uint64_t base);

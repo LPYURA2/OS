@@ -36,6 +36,48 @@ int main(void){
  CHECK(s844_count(&arena,&n)&&n==0);
  CHECK(!s844_acquire(&arena,1,1,(void*)memory));CHECK(!s844_acquire(&arena,1,1,&arena.slots[0]));
  arena.next=UINT64_MAX;CHECK(!s844_acquire(&arena,1,1,&out));
+ /* Exercise fragmented first-fit and refusal with no side effects.
+  * Eight free pages separated by live pages cannot form a two-page run. */
+ struct s844_arena frag={0};
+ struct s844_lease leases[S844_PAGES],fresh,old;
+ CHECK(s844_init(&frag,base));
+ for(unsigned i=0;i<S844_PAGES;i++){
+  CHECK(s844_acquire(&frag,i+1,1,&leases[i]));
+  CHECK(leases[i].pa==base+(uint64_t)i*4096u&&leases[i].generation==i+1);
+  memset(memory+i*4096u,0x40+i,4096);
+ }
+ for(unsigned i=0;i<S844_PAGES;i+=2)CHECK(s844_release(&frag,i+1,leases[i]));
+ CHECK(s844_count(&frag,&n)&&n==8);
+ struct s844_arena before=frag;
+ static unsigned char snapshot[S844_BYTES];
+ memcpy(snapshot,memory,sizeof memory);
+ fresh=(struct s844_lease){0x1234,0x5678,99,3};old=fresh;
+ CHECK(!s844_acquire(&frag,99,2,&fresh));
+ CHECK(!memcmp(&before,&frag,sizeof frag)&&!memcmp(&old,&fresh,sizeof fresh));
+ CHECK(!memcmp(snapshot,memory,sizeof memory));
+ _Alignas(8) unsigned char unaligned[sizeof(struct s844_arena)+8];
+ memset(unaligned,0,sizeof unaligned);
+ CHECK(!s844_init((struct s844_arena *)(void *)(unaligned+1),base));
+ CHECK(!s844_count((struct s844_arena *)(void *)(unaligned+1),&n));
+ CHECK(!s844_count(&frag,(unsigned *)(void *)(unaligned+1)));
+ CHECK(!s844_acquire(&frag,99,1,(struct s844_lease *)(void *)(unaligned+1)));
+ for(unsigned i=0;i<S844_PAGES;i+=2){
+  CHECK(s844_acquire(&frag,99,1,&fresh));
+  CHECK(fresh.pa==leases[i].pa&&fresh.generation==17+i/2);
+  CHECK(!s844_release(&frag,i+1,leases[i]));
+  CHECK(memory[i*4096u]==0&&memory[(i+1)*4096u]==0x40+i+1);
+  leases[i]=fresh;
+ }
+ CHECK(s844_count(&frag,&n)&&n==16);
+ for(unsigned i=0;i<S844_PAGES;i++)CHECK(s844_release(&frag,leases[i].owner,leases[i]));
+ CHECK(s844_count(&frag,&n)&&n==0);
+ for(size_t i=0;i<sizeof memory;i++)CHECK(memory[i]==0);
+ /* Corrupted metadata must not permit any allocation. */
+ CHECK(s844_acquire(&frag,1,2,&fresh));frag.slots[1]=fresh;
+ before=frag;old=out;
+ CHECK(!s844_acquire(&frag,2,1,&out));
+ CHECK(!s844_release(&frag,1,fresh));
+ CHECK(!memcmp(&before,&frag,sizeof frag)&&!memcmp(&old,&out,sizeof out));
  unsigned char raw[96];struct boot_range r={0x200000,0x210000},d={0};uint64_t attr=0;
  descriptor(raw,2,0x200000,16,8);descriptor(raw+48,7,0x300000,1,8);
  struct boot_memory_map map={.reserved={{0x200000,0x210000}},.nr_reserved=1};

@@ -13,7 +13,7 @@ static bool separated(const struct s844_arena *a,uint64_t base){
  struct boot_range r;return object(a,sizeof *a,&r)&&!overlap(r,(struct boot_range){base,base+S844_BYTES});
 }
 static bool shape(const struct s844_arena *a,uint32_t *mask){
- if(!a||!a->ready||!base_ok(a->base)||!a->next||!separated(a,a->base))return false;
+ if(!a||((uintptr_t)a%_Alignof(struct s844_arena))||!a->ready||!base_ok(a->base)||!a->next||!separated(a,a->base))return false;
  uint32_t used=0;
  for(unsigned i=0;i<S844_PAGES;i++){
   const struct s844_lease *s=&a->slots[i];
@@ -21,7 +21,8 @@ static bool shape(const struct s844_arena *a,uint32_t *mask){
   if(s->pa!=a->base+i*P||!s->owner||!s->pages||s->pages>S844_PAGES-i||s->generation>=a->next)return false;
   for(unsigned j=0;j<i;j++)if(a->slots[j].generation==s->generation)return false;
   uint32_t m=((UINT32_C(1)<<s->pages)-1)<<i;
-  if(used&m)return false;used|=m;
+  if(used&m)return false;
+  used|=m;
  }
  *mask=used;return true;
 }
@@ -30,12 +31,12 @@ static void zero(uint64_t pa,unsigned pages){
  for(size_t i=0;i<(size_t)pages*P;i++)v[i]=0;
 }
 bool s844_init(struct s844_arena *a,uint64_t base){
- if(!a||a->ready||!base_ok(base)||!separated(a,base))return false;
+ if(!a||((uintptr_t)a%_Alignof(struct s844_arena))||a->ready||!base_ok(base)||!separated(a,base))return false;
  *a=(struct s844_arena){.base=base,.next=1,.ready=true};return true;
 }
 bool s844_count(const struct s844_arena *a,unsigned *out){
  uint32_t used;struct boot_range r,m;
- if(!shape(a,&used)||!object(out,sizeof *out,&r)||!object(a,sizeof *a,&m)||
+ if(!shape(a,&used)||!object(out,sizeof *out,&r)||((uintptr_t)out%_Alignof(unsigned))||!object(a,sizeof *a,&m)||
  overlap(r,m)||overlap(r,(struct boot_range){a->base,a->base+S844_BYTES}))return false;
  unsigned n=0;for(unsigned i=0;i<S844_PAGES;i++)n+=(used>>i)&1u;*out=n;return true;
 }

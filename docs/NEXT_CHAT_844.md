@@ -1,3 +1,5 @@
 # S844 continuation
 
 Accepted S843 354e9fa439e71e77efa82a56393dd353d8d78cff, CI 45440785690 SUCCESS 195 PASS / 5 SKIPPED; verified archive, independent UART replay and 17 refusals. New branch feature/styleos-physical-arena-844. Read AGENTS.md, docs/PROJECT.md, docs/ROADMAP.md, docs/architecture/FOUNDATION_COMPLETION_GATE.md, PHYSICAL_ARENA_844.md. Verify S844 host/COFF and isolated actual EFI reservation, lifecycle and S843 timer replay. S844 is bounded, does not authorize general candidate RAM or production CR3. Next use verified allocator for task/process resources and integrate CPL3 then ordinary Desktop. Main and accepted refs untouched. Foundation -> filesystem -> independent .tea -> Explorer -> welcome/login/user selection/lock; approved mockups only. FOUNDATION NOT COMPLETE.
+
+Решение владельца 24.11.2026: после реализации фундамента провести полную проверку всего ядра по docs/architecture/KERNEL_FINAL_ACCEPTANCE.md перед файловой системой. Новая ревизия 844 добавляет host-проверки фрагментации, ошибок выравнивания и отказа без побочных эффектов. Проверить точный SHA и CI, не считать тесты пройденными до получения результата.

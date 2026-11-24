@@ -329,3 +329,5 @@ A separate terminal diagnostic observes trusted QEMU/OVMF RSDP/XSDT/MADT without
 Интерфейс строго по утверждённым макетам (docs/design/APPROVED_UI_REFERENCES.md); существующий Desktop не изменять в фундаментальных этапах. Порядок выше заменяет прежнюю очередность, но не отменяет уже принятые результаты. Каждый новый этап в отдельной ветке, main и принятые refs неизменны.
 
 Контроль завершения текущего фундамента: [FOUNDATION_COMPLETION_GATE.md](architecture/FOUNDATION_COMPLETION_GATE.md). Это инженерные критерии, не заявление о готовности. В каждом отчёте явно сообщать текущий статус фундамента.
+
+Решение владельца 24.11.2026: после завершения реализации фундамента — отдельная комплексная приёмка всего ядра по [KERNEL_FINAL_ACCEPTANCE.md](architecture/KERNEL_FINAL_ACCEPTANCE.md). До её PASS фундамент окончательно не принят; файловую систему не начинать.
