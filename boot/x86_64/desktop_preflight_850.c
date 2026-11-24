@@ -256,6 +256,24 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(cf8_before!=cf8_after||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("856-restore");
  arch_puts("STYLEOS S856 TOTAL");field("root",target);field("functions",functions);field("ide",ide);field("cf8-before",cf8_before);field("cf8-after",cf8_after);arch_putc('\n');
  arch_puts("STYLEOS S856 POLICY pci-census=yes ata-access=no data-write=no dma=no admission=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_STORAGE_BMDMA_857
+ /* Exact Q35/TCG fixture only. Harness independently checks BAR4 owner and
+  * extent before resuming from S853 READY. Reads only four BMIDE registers.
+  * Not a general port grant, ATA command, DMA stop or controller admission. */
+ uint32_t old857=in32(0xcf8),id857=cfg(5,0,0),class857=cfg(5,0,8),cmd857=cfg(5,0,4),bar857=cfg(5,0,0x20);
+ out32(0xcf8,old857);
+ if(ide!=1||id857!=0x70108086u||class857>>8!=0x010180u||!(cmd857&1u)||bar857!=0x60e1u||in32(0xcf8)!=old857||read_cr3()!=target||(flags()&0x200))fail("857-bmdma-context");
+ uint8_t samples857[2][4];
+ for(unsigned pass=0;pass<2;pass++){
+    const uint16_t ports[4]={0x60e0,0x60e2,0x60e8,0x60ea};
+    for(unsigned i=0;i<4;i++)__asm__ volatile("inb %1,%0":"=a"(samples857[pass][i]):"Nd"(ports[i]):"memory");
+ }
+ uint32_t after857=cfg(5,0,4),bar_after857=cfg(5,0,0x20);out32(0xcf8,old857);
+ if(after857!=cmd857||bar_after857!=bar857||in32(0xcf8)!=old857||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("857-bmdma-restore");
+ for(unsigned i=0;i<4;i++)if(samples857[0][i]!=samples857[1][i])fail("857-bmdma-unstable");
+ arch_puts("STYLEOS S857 BMIDE");field("root",target);field("bdf",40);field("bar4",bar857);field("pci-command",cmd857&0xffffu);field("primary-command",samples857[0][0]);field("primary-status",samples857[0][1]);field("secondary-command",samples857[0][2]);field("secondary-status",samples857[0][3]);field("samples",2);arch_putc('\n');
+ arch_puts("STYLEOS S857 POLICY bmdma-read=yes bmdma-write=no ata-access=no dma-denied=no admission=no production-cr3=deny\n");
+#endif
 #endif
  out32(0xf4,0x10);arch_halt();
 }

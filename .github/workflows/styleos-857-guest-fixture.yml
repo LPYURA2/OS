@@ -19,10 +19,16 @@ jobs:
           python3 tools/test_storage_topology_856_verify.py
       - name: Observe PIIX3 and disposable disk across actual guest boot
         run: python3 tools/test_guest_fixture_boot_857.py --output build/s857-guest-fixture
+      - name: Observe real BMIDE status under owned root (read only)
+        run: |
+          python3 tools/test_bmdma_boot_857.py --output build/s857-bmdma
+          python3 tools/test_bmdma_857_verify.py build/s857-bmdma
       - name: Preserve raw evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: styleos-857-guest-fixture
-          path: build/s857-guest-fixture/
+          path: |
+            build/s857-guest-fixture/
+            build/s857-bmdma/
           if-no-files-found: warn
