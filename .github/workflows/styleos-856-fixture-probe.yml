@@ -1,0 +1,24 @@
+name: StyleOS 856 paused storage fixture probe
+on:
+  push:
+    branches: [test/styleos-storage-fixture-856]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86
+      - name: Validate read-only fixture model
+        run: python3 tools/test_block_fixture_856.py
+      - name: Observe actual paused Q35 configurations
+        run: python3 tools/probe_storage_fixture_856.py --output build/s856-fixture-probe
+      - name: Preserve evidence even if fixture is incompatible
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-856-fixture-probe
+          path: build/s856-fixture-probe/
+          if-no-files-found: warn
