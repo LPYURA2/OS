@@ -53,3 +53,11 @@ bool s843_tick(struct s843_scheduler *s,struct s843_frame *f,uint64_t live_root)
  s->saved[cur]=*f;s->control=candidate;s->ticks++;*f=resume;
  return true;
 }
+
+enum s843_irq_action s843_irq_progress(const struct s843_scheduler *s,const struct s843_frame *f,uint64_t root,const uint64_t prev[2],const uint64_t now[2],unsigned defers){
+ if(!shape(s)||!f||!prev||!now||root!=s->root||((uintptr_t)f&7)||!contains(s->ist,(uintptr_t)f,sizeof *f)||s->ticks>=UINT_MAX-1||defers>S843_MAX_DEFER)return S843_IRQ_BAD;
+ unsigned cur=(unsigned)s->control.current,next=1-cur;
+ if(!frame_ok(s,cur,f)||!frame_ok(s,next,&s->saved[next])||f->rsp!=s->task[cur].stack.end-16||now[next]!=prev[next]||now[cur]<prev[cur])return S843_IRQ_BAD;
+ if(now[cur]>prev[cur])return S843_IRQ_SWITCH;
+ return defers<S843_MAX_DEFER?S843_IRQ_DEFER:S843_IRQ_BAD;
+}

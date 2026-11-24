@@ -29,4 +29,9 @@ bool s843_first(const struct s843_scheduler *,struct s843_frame *);
 /* On success, save interrupted registers and replace only the supplied IST
  * frame with the next task's frame. On refusal, neither object is changed. */
 bool s843_tick(struct s843_scheduler *,struct s843_frame *,uint64_t live_root);
+/* A real IRQ can arrive before the selected task executes an instruction.
+ * Such an event must not be counted as a successful task switch. */
+#define S843_MAX_DEFER 16u
+enum s843_irq_action { S843_IRQ_BAD, S843_IRQ_DEFER, S843_IRQ_SWITCH };
+enum s843_irq_action s843_irq_progress(const struct s843_scheduler *,const struct s843_frame *,uint64_t live_root,const uint64_t previous[2],const uint64_t now[2],unsigned defers);
 #endif

@@ -12,6 +12,22 @@ int main(void){
  struct boot_range irq={(uintptr_t)ist,(uintptr_t)ist+sizeof ist};
  struct s843_frame *f=(void*)(ist+4096-sizeof *f);struct s843_frame outside;
  CHECK(s843_init(&s,t,irq,0x300000,8,16));CHECK(!s843_first(&s,&outside));CHECK(s843_first(&s,f));CHECK(f->rip==t[0].entry&&s.control.current==0);
+ /* An IRQ without an instruction of progress is not a switch. */
+ const uint64_t prev[2]={0,0};uint64_t now[2]={0,0};
+ struct s843_scheduler unchanged=s;struct s843_frame same=*f;
+ CHECK(s843_irq_progress(&s,f,0x300000,prev,now,0)==S843_IRQ_DEFER);
+ CHECK(s843_irq_progress(&s,f,0x300000,prev,now,15)==S843_IRQ_DEFER);
+ CHECK(s843_irq_progress(&s,f,0x300000,prev,now,16)==S843_IRQ_BAD);
+ now[0]=1;CHECK(s843_irq_progress(&s,f,0x300000,prev,now,16)==S843_IRQ_SWITCH);
+ now[1]=1;CHECK(s843_irq_progress(&s,f,0x300000,prev,now,0)==S843_IRQ_BAD);
+ now[0]=now[1]=0;CHECK(s843_irq_progress(&s,f,0x301000,prev,now,0)==S843_IRQ_BAD);
+ CHECK(s843_irq_progress(&s,&outside,0x300000,prev,now,0)==S843_IRQ_BAD);
+ CHECK(!memcmp(&s,&unchanged,sizeof s)&&!memcmp(f,&same,sizeof *f));
+ f->rflags|=0x3000;CHECK(s843_irq_progress(&s,f,0x300000,prev,now,0)==S843_IRQ_BAD);*f=same;
+ f->rsp-=8;CHECK(s843_irq_progress(&s,f,0x300000,prev,now,0)==S843_IRQ_BAD);*f=same;
+ f->rip=t[1].entry;CHECK(s843_irq_progress(&s,f,0x300000,prev,now,0)==S843_IRQ_BAD);*f=same;
+ const uint64_t later[2]={1,0};CHECK(s843_irq_progress(&s,f,0x300000,later,now,0)==S843_IRQ_BAD);
+ CHECK(s843_irq_progress(&s,f,0x300000,prev,now,17)==S843_IRQ_BAD);
  for(unsigned i=0;i<20;i++){
   unsigned cur=(unsigned)s.control.current;f->rip=t[cur].entry+8;f->rax=0xabcd+i;f->r15=0xdef0+i;f->rsp=t[cur].stack.end-64;
   CHECK(s843_tick(&s,f,0x300000));CHECK(s.control.current==(int)(1-cur)&&s.ticks==i+1);CHECK(s.saved[cur].rax==0xabcd+i&&s.saved[cur].r15==0xdef0+i);

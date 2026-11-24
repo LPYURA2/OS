@@ -98,6 +98,7 @@ static struct {
  uintptr_t lapic,io;uint32_t reg,low,high,tpr,svr;
  struct idtr807 idt;
  uint64_t start,progress[2],root,ist;
+ unsigned defers;
  bool admitted;
 } hw843;
 static uint64_t root843(void){uint64_t n;__asm__ volatile("mov %%cr3,%0":"=r"(n));return n;}
@@ -195,7 +196,7 @@ static _Noreturn void finish843(uint64_t frame){
  __asm__ volatile("lidt %0"::"m"(hw843.idt):"memory");
  uint32_t low=io_read(hw843.io,hw843.reg),high=io_read(hw843.io,hw843.reg+1),tpr=mmio_read(hw843.lapic,0x80),svr=mmio_read(hw843.lapic,0xf0);
  if(low!=hw843.low||high!=hw843.high||tpr!=hw843.tpr||svr!=hw843.svr||root843()!=hw843.root)fail("s843-finish");
- arch_puts("STYLEOS S807 DELIVERY");fld("hits",ticks);fld("isr-seen",1);fld("eoi-cleared",1);fld("elapsed-tsc",elapsed);arch_putc('\n');
+ arch_puts("STYLEOS S807 DELIVERY");fld("hits",ticks+hw843.defers);fld("isr-seen",1);fld("eoi-cleared",1);fld("elapsed-tsc",elapsed);arch_putc('\n');
  arch_puts("STYLEOS S807 RESTORE");fld("ioapic-low",low);fld("ioapic-high",high);fld("tpr",tpr);fld("svr",svr);fld("if",0);arch_putc('\n');
  arch_puts("STYLEOS S842 IRQ");fld("before",hw843.root);fld("during",root843());fld("after",root843());fld("frame",frame+120);fld("ist",hw843.ist);arch_putc('\n');
  arch_puts("STYLEOS S842 POLICY isolated-own-root=yes pit-restored=no production-cr3=deny dma-grants=no\n");
@@ -213,7 +214,7 @@ static _Noreturn void finish843(uint64_t frame){
  __asm__ volatile("lidt %0"::"m"(hw843.idt):"memory");
  uint32_t low=io_read(hw843.io,hw843.reg),high=io_read(hw843.io,hw843.reg+1),tpr=mmio_read(hw843.lapic,0x80),svr=mmio_read(hw843.lapic,0xf0);
  if(low!=hw843.low||high!=hw843.high||tpr!=hw843.tpr||svr!=hw843.svr||root843()!=hw843.root||sched843.ticks!=16||sched843.control.slots[0].yields!=8||sched843.control.slots[1].yields!=8)fail("s843-finish");
- arch_puts("STYLEOS S807 DELIVERY");fld("hits",sched843.ticks);fld("isr-seen",1);fld("eoi-cleared",1);fld("elapsed-tsc",elapsed);arch_putc('\n');
+ arch_puts("STYLEOS S807 DELIVERY");fld("hits",sched843.ticks+hw843.defers);fld("isr-seen",1);fld("eoi-cleared",1);fld("elapsed-tsc",elapsed);arch_putc('\n');
  arch_puts("STYLEOS S807 RESTORE");fld("ioapic-low",low);fld("ioapic-high",high);fld("tpr",tpr);fld("svr",svr);fld("if",0);arch_putc('\n');
  arch_puts("STYLEOS S842 IRQ");fld("before",hw843.root);fld("during",root843());fld("after",root843());fld("frame",frame+120);fld("ist",hw843.ist);arch_putc('\n');
  arch_puts("STYLEOS S842 POLICY isolated-own-root=yes pit-restored=no production-cr3=deny dma-grants=no\n");
@@ -227,9 +228,24 @@ static _Noreturn void finish843(uint64_t frame){
 bool s843_irq_dispatch(struct s843_frame *f){
  uint64_t root=root843();unsigned cur=(unsigned)sched843.control.current;
  uint64_t a=s843_progress_a,b=s843_progress_b;
- if(!hw843.admitted||cur>1||root!=hw843.root||!f||(uintptr_t)f!=hw843.ist+4096-16-sizeof *f||
-    !regs843(f,cur)||!(mmio_read(hw843.lapic,0x120)&0x10000u)||
-    (cur==0?(a<=hw843.progress[0]||b!=hw843.progress[1]):(b<=hw843.progress[1]||a!=hw843.progress[0])))fail("s843-irq-context");
+ if(!hw843.admitted||cur>1||root!=hw843.root||!f||(uintptr_t)f!=hw843.ist+4096-16-sizeof *f)fail("s843-irq-frame-root");
+ if(!regs843(f,cur))fail("s843-irq-gprs");
+ if(!(mmio_read(hw843.lapic,0x120)&0x10000u))fail("s843-irq-isr");
+ const uint64_t now[2]={a,b};
+ enum s843_irq_action action=s843_irq_progress(&sched843,f,root,hw843.progress,now,hw843.defers);
+ if(action==S843_IRQ_BAD)fail("s843-irq-progress-or-context");
+ if(action==S843_IRQ_DEFER){
+  /* Same context, no schedule/stack accounting change. Require a real
+   * in-service IRQ and successful EOI even for a no-progress interrupt. */
+  mmio_write(hw843.lapic,0xb0,0);
+  if(mmio_read(hw843.lapic,0x120)&0x10000u)fail("s843-defer-eoi");
+  hw843.defers++;
+  arch_puts("STYLEOS S843 DEFER");fld("n",sched843.ticks+1);fld("count",hw843.defers);fld("from",cur);fld("root",root);
+  fld("frame",(uintptr_t)f);fld("rip",f->rip);fld("rsp",f->rsp);fld("a",a);fld("b",b);fld("gprs",0x7fff);fld("eoi",1);
+  const char *const names[15]={"r15","r14","r13","r12","r11","r10","r9","r8","rdi","rsi","rbp","rbx","rdx","rcx","rax"};
+  for(unsigned i=0;i<15;i++)fld(names[i],reg843(f,i));arch_putc('\n');
+  return true;
+ }
 #ifdef STYLEOS_TEST_TASK_STACKS_845
  if(!s845_observe(&trace845,&pair845,&sched843,f,a,b))fail("s845-stack-trace");
  arch_puts("STYLEOS S845 STACK");fld("n",trace845.ticks);fld("from",cur);fld("rsp",f->rsp);fld("a",trace845.count[0]);fld("b",trace845.count[1]);arch_putc('\n');
