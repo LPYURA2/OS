@@ -1,0 +1,39 @@
+name: StyleOS 857 terminal PCI bus master disable probe
+on:
+  push:
+    branches: [test/styleos-storage-busmaster-857]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU and OVMF build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Exhaustive host plan and confirmation model
+        run: |
+          set -euo pipefail
+          mkdir -p build/s857-busmaster-tests
+          for cc in gcc clang; do
+            "$cc" -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -Iinclude tests/test_busmaster_857.c -o "build/s857-busmaster-tests/$cc"
+            "build/s857-busmaster-tests/$cc" | tee "build/s857-busmaster-tests/$cc.log"
+          done
+      - name: Observe prior BMIDE state and replay refusal model
+        run: |
+          python3 tools/test_bmdma_boot_857.py --output build/s857-prior
+          python3 tools/test_busmaster_857_verify.py build/s857-prior
+      - name: Observe actual PCI bus master disable under owned CR3
+        run: python3 tools/test_busmaster_boot_857.py --output build/s857-busmaster
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-857-busmaster-probe
+          path: |
+            build/s857-prior/
+            build/s857-busmaster/
+            build/s857-busmaster-tests/*.log
+          if-no-files-found: warn

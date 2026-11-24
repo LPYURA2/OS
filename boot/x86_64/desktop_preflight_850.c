@@ -14,6 +14,9 @@ static struct rtc_x86_854 rtc854;
 #include <styleos/pit_x86_855.h>
 static struct pit_x86_855 pit855;
 #endif
+#ifdef STYLEOS_TEST_STORAGE_BUSMASTER_857
+#include <styleos/busmaster_857.h>
+#endif
 static _Alignas(4096) uint64_t tables[PG_TABLE_PAGES][512];
 static struct s850_desktop_root composed;
 static uint64_t read_cr3(void){uint64_t v;__asm__ volatile("mov %%cr3,%0":"=r"(v));return v;}
@@ -273,6 +276,26 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  for(unsigned i=0;i<4;i++)if(samples857[0][i]!=samples857[1][i])fail("857-bmdma-unstable");
  arch_puts("STYLEOS S857 BMIDE");field("root",target);field("bdf",40);field("bar4",bar857);field("pci-command",cmd857&0xffffu);field("primary-command",samples857[0][0]);field("primary-status",samples857[0][1]);field("secondary-command",samples857[0][2]);field("secondary-status",samples857[0][3]);field("samples",2);arch_putc('\n');
  arch_puts("STYLEOS S857 POLICY bmdma-read=yes bmdma-write=no ata-access=no dma-denied=no admission=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_STORAGE_BUSMASTER_857
+ /* Terminal fixture only. Never re-enable bus master, even on failed readback. */
+ struct bm857_snapshot before={target,id857,class857,cmd857,bar857,{samples857[0][0],samples857[0][1],samples857[0][2],samples857[0][3]}};
+ uint16_t word857=0;
+ if(!bm857_plan(&before,target,&word857)||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("857-busmaster-pre");
+ /* Re-read identity, class, BAR and status immediately before the one command write. */
+ uint32_t liveid=cfg(5,0,0),liveclass=cfg(5,0,8),livebar=cfg(5,0,0x20),livecmd=cfg(5,0,4);
+ out32(0xcf8,old857);
+ if(liveid!=id857||liveclass!=class857||livebar!=bar857||livecmd!=cmd857||in32(0xcf8)!=old857)fail("857-busmaster-live");
+ const uint16_t bmports857[4]={0x60e0,0x60e2,0x60e8,0x60ea};
+ for(unsigned i=0;i<4;i++){uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):"Nd"(bmports857[i]):"memory");if(v)fail("857-busmaster-active");}
+ cmdwrite(5,0,word857); /* outw CFC: never touch the W1C status word */
+ struct bm857_snapshot post={0};
+ post.root=read_cr3();post.id=cfg(5,0,0);post.class_revision=cfg(5,0,8);post.bar4=cfg(5,0,0x20);post.command_status=cfg(5,0,4);
+ out32(0xcf8,old857);
+ for(unsigned i=0;i<4;i++)__asm__ volatile("inb %1,%0":"=a"(post.bm[i]):"Nd"(bmports857[i]):"memory");
+ if(!bm857_confirm(&post,target)||read_cr3()!=target||(flags()&0x200)||in32(0xcf8)!=old857||!same_cache(cache))fail("857-busmaster-post");
+ arch_puts("STYLEOS S857 BUSMASTER");field("root",target);field("bdf",40);field("before",before.command_status);field("after",post.command_status);field("bar4",post.bar4);field("primary-command",post.bm[0]);field("primary-status",post.bm[1]);field("secondary-command",post.bm[2]);field("secondary-status",post.bm[3]);arch_putc('\n');
+ arch_puts("STYLEOS S857 BUSMASTER-POLICY pci-master-cleared=yes ata-access=no dma-admission=no production-cr3=deny\n");
+#endif
 #endif
 #endif
  out32(0xf4,0x10);arch_halt();
