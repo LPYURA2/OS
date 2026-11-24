@@ -1,5 +1,8 @@
 #include <styleos/apic_pe_842.h>
 #define P UINT64_C(4096)
+#ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
+bool s844_admit_efi(const struct boot_memory_evidence *,const struct boot_info *,struct boot_range *);
+#endif
 static bool inside(struct boot_range a,struct boot_range b){return a.start<a.end&&b.start<=a.start&&a.end<=b.end;}
 static bool overlap(struct boot_range a,struct boot_range b){return a.start<b.end&&b.start<a.end;}
 static bool reserved_ram(const struct boot_memory_map *m,struct boot_range r,bool loader_proved){
@@ -12,7 +15,7 @@ static bool reserved_ram(const struct boot_memory_map *m,struct boot_range r,boo
 }
 static bool build_pe(const struct s790_low_request *pe,
  const struct boot_memory_map *map,const struct s842_cache *cache,
- const struct acpi806_topology *t,uint64_t msr,struct s842_root *out,bool loader_proved){
+ const struct acpi806_topology *t,uint64_t msr,struct s842_root *out,bool loader_proved,struct boot_range extra){
  if(!out)return false;
  *out=(struct s842_root){0};
  if(!pe||!cache||!t||cache->bits<36||cache->bits>52||t->enabled_lapics!=1||t->ioapic_count!=1||t->iso_count>ACPI806_MAX_ISO)return false;
@@ -28,13 +31,17 @@ static bool build_pe(const struct s790_low_request *pe,
  struct s790_low_result low;
  if(!s790_prepare_owned_low(pe,&low)||!s790_audit_owned_low(&low,pe->required_exec,pe->required_write,pe->required_rsp))return false;
  low.plan.pa_bits=cache->bits;
+ if(extra.start||extra.end){
+  if(!extra.start||extra.start>=extra.end||low.plan.count>=PG_MAX_MAPS-2)return false;
+  low.plan.maps[low.plan.count++]=(struct pg_mapping){extra.start,extra.start,extra.end-extra.start,PG_WRITE};
+ }
  return s842_build(&low.plan,map,cache,lapic,io,out);
 }
 
 bool s842_build_pe(const struct s790_low_request *pe,
  const struct boot_memory_map *map,const struct s842_cache *cache,
  const struct acpi806_topology *t,uint64_t msr,struct s842_root *out){
- return build_pe(pe,map,cache,t,msr,out,false);
+ return build_pe(pe,map,cache,t,msr,out,false,(struct boot_range){0});
 }
 static uint64_t le(const unsigned char *p,unsigned count){
  uint64_t v=0;for(unsigned i=0;i<count;i++)v|=(uint64_t)p[i]<<(8u*i);return v;
@@ -86,5 +93,9 @@ bool s842_build_pe_efi(const struct s790_low_request *pe,
   for(unsigned j=0;j<2;j++)if(overlap(a,dev[j])&&(type!=11||!inside(dev[j],a)))return false;
  }
  if(covered!=pe->image.end-pe->image.start||source_covered!=e->live.source.end-e->live.source.start)return false;
- return build_pe(pe,e->map,cache,t,msr,out,true);
+ struct boot_range extra={0};
+#ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
+ if(!s844_admit_efi(e,b,&extra))return false;
+#endif
+ return build_pe(pe,e->map,cache,t,msr,out,true,extra);
 }

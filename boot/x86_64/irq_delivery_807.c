@@ -4,6 +4,9 @@
 #include <styleos/boot_info.h>
 #include <styleos/arch.h>
 #include <stdint.h>
+#ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
+void s844_guest_run(uint64_t);
+#endif
 #ifdef STYLEOS_TEST_TIMER_SCHEDULER_843
 #include <styleos/timer_context_843.h>
 #include <styleos/apic_root_842.h>
@@ -167,6 +170,9 @@ static _Noreturn void irq_run(const struct boot_info *b
 #ifdef STYLEOS_TEST_APIC_ROOT_842
  uint64_t initial;__asm__ volatile("mov %%cr3,%0":"=r"(initial));
  if(!expected_root||initial!=expected_root||!ist)fail("s842-initial-root");
+#ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
+ s844_guest_run(expected_root);
+#endif
 #endif
  if(!b||b->magic!=STYLEOS_BOOT_MAGIC||b->flags!=STYLEOS_BOOT_EXITED_SERVICES)fail("handoff");
  struct acpi806_topology t={0};if(!acpi806_copy_capture(&t))fail("acpi-topology");
