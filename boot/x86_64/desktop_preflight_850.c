@@ -10,6 +10,10 @@
 #include <styleos/rtc_x86_854.h>
 static struct rtc_x86_854 rtc854;
 #endif
+#ifdef STYLEOS_TEST_DESKTOP_TIME_855
+#include <styleos/pit_x86_855.h>
+static struct pit_x86_855 pit855;
+#endif
 static _Alignas(4096) uint64_t tables[PG_TABLE_PAGES][512];
 static struct s850_desktop_root composed;
 static uint64_t read_cr3(void){uint64_t v;__asm__ volatile("mov %%cr3,%0":"=r"(v));return v;}
@@ -184,6 +188,51 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
     time.hour>23||time.min>59||time.sec>59||read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("854-rtc");
  arch_puts("STYLEOS S854 RTC");field("root",target);field("hour",time.hour);field("minute",time.min);field("second",time.sec);field("shadow",rtc854.owner.shadow);arch_putc('\n');
  arch_puts("STYLEOS S854 POLICY terminal=yes rtc-read=yes data-write=no shadow=software nmi-mask=fixture irq=no storage=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_DESKTOP_TIME_855
+ /* Q35/TCG single-vCPU diagnostic only. The count +/-2 PIT tick
+  * envelope is a provisional fixture assumption, not a physical attestation.
+  * Compare independently observed RTC second edges before accepting a result. */
+ if(!identity((uintptr_t)pit_x86_bind_855,PG_EXEC)||!identity((uintptr_t)pit_x86_window_855,PG_EXEC)||
+    !identity((uintptr_t)pit_x86_counter_855,PG_EXEC)||!identity((uintptr_t)&pit855,PG_WRITE)||
+    read_cr3()!=target||flags()&0x200)fail("855-closure");
+ const struct pit_x86_contract_855 pc={.root=target,.terminal=true,.exclusive=true,.post_ebs=true,.reference_attested=true};
+ if(!pit_x86_bind_855(&pit855,&pc))fail("855-bind");
+ struct calibration_window_855 windows[S855_CAL_SAMPLES];
+ const uint16_t counts[S855_CAL_SAMPLES]={59659,47727,65535};
+ for(unsigned i=0;i<S855_CAL_SAMPLES;i++){
+    const struct pit_capture_contract_855 cc={.count=counts[i],.ref_ticks_min=(uint32_t)counts[i]-2,.ref_ticks_max=(uint32_t)counts[i]+1+(counts[i]!=65535),.max_polls=S855_CAPTURE_MAX_POLLS,.terminal=true,.exclusive=true,.reference_attested=true};
+    if(!pit_x86_window_855(&pit855,&cc,&windows[i])||pit855.capture.busy||pit855.capture.quarantined)fail("855-capture");
+    const struct calibration_window_855 *w=&windows[i];
+    arch_puts("STYLEOS S855 PIT");field("root",target);field("id",i);field("count",counts[i]);field("start-before",w->start_before);field("start-after",w->start_after);field("end-before",w->end_before);field("end-after",w->end_after);field("min-ticks",w->ref_ticks_min);field("max-ticks",w->ref_ticks_max);arch_putc('\n');
+ }
+ struct calibration_result_855 frequency;
+ if(!calibration_pit_855(windows,S855_CAL_SAMPLES,&frequency))fail("855-calibration");
+ arch_puts("STYLEOS S855 CAL");field("root",target);field("min-hz",frequency.min_hz);field("max-hz",frequency.max_hz);field("estimate",frequency.estimate_hz);arch_putc('\n');
+ /* RTC is a distinct emulated device, not an independent physical oscillator.
+  * Bracket consecutive second changes, tolerating failed stable reads. */
+ uint64_t before=0,after_read=0,last_before=0,edge_lo[2]={0},edge_hi[2]={0};
+ unsigned prev=86400,edges=0,edge_sec[2]={0};
+ for(unsigned i=0;i<2000000u&&edges<2;i++){
+    if(!pit_x86_counter_855(&pit855,&before))fail("855-edge-before");
+    bool valid=rtc_x86_read_854(&rtc854,&time);
+    if(!pit_x86_counter_855(&pit855,&after_read)||after_read<before||before<last_before||rtc854.owner.quarantined)fail("855-edge-after");
+    if(!valid)continue;
+    unsigned sec=(unsigned)time.hour*3600u+(unsigned)time.min*60u+time.sec;
+    if(prev!=86400&&sec!=prev){
+        if(sec!=(prev+1)%86400||!last_before)fail("855-edge-order");
+        edge_lo[edges]=last_before;edge_hi[edges]=after_read;edge_sec[edges]=sec;edges++;
+    }
+    prev=sec;last_before=before;
+ }
+ if(edges!=2||edge_lo[1]<=edge_hi[0]||edge_hi[1]<edge_lo[1])fail("855-edge-timeout");
+ uint64_t min=edge_lo[1]-edge_hi[0],max=edge_hi[1]-edge_lo[0],hz=frequency.estimate_hz;
+ if(min<hz-hz/20||max>hz+hz/20)fail("855-rtc-crosscheck");
+ for(unsigned i=0;i<2;i++){arch_puts("STYLEOS S855 EDGE");field("root",target);field("id",i);field("second",edge_sec[i]);field("lo",edge_lo[i]);field("hi",edge_hi[i]);arch_putc('\n');}
+ struct monotonic_855 mono={0};
+ if(!monotonic_init_855(&mono,hz,edge_hi[0])||!monotonic_sample_855(&mono,edge_lo[1])||!monotonic_sample_855(&mono,edge_hi[1])||!mono.ns||mono.faulted||read_cr3()!=target||flags()&0x200||!same_cache(cache)||rtc854.owner.shadow!=initial_index)fail("855-monotonic");
+ arch_puts("STYLEOS S855 MONO");field("root",target);field("origin",mono.origin);field("counter",mono.last_counter);field("ns",mono.ns);arch_putc('\n');
+ arch_puts("STYLEOS S855 POLICY terminal=yes pit2=stopped reference=fixture rtc-crosscheck=yes irq=no storage=no production-cr3=deny\n");
+#endif
 #endif
 #endif
 #endif
