@@ -16,7 +16,11 @@ static struct s842_root apic842;
 static struct s842_cache cache842;
 #ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
 #include <styleos/desktop_root_850.h>
-_Noreturn void s850_preflight(const struct s842_root *,const struct s842_cache *,struct pg_experiment *,const struct s846_guard *,uint64_t,uint64_t,uint64_t,uint64_t);
+_Noreturn void s850_preflight(const struct s842_root *,const struct s842_cache *,struct pg_experiment *,const struct s846_guard *,uint64_t,uint64_t,uint64_t,uint64_t
+#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+,uint16_t,uint16_t
+#endif
+);
 #endif
 #ifdef STYLEOS_TEST_USER_ROOTS_846
 bool s846_bind(const struct s842_root *,const struct s842_cache *,struct pg_experiment *,const struct igp785_tables *,uint64_t,uint64_t,uint64_t,uint64_t);
@@ -390,7 +394,11 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
     const struct s846_guard g850={{q.pages[IGP785_IST1],ist2_pa,ist3_pa}};
-    s850_preflight(&apic842,&cache842,p,&g850,q.pages[IGP785_GDT],q.pages[IGP785_NEW_IDT],q.pages[IGP785_TSS],q.pages[IGP785_RSP0]);
+    s850_preflight(&apic842,&cache842,p,&g850,q.pages[IGP785_GDT],q.pages[IGP785_NEW_IDT],q.pages[IGP785_TSS],q.pages[IGP785_RSP0]
+#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+,desc.new_gdt_limit,desc.tss_selector
+#endif
+);
 #endif
     attested=(struct state790){p->old_root,plan.new_root_pa,
         e->live.stack.start,e->live.stack.end,inherited_rsp,

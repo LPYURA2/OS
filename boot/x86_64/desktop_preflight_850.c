@@ -44,8 +44,71 @@ static bool capture(const struct desktop_surface *s,struct pci794_bar *out,uint3
  out32(0xcf8,old);if(in32(0xcf8)!=old||!ok)return false;
  *out=bar;*mask=size_mask;*dev_out=dev;*fn_out=fn;*command_out=before;return true;
 }
+#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+/* Terminal QEMU-only experiment. Transition IDT has no IST dependency and
+ * uses the common CPL0 stack until the new TSS is loaded. It never returns
+ * from an unexpected exception, and does not claim general NMI/DF recovery. */
+struct s851_dt {uint16_t limit;uint64_t base;} __attribute__((packed));
+struct s851_gate {uint16_t lo,cs;uint8_t ist,attr;uint16_t mid;uint32_t hi,zero;} __attribute__((packed));
+_Static_assert(sizeof(struct s851_gate)==16,"IDT gate");
+static _Alignas(4096) struct s851_gate bridge[256];
+volatile uint64_t s851_frame[5],s851_frame_address;
+void irq807_unexpected(void);void s851_bp(void);
+__asm__(".text\n.global s851_bp\ns851_bp:\n"
+ "pushq %rax\nleaq 8(%rsp),%rax\nmovq %rax,s851_frame_address(%rip)\n"
+ "movq 8(%rsp),%rax\nmovq %rax,s851_frame(%rip)\n"
+ "movq 16(%rsp),%rax\nmovq %rax,s851_frame+8(%rip)\n"
+ "movq 24(%rsp),%rax\nmovq %rax,s851_frame+16(%rip)\n"
+ "movq 32(%rsp),%rax\nmovq %rax,s851_frame+24(%rip)\n"
+ "movq 40(%rsp),%rax\nmovq %rax,s851_frame+32(%rip)\n"
+ "popq %rax\niretq\n");
+static struct s851_gate make_gate(uint64_t fn,uint16_t cs,uint8_t ist){return (struct s851_gate){(uint16_t)fn,cs,ist,0x8e,(uint16_t)(fn>>16),(uint32_t)(fn>>32),0};}
+static uint64_t reg4(void){uint64_t v;__asm__ volatile("mov %%cr4,%0":"=r"(v));return v;}
+static uint64_t read_msr(uint32_t n){uint32_t lo,hi;__asm__ volatile("rdmsr":"=a"(lo),"=d"(hi):"c"(n));return ((uint64_t)hi<<32)|lo;}
+static bool same_cache(const struct s842_cache *c){if(read_msr(0x277)!=c->pat||read_msr(0xfe)!=c->cap||read_msr(0x2ff)!=c->def)return false;for(unsigned i=0;i<c->count;i++)if(read_msr(0x200+2*i)!=c->pairs[i].base||read_msr(0x201+2*i)!=c->pairs[i].mask)return false;return true;}
+static bool identity(uint64_t va,unsigned rights){struct pg_lookup x;return pg_lookup(&composed.plan,va,&x)==PG_OK&&x.pa==va&&x.flags==rights;}
+static bool absent(uint64_t va){struct pg_lookup x;return pg_lookup(&composed.plan,va,&x)==PG_RANGE;}
+static uint64_t bytes64(const unsigned char *p){uint64_t v=0;for(unsigned i=0;i<8;i++)v|=(uint64_t)p[i]<<(8*i);return v;}
+static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,const struct desktop_surface *s,uint64_t gdt,uint64_t idt,uint64_t tss,uint64_t rsp0,uint16_t limit,uint16_t selector){
+ uint16_t cs,tr;uint64_t rsp,cr0;__asm__ volatile("mov %%cs,%0;str %1;mov %%rsp,%2;mov %%cr0,%3":"=r"(cs),"=r"(tr),"=r"(rsp),"=r"(cr0));
+ uint64_t cr4=reg4(),target=composed.built.root,bridge_pa=(uintptr_t)bridge;
+ if(!cs||(cs&7)||tr||flags()&0x200||!(cr0&(UINT64_C(1)<<16))||!(read_msr(0xc0000080)&(UINT64_C(1)<<11))||cr4&((UINT64_C(1)<<12)|(UINT64_C(1)<<17))||read_cr3()!=p->old_root||target==p->old_root||!same_cache(cache)||!selector||(selector&7)||limit!=selector+15||limit>=4096||cs+7>limit)fail("851-mode");
+ if(arch_paging_attest_image_writable(p,bridge_pa,sizeof bridge)!=PG_OK||!identity(bridge_pa,PG_WRITE)||!identity((uintptr_t)s851_bp,PG_EXEC)||!identity((uintptr_t)irq807_unexpected,PG_EXEC)||!identity(rsp,PG_WRITE)||!identity((uintptr_t)s851_frame,PG_WRITE)||!identity((uintptr_t)&s851_frame_address,PG_WRITE))fail("851-bridge-closure");
+ const unsigned char *ts=(const void *)(uintptr_t)tss,*gd=(const void *)(uintptr_t)gdt;uint64_t lo=bytes64(gd+selector),hi=bytes64(gd+selector+8);
+ if(((lo>>40)&255)!=0x89||((lo&0xffff)|(((lo>>48)&15)<<16))!=103||((lo>>16&0xffffff)|(lo>>56<<24)|(hi<<32))!=tss||hi>>16||bytes64(ts+4)!=rsp0+4096-16)fail("851-descriptor");
+ for(unsigned i=0;i<3;i++){uint64_t va=S846_IST+3*i*4096;struct pg_lookup x;if(bytes64(ts+36+8*i)!=va+4096-16||pg_lookup(&composed.plan,va,&x)!=PG_OK||x.pa!=guard->pa[i]||x.flags!=PG_WRITE||!absent(va-4096)||!absent(va+4096))fail("851-ist");}
+ for(unsigned i=0;i<256;i++)bridge[i]=make_gate((uintptr_t)irq807_unexpected,cs,0);
+ ((struct s851_gate *)(uintptr_t)idt)[3]=make_gate((uintptr_t)s851_bp,cs,1);
+ struct s851_dt b={4095,bridge_pa},g={limit,gdt},d={4095,idt},live_g,live_d;
+ arch_puts("STYLEOS S851 BRIDGE");field("idt",bridge_pa);field("old",p->old_root);field("new",target);field("cs",cs);field("selector",selector);arch_putc('\n');
+ /* IDT with IST=0 first. Any unexpected vector exits on the common stack;
+  * after new CR3 the new GDT and bridge remain valid, then LTR and final IDT. */
+ __asm__ volatile("cli;lidt %0;lgdt %1;mov %2,%%cr4;mov %3,%%cr3;ltr %4;lidt %5"::"m"(b),"m"(g),"r"(cr4&~(UINT64_C(1)<<7)),"r"(target),"rm"(selector),"m"(d):"memory");
+ __asm__ volatile("sgdt %0;sidt %1;str %2":"=m"(live_g),"=m"(live_d),"=r"(tr)::"memory");
+ if(read_cr3()!=target||reg4()&(UINT64_C(1)<<7)||flags()&0x200||live_g.base!=gdt||live_g.limit!=limit||live_d.base!=idt||live_d.limit!=4095||tr!=selector||((volatile const unsigned char *)gd)[selector+5]!=0x8b||!same_cache(cache))fail("851-live-descriptors");
+ arch_puts("STYLEOS S851 ACTIVE");field("root",read_cr3());field("gdt",live_g.base);field("idt",live_d.base);field("tr",tr);field("pat",read_msr(0x277));field("pge",(reg4()>>7)&1);arch_putc('\n');
+ uint64_t expected_pc,before_rsp;__asm__ volatile("leaq s851_bp_return(%%rip),%0;mov %%rsp,%1;int3;.global s851_bp_return;s851_bp_return:":"=&r"(expected_pc),"=&r"(before_rsp)::"memory");
+ if(read_cr3()!=target||s851_frame_address!=S846_IST+4096-16-40||s851_frame[0]!=expected_pc||s851_frame[1]!=cs||s851_frame[2]&0x200||s851_frame[3]!=before_rsp)fail("851-real-ist");
+ arch_puts("STYLEOS S851 BP");field("root",read_cr3());field("frame",s851_frame_address);field("rip",s851_frame[0]);field("rsp",s851_frame[3]);field("cs",s851_frame[1]);field("flags",s851_frame[2]);arch_putc('\n');
+ uint64_t offsets[2]={0,4*((uint64_t)(s->height-1)*s->stride+s->width-1)};
+ for(unsigned i=0;i<2;i++){
+  if(offsets[i]>composed.gop.mapping.bytes-4||offsets[i]>s->bytes-4)fail("851-pixel-bounds");
+  volatile uint32_t *pixel=(void *)(s->base+offsets[i]);uint32_t old=*pixel,want=old^0x00ffffffu;
+  *pixel=want;__asm__ volatile("mfence":::"memory");uint32_t got=*pixel;
+  *pixel=old;__asm__ volatile("mfence":::"memory");uint32_t restored=*pixel;
+  if(got!=want||restored!=old||read_cr3()!=target)fail("851-pixel");
+  arch_puts("STYLEOS S851 PIXEL");field("id",i);field("root",target);field("address",(uintptr_t)pixel);field("old",old);field("write",want);field("read",got);field("restored",restored);arch_putc('\n');
+ }
+ arch_puts("STYLEOS S851 POLICY terminal=yes own-root=yes hardware-ist=yes framebuffer-restored=yes firmware-return=no production-cr3=deny\n");out32(0xf4,0x10);arch_halt();
+}
+#endif
+
 extern bool s850_read_inherited_entry(void *,uint64_t,uint16_t,uint64_t *);
-_Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cache *cache,struct pg_experiment *p,const struct s846_guard *guard,uint64_t gdt,uint64_t idt,uint64_t tss,uint64_t rsp0){
+_Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cache *cache,struct pg_experiment *p,const struct s846_guard *guard,uint64_t gdt,uint64_t idt,uint64_t tss,uint64_t rsp0
+#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+,uint16_t gdt_limit,uint16_t tss_selector
+#endif
+){
  if(!p||!p->evidence||!guard||read_cr3()!=p->old_root||(flags()&0x200)||arch_paging_attest_image_writable(p,(uintptr_t)tables,sizeof tables)!=PG_OK)fail("context-storage");
  const struct desktop_surface *surface=desktop_platform_surface();
  if(!desktop_surface_valid(surface))fail("surface-invalid");
@@ -65,5 +128,10 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
  arch_puts("STYLEOS S850 BAR");field("dev",dev);field("fn",fn);field("command",command);field("raw",bar.raw_lo);field("mask",mask);field("size",composed.gop.bar_bytes);arch_putc('\n');
  arch_puts("STYLEOS S850 ROOT");field("inherited",p->old_root);field("live",read_cr3());field("detached",composed.built.root);field("source",base->built.root);field("used",composed.built.used);field("pages",composed.gop.pages);field("pat-index",composed.gop.pat_index);field("cache-bits",composed.gop.cache_bits);field("pat",cache->pat);arch_putc('\n');
  arch_puts("STYLEOS S850 DESCRIPTORS");field("gdt",gdt);field("idt",idt);field("tss",tss);field("rsp0",rsp0);field("ist1",guard->pa[0]);field("ist2",guard->pa[1]);field("ist3",guard->pa[2]);arch_putc('\n');
- arch_puts("STYLEOS S850 POLICY bar-restored=yes detached-audited=yes descriptors-staged=yes desktop-root-active=no framebuffer-write=no production-cr3=deny\n");out32(0xf4,0x10);arch_halt();
+ arch_puts("STYLEOS S850 POLICY bar-restored=yes detached-audited=yes descriptors-staged=yes desktop-root-active=no framebuffer-write=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+ s851_switch(p,cache,guard,surface,gdt,idt,tss,rsp0,gdt_limit,tss_selector);
+#else
+ out32(0xf4,0x10);arch_halt();
+#endif
 }
