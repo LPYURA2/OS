@@ -145,6 +145,28 @@ static void resources824(void){
  arch_puts("STYLEOS S824 POLICY observation-only=yes ecam=not-read dma-grants=no production-cr3=deny\n");
 }
 #endif
+#ifdef STYLEOS_TEST_IOMMU_EVIDENCE_828
+static void evidence828(void){
+ arch_puts("STYLEOS S828 TABLE");f("backend",(uint64_t)backend);arch_puts(" data=");
+ if(backend==IOMMU810_INTEL)bytes824(dmar_copy,dmar_size);
+ else if(backend==IOMMU810_AMD)bytes824(ivrs_copy,ivrs_size);
+ else arch_puts("none\n");
+ for(unsigned rid=0;rid<65536;rid++)if(topo.kind[rid]){
+  unsigned sec=topo.next_bus[rid],sub=sec?topo.upper[sec]:0;
+  arch_puts("STYLEOS S828 FUNCTION");f("rid",rid);f("kind",topo.kind[rid]);
+  f("secondary",sec);f("subordinate",sub);arch_putc('\n');
+ }
+ for(unsigned i=0;i<audit.exact;i++){
+  arch_puts("STYLEOS S828 EXACT");f("rid",audit.records[i].rid);f("unit",audit.records[i].unit);
+  f("source",audit.records[i].source);arch_putc('\n');
+ }
+ for(unsigned i=0;i<audit.aliases;i++){
+  arch_puts("STYLEOS S828 ALIAS");f("from",audit.alias[i].from);f("to",audit.alias[i].to);
+  f("unit",audit.alias[i].unit);arch_putc('\n');
+ }
+ arch_puts("STYLEOS S828 POLICY observation-only=yes unit-ownership=no dma-grants=no ecam=not-read production-cr3=deny\n");
+}
+#endif
 void pci816_capture(const struct efi_system_table *st){
  static const struct efi_guid guid={
   0x8868e871,0xe4f1,0x11d3,{0xbc,0x22,0x00,0x80,0xc7,0x3c,0x88,0x81}};
@@ -376,6 +398,9 @@ _Noreturn void pci816_terminal(const struct boot_info *boot){
  }
 #ifdef STYLEOS_TEST_ACPI_RESOURCES_824
  resources824();
+#endif
+#ifdef STYLEOS_TEST_IOMMU_EVIDENCE_828
+ evidence828();
 #endif
  arch_puts("STYLEOS S816 PLATFORM");f("backend",(uint64_t)backend);f("root-entries",root_count);arch_putc('\n');
  arch_puts("STYLEOS S816 TOPOLOGY");f("buses",topo.buses);f("functions",topo.functions);

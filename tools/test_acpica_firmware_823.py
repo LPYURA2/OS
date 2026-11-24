@@ -7,12 +7,15 @@ from test import firmware_path
 ROOT=Path(__file__).resolve().parents[1]
 def main():
  ap=argparse.ArgumentParser();profile=ap.add_mutually_exclusive_group()
- profile.add_argument('--resources-824',action='store_true');profile.add_argument('--ecam-826',action='store_true');profile.add_argument('--ecam-quarantine-827',action='store_true')
+ profile.add_argument('--resources-824',action='store_true');profile.add_argument('--ecam-826',action='store_true');profile.add_argument('--ecam-quarantine-827',action='store_true');profile.add_argument('--iommu-evidence-828',action='store_true')
  ap.add_argument('--output',required=True,type=Path)
  ap.add_argument('--core-lib',required=True,type=Path)
  ap.add_argument('--core-include',required=True,type=Path)
  args=ap.parse_args();output=args.output;output.mkdir(parents=True,exist_ok=True)
- if args.ecam_quarantine_827:
+ if args.iommu_evidence_828:
+  args.ecam_826=True;args.resources_824=True
+  from iommu_evidence_828_verify import verify as check
+ elif args.ecam_quarantine_827:
   args.ecam_826=True;args.resources_824=True
   from ecam_quarantine_827_verify import verify as check
  elif args.ecam_826:
@@ -22,12 +25,12 @@ def main():
   from acpi_resources_824_verify import verify as check
  else:
   check=verify
- stage=827 if args.ecam_quarantine_827 else 826 if args.ecam_826 else 824 if args.resources_824 else 823
+ stage=828 if args.iommu_evidence_828 else 827 if args.ecam_quarantine_827 else 826 if args.ecam_826 else 824 if args.resources_824 else 823
  if not args.core_lib.is_file() or not (args.core_include/'acpi.h').is_file():raise RuntimeError('verified ACPICA core/header missing')
  build=output/'build'
  with (output/'compile.log').open('w') as log:
   subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',
-   ('--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
+   ('--test-iommu-evidence-828' if args.iommu_evidence_828 else '--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
    stdout=log,stderr=subprocess.STDOUT,check=True)
  qemu=shutil.which('qemu-system-x86_64')
  code=firmware_path('OVMF_CODE','OVMF_CODE')
@@ -85,6 +88,9 @@ def main():
      (dst/name).write_bytes(data)
    if args.ecam_826:
     for name,data in details.pop('_s826_raw').items():
+     (dst/name).write_bytes(data)
+   if args.iommu_evidence_828:
+    for name,data in details.pop('_s828_raw').items():
      (dst/name).write_bytes(data)
    details['dsdt_sha256']=hashlib.sha256((dst/'dsdt.aml').read_bytes()).hexdigest()
   observations[mode]={'status':'PASS' if good else 'FAIL','qemu_exit_code':rc,
