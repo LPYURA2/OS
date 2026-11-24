@@ -617,6 +617,22 @@ jobs:
           objdump -t build/recovery-canonical/apic-842/root.obj > build/recovery-canonical/apic-842/symbols.log
           if grep -q '__chkstk' build/recovery-canonical/apic-842/symbols.log; then exit 1; fi
 
+      - name: 842 Compose loaded PE rights and APIC mapping contracts
+        if: github.ref_name == 'feature/styleos-apic-root-842'
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/apic-842
+          for mode in normal ubsan; do
+            flags=()
+            if test "$mode" = ubsan; then flags=(-fsanitize=undefined -fno-sanitize-recover=all); fi
+            gcc -D_GNU_SOURCE -std=c11 -O2 -Wall -Wextra -Werror -I include "${flags[@]}" kernel/apic_pe_842.c kernel/apic_root_842.c tests/test_apic_pe_842.c kernel/owned_low_790.c kernel/paging.c kernel/cache_policy_800.c -o build/recovery-canonical/apic-842/pe-$mode
+            build/recovery-canonical/apic-842/pe-$mode | tee build/recovery-canonical/apic-842/pe-$mode.log
+          done
+          cmp build/recovery-canonical/apic-842/pe-normal.log build/recovery-canonical/apic-842/pe-ubsan.log
+          clang --target=x86_64-pc-windows-msvc -O2 -ffreestanding -fno-builtin -Wall -Wextra -Werror -I include -c kernel/apic_pe_842.c -o build/recovery-canonical/apic-842/pe.obj
+          objdump -t build/recovery-canonical/apic-842/pe.obj > build/recovery-canonical/apic-842/pe-symbols.log
+          if grep -q '__chkstk' build/recovery-canonical/apic-842/pe-symbols.log; then exit 1; fi
+
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
           set -euo pipefail

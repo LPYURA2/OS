@@ -1,3 +1,5 @@
 # S842 continuation
 
 Accepted S841 cc965962327add8ca92454897c8098f944daa7d6, CI 45435034196 SUCCESS 190 PASS / 5 SKIPPED; independent artifact/hash/guest replay and 95 refusals verified. All modes partial (64 paths, 452 denied). Current branch feature/styleos-apic-root-842. Read AGENTS.md, docs/PROJECT.md, docs/ROADMAP.md, docs/architecture/FOUNDATION_COMPLETION_GATE.md and APIC_ROOT_842.md. S842 detached root builder and model tests published; verify exact CI then implement same-boot isolated own-root IRQ integration with S790/S807. Do not call the model evidence of guest execution. No production CR3 authority. Main, previous refs, Desktop and safeguards unchanged. Foundation -> filesystem -> independent .tea -> Explorer -> welcome/login/user selection/lock. Strict approved mockups. FOUNDATION NOT COMPLETE.
+
+Latest revision adds S790/S842 PE composition and MADT/MSR address consistency with 15 host checks in GCC and UBSan, COFF PASS. Next: actual guest entry on image-owned stack, same-boot attest inherited source and all live descriptor dependencies; only then isolated root switch and S807 PIT IRQ/EOI. Do not count model as integration completion.
