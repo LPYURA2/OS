@@ -13,8 +13,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y qemu-system-x86
       - name: Validate read-only fixture model
         run: python3 tools/test_block_fixture_856.py
-      - name: Observe actual paused Q35 configurations
-        run: python3 tools/probe_storage_fixture_856.py --output build/s856-fixture-probe
+      - name: Replay actual PIIX3 identity and malformed identities
+        run: python3 tools/test_pci_identity_856.py
+      - name: Observe actual paused Q35 controller identities
+        run: python3 tools/probe_storage_fixture_856.py --identity-only --output build/s856-fixture-probe
       - name: Preserve evidence even if fixture is incompatible
         if: always()
         uses: actions/upload-artifact@v4

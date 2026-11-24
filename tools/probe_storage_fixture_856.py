@@ -2,7 +2,7 @@
 """Paused Q35 host probe: no guest execution and no storage admission."""
 import argparse, hashlib, json, selectors, shutil, subprocess, time
 from pathlib import Path
-from block_fixture_856_verify import verify_fixture, CONTROLLER, DEVICE, RAW, FILE
+from block_fixture_856_verify import verify_fixture, controller_identity, CONTROLLER, DEVICE, RAW, FILE
 from sector_evidence_856 import fixture
 
 class QMP:
@@ -57,7 +57,7 @@ def probe(q, out, mode):
                 matches=[d for d in devices if d.get('qdev_id')==CONTROLLER]
                 if mode=='default':
                     if matches:raise ValueError('unexpected explicit controller')
-                elif len(matches)!=1 or matches[0]['slot']!=5 or matches[0]['function']!=0 or matches[0]['id']!={'vendor':0x8086,'device':0x7010}:raise ValueError('PIIX3 absent/wrong identity')
+                elif len(matches)!=1 or not controller_identity(matches[0]):raise ValueError('PIIX3 absent/wrong identity')
                 if mode=='readonly':
                     unit=m.call('qom-get',path='/machine/peripheral/'+DEVICE,property='unit');dump(out/'unit.json',unit)
                     report['fixture']=verify_fixture(**{k:observed[k] for k in ('blocks','nodes','graph','qtree','pci')},unit=unit,path=path,original=original,current=path.read_bytes(),seed=19)
@@ -67,6 +67,8 @@ def probe(q, out, mode):
                 if p.poll() is None:p.kill();p.wait(timeout=8)
     except (OSError,RuntimeError,ValueError,TimeoutError,subprocess.TimeoutExpired,KeyError,TypeError) as exc:
         report.update(status='FAIL',error=str(exc))
+        if (out/'qemu.log').exists():
+            report['qemu_stderr']=(out/'qemu.log').read_text(errors='replace')[-4096:]
     finally:
         if original is not None:
             actual=path.read_bytes();report['before_sha256']=hashlib.sha256(original).hexdigest();report['after_sha256']=hashlib.sha256(actual).hexdigest()
@@ -75,11 +77,12 @@ def probe(q, out, mode):
     return report
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',required=True,type=Path);args=p.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
+    p=argparse.ArgumentParser();p.add_argument('--output',required=True,type=Path);p.add_argument('--identity-only',action='store_true');args=p.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     q=shutil.which('qemu-system-x86_64')
     if not q:raise RuntimeError('QEMU required')
     (out/'version.txt').write_text(subprocess.check_output([q,'--version'],text=True))
-    results=[probe(q,out/m,m) for m in ('default','piix3','readonly')];dump(out/'results.json',results)
+    modes=('default','piix3') if args.identity_only else ('default','piix3','readonly')
+    results=[probe(q,out/m,m) for m in modes];dump(out/'results.json',results)
     for r in results:print(r['mode'],r['status'],r.get('error',''))
     return 0 if all(r['status']=='PASS' for r in results) else 1
 if __name__=='__main__':raise SystemExit(main())

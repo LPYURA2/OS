@@ -11,6 +11,14 @@ FILE='s856-file'
 def need(condition, message):
     if not condition: raise ValueError(message)
 
+def controller_identity(d):
+    """QMP may report subsystem metadata in addition to vendor/device."""
+    if not isinstance(d,dict): return False
+    ident=d.get('id'); cls=d.get('class_info')
+    if not isinstance(ident,dict) or not isinstance(cls,dict): return False
+    fields=((d,'slot',5),(d,'function',0),(ident,'vendor',0x8086),(ident,'device',0x7010),(cls,'class',0x0101))
+    return d.get('qdev_id')==CONTROLLER and all(type(obj.get(k)) is int and obj[k]==v for obj,k,v in fields)
+
 def tree_device(tree):
     """Find direct parent bus/controller in HMP info qtree indentation tree."""
     need(isinstance(tree,str), 'qtree type')
@@ -47,7 +55,7 @@ def verify_fixture(*, blocks, nodes, qtree, unit, pci, graph, path, original, cu
     matches=[d for d in devices if d.get('qdev_id')==CONTROLLER]
     need(len(matches)==1,'controller QMP identity')
     d=matches[0]
-    need(d.get('slot')==5 and d.get('function')==0 and d.get('id')=={'vendor':0x8086,'device':0x7010} and d.get('class_info',{}).get('class')==0x0101,'controller PCI address/class')
+    need(controller_identity(d),'controller PCI address/class')
     tree_device(qtree)
     named={}
     for n in nodes:
