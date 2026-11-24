@@ -8,10 +8,13 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
  ap=argparse.ArgumentParser();profile=ap.add_mutually_exclusive_group()
  profile.add_argument('--resources-824',action='store_true');profile.add_argument('--ecam-826',action='store_true');profile.add_argument('--ecam-quarantine-827',action='store_true');profile.add_argument('--iommu-evidence-828',action='store_true');profile.add_argument('--irq-sources-830',action='store_true')
+ ap.add_argument('--capture-mtree-833',action='store_true')
  ap.add_argument('--output',required=True,type=Path)
  ap.add_argument('--core-lib',required=True,type=Path)
  ap.add_argument('--core-include',required=True,type=Path)
- args=ap.parse_args();output=args.output;output.mkdir(parents=True,exist_ok=True)
+ args=ap.parse_args()
+ if args.capture_mtree_833 and not args.irq_sources_830:ap.error('S833 requires S830 profile')
+ output=args.output;output.mkdir(parents=True,exist_ok=True)
  if args.irq_sources_830:
   args.iommu_evidence_828=True;args.ecam_826=True;args.resources_824=True
   from irq_sources_830_verify import verify as check
@@ -75,9 +78,13 @@ def main():
    '-drive',f'if=none,id=styleos,format=raw,readonly=on,file={build/"x86_64"/"styleos.img"}',
    *drive,*extra]
   try:
-   r=subprocess.run(cmd,timeout=30,capture_output=True)
-   rc=r.returncode
-   (dst/'qemu.log').write_bytes(r.stdout+r.stderr)
+   if args.capture_mtree_833:
+    from qmp_aperture_833 import capture
+    rc=capture(cmd,dst)
+   else:
+    r=subprocess.run(cmd,timeout=30,capture_output=True)
+    rc=r.returncode
+    (dst/'qemu.log').write_bytes(r.stdout+r.stderr)
   except subprocess.TimeoutExpired as e:
    rc=None;(dst/'qemu.log').write_text('TIMEOUT '+str(e))
   raw=serial.read_bytes() if serial.exists() else b''
@@ -101,6 +108,7 @@ def main():
    details['dsdt_sha256']=hashlib.sha256((dst/'dsdt.aml').read_bytes()).hexdigest()
   observations[mode]={'status':'PASS' if good else 'FAIL','qemu_exit_code':rc,
    'uart_sha256':hashlib.sha256(raw).hexdigest(),'observations':details}
+  if args.capture_mtree_833:observations[mode]['qmp_833_sha256']=hashlib.sha256((dst/'qmp-833.json').read_bytes()).hexdigest()
   print(f'S{stage} QEMU',mode,observations[mode],flush=True)
   if not good:
    raise SystemExit(f'S{stage} fail-closed: first failing QEMU mode '+mode)
@@ -128,6 +136,7 @@ def main():
   'uefi_runtime_verified':False,'production_cr3_authorized':False,
   'firmware_acpi_root_reconciled':False,'upstream_version':'20260930','full_core_compiled':True,
   'efi_sha256':hashlib.sha256((build/'x86_64'/'BOOTX64.EFI').read_bytes()).hexdigest()}
+ if args.capture_mtree_833:result['qmp_833_capture']=True
  (output/'results.json').write_text(json.dumps(result,indent=2)+'\n')
  if not success:raise SystemExit(1)
 if __name__=='__main__':main()
