@@ -1,6 +1,10 @@
-## Stage 855 — terminal PIT/TSC monotonic diagnostic (candidate)
+## Stage 856 — terminal storage topology (candidate)
 
-Accepted S854 7ae1d2777ca7e358acad3ee680ca8e0ad7f85f0b, CI 45482794716 SUCCESS. See [architecture](architecture/DESKTOP_TIME_855.md), [handoff](NEXT_CHAT_855.md). Local EFI/IMG only; guest execution pending. No production clock or UI changes.
+See [handoff](NEXT_CHAT_856.md), [post-kernel roadmap](POST_KERNEL_ROADMAP.md). No ATA admission, production root or UI change.
+
+## Stage 855 — terminal PIT/TSC monotonic diagnostic (accepted icount fixture only)
+
+Accepted S854 7ae1d2777ca7e358acad3ee680ca8e0ad7f85f0b, CI 45482794716 SUCCESS. See [architecture](architecture/DESKTOP_TIME_855.md), [handoff](NEXT_CHAT_855.md). CI 45488472815 SUCCESS; 217 PASS, 5 SKIPPED, 0 FAIL; artifact 14965333355 independently replayed. Non-icount and production clock remain open. No UI changes.
 
 ## Stage 854 — terminal RTC under owned Desktop root (candidate)
 

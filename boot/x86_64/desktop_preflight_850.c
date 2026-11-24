@@ -236,6 +236,27 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #endif
 #endif
 #endif
+#ifdef STYLEOS_TEST_STORAGE_TOPOLOGY_856
+ /* Read-only PCI configuration census. No CFC writes, no ATA ports, no
+  * controller admission. CF8 is restored before terminal completion. */
+ uint32_t cf8_before=in32(0xcf8);unsigned functions=0,ide=0;
+ if(read_cr3()!=target||(flags()&0x200))fail("856-context");
+ for(unsigned d=0;d<32;d++)for(unsigned f=0;f<8;f++){
+    uint32_t id=cfg(d,f,0);if((id&0xffffu)==0xffffu)continue;
+    if(!(id&0xffffu))fail("856-vendor");
+    uint32_t cls=cfg(d,f,8);functions++;
+    arch_puts("STYLEOS S856 PCI");field("root",target);field("bdf",d*8+f);field("id",id);field("class",cls);arch_putc('\n');
+    if((cls>>16)!=0x0101u)continue;
+    uint32_t status=cfg(d,f,4),header=cfg(d,f,12),timing=cfg(d,f,0x40);
+    uint32_t bars[5];for(unsigned i=0;i<5;i++)bars[i]=cfg(d,f,0x10+4*i);
+    arch_puts("STYLEOS S856 IDE");field("root",target);field("bdf",d*8+f);field("command-status",status);field("header",header);field("timing",timing);
+    field("bar0",bars[0]);field("bar1",bars[1]);field("bar2",bars[2]);field("bar3",bars[3]);field("bar4",bars[4]);arch_putc('\n');ide++;
+ }
+ out32(0xcf8,cf8_before);uint32_t cf8_after=in32(0xcf8);
+ if(cf8_before!=cf8_after||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("856-restore");
+ arch_puts("STYLEOS S856 TOTAL");field("root",target);field("functions",functions);field("ide",ide);field("cf8-before",cf8_before);field("cf8-after",cf8_after);arch_putc('\n');
+ arch_puts("STYLEOS S856 POLICY pci-census=yes ata-access=no data-write=no dma=no admission=no production-cr3=deny\n");
+#endif
  out32(0xf4,0x10);arch_halt();
 }
 #endif
