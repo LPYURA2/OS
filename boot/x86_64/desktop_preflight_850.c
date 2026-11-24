@@ -3,6 +3,9 @@
 #include <styleos/desktop_root_850.h>
 #include <styleos/arch.h>
 #include <styleos/ist_guard_plan_785.h>
+#ifdef STYLEOS_TEST_DESKTOP_FRAME_852
+#include <styleos/desktop_v0.h>
+#endif
 static _Alignas(4096) uint64_t tables[PG_TABLE_PAGES][512];
 static struct s850_desktop_root composed;
 static uint64_t read_cr3(void){uint64_t v;__asm__ volatile("mov %%cr3,%0":"=r"(v));return v;}
@@ -99,7 +102,26 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
   if(got!=want||restored!=old||read_cr3()!=target)fail("851-pixel");
   arch_puts("STYLEOS S851 PIXEL");field("id",i);field("root",target);field("address",(uintptr_t)pixel);field("old",old);field("write",want);field("read",got);field("restored",restored);arch_putc('\n');
  }
- arch_puts("STYLEOS S851 POLICY terminal=yes own-root=yes hardware-ist=yes framebuffer-restored=yes firmware-return=no production-cr3=deny\n");out32(0xf4,0x10);arch_halt();
+ arch_puts("STYLEOS S851 POLICY terminal=yes own-root=yes hardware-ist=yes framebuffer-restored=yes firmware-return=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_DESKTOP_FRAME_852
+ /* Bound the diagnostic workload to the admitted standard VGA mode. */
+ if(s->width!=1280||s->height!=800||s->stride!=1280||s->format!=DESKTOP_BGR_BYTES||
+    s->bytes!=UINT64_C(4096000)||composed.gop.mapping.bytes<s->bytes||
+    !identity((uintptr_t)desk_first_frame_852,PG_EXEC)||read_cr3()!=target)fail("852-frame-contract");
+ size_t writes=desk_first_frame_852(s);
+ if(writes!=(size_t)s->width*s->height||read_cr3()!=target||flags()&0x200)fail("852-frame-write");
+ __asm__ volatile("mfence":::"memory");
+ const volatile uint32_t *fb=(const volatile uint32_t *)s->base;
+ uint64_t hash=UINT64_C(14695981039346656037);
+ for(size_t i=0;i<writes;i++){
+    uint32_t pixel=fb[i];
+    for(unsigned b=0;b<4;b++){hash^=(pixel>>(8*b))&255u;hash*=UINT64_C(1099511628211);}
+ }
+ if(read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("852-frame-readback");
+ arch_puts("STYLEOS S852 FRAME");field("root",target);field("width",s->width);field("height",s->height);field("writes",writes);field("fnv",hash);field("first",fb[0]);field("last",fb[writes-1]);arch_putc('\n');
+ arch_puts("STYLEOS S852 POLICY first-frame=yes input=no storage=no app-admission=no production-cr3=deny\n");
+#endif
+ out32(0xf4,0x10);arch_halt();
 }
 #endif
 

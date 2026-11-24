@@ -998,6 +998,23 @@ static bool update_clock(void)
     return change;
 }
 
+#ifdef STYLEOS_TEST_DESKTOP_FRAME_852
+/* Reuse the real shell renderer and initial window geometry. This diagnostic
+ * does not enter the event loop, probe devices, mount storage or create PIDs. */
+size_t desk_first_frame_852(const struct desktop_surface *surface)
+{
+    if (!desktop_surface_valid(surface) || surface->width < 800 || surface->height < 600)
+        return 0;
+    width = (int)surface->width;
+    height = (int)surface->height;
+    mx = width / 2;
+    my = height * 3 / 4;
+    initial_windows();
+    desk_draw_init(surface);
+    return desk_present(&(struct desk_damage){.all = true}, draw);
+}
+#endif
+
 _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 {
     width = (int)surface->width;

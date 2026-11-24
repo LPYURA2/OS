@@ -36,7 +36,11 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False, test_physical_arena_844=False, test_task_stacks_845=False, test_user_roots_846=False, test_process_trial_847=False, test_user_preempt_848=False, test_fx_context_849=False, test_desktop_preflight_850=False, test_desktop_switch_851=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False, test_physical_arena_844=False, test_task_stacks_845=False, test_user_roots_846=False, test_process_trial_847=False, test_user_preempt_848=False, test_fx_context_849=False, test_desktop_preflight_850=False, test_desktop_switch_851=False, test_desktop_frame_852=False):
+    if test_desktop_frame_852:
+        if arch != "x86_64" or desktop_v0 or update_build is not None:
+            raise ValueError("852 requires isolated x86-64 profile")
+        test_desktop_switch_851 = True
     if test_desktop_switch_851:
         test_desktop_preflight_850 = True
     if test_desktop_preflight_850:
@@ -229,7 +233,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
                    'arch/aarch64/disk_app_entry.S']
     if test_desktop_preflight_850 or test_desktop_display or desktop_v0 or test_hw_probe_793 or test_pci_probe_794 or test_pci_aperture_795 or test_pci_topology_796 or test_pci_range_799 or test_cache_800 or test_cache_801 or test_cache_803 or test_cache_804:
         common += ['kernel/desktop_display.c', 'boot/x86_64/desktop_display.c']
-    if desktop_v0:
+    if desktop_v0 or test_desktop_frame_852:
         common += ['kernel/process_runtime.c', 'kernel/process_scheduler.c', 'kernel/desktop_process_runtime.c', 'kernel/desktop_vm_stage.c', 'kernel/desktop_frame_owner.c', 'kernel/window_service.c', 'kernel/user_session_runtime.c', 'kernel/native_launch_stage.c', 'kernel/native_window_channel.c', 'kernel/native_desktop_launch.c', 'kernel/native_tea_elf.c', 'kernel/native_tea_package.c', 'kernel/native_tea_staging.c', 'kernel/native_desktop_bridge.c', 'kernel/process_inspector.c', 'kernel/process_view.c', 'kernel/process_api.c', 'kernel/system_apps.c', 'kernel/desktop_sessions.c', 'kernel/desktop_text_app.c', 'kernel/desktop_shell.c', 'kernel/desktop_draw.c',
                    'kernel/desktop_store.c', 'kernel/stylefs.c', 'kernel/desktop_volume_io.c',
                    'kernel/desktop_stylefs.c', 'kernel/desktop_extra_volume.c',
@@ -383,6 +387,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         # aligned fields into wider unaligned accesses to stack or DTB data.
         cpu_flags = ['-mgeneral-regs-only', '-mno-outline-atomics', '-mstrict-align']
         arch_id = '2'
+    if test_desktop_frame_852:
+        sources = ["kernel/desktop_frame_io_852.c" if name == "arch/x86_64/desktop_io.c" else name
+                   for name in dict.fromkeys(sources)]
     objects = []
     flags = ['--target=' + target, '-O2', '-g0', '-ffreestanding',
              '-fno-stack-protector', '-fno-builtin', '-fno-pic', '-fno-pie',
@@ -496,6 +503,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_DESKTOP_PREFLIGHT_850=1')
     if test_desktop_switch_851:
         flags.append('-DSTYLEOS_TEST_DESKTOP_SWITCH_851=1')
+    if test_desktop_frame_852:
+        flags.append('-DSTYLEOS_TEST_DESKTOP_FRAME_852=1')
     if test_fx_context_849:
         flags.append('-DSTYLEOS_TEST_FX_CONTEXT_849=1')
     if test_user_preempt_848:
@@ -766,6 +775,7 @@ def main():
                           help='791 isolated hardware supervisor RX write protection fault')
     negative.add_argument('--test-wx-exec-791', action='store_true',
                           help='791 isolated hardware NX instruction fetch protection fault')
+    negative.add_argument('--test-desktop-frame-852', action='store_true',help='852 isolated first Desktop frame under own CR3, QEMU only')
     negative.add_argument('--test-desktop-switch-851', action='store_true',help='851 terminal protected root switch and reversible pixel probe, QEMU only')
     negative.add_argument('--test-desktop-preflight-850', action='store_true',help='850 same-boot detached GOP and guarded IST preflight')
     negative.add_argument('--test-fx-context-849', action='store_true',help='849 isolated x87/SSE context trial')
@@ -829,6 +839,10 @@ def main():
     parser.add_argument('--update-public-key', type=Path, help='Raw Ed25519 verification key')
     parser.add_argument('--test-update-fail', action='store_true', help='Trial intentionally never becomes ready')
     args = parser.parse_args()
+    if args.test_desktop_frame_852:
+        if args.arch != "x86_64" or not args.output:
+            parser.error("852 requires x86-64 and dedicated --output")
+        args.test_desktop_switch_851 = True
     if args.test_desktop_switch_851:
         if args.arch != "x86_64" or not args.output:
             parser.error("851 requires x86-64 and dedicated --output")
@@ -999,6 +1013,7 @@ def main():
                'pci-probe-794' if args.test_pci_probe_794 else
                'wx-exec-791' if args.test_wx_exec_791 else
                'wx-write-791' if args.test_wx_write_791 else
+               'desktop-frame-852' if args.test_desktop_frame_852 else
                'desktop-switch-851' if args.test_desktop_switch_851 else
                'desktop-preflight-850' if args.test_desktop_preflight_850 else
                'fx-context-849' if args.test_fx_context_849 else
@@ -1064,6 +1079,7 @@ def main():
                              **({'test_user_preempt_848': True} if args.test_user_preempt_848 else {}),
                              **({'test_desktop_preflight_850': True} if args.test_desktop_preflight_850 else {}),
                              **({'test_desktop_switch_851': True} if args.test_desktop_switch_851 else {}),
+                             **({'test_desktop_frame_852': True} if args.test_desktop_frame_852 else {}),
                              **({'test_fx_context_849': True} if args.test_fx_context_849 else {}),
                              **({'test_hw_probe_793': True} if args.test_hw_probe_793 else {}),
                              **({'test_pci_probe_794': True} if args.test_pci_probe_794 else {}),
@@ -1136,6 +1152,7 @@ def main():
         **({'test_user_preempt_848': True} if args.test_user_preempt_848 else {}),
                              **({'test_desktop_preflight_850': True} if args.test_desktop_preflight_850 else {}),
                              **({'test_desktop_switch_851': True} if args.test_desktop_switch_851 else {}),
+                             **({'test_desktop_frame_852': True} if args.test_desktop_frame_852 else {}),
                              **({'test_fx_context_849': True} if args.test_fx_context_849 else {}),
         'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,

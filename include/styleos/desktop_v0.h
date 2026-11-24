@@ -69,6 +69,10 @@ bool desk_store_load(const struct desk_store *s, unsigned slot, char *text, size
 bool desk_store_save(struct desk_store *s, unsigned slot, unsigned folder,
                      const char *text, size_t length);
 
+#ifdef STYLEOS_TEST_DESKTOP_FRAME_852
+/* First frame only: no storage, input, clock or user-process admission. */
+size_t desk_first_frame_852(const struct desktop_surface *surface);
+#endif
 _Noreturn void desktop_v0_run(const struct desktop_surface *surface);
 
 #endif
