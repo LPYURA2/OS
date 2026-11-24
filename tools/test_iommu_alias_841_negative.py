@@ -19,13 +19,15 @@ def test(folder,report_path):
         def packet(o):return ('\n'.join(lines[:start]+o+lines[end:])+'\n').encode('ascii')
         need(replay(packet(obs),efi,mode)==row,'unaltered control')
         def index(tag):return next(i for i,x in enumerate(obs) if x.startswith('STYLEOS S841 '+tag+' '))
-        path=index('PATH');first=index('ROW');last=index('TOTAL')
+        path=index('PATH');first=index('ROW');last=index('TOTAL');proof=index('PROOF')
         mutations=[]
         def change(i,key,xor):
             bad=obs.copy()
             bad[i]=re.sub(r' '+key+r'=0x([0-9a-f]{16})',lambda m:f' {key}=0x{(int(m[1],16)^xor):016x}',bad[i],count=1)
             need(bad!=obs,'mutation changed bytes');mutations.append(bad)
         for key,xor in [('pa',4096),('prefix',4096),('level',1),('admitted',1)]:change(path,key,xor)
+        change(proof,'table',4096);change(proof,'slot',1);change(proof,'entry',4096)
+        mutations.append(obs[:proof]+obs[proof+1:])
         change(first,'slot',16)
         # Slot zero in the root is already bound to the parent live proof.
         change(first,'e',4096)

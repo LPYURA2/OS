@@ -11,7 +11,7 @@ POLICY='STYLEOS S841 POLICY target-read=no mappings-changed=no dma-grants=no pro
 def replay(raw,efi,mode):
     lines=raw.decode('ascii').splitlines()
     obs=[s for s in lines if s.startswith('STYLEOS S841 ')]
-    need(0<len(obs)<40000,'S841 record bound')
+    need(0<len(obs)<41000,'S841 record bound')
     i=lines.index(obs[0])
     need(lines[i:i+len(obs)]==obs and i==lines.index(PARENT_POLICY)+1 and i+len(obs)<lines.index('STYLEOS S823 PASS'),'S841 placement')
     owner=ownership_report(raw,'x86_64');src=owner['source_data'];maps=parse(efi,src['stride'],src['version'])
@@ -41,7 +41,7 @@ def replay(raw,efi,mode):
     for x in lines:
         if x.startswith(('STYLEOS S840 READ ','STYLEOS S840 IDENTITY ')):
             pa,slot,e=fields(x,'S840 '+x.split()[2],'table','slot','entry');record(pa,slot,e)
-    proof=dict(seen);mask=((1<<bits)-1)&~4095
+    mask=((1<<bits)-1)&~4095
     def safe(pa):
         if not(pa and pa%4096==0 and pa<0x8000000 and any(a<=pa and pa+4096<=b for a,b in baseline) and not any(a<pa+4096 and pa<b for a,b in candidate) and any(r['type']==4 and r['attributes']&8 and r['start']<=pa and pa+4096<=r['end_exclusive'] for r in maps)):return False
         return all((lambda t:t[0]==6 and t[2])(model(x,bits,cap,default,pairs)) for x in (pa,pa+4095))
@@ -49,16 +49,23 @@ def replay(raw,efi,mode):
         pa=root&~4095
         for level in (4,3,2,1):
             if pa not in known or not safe(pa):return None
-            slot=(va>>(12+9*(level-1)))&511;e=proof.get((pa,slot))
-            if e is None or not e&1 or level==4 and e&128:return None
+            slot=(va>>(12+9*(level-1)))&511
+            t,k,e=take('PROOF','table','slot','entry');need((t,k)==(pa,slot),'S841 proof order');record(pa,slot,e)
+            if not e&1:return (0,0,0,0)
+            if level==4 and e&128:return None
             if level==1 or e&128:
-                size=1<<(12+9*(level-1));idx=((e>>(7 if level==1 else 12))&1)*4+((e>>4)&1)*2+((e>>3)&1)
-                return ((e&mask&~(size-1))+(va&(size-1)),e&~0x60,size,(pat>>(8*idx))&255)
+                size=1<<(12+9*(level-1))
+                if level>1 and e&(size-1)&~0x1fff:return None
+                idx=((e>>(7 if level==1 else 12))&1)*4+((e>>4)&1)*2+((e>>3)&1)
+                return ((e&mask&~(size-1))+(va&(size-1)),e,size,(pat>>(8*idx))&255)
             pa=e&mask
+            if not pa:return None
         return None
     def admitted(pa):
         if not safe(pa):return False
-        f,l=identity(pa),identity(pa+4095)
+        f=identity(pa)
+        if f is None:return False
+        l=identity(pa+4095)
         return f is not None and l is not None and f[0]==pa and l[0]==pa+4095 and f[1:]==l[1:] and f[3]==6
     cursor=visited=denied=0;aliases=[];leaves=0
     a,b=COVERS[mode]

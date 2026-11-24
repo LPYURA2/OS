@@ -85,6 +85,7 @@ static bool quiet_known(void *ptr,uint64_t pa,uint16_t slot,uint64_t *v){
   const struct op_walk *w=&c->in->walks[i];
   if(w->kind==OP_WALK_TABLE&&w->va==pa&&w->pa==pa){
    *v=((const volatile uint64_t *)(uintptr_t)pa)[slot];
+   arch_puts("STYLEOS S841 PROOF");field("table",pa);field("slot",slot);field("entry",*v);arch_putc('\n');
    return consistent(c->in,pa,slot,*v);
   }
  }
@@ -100,8 +101,9 @@ static bool admit841(struct context *c,uint64_t pa){
 }
 static int scan841(struct census *q,uint64_t pa,uint64_t prefix,unsigned level){
  struct context *c=q->ctx;
+ bool admitted=q->visited<S841_MAX_PATHS&&admit841(c,pa);
  arch_puts("STYLEOS S841 PATH");field("pa",pa);field("prefix",prefix);field("level",level);
- if(q->visited>=S841_MAX_PATHS||!admit841(c,pa)){
+ if(!admitted){
   field("admitted",0);arch_putc('\n');q->denied++;return 1;
  }
  field("admitted",1);arch_putc('\n');q->visited++;
