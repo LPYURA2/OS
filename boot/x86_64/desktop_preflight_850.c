@@ -48,7 +48,8 @@ extern bool s850_read_inherited_entry(void *,uint64_t,uint16_t,uint64_t *);
 _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cache *cache,struct pg_experiment *p,const struct s846_guard *guard,uint64_t gdt,uint64_t idt,uint64_t tss,uint64_t rsp0){
  if(!p||!p->evidence||!guard||read_cr3()!=p->old_root||(flags()&0x200)||arch_paging_attest_image_writable(p,(uintptr_t)tables,sizeof tables)!=PG_OK)fail("context-storage");
  const struct desktop_surface *surface=desktop_platform_surface();
- if(!desktop_surface_valid(surface)||!desktop_surface_excludes_boot_memory(surface,p->evidence))fail("surface");
+ if(!desktop_surface_valid(surface))fail("surface-invalid");
+ if(!desktop_surface_excludes_boot_memory(surface,p->evidence))fail("surface-overlap");
  const struct boot_info *boot=(const void *)(uintptr_t)p->evidence->live.handoff.start;
  struct pci794_bar bar;uint32_t mask;unsigned dev,fn;uint16_t command;
  if(!capture(surface,&bar,&mask,&dev,&fn,&command))fail("vga-bar");
