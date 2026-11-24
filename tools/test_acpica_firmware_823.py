@@ -7,24 +7,27 @@ from test import firmware_path
 ROOT=Path(__file__).resolve().parents[1]
 def main():
  ap=argparse.ArgumentParser();profile=ap.add_mutually_exclusive_group()
- profile.add_argument('--resources-824',action='store_true');profile.add_argument('--ecam-826',action='store_true')
+ profile.add_argument('--resources-824',action='store_true');profile.add_argument('--ecam-826',action='store_true');profile.add_argument('--ecam-quarantine-827',action='store_true')
  ap.add_argument('--output',required=True,type=Path)
  ap.add_argument('--core-lib',required=True,type=Path)
  ap.add_argument('--core-include',required=True,type=Path)
  args=ap.parse_args();output=args.output;output.mkdir(parents=True,exist_ok=True)
- if args.ecam_826:
+ if args.ecam_quarantine_827:
+  args.ecam_826=True;args.resources_824=True
+  from ecam_quarantine_827_verify import verify as check
+ elif args.ecam_826:
   args.resources_824=True
   from acpi_ecam_826_verify import verify as check
  elif args.resources_824:
   from acpi_resources_824_verify import verify as check
  else:
   check=verify
- stage=826 if args.ecam_826 else 824 if args.resources_824 else 823
+ stage=827 if args.ecam_quarantine_827 else 826 if args.ecam_826 else 824 if args.resources_824 else 823
  if not args.core_lib.is_file() or not (args.core_include/'acpi.h').is_file():raise RuntimeError('verified ACPICA core/header missing')
  build=output/'build'
  with (output/'compile.log').open('w') as log:
   subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',
-   ('--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
+   ('--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
    stdout=log,stderr=subprocess.STDOUT,check=True)
  qemu=shutil.which('qemu-system-x86_64')
  code=firmware_path('OVMF_CODE','OVMF_CODE')

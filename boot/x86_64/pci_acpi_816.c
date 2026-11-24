@@ -236,6 +236,9 @@ int styleos823_get_firmware(struct styleos823_firmware *out){
   x.ssdt[i]=ssdt_copy[i];x.ssdt_len[i]=ssdt_length[i];
  }
  x.ssdt_count=ssdt_seen;x.mcfg_len=mcfg_size;x.root_count=bridge_count;
+#ifdef STYLEOS_TEST_ECAM_QUARANTINE_827
+ x.mcfg=mcfg_copy;
+#endif
  *out=x;return 1;
 }
 #endif

@@ -14,6 +14,11 @@
 #ifdef STYLEOS_TEST_ECAM_826
 #include <styleos/ecam_map_capture_826.h>
 #endif
+#ifdef STYLEOS_TEST_ECAM_QUARANTINE_827
+#include <styleos/ecam_quarantine_827.h>
+static struct ecam827_report report827;
+static struct ecam827_work work827;
+#endif
 
 #define HEAP_822 (16u*1024u*1024u)
 static _Alignas(16) unsigned char heap[HEAP_822];
@@ -227,6 +232,23 @@ static int extent826(const unsigned char *buf, size_t capacity, size_t used,
  return used<=capacity && used>=sizeof(ACPI_OBJECT) && ptr && p>=v &&
         p-v>=sizeof(ACPI_OBJECT) && p-v<=used && count<=used-(p-v);
 }
+#ifdef STYLEOS_TEST_ECAM_QUARANTINE_827
+static void range827(const char *kind,struct boot_range r){
+ arch_puts("STYLEOS S827 ");arch_puts(kind);arch_putc(' ');hex(r.start);arch_putc(' ');hex(r.end);arch_putc('\n');
+}
+static void quarantine827(const struct boot_info *boot,const uint8_t *drac,size_t n){
+ if(!ecam827_quarantine(fw.mcfg,fw.mcfg_len,drac,n,
+       (const void *)(uintptr_t)boot->memory_map,boot->memory_map_size,
+       boot->descriptor_size,boot->descriptor_version,&report827,&work827))fail("827-quarantine",AE_ACCESS);
+ arch_puts("STYLEOS S827 ECAM start=");hex(report827.ecam.start);
+ arch_puts(" end=");hex(report827.ecam.end);
+ arch_puts(" explicit-pages=");hex(report827.explicit_pages);
+ arch_puts(" gap-pages=");hex(report827.gap_pages);arch_putc('\n');
+ for(size_t i=0;i<report827.diagnostic.nr_reserved;i++)range827("RESERVED",report827.diagnostic.reserved[i]);
+ for(size_t i=0;i<report827.diagnostic.nr_candidates;i++)range827("CANDIDATE",report827.diagnostic.candidates[i]);
+ arch_puts("STYLEOS S827 POLICY detached-map=yes ram-grants=no ecam=not-read dma-grants=no production-cr3=deny\n");
+}
+#endif
 static void eval_drac826(const struct boot_info *boot){
  if(!styleos826_emit_final_map(boot))fail("826-final-map",AE_BAD_PARAMETER);
  _Alignas(16) unsigned char buf[2048]={0};ACPI_BUFFER b={sizeof buf,buf};
@@ -247,6 +269,9 @@ static void eval_drac826(const struct boot_info *boot){
  }
  arch_putc('\n');
  arch_puts("STYLEOS S826 POLICY observation-only=yes ecam=not-read dma-grants=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_ECAM_QUARANTINE_827
+ quarantine827(boot,o->Buffer.Pointer,o->Buffer.Length);
+#endif
 }
 #endif
 void acpi823_terminal(const struct boot_info *boot){

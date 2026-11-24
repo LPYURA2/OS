@@ -9,6 +9,9 @@ struct styleos823_firmware {
  const uint8_t *ssdt[STYLEOS823_MAX_SSDT];
  uint32_t ssdt_len[STYLEOS823_MAX_SSDT];
  uint32_t ssdt_count;
+#ifdef STYLEOS_TEST_ECAM_QUARANTINE_827
+ const uint8_t *mcfg;
+#endif
  uint32_t mcfg_len;
  uint32_t root_count;
 };
