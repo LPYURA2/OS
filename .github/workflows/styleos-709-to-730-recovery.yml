@@ -591,6 +591,12 @@ jobs:
             --output build/recovery-canonical/acpi-841/qemu 2>&1 | tee build/recovery-canonical/acpi-841/qemu.log
           python3 tools/iommu_alias_841_verify.py --input build/recovery-canonical/acpi-841/qemu --output build/recovery-canonical/acpi-841/results.json | tee build/recovery-canonical/acpi-841/replay.log
 
+      - name: 841 Reject tampered paths, omitted table rows and counterfeit authority
+        if: github.ref_name == 'feature/styleos-alias-census-841'
+        run: |
+          set -euo pipefail
+          python3 tools/test_iommu_alias_841_negative.py --input build/recovery-canonical/acpi-841/qemu --report build/recovery-canonical/acpi-841/results.json | tee build/recovery-canonical/acpi-841/negative.log
+
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
           set -euo pipefail

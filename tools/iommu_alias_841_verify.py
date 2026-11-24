@@ -15,6 +15,7 @@ def replay(raw,efi,mode):
     i=lines.index(obs[0])
     need(lines[i:i+len(obs)]==obs and i==lines.index(PARENT_POLICY)+1 and i+len(obs)<lines.index('STYLEOS S823 PASS'),'S841 placement')
     owner=ownership_report(raw,'x86_64');src=owner['source_data'];maps=parse(efi,src['stride'],src['version'])
+    need(not owner['state_before']['aux0']&(1<<12),'S841 requires four-level root')
     def fields(line,tag,*keys):
         m=re.fullmatch('STYLEOS '+tag+''.join(' '+k+'=0x([0-9a-f]{16})' for k in keys),line)
         need(m is not None,'S841 schema '+tag);return tuple(int(v,16) for v in m.groups())
@@ -23,7 +24,8 @@ def replay(raw,efi,mode):
     for x in [x for x in lines if x.startswith('STYLEOS S840 MTRR ')]:
         idx,b,m=fields(x,'S840 MTRR','index','base','mask')
         need(idx==len(pairs),'S841 MTRR order');pairs.append(dict(base=b,mask=m))
-    need(len(pairs)==n,'S841 MTRR count')
+    need((root,pat,bits)==(owner['state_before']['root'],owner['state_before']['pat'],owner['state_before']['bits']) and 36<=bits<=52,'S841 CPU binding')
+    need(len(pairs)==n==cap&255 and n<=16,'S841 MTRR count')
     baseline=[];candidate=[]
     for line in lines:
         m=re.fullmatch(r'STYLEOS MEMMAP (RESERVED|CANDIDATE) 0x([0-9a-f]{16}) 0x([0-9a-f]{16})',line)
@@ -78,6 +80,7 @@ def replay(raw,efi,mode):
             va=prefix|(slot<<(12+9*(level-1)))
             if level==1 or e&128:
                 size=1<<(12+9*(level-1));need(level==1 or not e&(size-1)&~0x1fff,'S841 leaf alignment')
+                need(level!=3 or owner['state_before']['features']&2,'S841 unsupported 1GiB leaf')
                 lo=e&mask&~(size-1);hi=lo+size;leaves+=1
                 if a<b and lo<b and a<hi:
                     start=max(a,lo);end=min(b,hi);v=va+start-lo
@@ -88,7 +91,9 @@ def replay(raw,efi,mode):
     scan(root&~4095,0,4)
     need(take('TOTAL','paths','denied')==(visited,denied) and obs[cursor:]==[POLICY],'S841 totals/policy')
     need(visited>0,'S841 no root evidence')
-    if a<b:need(any(x['identity'] and x['physical']==a and x['end']==b for x in aliases) or denied>0,'S841 expected identity or unresolved path')
+    if a<b:
+        # A cover may straddle several valid leaves; check each page rather than requiring one leaf.
+        need(all(any(x['identity'] and x['physical']<=pa and pa+4096<=x['end'] for x in aliases) for pa in range(a,b,4096)) or denied>0,'S841 expected identity or unresolved path')
     return dict(status='COMPLETE_INHERITED_ROOT' if not denied else 'PARTIAL',paths=visited,denied=denied,leaves=leaves,aliases=aliases,production_cr3_authorized=False)
 def run(folder):
     prior=parent(folder);meta=json.loads((folder/'results.json').read_text());manifest=json.loads((folder/'build/manifest.json').read_text())
