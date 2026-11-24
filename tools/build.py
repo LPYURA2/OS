@@ -36,7 +36,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False):
+    if test_timer_scheduler_843:
+        test_apic_root_842 = True
     if test_apic_root_842:
         test_owned_low = True
     if test_alias_census_841:
@@ -323,6 +325,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/ist_guard_plan_785.c', 'kernel/root_minimization_789.c', 'kernel/root_slot_trial_789.c']
     if test_wx_fault:
         common += ['kernel/ist_guard_plan_785.c', 'kernel/owned_low_790.c', 'kernel/wx_fault_trial_791.c']
+    if test_timer_scheduler_843:
+        common += ['kernel/tasks.c','kernel/timer_context_843.c',
+                   'arch/x86_64/timer_context_843.S','arch/x86_64/timer_workload_843.S']
     if test_apic_root_842:
         common += ['kernel/apic_root_842.c','kernel/apic_pe_842.c','kernel/cache_policy_800.c',
                    'kernel/acpi_madt_806.c','boot/x86_64/acpi_madt_806.c',
@@ -457,6 +462,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_wx_fault:
         flags.append('-DSTYLEOS_TEST_WX_FAULT_791=1')
         if test_wx_exec: flags.append('-DSTYLEOS_TEST_WX_EXEC_791=1')
+    if test_timer_scheduler_843:
+        flags.append('-DSTYLEOS_TEST_TIMER_SCHEDULER_843=1')
     if test_apic_root_842:
         flags.append('-DSTYLEOS_TEST_APIC_ROOT_842=1')
     if test_owned_low:
@@ -713,6 +720,8 @@ def main():
                           help='791 isolated hardware supervisor RX write protection fault')
     negative.add_argument('--test-wx-exec-791', action='store_true',
                           help='791 isolated hardware NX instruction fetch protection fault')
+    negative.add_argument('--test-timer-scheduler-843', action='store_true',
+                          help='843 isolated hardware timer preemption of two integer tasks')
     negative.add_argument('--test-apic-root-842', action='store_true',
                           help='842 terminal own-root PIT IRQ with guarded IST')
     negative.add_argument('--test-owned-low-790', action='store_true',
@@ -763,6 +772,8 @@ def main():
     parser.add_argument('--update-public-key', type=Path, help='Raw Ed25519 verification key')
     parser.add_argument('--test-update-fail', action='store_true', help='Trial intentionally never becomes ready')
     args = parser.parse_args()
+    if args.test_timer_scheduler_843:
+        args.test_apic_root_842 = True
     if args.test_apic_root_842:
         args.test_owned_low_790 = True
     if args.test_alias_census_841:
@@ -913,6 +924,7 @@ def main():
                'pci-probe-794' if args.test_pci_probe_794 else
                'wx-exec-791' if args.test_wx_exec_791 else
                'wx-write-791' if args.test_wx_write_791 else
+               'timer-scheduler-843' if args.test_timer_scheduler_843 else
                'apic-root-842' if args.test_apic_root_842 else
                'owned-low-790' if args.test_owned_low_790 else
                'root-slots-789' if args.test_root_slots_789 else
@@ -961,6 +973,8 @@ def main():
                              **({'test_wx_fault': True, 'test_wx_exec': args.test_wx_exec_791} if (args.test_wx_write_791 or args.test_wx_exec_791) else {}),
                              **({'test_owned_low': True} if args.test_owned_low_790 else {}),
                              **({'test_apic_root_842': True} if args.test_apic_root_842 else {}),
+        **({'test_timer_scheduler_843': True} if args.test_timer_scheduler_843 else {}),
+                             **({'test_timer_scheduler_843': True} if args.test_timer_scheduler_843 else {}),
                              **({'test_hw_probe_793': True} if args.test_hw_probe_793 else {}),
                              **({'test_pci_probe_794': True} if args.test_pci_probe_794 else {}),
                              **({'test_pci_aperture_795': True} if args.test_pci_aperture_795 else {}),

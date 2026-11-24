@@ -1,0 +1,7 @@
+# Stage 843 — isolated real timer preemption candidate
+
+Accepted base S842 0585c5ca6c0cce5c18840088efd2a1915890fe6c, run 45438372833 SUCCESS 193 PASS / 5 SKIPPED. Archive SHA256 d1f326504146fd80f665f4dc889c8c1a467898540d490b0c2ec4990375d50cbf. Original UART independent replay exact, 11 refusals; source/binary checksums match. Real S842 IRQ reached owned root with seven low table pages; one IRQ delivered and EOI observed. No production activation.
+
+S843 publishes the locally prepared integer-only context model (GCC and UBSan 125 + 644 checks each) and isolated --test-timer-scheduler-843 guest candidate. Reuse S842 live memory/cache/descriptor admission. Two image-owned 16 KiB task stacks and independent assembly loops with no voluntary yield; 15 GPRs seeded separately and verified per real IRQ, IST1 five-word hardware frame, IRETQ resume, sixteen alternating ticks and independent progress counters. Every IRQ must observe LAPIC ISR and EOI, unchanged CR3 and correct live frame. Terminal restore of IOAPIC/LAPIC/IDT; PIT phase not restored. Separate verifier and genuine-capture mutations. No FP/SIMD, CPL3, general allocator, SMP, actual Desktop integration or production authority. New hardware profile is untested at commit creation; require exact CI and original evidence before acceptance. No changes to ordinary Desktop or accepted refs.
+
+Next: verify actual guest execution and repair any failures, then physical memory ownership and integrate isolated user processes and ordinary Desktop. Foundation not complete.
