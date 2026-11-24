@@ -1,0 +1,38 @@
+#include <styleos/process_entry_847.h>
+#define P UINT64_C(4096)
+#define LOW (UINT64_C(1)<<47)
+static bool region(const void *p,size_t n,size_t a){return p&&!((uintptr_t)p%a)&&n<=UINTPTR_MAX-(uintptr_t)p;}
+static bool separate(const void *a,size_t n,const void *b,size_t m){return (uintptr_t)a+n<=(uintptr_t)b||(uintptr_t)b+m<=(uintptr_t)a;}
+static uint64_t get64(const uint8_t *p){uint64_t v=0;for(unsigned i=0;i<8;i++)v|=(uint64_t)p[i]<<(8*i);return v;}
+static void put64(uint8_t *p,uint64_t v){for(unsigned i=0;i<8;i++)p[i]=(uint8_t)(v>>(8*i));}
+bool s847_gdt_append(uint8_t *g,size_t len,uint16_t limit,uint16_t tr,uint16_t cs,struct s847_selectors *out){
+ unsigned end=(unsigned)limit+1;
+ if(len!=P||!region(g,len,P)||!region(out,sizeof *out,_Alignof(struct s847_selectors))||!separate(g,len,out,sizeof *out)||!end||(end&7)||end>P-16||!tr||(tr&7)||!cs||(cs&7)||(unsigned)tr+16!=end||(unsigned)cs+8>tr)return false;
+ uint64_t code=get64(g+cs),tss=get64(g+tr),high=get64(g+tr+8);
+ uint64_t tssbase=((tss>>16)&0xffffff)|((tss>>56)<<24)|(high<<32);
+ if(((code>>40)&0xfe)!=0x9a||!(code&(UINT64_C(1)<<53))||(code&(UINT64_C(1)<<54))||((tss>>40)&255)!=0x8b||((tss>>52)&15)||((tss>>48)&15)||(tss&0xffff)!=103||(high>>16)||!tssbase||tssbase>=LOW-P||(tssbase&(P-1))||get64(g+end)||get64(g+end+8))return false;
+ /* Accessed bit preset: descriptor reads need not modify GDT. Flat long-mode RX code / writable data. */
+ put64(g+end,UINT64_C(0x00affa000000ffff)|UINT64_C(0x0000010000000000));
+ put64(g+end+8,UINT64_C(0x00cff2000000ffff)|UINT64_C(0x0000010000000000));
+ *out=(struct s847_selectors){(uint16_t)(end|3),(uint16_t)((end+8)|3),(uint16_t)(end+15)};return true;
+}
+bool s847_decode(const struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root,uint16_t cs,uint16_t ss,struct up_context *out,struct up_event *ev){
+ if(!region(f,sizeof *f,_Alignof(struct s847_raw))||!region(out,sizeof *out,_Alignof(struct up_context))||!region(ev,sizeof *ev,_Alignof(struct up_event))||!separate(f,sizeof *f,out,sizeof *out)||!separate(f,sizeof *f,ev,sizeof *ev)||!separate(out,sizeof *out,ev,sizeof *ev)||!root||root>=LOW||(root&(P-1))||(cs&7)!=3||(ss&7)!=3||cs<11||ss<11||cs==ss||f->cs!=cs||f->ss!=ss||!(f->rflags&2)||(f->rflags&~UINT64_C(0x8d7))||f->rip<S846_CODE||f->rip>=S846_CODE+P||f->rsp<S846_STACK||f->rsp>S846_STACK+P)return false;
+ uint64_t ist;
+ if(f->vector==128){if(f->error)return false;ist=S846_IST;}
+ else if(f->vector==14){if(!(f->error&4)||(f->error&~UINT64_C(7))||cr2>=LOW)return false;ist=S846_IST+3*P;}
+ else return false;
+ if(va!=ist+P-16-sizeof *f)return false;
+ struct up_context c={.sp=f->rsp,.pc=f->rip,.status=f->rflags,.cs=f->cs,.ss=f->ss};
+ for(unsigned i=0;i<15;i++)c.gpr[i]=f->gpr[i];
+ struct up_event e={.kind=f->vector==14?UP_FAULT:UP_EVENT_NONE,.vector=f->vector,.syndrome=f->error,.fault_va=f->vector==14?cr2:0,.active_root=root,.kernel_sp=va};
+ *out=c;*ev=e;return true;
+}
+
+bool s847_apply_raw(struct s847_control *ctl,struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root,struct s847_decision *out){
+ if(!region(ctl,sizeof *ctl,_Alignof(struct s847_control))||!region(f,sizeof *f,_Alignof(struct s847_raw))||!region(out,sizeof *out,_Alignof(struct s847_decision))||!separate(ctl,sizeof *ctl,f,sizeof *f)||!separate(ctl,sizeof *ctl,out,sizeof *out)||!separate(f,sizeof *f,out,sizeof *out)||ctl->cs>UINT16_MAX||ctl->ss>UINT16_MAX)return false;
+ struct up_context c;struct up_event e;struct s847_decision d;
+ if(!s847_decode(f,va,cr2,root,(uint16_t)ctl->cs,(uint16_t)ctl->ss,&c,&e)||!s847_trap(ctl,&c,&e,&d))return false;
+ if(d.action==S847_RETURN)f->gpr[0]=d.result;
+ *out=d;return true;
+}

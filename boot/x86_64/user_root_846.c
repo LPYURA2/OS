@@ -41,6 +41,9 @@ static uint64_t read_word(uint64_t a){return *(volatile uint64_t *)(uintptr_t)a;
 static void write_word(uint64_t a,uint64_t v){*(volatile uint64_t *)(uintptr_t)a=v;}
 static bool zero_span(uint64_t pa,uint64_t bytes){const volatile unsigned char *b=(const void *)(uintptr_t)pa;for(uint64_t i=0;i<bytes;i++)if(b[i])return false;return true;}
 static void clear_span(void *pa,size_t bytes){volatile unsigned char *b=pa;for(size_t i=0;i<bytes;i++)b[i]=0;}
+#ifdef STYLEOS_TEST_PROCESS_TRIAL_847
+void s847_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t);
+#endif
 void s846_guest_run(uint64_t root){
  uint16_t cs;__asm__ volatile("mov %%cs,%0":"=r"(cs));
  /* No PCID/PGE/LA57/SMAP. Do not change policy to force this profile to pass. */
@@ -68,6 +71,9 @@ void s846_guest_run(uint64_t root){
   for(unsigned j=0;j<3;j++)if(g[j]!=UINT64_C(0x84610000)+j)fail("live-guard");
   arch_puts("STYLEOS S846 SWITCH");fld("id",i);fld("live",live);fld("after",cr3());fld("code",code);fld("data",data);fld("stack",stack);fld("write-data",read_word(leases[i].pa+P));fld("write-stack",read_word(leases[i].pa+2*P));fld("foreign-data",read_word(leases[1-i].pa+P));for(unsigned j=0;j<3;j++)fld(j==0?"g1":j==1?"g2":"g3",g[j]);arch_putc('\n');
  }
+#ifdef STYLEOS_TEST_PROCESS_TRIAL_847
+ s847_trial(child,leases,root);
+#endif
  if(!s846_audit_pair(safe,cache,a,leases,&guards,&child[0],&child[1]))fail("post-switch-audit");
  /* Invalidate detached contexts before releasing any mapped data. */
  clear_span(child,sizeof child);clear_span(tables,sizeof tables);
