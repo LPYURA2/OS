@@ -1,0 +1,5 @@
+# S838 — detached mapping observation contract
+
+Accepted S837 bf6d787a06452d68e77f9fbd5c8654570ad6c517, CI 45410130771 SUCCESS (184 PASS, 5 SKIPPED). S838 checks a detached protected plan and synthetic translation records for only the two known Q35 IOMMU covers. Require normalized disjoint plan ranges, complete cover, consistent first/last translations, raw leaf consistency and bounded physical-cache observations. No target register access, changes to mappings, allocation, effective-cache guarantee, alias proof or ownership grant. CI independently replays fresh S837 guest evidence before exercising this host contract.
+
+Local preflight UBSan timeout resolved on rerun (153/153); strengthened contract 209/209 each GCC and UBSan, identical reports; COFF PASS. All five genuine S837 plans replayed, with synthetic mapping inputs only. No new guest mapping evidence. Full CI and independent replay required before acceptance. Next: separately observe mappings in a dedicated diagnostic profile using existing read-only evidence mechanisms. Do not infer physical-device support or production authority.
