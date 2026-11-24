@@ -1,3 +1,7 @@
+## Stage 857 — same-boot storage fixture candidate
+
+Accepted S856 24b424d581b86dd1b500cd57755ac835b8b9903a, CI 45490977416 SUCCESS: 219 PASS, 5 SKIPPED, 0 FAIL; independent raw replay passed. See [handoff](NEXT_CHAT_857.md). No ATA admission or kernel/UI changes. Focused guest experiment pending; full regression still required.
+
 ## Stage 856 — terminal storage topology (candidate)
 
 See [handoff](NEXT_CHAT_856.md), [post-kernel roadmap](POST_KERNEL_ROADMAP.md). No ATA admission, production root or UI change.
