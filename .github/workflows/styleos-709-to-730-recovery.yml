@@ -87,6 +87,7 @@ on:
       - feature/styleos-observation-collector-839
       - feature/styleos-guest-observation-840
       - feature/styleos-alias-census-841
+      - feature/styleos-apic-root-842
   workflow_dispatch:
 
 permissions:
@@ -268,7 +269,7 @@ jobs:
             2>&1 | tee build/recovery-canonical/acpica-823/negative.log
 
       - name: 824 Refuse malformed resource descriptors and forged UART
-        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-824
@@ -276,7 +277,7 @@ jobs:
             2>&1 | tee build/recovery-canonical/acpi-824/negative.log
 
       - name: 824 Capture evaluated PCI0 CRS and correlate UEFI MCFG live buses
-        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-824
@@ -299,7 +300,7 @@ jobs:
           PYCODE
 
       - name: 825 Audit same-boot allocated UEFI windows against AML producer windows and ECAM exclusion
-        if: github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-825
@@ -307,7 +308,7 @@ jobs:
             --output build/recovery-canonical/acpi-825 2>&1 | tee build/recovery-canonical/acpi-825/run.log
 
       - name: 826 Test final map capture and replay guards on authentic parent UART with synthetic records
-        if: github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-826
@@ -318,7 +319,7 @@ jobs:
           python3 tools/test_acpi_ecam_826_verify.py build/recovery-canonical/acpi-824/qemu/disabled | tee build/recovery-canonical/acpi-826/negative.log
 
       - name: 826 Evaluate DRAC native AML and capture exact final UEFI map in QEMU
-        if: github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --ecam-826 \
@@ -340,7 +341,7 @@ jobs:
           PYCODE
 
       - name: 827 Test native ECAM quarantine with actual MCFG DRAC and synthetic EFI maps
-        if: github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-827
@@ -354,7 +355,7 @@ jobs:
           python3 tools/test_ecam_quarantine_827_negative.py build/recovery-canonical/acpi-826/qemu/disabled | tee build/recovery-canonical/acpi-827/negative.log
 
       - name: 827 Prove detached native ECAM exclusion against same-boot UEFI map in QEMU
-        if: github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --ecam-quarantine-827 \
@@ -376,14 +377,14 @@ jobs:
           PYCODE
 
       - name: 828 Test independent IOMMU inventory decoder and forged records
-        if: github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-828
           python3 tools/test_iommu_evidence_828.py build/recovery-canonical/acpi-827/qemu/disabled | tee build/recovery-canonical/acpi-828/negative.log
 
       - name: 828 Capture same-boot DMAR IVRS and live requester topology in QEMU
-        if: github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --iommu-evidence-828 \
@@ -392,7 +393,7 @@ jobs:
             --output build/recovery-canonical/acpi-828/qemu 2>&1 | tee build/recovery-canonical/acpi-828/run.log
 
       - name: 829 Verify conservative requester association and replay fresh S828 inventory
-        if: github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-829
@@ -400,7 +401,7 @@ jobs:
           python3 tools/replay_requester_plan_829.py --input build/recovery-canonical/acpi-828/qemu --output build/recovery-canonical/acpi-829 | tee build/recovery-canonical/acpi-829/run.log
 
       - name: 830 Test IOAPIC source classification and forged MADT records
-        if: github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-830
@@ -408,7 +409,7 @@ jobs:
           python3 tools/test_irq_sources_830_uart.py build/recovery-canonical/acpi-828/qemu | tee build/recovery-canonical/acpi-830/negative.log
 
       - name: 830 Capture MADT and correlate Intel AMD interrupt sources in same QEMU boot
-        if: github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --irq-sources-830 \
@@ -417,7 +418,7 @@ jobs:
             --output build/recovery-canonical/acpi-830/qemu 2>&1 | tee build/recovery-canonical/acpi-830/run.log
 
       - name: 831 Refine diagnostic DMA associations using fresh verified MADT inventory
-        if: github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-dma-association-831' || github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-831
@@ -426,7 +427,7 @@ jobs:
           python3 tools/replay_dma_association_831.py --input build/recovery-canonical/acpi-830/qemu --output build/recovery-canonical/acpi-831 | tee build/recovery-canonical/acpi-831/run.log
 
       - name: 832 Audit IOMMU first-page coverage and conflicts without MMIO access
-        if: github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-iommu-base-page-832' || github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-832
@@ -435,14 +436,14 @@ jobs:
           python3 tools/replay_iommu_base_page_832.py --input build/recovery-canonical/acpi-830/qemu --association build/recovery-canonical/acpi-831/results.json --output build/recovery-canonical/acpi-832 | tee build/recovery-canonical/acpi-832/run.log
 
       - name: 833 Test QMP aperture capture and synthetic map refusals
-        if: github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-833
           python3 tools/test_iommu_aperture_833.py build/recovery-canonical/acpi-830/qemu | tee build/recovery-canonical/acpi-833/host.log
 
       - name: 833 Correlate initial QEMU MMIO apertures with same-process final UEFI map
-        if: github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-iommu-aperture-833' || github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --irq-sources-830 --capture-mtree-833 \
@@ -452,14 +453,14 @@ jobs:
           python3 tools/iommu_aperture_833.py --input build/recovery-canonical/acpi-833/qemu --output build/recovery-canonical/acpi-833 | tee build/recovery-canonical/acpi-833/run.log
 
       - name: 834 Test post-EBS gate protocol with original initial maps and synthetic snapshots
-        if: github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-834
           python3 tools/test_post_ebs_834.py build/recovery-canonical/acpi-833/qemu | tee build/recovery-canonical/acpi-834/host.log
 
       - name: 834 Compare same-process preboot and post-EBS IOMMU apertures in QEMU
-        if: github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-post-ebs-aperture-834' || github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --irq-sources-830 --capture-post-ebs-834 \
@@ -469,7 +470,7 @@ jobs:
           python3 tools/post_ebs_aperture_834.py --input build/recovery-canonical/acpi-834/qemu --output build/recovery-canonical/acpi-834 | tee build/recovery-canonical/acpi-834/run.log
 
       - name: 835 Test native deny-only map and fixture derivation from fresh S834 evidence
-        if: github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-835
@@ -486,7 +487,7 @@ jobs:
           cmp build/recovery-canonical/acpi-835/native-normal.json build/recovery-canonical/acpi-835/native-ubsan.json
 
       - name: 835 Verify native guest detached deny-only map against paired QMP evidence
-        if: github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-iommu-quarantine-835' || github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --irq-sources-830 --capture-post-ebs-834 --native-quarantine-835 \
@@ -496,7 +497,7 @@ jobs:
           python3 tools/iommu_quarantine_835_verify.py --input build/recovery-canonical/acpi-835/qemu --output build/recovery-canonical/acpi-835 | tee build/recovery-canonical/acpi-835/run.log
 
       - name: 836 Validate detached plan composition on fresh verified S835 evidence
-        if: github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-ownership-compose-836' || github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-836
@@ -512,7 +513,7 @@ jobs:
           clang --target=x86_64-pc-windows-msvc -ffreestanding -fno-builtin -O2 -Wall -Wextra -Werror -I include -c kernel/iommu_plan_836.c -o build/recovery-canonical/acpi-836/plan.obj
 
       - name: 837 Verify guest plan provenance and composition refusal contracts
-        if: github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-837
@@ -520,7 +521,7 @@ jobs:
           python3 tools/test_guest_plan_837_preflight.py build/recovery-canonical | tee build/recovery-canonical/acpi-837/preflight.log
 
       - name: 837 Observe both diagnostic plans in the same QEMU boot
-        if: github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-guest-plan-837' || github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --irq-sources-830 --capture-post-ebs-834 --native-quarantine-835 --guest-plan-837 \
@@ -530,7 +531,7 @@ jobs:
           python3 tools/iommu_guest_837_verify.py --input build/recovery-canonical/acpi-837/qemu --output build/recovery-canonical/acpi-837 | tee build/recovery-canonical/acpi-837/run.log
 
       - name: 838 Verify detached mapping observation contract on fresh S837 plans
-        if: github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-mapping-contract-838' || github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-838
@@ -546,7 +547,7 @@ jobs:
           clang --target=x86_64-pc-windows-msvc -ffreestanding -fno-builtin -O2 -Wall -Wextra -Werror -I include -c kernel/iommu_mapping_838.c -o build/recovery-canonical/acpi-838/mapping.obj
 
       - name: 839 Validate observation collector on fresh S837 plans
-        if: github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-observation-collector-839' || github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-839
@@ -562,7 +563,7 @@ jobs:
           clang --target=x86_64-pc-windows-msvc -ffreestanding -fno-builtin -O2 -Wall -Wextra -Werror -I include -c kernel/iommu_collect_839.c -o build/recovery-canonical/acpi-839/collector.obj
 
       - name: 840 Reject synthetic forged observation records on verified S837 evidence
-        if: github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-840
@@ -570,7 +571,7 @@ jobs:
           python3 tools/test_iommu_observe_840_negative.py --input build/recovery-canonical/acpi-837/qemu | tee build/recovery-canonical/acpi-840/negative.log
 
       - name: 840 Observe actual inherited IOMMU cover mappings in independent QEMU boots
-        if: github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-guest-observation-840' || github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-840
@@ -581,7 +582,7 @@ jobs:
           python3 tools/iommu_observe_840_verify.py --input build/recovery-canonical/acpi-840/qemu --output build/recovery-canonical/acpi-840/results.json | tee build/recovery-canonical/acpi-840/replay.log
 
       - name: 841 Census inherited table paths and independently reconstruct aliases in QEMU
-        if: github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-841
@@ -595,10 +596,26 @@ jobs:
           python3 tools/iommu_alias_841_verify.py --input build/recovery-canonical/acpi-841/qemu --output build/recovery-canonical/acpi-841/results.json | tee build/recovery-canonical/acpi-841/replay.log
 
       - name: 841 Reject tampered paths, omitted table rows and counterfeit authority
-        if: github.ref_name == 'feature/styleos-alias-census-841'
+        if: github.ref_name == 'feature/styleos-alias-census-841' || github.ref_name == 'feature/styleos-apic-root-842'
         run: |
           set -euo pipefail
           python3 tools/test_iommu_alias_841_negative.py --input build/recovery-canonical/acpi-841/qemu --report build/recovery-canonical/acpi-841/results.json | tee build/recovery-canonical/acpi-841/negative.log
+
+      - name: 842 Build detached owned APIC root and reject invalid maps
+        if: github.ref_name == 'feature/styleos-apic-root-842'
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/apic-842
+          for mode in normal ubsan; do
+            flags=()
+            if test "$mode" = ubsan; then flags=(-fsanitize=undefined -fno-sanitize-recover=all); fi
+            gcc -std=c11 -O2 -Wall -Wextra -Werror -I include "${flags[@]}" kernel/apic_root_842.c tests/test_apic_root_842.c kernel/paging.c kernel/cache_policy_800.c -o build/recovery-canonical/apic-842/test-$mode
+            build/recovery-canonical/apic-842/test-$mode | tee build/recovery-canonical/apic-842/$mode.log
+          done
+          cmp build/recovery-canonical/apic-842/normal.log build/recovery-canonical/apic-842/ubsan.log
+          clang --target=x86_64-pc-windows-msvc -O2 -ffreestanding -fno-builtin -Wall -Wextra -Werror -I include -c kernel/apic_root_842.c -o build/recovery-canonical/apic-842/root.obj
+          objdump -t build/recovery-canonical/apic-842/root.obj > build/recovery-canonical/apic-842/symbols.log
+          if grep -q '__chkstk' build/recovery-canonical/apic-842/symbols.log; then exit 1; fi
 
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
@@ -1873,6 +1890,7 @@ jobs:
             build/recovery-canonical/acpica-821/qemu/upstream-core/core-manifest.json
             build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
             --output build/recovery-canonical/acpi-841/qemu 2>&1 | tee build/recovery-canonical/acpi-841/qemu.log
+            build/recovery-canonical/apic-842/*.log
             build/recovery-canonical/acpi-841/*.log
             build/recovery-canonical/acpi-841/results.json
             build/recovery-canonical/acpi-841/qemu/results.json

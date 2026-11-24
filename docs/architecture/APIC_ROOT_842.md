@@ -1,0 +1,7 @@
+# S842 — detached owned APIC root, integration milestone
+
+Accepted S841 cc965962327add8ca92454897c8098f944daa7d6, CI 45435034196 SUCCESS: 190 PASS / 5 SKIPPED / 0 FAIL. Artifact SHA256 2c25f63cd67afb616154c65bc510b3199c3d9b3ff9838bde41884e88401b4086, source and binaries verified; independent raw replay byte-identical; 95 host refusals. All five modes partial: 64 admitted paths, 452 denied, 31743 leaves. Never infer global alias absence.
+
+Publish the prepared detached root builder: common pg_build plus exactly two UC RW/NX supervisor-only identity pages for LAPIC and IOAPIC, WB RAM, bounded full detached tree audit, reject extra/foreign/shared tables and permission/cache changes. Caller must attest storage, actual MADT/MSR, live PAT/MTRR and device ownership. No active root write, CR3 activation, MMIO access or DMA authorization. Model tests only in this revision. Ordinary Desktop unchanged.
+
+Next within 842: combine S790 PE/stack ownership and S807 timer/IRQ in a separate guest profile, with same-boot address/cache provenance and safe return/terminal failure. Do not activate production root on partial S841 evidence. Use a fully owned root with explicit leaf audit and no inherited global TLB entries. Hardware validation required before claiming integration; then scheduler, physical memory and isolation. Foundation incomplete.
