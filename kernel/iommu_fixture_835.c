@@ -23,14 +23,22 @@ static int resources(struct s835_input *x,const uint8_t *p,size_t n,int uefi){
  }
  return 0;
 }
-int s835_input_from_tables(unsigned backend,const uint8_t *table,size_t tn,const uint8_t *madt,size_t an,const uint8_t *crs,size_t cn,const uint8_t *root,size_t rn,struct s835_input *out){
- if(!out||backend>2)return 0;
- struct s835_input x={0};x.backend=backend;
+static int separate(const void *a,size_t an,const void *b,size_t bn){
+ uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
+ if(!a||!an||x>UINTPTR_MAX-an)return 0;
+ if(!bn)return 1;
+ return b&&y<=UINTPTR_MAX-bn&&(x+an<=y||y+bn<=x);
+}
+int s835_input_from_tables(unsigned backend,const uint8_t *table,size_t tn,const uint8_t *madt,size_t an,const uint8_t *crs,size_t cn,const uint8_t *root,size_t rn,struct s835_input *out,struct s835_input *scratch){
+ if(backend>2||!separate(out,sizeof *out,scratch,sizeof *scratch))return 0;
+ const void *inputs[]={table,madt,crs,root};size_t lengths[]={tn,an,cn,rn};
+ for(unsigned i=0;i<4;i++)if(!separate(out,sizeof *out,inputs[i],lengths[i])||!separate(scratch,sizeof *scratch,inputs[i],lengths[i]))return 0;
+ *scratch=(struct s835_input){0};scratch->backend=backend;
  if(backend==0){if(tn)return 0;}
- else if(backend==1){struct dmar808_info d={0};if(!dmar808_parse(table,tn,&d)||d.drhd_count!=1||d.drhd[0].segment||d.drhd[0].base!=UINT64_C(0xfed90000))return 0;x.aperture=(struct boot_range){0xfed90000,0xfed90230};}
- else {struct iommu810_ivrs d={0};if(!ivrs810_parse(table,tn,&d)||d.ivhd_count!=1||d.units[0].pci_segment||d.units[0].mmio_base!=UINT64_C(0xfed80000))return 0;x.aperture=(struct boot_range){0xfed80000,0xfed84000};}
+ else if(backend==1){struct dmar808_info d={0};if(!dmar808_parse(table,tn,&d)||d.drhd_count!=1||d.drhd[0].segment||d.drhd[0].base!=UINT64_C(0xfed90000))return 0;scratch->aperture=(struct boot_range){0xfed90000,0xfed90230};}
+ else {struct iommu810_ivrs d={0};if(!ivrs810_parse(table,tn,&d)||d.ivhd_count!=1||d.units[0].pci_segment||d.units[0].mmio_base!=UINT64_C(0xfed80000))return 0;scratch->aperture=(struct boot_range){0xfed80000,0xfed84000};}
  struct acpi806_topology m={0};if(!acpi806_madt(madt,an,&m)||!m.ioapic_count)return 0;
- if(!resources(&x,crs,cn,0)||!resources(&x,root,rn,1))return 0;
- for(unsigned i=0;i<m.ioapic_count;i++){uint64_t a=m.ioapic[i].physical;if(!a||(a&4095u)||!add(&x,a,a+4096))return 0;}
- *out=x;return 1;
+ if(!resources(scratch,crs,cn,0)||!resources(scratch,root,rn,1))return 0;
+ for(unsigned i=0;i<m.ioapic_count;i++){uint64_t a=m.ioapic[i].physical;if(!a||(a&4095u)||!add(scratch,a,a+4096))return 0;}
+ *out=*scratch;return 1;
 }

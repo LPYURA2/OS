@@ -8,7 +8,7 @@ from post_ebs_aperture_834 import READY,ACK
 class R(c.Structure):_fields_=[('start',c.c_uint64),('end',c.c_uint64)]
 class I(c.Structure):_fields_=[('backend',c.c_uint),('aperture',R),('others',R*256),('nr_others',c.c_size_t)]
 fn=c.CDLL(sys.argv[1]).s835_input_from_tables
-fn.argtypes=[c.c_uint]+[c.c_void_p,c.c_size_t]*4+[c.POINTER(I)];fn.restype=c.c_int
+fn.argtypes=[c.c_uint]+[c.c_void_p,c.c_size_t]*4+[c.POINTER(I),c.POINTER(I)];fn.restype=c.c_int
 n=0;uart_n=0
 for mode,backend in BACKEND.items():
  p=Path(sys.argv[2])/mode
@@ -16,10 +16,10 @@ for mode,backend in BACKEND.items():
  raw=(p/'serial.log').read_bytes();gated=(p/'serial-gated.log').read_bytes();t=json.loads((p/'qmp-834.json').read_text())
  ok,d=verify(raw,33,mode);assert ok;w=reconcile(d)
  blobs=[(p/f).read_bytes() for f in ('iommu-table.bin','madt.bin','crs.bin','uefi-root-0.bin')]
- def run(bs,be=backend,good=True):
+ def run(bs,be=backend,good=True,alias=False):
   global n
   out=I();c.memset(c.byref(out),0xa5,c.sizeof(out));before=bytes(out)
-  args=[v for b in bs for v in (b,len(b))];assert fn(be,*args,c.byref(out))==int(good),mode
+  scratch=I();args=[v for b in bs for v in (b,len(b))];assert fn(be,*args,c.byref(out),c.byref(out if alias else scratch))==int(good),mode
   if not good:assert bytes(out)==before
   n+=1;return out
  v=run(blobs);want=[v[1:] for v in w['producer_windows'] if v[0]==0]+[[v['start'],v['end']] for v in w['allocated_windows'] if v['kind']==0]+[[v['address'],v['address']+4096] for v in d['s830_ioapics']]
@@ -28,6 +28,13 @@ for mode,backend in BACKEND.items():
   if not b:continue
   bs=list(blobs);bs[j]=b[:-1];run(bs,good=False)
  run(blobs,3,False)
+ run(blobs,good=False,alias=True)
+ # Workspace overlapping a readable input must be refused before writing.
+ for k in (0,1,2,3):
+  if not blobs[k]:continue
+  tmp=I();out=I();c.memset(c.byref(out),0xa5,c.sizeof(out));before=bytes(out);buf=bytes(tmp)
+  args=[v for b in blobs for v in (b,len(b))];args[2*k]=c.cast(c.byref(tmp),c.c_void_p);args[2*k+1]=min(len(blobs[k]),c.sizeof(tmp))
+  assert fn(backend,*args,c.byref(out),c.byref(tmp))==0 and bytes(out)==before and bytes(tmp)==buf;n+=1
  lines,report=records(gated,33,mode,t);assert [v.aperture.start,v.aperture.end]==report['aperture']
  anchor=b'STYLEOS S827 POLICY detached-map=yes ram-grants=no ecam=not-read dma-grants=no production-cr3=deny';assert raw.count(anchor)==1
  # QEMU line endings from the original UART are preserved.

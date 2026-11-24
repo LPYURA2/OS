@@ -289,7 +289,7 @@ int styleos823_get_firmware(struct styleos823_firmware *out){
 }
 #endif
 #ifdef STYLEOS_TEST_IOMMU_QUARANTINE_835
-static struct s835_input input835;
+static struct s835_input input835,scratch835;
 static struct s835_report report835;
 static struct s835_work work835;
 static void range835(const char *name,struct boot_range r){
@@ -299,7 +299,7 @@ int s835_guest_report(const struct boot_info *boot,const uint8_t *crs,size_t cn,
  if(!boot||!valid||!root_capture_ok||bridge_count!=1||resources_segment[0]!=0)return 0;
  const uint8_t *table=backend==IOMMU810_INTEL?dmar_copy:ivrs_copy;
  size_t tn=backend==IOMMU810_INTEL?dmar_size:backend==IOMMU810_AMD?ivrs_size:0;
- if(!s835_input_from_tables((unsigned)backend,table,tn,madt830_copy,madt830_size,crs,cn,resources_copy[0],resources_len[0],&input835))return 0;
+ if(!s835_input_from_tables((unsigned)backend,table,tn,madt830_copy,madt830_size,crs,cn,resources_copy[0],resources_len[0],&input835,&scratch835))return 0;
  if(!s835_quarantine(&input835,mcfg_copy,mcfg_size,drac,dn,(const void *)(uintptr_t)boot->memory_map,boot->memory_map_size,boot->descriptor_size,boot->descriptor_version,&report835,&work835))return 0;
  arch_puts("STYLEOS S835 SUMMARY");f("backend",backend);f("explicit-pages",report835.explicit_pages);f("gap-pages",report835.gap_pages);arch_putc('\n');
  range835("APERTURE",report835.aperture);range835("COVER",report835.cover);
