@@ -70,6 +70,7 @@ on:
       - feature/styleos-acpica-namespace-init-822
       - feature/styleos-acpica-real-hostbridge-823
       - feature/styleos-acpi-resources-824
+      - feature/styleos-acpi-windows-825
   workflow_dispatch:
 
 permissions:
@@ -251,7 +252,7 @@ jobs:
             2>&1 | tee build/recovery-canonical/acpica-823/negative.log
 
       - name: 824 Refuse malformed resource descriptors and forged UART
-        if: github.ref_name == 'feature/styleos-acpi-resources-824'
+        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-824
@@ -259,7 +260,7 @@ jobs:
             2>&1 | tee build/recovery-canonical/acpi-824/negative.log
 
       - name: 824 Capture evaluated PCI0 CRS and correlate UEFI MCFG live buses
-        if: github.ref_name == 'feature/styleos-acpi-resources-824'
+        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-824
@@ -280,6 +281,14 @@ jobs:
               assert not d['observations']['s824_resource_ownership']
           assert not r['dma_access_authorized'] and not r['production_cr3_authorized']
           PYCODE
+
+      - name: 825 Audit same-boot allocated UEFI windows against AML producer windows and ECAM exclusion
+        if: github.ref_name == 'feature/styleos-acpi-windows-825'
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpi-825
+          python3 tools/test_acpi_windows_825.py --input build/recovery-canonical/acpi-824/qemu \
+            --output build/recovery-canonical/acpi-825 2>&1 | tee build/recovery-canonical/acpi-825/run.log
 
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
@@ -1553,6 +1562,8 @@ jobs:
             build/recovery-canonical/acpica-821/qemu/qemu-device-help.log
             build/recovery-canonical/acpica-821/qemu/upstream-core/core-manifest.json
             build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
+            build/recovery-canonical/acpi-825/*.log
+            build/recovery-canonical/acpi-825/results.json
             build/recovery-canonical/acpi-824/*.log
             build/recovery-canonical/acpi-824/qemu/results.json
             build/recovery-canonical/acpi-824/qemu/*.log
