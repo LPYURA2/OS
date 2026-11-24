@@ -60,6 +60,14 @@ s847_pf_entry:
 s847_call_entry:
     pushq $0
     pushq $128
+#ifdef STYLEOS_TEST_USER_PREEMPT_848
+    jmp .Ltrap847
+.globl s848_irq_entry
+s848_irq_entry:
+    pushq $0
+    pushq $0x50
+    jmp .Ltrap847
+#endif
 .Ltrap847:
     pushq %r15
     pushq %r14
@@ -207,3 +215,30 @@ s847_1_exit:
 .Luser_bad1:
     ud2
 s847_1_end:
+
+#ifdef STYLEOS_TEST_USER_PREEMPT_848
+/* No voluntary yield or GPR changes in either busy loop. */
+.text
+.globl s848_a_start,s848_a_loop_end,s848_a_fault,s848_a_end
+s848_a_start:
+1:  incq (%rdi)
+    cmpq $0,8(%rdi)
+    je 1b
+s848_a_loop_end:
+    movabs $0x400000003000,%rax
+s848_a_fault:
+    movq (%rax),%rax
+    ud2
+s848_a_end:
+.globl s848_b_start,s848_b_loop_end,s848_b_exit,s848_b_end
+s848_b_start:
+2:  incq (%rdi)
+    cmpq $0,8(%rdi)
+    je 2b
+s848_b_loop_end:
+    movq $2,%rax
+    int $0x80
+s848_b_exit:
+    ud2
+s848_b_end:
+#endif

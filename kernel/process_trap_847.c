@@ -58,3 +58,14 @@ bool s847_trap(struct s847_control *c,const struct up_context *f,const struct up
  }else return false;
  s->context=resume;s->state=state;if(state!=S847_RUNNING)c->current=-1;*out=d;return true;
 }
+
+/* S848: distinct hardware tick transition; do not synthesize an INT80 yield.
+ * Stored context uses the existing IF=0 convention. The IRQ bridge validates
+ * the actual saved IF and restores it only on entry to the user program. */
+bool s848_suspend_tick(struct s847_control *c,const struct up_context *f,uint64_t live_root){
+ if(!shape(c)||c->current<0||!region(f,sizeof *f,_Alignof(struct up_context))||
+ !separate(c,sizeof *c,f,sizeof *f)||!context_ok(c,f))return false;
+ struct s847_slot *s=&c->slot[c->current];
+ if(s->root!=live_root)return false;
+ s->context=*f;s->state=S847_READY;c->current=-1;return true;
+}

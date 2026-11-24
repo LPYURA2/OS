@@ -43,6 +43,9 @@ static bool zero_span(uint64_t pa,uint64_t bytes){const volatile unsigned char *
 static void clear_span(void *pa,size_t bytes){volatile unsigned char *b=pa;for(size_t i=0;i<bytes;i++)b[i]=0;}
 #ifdef STYLEOS_TEST_PROCESS_TRIAL_847
 void s847_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t);
+#ifdef STYLEOS_TEST_USER_PREEMPT_848
+void s848_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t,uint64_t);
+#endif
 #endif
 void s846_guest_run(uint64_t root){
  uint16_t cs;__asm__ volatile("mov %%cs,%0":"=r"(cs));
@@ -73,6 +76,9 @@ void s846_guest_run(uint64_t root){
  }
 #ifdef STYLEOS_TEST_PROCESS_TRIAL_847
  s847_trial(child,leases,root);
+#ifdef STYLEOS_TEST_USER_PREEMPT_848
+ s848_trial(child,leases,root,safe->lapic);
+#endif
 #endif
  if(!s846_audit_pair(safe,cache,a,leases,&guards,&child[0],&child[1]))fail("post-switch-audit");
  /* Invalidate detached contexts before releasing any mapped data. */

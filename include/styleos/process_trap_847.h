@@ -20,4 +20,6 @@ bool s847_dispatch(struct s847_control *,uint64_t live_root,unsigned *,struct up
  * Non-return actions MUST return via safe root before next dispatch or cleanup.
  * range syscall returns only a status, never copies bytes. */
 bool s847_trap(struct s847_control *,const struct up_context *,const struct up_event *,struct s847_decision *);
+/* S848 pure timer transition; caller must prove live IRQ and normalize IF. */
+bool s848_suspend_tick(struct s847_control *,const struct up_context *,uint64_t);
 #endif

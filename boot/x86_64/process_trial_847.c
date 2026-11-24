@@ -20,7 +20,14 @@ static bool rw_image847(const struct s846_root *r,uint64_t x,uint64_t n){
  return false;
 }
 static void gate847(unsigned n,void (*entry)(void),uint16_t cs,uint8_t ist,uint8_t type){uint64_t p=(uintptr_t)entry;idt847[n]=(struct gate847){(uint16_t)p,cs,ist,type,(uint16_t)(p>>16),(uint32_t)(p>>32),0};}
+#ifdef STYLEOS_TEST_USER_PREEMPT_848
+bool s848_active(void);
+unsigned s848_dispatch_raw(struct s847_raw *,uint64_t,uint64_t);
+#endif
 unsigned s847_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
+#ifdef STYLEOS_TEST_USER_PREEMPT_848
+ if(s848_active())return s848_dispatch_raw(f,cr2,root);
+#endif
  static const unsigned ids[8]={0,0,0,1,1,1,0,1};
  static const unsigned stages[8]={0,1,2,0,1,2,3,3};
  unsigned n=events847;if(n>=8||ctl847.current!=(int)ids[n])fail847("event-order");
