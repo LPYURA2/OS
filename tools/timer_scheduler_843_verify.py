@@ -1,7 +1,7 @@
 """Verify real S843 timer dispatches, preserving S842 and S807 gates."""
 import re
 from apic_root_842_verify import verify as prior
-def verify(raw,rc):
+def verify(raw,rc,*,external_stack=None):
     try:
         ok,obs=prior(raw,rc)
         if not ok:raise ValueError(obs)
@@ -19,8 +19,9 @@ def verify(raw,rc):
         if a['root']!=obs['root']['new'] or a['ist']!=obs['root']['ist']:raise ValueError('root')
         lo,hi=[int(x,16) for x in next(x for x in lines if x.startswith(b'STYLEOS MEMMAP IMAGE ')).split()[-2:]]
         ranges=[]
+        stack_lo,stack_hi=(lo,hi) if external_stack is None else external_stack
         for t in 'ab':
-            if not lo<=a[t+'-code']<a[t+'-end']<=hi or not lo<=a[t+'-stack']<a[t+'-stack']+16384<=hi or a[t+'-stack']%4096:raise ValueError('ownership extent')
+            if not lo<=a[t+'-code']<a[t+'-end']<=hi or not stack_lo<=a[t+'-stack']<a[t+'-stack']+16384<=stack_hi or a[t+'-stack']%4096:raise ValueError('ownership extent')
             ranges.extend([(a[t+'-code'],a[t+'-end']),(a[t+'-stack'],a[t+'-stack']+16384)])
         if any(x<z2 and z<x2 for i,(x,x2) in enumerate(ranges) for z,z2 in ranges[:i]):raise ValueError('overlap')
         names=('r15','r14','r13','r12','r11','r10','r9','r8','rdi','rsi','rbp','rbx','rdx','rcx','rax')

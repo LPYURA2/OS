@@ -4,12 +4,18 @@
 .p2align 4
 .globl s843_workload_a,s843_workload_a_end
 s843_workload_a:
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+    incq -8(%rsp)
+#endif
     incq s843_progress_a(%rip)
     jmp s843_workload_a
 s843_workload_a_end:
 .p2align 4
 .globl s843_workload_b,s843_workload_b_end
 s843_workload_b:
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+    incq -8(%rsp)
+#endif
     incq s843_progress_b(%rip)
     jmp s843_workload_b
 s843_workload_b_end:

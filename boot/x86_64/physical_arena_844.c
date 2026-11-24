@@ -5,6 +5,18 @@
 static struct boot_range reserved844;
 static bool admitted844;
 static struct s844_arena arena844;
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+/* Query is read-only before own CR3. Return the allocator only after the
+ * existing live test has completed and the reserved area is empty. */
+bool s845_extent(struct boot_range *out){
+ if(!out||!admitted844||arena844.ready)return false;
+ *out=reserved844;return true;
+}
+struct s844_arena *s845_arena(void){
+ unsigned used;
+ return admitted844&&s844_count(&arena844,&used)&&!used?&arena844:0;
+}
+#endif
 static void fld(const char *key,uint64_t v){arch_putc(' ');arch_puts(key);arch_putc('=');arch_puts("0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15]);}
 static _Noreturn void fail(const char *s){arch_puts("STYLEOS S844 FAIL ");arch_puts(s);arch_putc('\n');__asm__ volatile("cli;outl %0,%1"::"a"(0x24u),"Nd"((uint16_t)0xf4));arch_halt();}
 typedef EFI_STATUS (EFIAPI *alloc_pages844)(uint32_t,uint32_t,UINTN,uint64_t *);

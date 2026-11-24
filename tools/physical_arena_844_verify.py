@@ -1,9 +1,9 @@
 """Validate the bounded external EFI allocation and real S843 IRQ run."""
 import re
 from timer_scheduler_843_verify import verify as prior
-def verify(raw,rc):
+def verify(raw,rc,*,external_stack=None):
     try:
-        ok,obs=prior(raw,rc)
+        ok,obs=prior(raw,rc,external_stack=external_stack)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines()
         rec=[x for x in lines if x.startswith(b'STYLEOS S844 ')]
@@ -30,6 +30,7 @@ def verify(raw,rc):
         own=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S842 READY '))
         sched=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S843 READY '))
         if not lines.index(rec[0])<marker<lines.index(rec[1])<own<lines.index(rec[2])<lines.index(policy)<sched:raise ValueError('phase order')
+        if external_stack is not None and external_stack!=(start,end):raise ValueError('external stack not in admitted arena')
         obs.update(physical_arena_verified=True,reserve=a,admission=b,lifecycle=c)
         return True,obs
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)

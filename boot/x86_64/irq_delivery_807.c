@@ -10,6 +10,11 @@ void s844_guest_run(uint64_t);
 #ifdef STYLEOS_TEST_TIMER_SCHEDULER_843
 #include <styleos/timer_context_843.h>
 #include <styleos/apic_root_842.h>
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+#include <styleos/task_stack_trace_845.h>
+bool s845_extent(struct boot_range *);
+struct s844_arena *s845_arena(void);
+#endif
 #endif
 #include <stddef.h>
 /* ISOLATED TERMINAL QEMU ONLY. No code is linked to ordinary Desktop.
@@ -77,7 +82,14 @@ extern void s843_irq_entry(void);
 extern _Noreturn void s843_enter_first(struct s843_frame *);
 extern const unsigned char s843_workload_a[],s843_workload_a_end[],s843_workload_b[],s843_workload_b_end[];
 extern volatile uint64_t s843_progress_a,s843_progress_b;
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+static struct s845_pair pair845;
+static struct s845_trace trace845;
+static struct boot_range extent845;
+static struct s844_arena *arena845;
+#else
 _Alignas(4096) static unsigned char stacks843[2][TASKS_STACK_BYTES];
+#endif
 static struct s843_scheduler sched843;
 static struct {
  uintptr_t lapic,io;uint32_t reg,low,high,tpr,svr;
@@ -99,6 +111,17 @@ static struct boot_range extent843(const void *a,size_t n){
 }
 bool s843_admit(const struct s842_root *r,struct pg_experiment *p,uint64_t root,uint64_t ist){
  if(!r||!p||!r->ready||!root||!ist||hw843.admitted)return false;
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+ const struct s845_code code[2]={
+ {{(uintptr_t)s843_workload_a,(uintptr_t)s843_workload_a_end},(uintptr_t)s843_workload_a},
+ {{(uintptr_t)s843_workload_b,(uintptr_t)s843_workload_b_end},(uintptr_t)s843_workload_b}};
+ if(!s845_extent(&extent845)||!rights843(r,extent845,PG_WRITE)||
+    !rights843(r,code[0].span,PG_EXEC)||!rights843(r,code[1].span,PG_EXEC)||
+    !rights843(r,extent843(&pair845,sizeof pair845),PG_WRITE)||
+    !rights843(r,extent843(&trace845,sizeof trace845),PG_WRITE)||
+    !rights843(r,extent843(&extent845,sizeof extent845),PG_WRITE)||
+    !rights843(r,extent843(&arena845,sizeof arena845),PG_WRITE))return false;
+#else
  const struct s843_task task[2]={
  {{(uintptr_t)s843_workload_a,(uintptr_t)s843_workload_a_end},extent843(stacks843[0],TASKS_STACK_BYTES),(uintptr_t)s843_workload_a},
  {{(uintptr_t)s843_workload_b,(uintptr_t)s843_workload_b_end},extent843(stacks843[1],TASKS_STACK_BYTES),(uintptr_t)s843_workload_b}};
@@ -106,12 +129,15 @@ bool s843_admit(const struct s842_root *r,struct pg_experiment *p,uint64_t root,
   if(!rights843(r,task[i].code,PG_EXEC)||!rights843(r,task[i].stack,PG_WRITE)||
      arch_paging_attest_image_writable(p,task[i].stack.start,TASKS_STACK_BYTES)!=PG_OK)return false;
  }
+ #endif
  if(!rights843(r,extent843(&sched843,sizeof sched843),PG_WRITE)||
     !rights843(r,extent843(&hw843,sizeof hw843),PG_WRITE)||
     !rights843(r,extent843((const void *)&s843_progress_a,8),PG_WRITE)||
     !rights843(r,extent843((const void *)&s843_progress_b,8),PG_WRITE))return false;
+#ifndef STYLEOS_TEST_TASK_STACKS_845
  uint16_t cs,ss;__asm__ volatile("mov %%cs,%0;mov %%ss,%1":"=r"(cs),"=r"(ss));
  if(!s843_init(&sched843,task,(struct boot_range){ist,ist+4096},root,cs,ss))return false;
+#endif
  hw843.root=root;hw843.ist=ist;hw843.admitted=true;return true;
 }
 static uint64_t pattern843(unsigned task,unsigned i){return UINT64_C(0x8430000000000000)|((uint64_t)task<<32)|i;}
@@ -125,6 +151,58 @@ static void seed843(struct s843_frame *f,unsigned task){
  for(unsigned i=0;i<15;i++)for(unsigned j=0;j<8;j++)p[8*i+j]=(unsigned char)(pattern843(task,i)>>(8*j));
 }
 static bool regs843(const struct s843_frame *f,unsigned task){for(unsigned i=0;i<15;i++)if(reg843(f,i)!=pattern843(task,i))return false;return true;}
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+static void start845(uint64_t root,uint64_t ist){
+ uint16_t cs,ss;uint64_t flags;
+ __asm__ volatile("mov %%cs,%0;mov %%ss,%1;pushfq;popq %2":"=r"(cs),"=r"(ss),"=r"(flags));
+ const struct s845_code code[2]={
+ {{(uintptr_t)s843_workload_a,(uintptr_t)s843_workload_a_end},(uintptr_t)s843_workload_a},
+ {{(uintptr_t)s843_workload_b,(uintptr_t)s843_workload_b_end},(uintptr_t)s843_workload_b}};
+ arena845=s845_arena();
+ if(!arena845||arena845->base!=extent845.start||extent845.end!=extent845.start+S844_BYTES||root843()!=root||flags&0x200||
+    !s845_prepare(arena845,&pair845,&sched843,code,(struct boot_range){ist,ist+4096},root,cs,ss))fail("s845-leases");
+ arch_puts("STYLEOS S845 LEASE");fld("base",extent845.start);fld("end",extent845.end);
+ fld("a",pair845.lease[0].pa);fld("b",pair845.lease[1].pa);fld("gen-a",pair845.lease[0].generation);fld("gen-b",pair845.lease[1].generation);arch_putc('\n');
+}
+static void finish845(struct s843_frame *f){
+ uint64_t rsp,flags;__asm__ volatile("mov %%rsp,%0;pushfq;popq %1":"=r"(rsp),"=r"(flags));
+ if(trace845.ticks!=16||!s845_release_terminal(arena845,&pair845,&sched843,f,rsp,root843(),flags))fail("s845-terminal-release");
+ unsigned used=99;
+ if(!s844_count(arena845,&used)||used||pair845.live||sched843.ready)fail("s845-live-after-release");
+ const volatile unsigned char *data=(const volatile unsigned char *)(uintptr_t)extent845.start;
+ for(size_t i=0;i<2*TASKS_STACK_BYTES;i++)if(data[i])fail("s845-not-zero");
+ struct s844_lease reuse;
+ if(!s844_acquire(arena845,0x8453,8,&reuse)||reuse.pa!=extent845.start||reuse.generation!=6||!s844_release(arena845,0x8453,reuse)||!s844_count(arena845,&used)||used)fail("s845-reuse");
+ arch_puts("STYLEOS S845 RELEASE");fld("root",root843());fld("rsp",rsp);fld("frame",(uintptr_t)f);fld("flags",flags);
+ fld("a",trace845.count[0]);fld("b",trace845.count[1]);fld("used",used);fld("zero",1);fld("reuse-gen",reuse.generation);arch_putc('\n');
+ arch_puts("STYLEOS S845 POLICY terminal=yes contexts-cleared=yes cpl3=no production-cr3=deny\n");
+}
+#endif
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+static _Noreturn void finish843(uint64_t frame){
+ uint64_t elapsed=tsc()-hw843.start;
+ const uint64_t ticks=sched843.ticks,dispatches=sched843.control.dispatches;
+ if(ticks!=16||sched843.control.slots[0].yields!=8||sched843.control.slots[1].yields!=8)fail("s843-tick-total");
+ io_write(hw843.io,hw843.reg,0x10050u);
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+ finish845((struct s843_frame *)(uintptr_t)frame);
+#endif
+ io_write(hw843.io,hw843.reg+1,hw843.high);io_write(hw843.io,hw843.reg,hw843.low);
+ mmio_write(hw843.lapic,0x80,hw843.tpr);mmio_write(hw843.lapic,0xf0,hw843.svr);
+ __asm__ volatile("lidt %0"::"m"(hw843.idt):"memory");
+ uint32_t low=io_read(hw843.io,hw843.reg),high=io_read(hw843.io,hw843.reg+1),tpr=mmio_read(hw843.lapic,0x80),svr=mmio_read(hw843.lapic,0xf0);
+ if(low!=hw843.low||high!=hw843.high||tpr!=hw843.tpr||svr!=hw843.svr||root843()!=hw843.root)fail("s843-finish");
+ arch_puts("STYLEOS S807 DELIVERY");fld("hits",ticks);fld("isr-seen",1);fld("eoi-cleared",1);fld("elapsed-tsc",elapsed);arch_putc('\n');
+ arch_puts("STYLEOS S807 RESTORE");fld("ioapic-low",low);fld("ioapic-high",high);fld("tpr",tpr);fld("svr",svr);fld("if",0);arch_putc('\n');
+ arch_puts("STYLEOS S842 IRQ");fld("before",hw843.root);fld("during",root843());fld("after",root843());fld("frame",frame+120);fld("ist",hw843.ist);arch_putc('\n');
+ arch_puts("STYLEOS S842 POLICY isolated-own-root=yes pit-restored=no production-cr3=deny dma-grants=no\n");
+ arch_puts("STYLEOS S843 TOTAL");fld("ticks",ticks);fld("dispatches",dispatches);fld("a",s843_progress_a);fld("b",s843_progress_b);arch_putc('\n');
+ arch_puts("STYLEOS S843 POLICY integer-only=yes cpl3=no production-cr3=deny pit-restored=no\n");
+ arch_puts("STYLEOS S807 POLICY madt=verified ioapic-route=verified pit-irq0-delivery=verified lapic-isr-eoi=verified ioapic-lapic-restored=yes pit-restored=no ordinary-desktop=unchanged dma-iommu=unverified uefi-runtime=unverified production-cr3=deny\n");
+ arch_puts("STYLEOS S807 PASS\n");
+ __asm__ volatile("outl %0,%1"::"a"(0x10u),"Nd"((uint16_t)0xf4u));arch_halt();
+}
+#else
 static _Noreturn void finish843(uint64_t frame){
  uint64_t elapsed=tsc()-hw843.start;
  io_write(hw843.io,hw843.reg,0x10050u);io_write(hw843.io,hw843.reg+1,hw843.high);io_write(hw843.io,hw843.reg,hw843.low);
@@ -142,12 +220,17 @@ static _Noreturn void finish843(uint64_t frame){
  arch_puts("STYLEOS S807 PASS\n");
  __asm__ volatile("outl %0,%1"::"a"(0x10u),"Nd"((uint16_t)0xf4u));arch_halt();
 }
+#endif
 bool s843_irq_dispatch(struct s843_frame *f){
  uint64_t root=root843();unsigned cur=(unsigned)sched843.control.current;
  uint64_t a=s843_progress_a,b=s843_progress_b;
  if(!hw843.admitted||cur>1||root!=hw843.root||!f||(uintptr_t)f!=hw843.ist+4096-16-sizeof *f||
     !regs843(f,cur)||!(mmio_read(hw843.lapic,0x120)&0x10000u)||
     (cur==0?(a<=hw843.progress[0]||b!=hw843.progress[1]):(b<=hw843.progress[1]||a!=hw843.progress[0])))fail("s843-irq-context");
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+ if(!s845_observe(&trace845,&pair845,&sched843,f,a,b))fail("s845-stack-trace");
+ arch_puts("STYLEOS S845 STACK");fld("n",trace845.ticks);fld("from",cur);fld("rsp",f->rsp);fld("a",trace845.count[0]);fld("b",trace845.count[1]);arch_putc('\n');
+#endif
  struct s843_frame interrupted=*f;
  uint64_t rip=f->rip,rsp=f->rsp;
  if(!s843_tick(&sched843,f,root)||!regs843(f,1-cur))fail("s843-switch");
@@ -172,6 +255,9 @@ static _Noreturn void irq_run(const struct boot_info *b
  if(!expected_root||initial!=expected_root||!ist)fail("s842-initial-root");
 #ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
  s844_guest_run(expected_root);
+#ifdef STYLEOS_TEST_TASK_STACKS_845
+ start845(expected_root,ist);
+#endif
 #endif
 #endif
  if(!b||b->magic!=STYLEOS_BOOT_MAGIC||b->flags!=STYLEOS_BOOT_EXITED_SERVICES)fail("handoff");
