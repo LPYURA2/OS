@@ -1,3 +1,7 @@
+## Stage 853 — polled PS/2 and bounded cursor damage candidate
+
+See [architecture](architecture/DESKTOP_INPUT_853.md), [handoff](NEXT_CHAT_853.md), [new chat](MESSAGE_FOR_NEW_CHAT_853.md). Terminal fixture only; acceptance requires exact successful CI and independent evidence review.
+
 ## Stage 799 — isolated downstream PCI BAR aperture measurements
 
 Dedicated QEMU test probes and restores two selected VirtIO Serial MMIO BARs

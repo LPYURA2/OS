@@ -130,6 +130,7 @@ bool desk_input_next(struct desk_event *event)
     return false;
 }
 
+#ifndef STYLEOS_TEST_DESKTOP_INPUT_853
 void desk_reboot(void) { (void)ps_write(KSTAT, 0xfe); }
 
 static uint8_t rtc(unsigned n) { out8(0x70, (uint8_t)n); return in8(0x71); }
@@ -372,3 +373,5 @@ bool desk_update_io(struct upd_io *io)
     return true;
 }
 #endif
+
+#endif /* S853 links only the polled PS/2 implementation. */

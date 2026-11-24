@@ -7,8 +7,10 @@ static _Noreturn void denied(void)
     arch_puts("STYLEOS S852 FAIL desktop-io-denied\n");
     arch_halt();
 }
+#ifndef STYLEOS_TEST_DESKTOP_INPUT_853
 unsigned desk_input_init(void){denied();}
 bool desk_input_next(struct desk_event *e){(void)e;denied();}
+#endif
 bool desk_clock(unsigned *h,unsigned *m){(void)h;(void)m;denied();}
 void desk_pointer_clock_init(void){denied();}
 uint64_t desk_pointer_clock(void){denied();}

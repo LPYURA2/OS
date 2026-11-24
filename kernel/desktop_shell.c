@@ -1015,6 +1015,21 @@ size_t desk_first_frame_852(const struct desktop_surface *surface)
 }
 #endif
 
+#ifdef STYLEOS_TEST_DESKTOP_INPUT_853
+/* Fixed diagnostic motion away from hover/drag targets. No UI actions. */
+size_t desk_cursor_853(const struct desk_event *event)
+{
+    if (!event || !event->mouse || event->buttons || event->modifiers ||
+        width != 1280 || height != 800 || mx != 640 || my != 600 ||
+        event->dx != 20 || event->dy != 0) return 0;
+    struct desk_damage damage = {0};
+    desk_damage_add(&damage, (struct desk_box){mx, my, CURSOR_W, CURSOR_H});
+    mx = clamp(mx + event->dx, 0, width - 1);
+    desk_damage_add(&damage, (struct desk_box){mx, my, CURSOR_W, CURSOR_H});
+    return desk_present(&damage, draw);
+}
+#endif
+
 _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 {
     width = (int)surface->width;

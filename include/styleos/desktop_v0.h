@@ -73,6 +73,9 @@ bool desk_store_save(struct desk_store *s, unsigned slot, unsigned folder,
 /* First frame only: no storage, input, clock or user-process admission. */
 size_t desk_first_frame_852(const struct desktop_surface *surface);
 #endif
+#ifdef STYLEOS_TEST_DESKTOP_INPUT_853
+size_t desk_cursor_853(const struct desk_event *event);
+#endif
 _Noreturn void desktop_v0_run(const struct desktop_surface *surface);
 
 #endif

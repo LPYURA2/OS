@@ -120,6 +120,45 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("852-frame-readback");
  arch_puts("STYLEOS S852 FRAME");field("root",target);field("width",s->width);field("height",s->height);field("writes",writes);field("fnv",hash);field("first",fb[0]);field("last",fb[writes-1]);arch_putc('\n');
  arch_puts("STYLEOS S852 POLICY first-frame=yes input=no storage=no app-admission=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_DESKTOP_INPUT_853
+ /* This is a fixed Q35/TCG terminal fixture, not general ACPI resource admission. */
+ uint32_t a,b,c,d;
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
+ if(!(c&(1u<<31)))fail("853-hypervisor");
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(0x40000000),"2"(0));
+ if(b!=0x54474354u||c!=0x43544743u||d!=0x47435447u)fail("853-tcg");
+ uint32_t cf8=in32(0xcf8),lpc=cfg(31,0,0),classreg=cfg(31,0,8);
+ out32(0xcf8,cf8);
+ if(in32(0xcf8)!=cf8||lpc!=0x29188086u||(classreg>>16)!=0x0601||
+    !identity((uintptr_t)desk_input_init,PG_EXEC)||!identity((uintptr_t)desk_input_next,PG_EXEC)||
+    !identity((uintptr_t)desk_cursor_853,PG_EXEC)||read_cr3()!=target||flags()&0x200)
+     fail("853-fixture");
+ unsigned input=desk_input_init();
+ if(input!=3||read_cr3()!=target||flags()&0x200)fail("853-init");
+ arch_puts("STYLEOS S853 READY");field("root",target);field("lpc",lpc);field("input",input);arch_putc('\n');
+ struct desk_event event={0};bool key=false,mouse=false;
+ for(unsigned i=0;i<20000000u;i++){
+    if(!desk_input_next(&event)){__asm__ volatile("pause");continue;}
+    if(event.mouse||event.key!=0x1e||event.modifiers)fail("853-key");
+    key=true;break;
+ }
+ if(!key||read_cr3()!=target||flags()&0x200)fail("853-key-timeout");
+ arch_puts("STYLEOS S853 KEY");field("root",target);field("key",event.key);field("modifiers",event.modifiers);arch_putc('\n');
+ for(unsigned i=0;i<20000000u;i++){
+    if(!desk_input_next(&event)){__asm__ volatile("pause");continue;}
+    if(!event.mouse||event.dx!=20||event.dy!=0||event.buttons||event.modifiers)fail("853-mouse");
+    mouse=true;break;
+ }
+ if(!mouse||read_cr3()!=target||flags()&0x200)fail("853-mouse-timeout");
+ size_t moved=desk_cursor_853(&event);
+ if(!moved||moved>340||read_cr3()!=target||flags()&0x200)fail("853-damage");
+ __asm__ volatile("mfence":::"memory");
+ uint64_t after=UINT64_C(14695981039346656037);
+ for(size_t i=0;i<writes;i++){uint32_t pixel=fb[i];for(unsigned j=0;j<4;j++){after^=(pixel>>(8*j))&255u;after*=UINT64_C(1099511628211);}}
+ if(after==hash||read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("853-readback");
+ arch_puts("STYLEOS S853 MOUSE");field("root",target);field("dx",event.dx);field("dy",event.dy);field("buttons",event.buttons);field("writes",moved);field("fnv",after);arch_putc('\n');
+ arch_puts("STYLEOS S853 POLICY polling=yes irq=no storage=no clock=no reset=no app-admission=no production-cr3=deny\n");
+#endif
 #endif
  out32(0xf4,0x10);arch_halt();
 }
