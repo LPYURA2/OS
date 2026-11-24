@@ -1,0 +1,26 @@
+name: StyleOS 856 paused disposable overlay probe
+on:
+  push:
+    branches: [test/styleos-storage-overlay-856]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 qemu-utils
+      - name: Replay identity and overlay refusal models
+        run: |
+          python3 tools/test_block_fixture_856.py
+          python3 tools/test_overlay_856.py
+      - name: Observe actual paused disposable overlay attachment
+        run: python3 tools/probe_overlay_856.py --output build/s856-overlay-probe
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-856-overlay-probe
+          path: build/s856-overlay-probe/
+          if-no-files-found: warn
