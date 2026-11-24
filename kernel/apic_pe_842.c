@@ -60,12 +60,13 @@ bool s842_build_pe_efi(const struct s790_low_request *pe,
  !b->memory_map||!b->memory_map_size||b->memory_map_size%b->descriptor_size||
  b->memory_map_size/b->descriptor_size>BOOT_MEMORY_INPUT_MAX||
  b->memory_map_size>UINT64_MAX-b->memory_map||e->live.source.start!=b->memory_map||
- e->live.source.end!=b->memory_map+b->memory_map_size||!inside(e->live.source,pe->image)||
+ e->live.source.end!=b->memory_map+b->memory_map_size||
+ !reserved_ram(e->map,e->live.source,true)||
  t->ioapic_count!=1)return false;
  const unsigned char *map=(const unsigned char *)(uintptr_t)b->memory_map;
  const size_t stride=b->descriptor_size,size=(size_t)b->memory_map_size;
  if((pe->image.start|pe->image.end)&(P-1)||pe->image.start>=pe->image.end)return false;
- uint64_t covered=0;
+ uint64_t covered=0,source_covered=0;
  struct boot_range dev[2]={{t->lapic_physical,(uint64_t)t->lapic_physical+P},
  {t->ioapic[0].physical,(uint64_t)t->ioapic[0].physical+P}};
  for(size_t i=0;i<size;i+=stride){
@@ -77,8 +78,13 @@ bool s842_build_pe_efi(const struct s790_low_request *pe,
    uint64_t lo=a.start>pe->image.start?a.start:pe->image.start,hi=a.end<pe->image.end?a.end:pe->image.end;
    covered+=hi-lo;
   }
+  if(overlap(a,e->live.source)){
+   if(type!=2||!(attr&8u)||(attr>>63))return false;
+   uint64_t lo=a.start>e->live.source.start?a.start:e->live.source.start,hi=a.end<e->live.source.end?a.end:e->live.source.end;
+   source_covered+=hi-lo;
+  }
   for(unsigned j=0;j<2;j++)if(overlap(a,dev[j])&&(type!=11||!inside(dev[j],a)))return false;
  }
- if(covered!=pe->image.end-pe->image.start)return false;
+ if(covered!=pe->image.end-pe->image.start||source_covered!=e->live.source.end-e->live.source.start)return false;
  return build_pe(pe,e->map,cache,t,msr,out,true);
 }

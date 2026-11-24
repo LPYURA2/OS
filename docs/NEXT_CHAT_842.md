@@ -5,3 +5,5 @@ Accepted S841 cc965962327add8ca92454897c8098f944daa7d6, CI 45435034196 SUCCESS 1
 Latest revision adds S790/S842 PE composition and MADT/MSR address consistency with 15 host checks in GCC and UBSan, COFF PASS. Next: actual guest entry on image-owned stack, same-boot attest inherited source and all live descriptor dependencies; only then isolated root switch and S807 PIT IRQ/EOI. Do not count model as integration completion.
 
 New isolated --test-apic-root-842 attempts actual CR3 + PIT/IOAPIC/LAPIC interrupt and guarded IST using S790/S807. Real UEFI loader descriptor proof replaces synthetic conventional-RAM assumption for guest path. Verify exact CI, raw QEMU IRQ evidence, negative tests and complete artifact. Do not claim production CR3 or foundation completion from terminal result.
+
+Latest revision handles the separate EFI LoaderData memory-map buffer and adds host cases for real reserved-only normalized UEFI semantics; verify full guest and host CI on exact latest SHA.

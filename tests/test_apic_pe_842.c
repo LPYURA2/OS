@@ -39,6 +39,12 @@ static struct s790_low_request request(void)
         .required_write=(uint64_t)(uintptr_t)(image+5u*P+64u),
         .required_rsp=(uint64_t)(uintptr_t)(stackbuf+P+64u)};
 }
+static void u64(unsigned char *b,unsigned off,uint64_t val){
+ for(unsigned i=0;i<8;i++)b[off+i]=(unsigned char)(val>>(8*i));
+}
+static void descriptor(unsigned char *b,unsigned type,uint64_t pa,uint64_t pages,uint64_t attr){
+ memset(b,0,48);u32(b,0,type);u64(b,8,pa);u64(b,24,pages);u64(b,32,attr);
+}
 int main(void){
  image=mmap(NULL,N*P,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_32BIT,-1,0);
  stackbuf=mmap(NULL,2u*P,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_32BIT,-1,0);
@@ -62,5 +68,28 @@ int main(void){
  q=p;q.required_exec=q.required_write;CHECK(!s842_build_pe(&q,&m,&c,&t,msr,&r));
  u32(image,0x80+24+0xf0+36,0xe0000000u);CHECK(!s842_build_pe(&p,&m,&c,&t,msr,&r));pe();
  CHECK(s842_build_pe(&p,&m,&c,&t,msr,&r));
+ /* Real normalized UEFI semantics: loader pages are reserved, not
+  * conventional RAM. Source is a separate EfiLoaderData allocation. */
+ q=p;q.boot_stack=(struct boot_range){p.image.start+6*P,p.image.start+8*P};q.required_rsp=q.boot_stack.start+P;
+ struct boot_info *boot=(struct boot_info *)(void *)(image+4*P+128);
+ unsigned char *raw=stackbuf;
+ *boot=(struct boot_info){.magic=STYLEOS_BOOT_MAGIC,.version=1,.size=sizeof(*boot),
+ .arch=STYLEOS_ARCH_X86_64,.platform=STYLEOS_PLATFORM_UEFI,.flags=STYLEOS_BOOT_EXITED_SERVICES,
+ .memory_map=(uintptr_t)raw,.memory_map_size=96,.descriptor_size=48,.descriptor_version=1};
+ descriptor(raw,1,p.image.start,N,15);descriptor(raw+48,2,(uintptr_t)raw,2,15);
+ struct boot_memory_map live={.reserved={p.image,{(uintptr_t)raw,(uintptr_t)raw+2*P}},.nr_reserved=2};
+ struct boot_memory_evidence ev={.live={q.image,q.boot_stack,{(uintptr_t)boot,(uintptr_t)boot+sizeof(*boot)},{(uintptr_t)raw,(uintptr_t)raw+96}},.map=&live};
+ CHECK(!s842_build_pe(&q,&live,&c,&t,msr,&r));
+ CHECK(s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));CHECK(s842_audit(&r,&c));
+ u32(raw,0,7);CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));u32(raw,0,1);
+ u32(raw+48,0,4);CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));u32(raw+48,0,2);
+ u64(raw,32,0);CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));u64(raw,32,15);
+ live.nr_reserved=1;CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));live.nr_reserved=2;
+ ev.live.source.end++;CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));ev.live.source.end--;
+ live.candidates[0]=q.image;live.nr_candidates=1;CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));live.nr_candidates=0;
+ boot->memory_map_size=144;ev.live.source.end=(uintptr_t)raw+144;
+ descriptor(raw+96,2,0xfee00000,1,15);CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));
+ descriptor(raw+96,11,0xfee00000,1,1);CHECK(s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));
+ descriptor(raw+96,2,q.image.start,1,15);CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));
  printf("S842 PE/APIC composition: %u PASS (host fixture only)\n",n);return 0;
 }
