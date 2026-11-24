@@ -1,3 +1,5 @@
 # S854 continuation
 
 Accepted S853 2609bd486222d4024d52dc644344ce1ce5960310, CI 45479050123 SUCCESS 212 PASS / 5 SKIPPED, archive 14961673595 independently verified. Candidate feature/styleos-desktop-rtc-854. Read AGENTS.md, PROJECT.md, ROADMAP.md, architecture/DESKTOP_RTC_854.md, FOUNDATION_COMPLETION_GATE.md, KERNEL_FINAL_ACCEPTANCE.md and POST_ACCEPTANCE_PERFORMANCE_REVIEW.md. Verify exact head, full CI, archive, both actual RTC guest captures, strict UART replay, reference builds and refusals. RTC only, not monotonic time or production admission. Next timekeeping/IRQ integration, storage and integrated scheduler/kernel, final acceptance, performance/requirements discussion, filesystem, native apps, Explorer and user screens. Cursor separately during optimization; no other UI changes. Preserve main and accepted refs. FOUNDATION NOT COMPLETE.
+
+Host regression sources are retained in tests/ and executed by tools/test_rtc_854_host.sh. Verify the mandatory host test step and log as part of acceptance; no claim of production RTC ownership.

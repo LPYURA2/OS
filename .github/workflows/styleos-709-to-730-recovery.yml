@@ -852,6 +852,13 @@ jobs:
           mkdir -p build/recovery-canonical/desktop-input-853
           python3 tools/test_desktop_input_853.py --output build/recovery-canonical/desktop-input-853/qemu | tee build/recovery-canonical/desktop-input-853/guest.log
 
+      - name: 854 Verify actual kernel RTC sources with GCC Clang sanitizers and COFF
+        if: github.ref_name == 'feature/styleos-desktop-rtc-854'
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/desktop-rtc-854
+          sh tools/test_rtc_854_host.sh | tee build/recovery-canonical/desktop-rtc-854/host-tests.log
+
       - name: 854 Validate RTC record refusal model
         if: github.ref_name == 'feature/styleos-desktop-rtc-854'
         run: python3 tools/test_desktop_rtc_854_verify.py
