@@ -112,8 +112,16 @@ bool s843_admit(const struct s842_root *r,struct pg_experiment *p,uint64_t root,
  hw843.root=root;hw843.ist=ist;hw843.admitted=true;return true;
 }
 static uint64_t pattern843(unsigned task,unsigned i){return UINT64_C(0x8430000000000000)|((uint64_t)task<<32)|i;}
-static void seed843(struct s843_frame *f,unsigned task){uint64_t *p=(void *)f;for(unsigned i=0;i<15;i++)p[i]=pattern843(task,i);}
-static bool regs843(const struct s843_frame *f,unsigned task){const uint64_t *p=(const void *)f;for(unsigned i=0;i<15;i++)if(p[i]!=pattern843(task,i))return false;return true;}
+static uint64_t reg843(const struct s843_frame *f,unsigned i){
+ const unsigned char *p=(const unsigned char *)f+8u*i;uint64_t value=0;
+ for(unsigned j=0;j<8;j++)value|=(uint64_t)p[j]<<(8u*j);
+ return value;
+}
+static void seed843(struct s843_frame *f,unsigned task){
+ unsigned char *p=(unsigned char *)f;
+ for(unsigned i=0;i<15;i++)for(unsigned j=0;j<8;j++)p[8*i+j]=(unsigned char)(pattern843(task,i)>>(8*j));
+}
+static bool regs843(const struct s843_frame *f,unsigned task){for(unsigned i=0;i<15;i++)if(reg843(f,i)!=pattern843(task,i))return false;return true;}
 static _Noreturn void finish843(uint64_t frame){
  uint64_t elapsed=tsc()-hw843.start;
  io_write(hw843.io,hw843.reg,0x10050u);io_write(hw843.io,hw843.reg+1,hw843.high);io_write(hw843.io,hw843.reg,hw843.low);
@@ -137,13 +145,16 @@ bool s843_irq_dispatch(struct s843_frame *f){
  if(!hw843.admitted||cur>1||root!=hw843.root||!f||(uintptr_t)f!=hw843.ist+4096-16-sizeof *f||
     !regs843(f,cur)||!(mmio_read(hw843.lapic,0x120)&0x10000u)||
     (cur==0?(a<=hw843.progress[0]||b!=hw843.progress[1]):(b<=hw843.progress[1]||a!=hw843.progress[0])))fail("s843-irq-context");
+ struct s843_frame interrupted=*f;
  uint64_t rip=f->rip,rsp=f->rsp;
  if(!s843_tick(&sched843,f,root)||!regs843(f,1-cur))fail("s843-switch");
  mmio_write(hw843.lapic,0xb0,0);
  if(mmio_read(hw843.lapic,0x120)&0x10000u)fail("s843-eoi");
  hw843.progress[0]=a;hw843.progress[1]=b;
  arch_puts("STYLEOS S843 TICK");fld("n",sched843.ticks);fld("from",cur);fld("to",1-cur);fld("root",root);
- fld("frame",(uintptr_t)f);fld("rip",rip);fld("rsp",rsp);fld("a",a);fld("b",b);fld("gprs",0x7fff);fld("eoi",1);arch_putc('\n');
+ fld("frame",(uintptr_t)f);fld("rip",rip);fld("rsp",rsp);fld("a",a);fld("b",b);fld("gprs",0x7fff);fld("eoi",1);
+ const char *const names[15]={"r15","r14","r13","r12","r11","r10","r9","r8","rdi","rsi","rbp","rbx","rdx","rcx","rax"};
+ for(unsigned i=0;i<15;i++)fld(names[i],reg843(&interrupted,i));arch_putc('\n');
  if(sched843.ticks==16)finish843((uintptr_t)f);
  return true;
 }
@@ -201,8 +212,8 @@ static _Noreturn void irq_run(const struct boot_info *b
  if(actual_low!=0x50||actual_high!=(dest<<24))fail("ioapic-route-readback");
  /* PIT channel0, periodic mode2, 11932 ticks ~100Hz. Terminal isolated run.
   * PIC masks are NOT changed. Avoid unbounded HLT: use TSC timeout. */
- outb(0x43,0x34);outb(0x40,(uint8_t)11932);outb(0x40,(uint8_t)(11932>>8));
 #ifdef STYLEOS_TEST_TIMER_SCHEDULER_843
+ io_write(io,reg,0x10050u);
  if(!hw843.admitted||hw843.root!=expected_root||hw843.ist!=ist)fail("s843-not-admitted");
  hw843.lapic=lapic;hw843.io=io;hw843.reg=reg;hw843.low=original_low;hw843.high=original_high;
  hw843.tpr=original_tpr;hw843.svr=original_svr;hw843.idt=old_idt;
@@ -213,7 +224,12 @@ static _Noreturn void irq_run(const struct boot_info *b
  arch_puts("STYLEOS S843 READY");fld("root",expected_root);fld("ist",ist);
  for(unsigned i=0;i<2;i++){fld(i?"b-code":"a-code",sched843.task[i].code.start);fld(i?"b-end":"a-end",sched843.task[i].code.end);fld(i?"b-stack":"a-stack",sched843.task[i].stack.start);}
  arch_putc('\n');
+ /* 20Hz leaves time for a complete UART observation before the next tick. */
+ outb(0x43,0x34);outb(0x40,(uint8_t)59659);outb(0x40,(uint8_t)(59659>>8));
+ io_write(io,reg,0x50u);
  hw843.start=tsc();s843_enter_first(first);
+#else
+ outb(0x43,0x34);outb(0x40,(uint8_t)11932);outb(0x40,(uint8_t)(11932>>8));
 #endif
  uint64_t start=tsc();__asm__ volatile("sti" ::: "memory");
  uint64_t elapsed=0;

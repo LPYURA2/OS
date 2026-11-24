@@ -1,3 +1,5 @@
 # S843 continuation
 
 Accepted S842 0585c5ca6c0cce5c18840088efd2a1915890fe6c, CI 45438372833 SUCCESS 193 PASS / 5 SKIPPED; exact archive SHA/source/binaries/raw replay and 11 refusals confirmed. Current branch feature/styleos-timer-scheduler-843. Read AGENTS.md, docs/PROJECT.md, docs/ROADMAP.md, docs/architecture/FOUNDATION_COMPLETION_GATE.md and TIMER_SCHEDULER_843.md. S843 local model 125+644 per GCC and UBSan; new isolated hardware guest candidate published, not accepted. Verify latest CI and actual raw timer/IST/GPR/EOI traces with 16 alternating ticks and both non-yielding task counters. Do not count model evidence as real execution. Main, Desktop, previous refs and protections unchanged. Foundation -> filesystem -> independent .tea -> Explorer -> welcome/login/user selection/lock. Strict approved mockups. FOUNDATION NOT COMPLETE.
+
+Latest revision fixes build keyword duplication and emits all fifteen raw GPR words; guest IRQ starts at 20Hz immediately before first IRETQ. Verify exact latest SHA and independent replay.

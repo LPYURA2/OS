@@ -23,12 +23,14 @@ def verify(raw,rc):
             if not lo<=a[t+'-code']<a[t+'-end']<=hi or not lo<=a[t+'-stack']<a[t+'-stack']+16384<=hi or a[t+'-stack']%4096:raise ValueError('ownership extent')
             ranges.extend([(a[t+'-code'],a[t+'-end']),(a[t+'-stack'],a[t+'-stack']+16384)])
         if any(x<z2 and z<x2 for i,(x,x2) in enumerate(ranges) for z,z2 in ranges[:i]):raise ValueError('overlap')
+        names=('r15','r14','r13','r12','r11','r10','r9','r8','rdi','rsi','rbp','rbx','rdx','rcx','rax')
         progress=[0,0];ticks=[]
         for i,line in enumerate(records[1:17]):
-            v=parse(line,'TICK',('n','from','to','root','frame','rip','rsp','a','b','gprs','eoi'))
+            v=parse(line,'TICK',('n','from','to','root','frame','rip','rsp','a','b','gprs','eoi')+names)
             cur=i%2;t='ab'[cur]
             if (v['n'],v['from'],v['to'],v['root'],v['frame'],v['gprs'],v['eoi'])!=(i+1,cur,1-cur,a['root'],a['ist']+4096-16-160,0x7fff,1):raise ValueError('switch context')
             if not a[t+'-code']<=v['rip']<a[t+'-end'] or v['rsp']!=a[t+'-stack']+16384-16:raise ValueError('task rip/rsp')
+            if any(v[name]!=(0x8430000000000000 | (cur<<32) | j) for j,name in enumerate(names)):raise ValueError('raw GPR pattern')
             now=[v['a'],v['b']]
             if now[cur]<=progress[cur] or now[1-cur]!=progress[1-cur]:raise ValueError('independent progress')
             progress=now;ticks.append(v)

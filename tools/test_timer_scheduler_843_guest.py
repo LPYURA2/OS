@@ -26,7 +26,7 @@ def main():
  except subprocess.TimeoutExpired as e:(out/'qemu.log').write_text('TIMEOUT '+str(e))
  uart=serial.read_bytes() if serial.exists() else b'';ok,obs=verify(uart,rc)
  result={'stage':843,'status':'PASS' if ok else 'FAIL','qemu_exit_code':rc,'ioapic_redirection_verified':bool(ok),
- 'owned_root_irq_verified':bool(ok),'irq_delivery_verified':bool(ok),'lapic_eoi_verified':bool(ok),'pit_state_restored':False,
+ 'timer_scheduler_verified':bool(ok),'owned_root_irq_verified':bool(ok),'irq_delivery_verified':bool(ok),'lapic_eoi_verified':bool(ok),'pit_state_restored':False,
  'dma_iommu_verified':False,'uefi_runtime_verified':False,'production_cr3_authorized':False,
  'uart_sha256':hashlib.sha256(uart).hexdigest(),
  'efi_sha256':hashlib.sha256((build/'x86_64'/'BOOTX64.EFI').read_bytes()).hexdigest(),
