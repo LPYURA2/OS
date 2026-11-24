@@ -14,6 +14,9 @@ _Noreturn void irq842_terminal(const struct boot_info *,uint64_t,uint64_t);
 void irq807_unexpected(void);
 static struct s842_root apic842;
 static struct s842_cache cache842;
+#ifdef STYLEOS_TEST_USER_ROOTS_846
+bool s846_bind(const struct s842_root *,const struct s842_cache *,struct pg_experiment *,const struct igp785_tables *,uint64_t,uint64_t,uint64_t,uint64_t);
+#endif
 #ifdef STYLEOS_TEST_TIMER_SCHEDULER_843
 bool s843_admit(const struct s842_root *,struct pg_experiment *,uint64_t,uint64_t);
 #endif
@@ -295,6 +298,9 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
     if(!acpi806_copy_capture(&topo842)||!snap842(&cache842)||
        !s842_build_pe_efi(&low_request,e,boot842,&cache842,&topo842,msr842(0x1b),&apic842)||
        !s842_audit(&apic842,&cache842)||!cache_unchanged842(&cache842))fail("s842-apic-root-admission");
+#endif
+#ifdef STYLEOS_TEST_USER_ROOTS_846
+    if(!s846_bind(&apic842,&cache842,p,t,plan.new_root_pa,q.pages[IGP785_IST1],ist2_pa,ist3_pa))fail("s846-storage");
 #endif
 #ifdef STYLEOS_TEST_TIMER_SCHEDULER_843
     if(!s843_admit(&apic842,p,plan.new_root_pa,IGP785_IST_ALIAS))fail("s843-task-admission");

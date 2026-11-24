@@ -5,7 +5,7 @@
 static struct boot_range reserved844;
 static bool admitted844;
 static struct s844_arena arena844;
-#ifdef STYLEOS_TEST_TASK_STACKS_845
+#if defined(STYLEOS_TEST_TASK_STACKS_845) || defined(STYLEOS_TEST_USER_ROOTS_846)
 /* Query is read-only before own CR3. Return the allocator only after the
  * existing live test has completed and the reserved area is empty. */
 bool s845_extent(struct boot_range *out){

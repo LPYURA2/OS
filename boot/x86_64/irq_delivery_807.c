@@ -6,6 +6,9 @@
 #include <stdint.h>
 #ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
 void s844_guest_run(uint64_t);
+#ifdef STYLEOS_TEST_USER_ROOTS_846
+void s846_guest_run(uint64_t);
+#endif
 #endif
 #ifdef STYLEOS_TEST_TIMER_SCHEDULER_843
 #include <styleos/timer_context_843.h>
@@ -255,6 +258,9 @@ static _Noreturn void irq_run(const struct boot_info *b
  if(!expected_root||initial!=expected_root||!ist)fail("s842-initial-root");
 #ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
  s844_guest_run(expected_root);
+#ifdef STYLEOS_TEST_USER_ROOTS_846
+ s846_guest_run(expected_root);
+#endif
 #ifdef STYLEOS_TEST_TASK_STACKS_845
  start845(expected_root,ist);
 #endif
