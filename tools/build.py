@@ -36,7 +36,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False):
+    if test_alias_census_841:
+        test_guest_observation_840 = True
     if test_guest_observation_840:
         test_guest_plan_837 = True
     if test_guest_plan_837:
@@ -404,6 +406,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_GUEST_PLAN_837=1')
     if test_guest_observation_840:
         flags.append('-DSTYLEOS_TEST_GUEST_OBSERVATION_840=1')
+    if test_alias_census_841:
+        flags.append('-DSTYLEOS_TEST_ALIAS_CENSUS_841=1')
     if test_acpica_core_821:
         flags += ['-DSTYLEOS_TEST_ACPICA_CORE_821=1', '-D_GNU_EFI', '-I', str(Path(acpica_core_include).resolve())]
     if test_acpi_hostbridge_815:
@@ -626,6 +630,7 @@ def main():
                           help='Dedicated x86-64 test only: prove new CR3 and restore inherited CR3')
     negative.add_argument('--test-hw-probe-793', action='store_true',
                           help='793 dedicated terminal UEFI GOP/memory and CPU cache-state observation')
+    negative.add_argument('--test-alias-census-841', action='store_true', help='841 isolated inherited table census')
     negative.add_argument('--test-guest-observation-840', action='store_true',
                           help='840 isolated read-only live mapping observation')
     negative.add_argument('--test-guest-plan-837', action='store_true',
@@ -748,6 +753,8 @@ def main():
     parser.add_argument('--update-public-key', type=Path, help='Raw Ed25519 verification key')
     parser.add_argument('--test-update-fail', action='store_true', help='Trial intentionally never becomes ready')
     args = parser.parse_args()
+    if args.test_alias_census_841:
+        args.test_guest_observation_840 = True
     if args.test_guest_observation_840:
         args.test_guest_plan_837 = True
     if args.test_guest_plan_837:
@@ -856,6 +863,7 @@ def main():
                'paging' if args.test_paging else
                'paging-fault' if args.test_paging_fault else
                'paging-roundtrip' if args.test_paging_roundtrip else
+               'alias-census-841' if args.test_alias_census_841 else
                'guest-observation-840' if args.test_guest_observation_840 else
                'guest-plan-837' if args.test_guest_plan_837 else
                'iommu-quarantine-835' if args.test_iommu_quarantine_835 else
@@ -945,7 +953,7 @@ def main():
                              **({'test_pci_topology_796': True} if args.test_pci_topology_796 else {}),
                              **({'test_pci_range_799': True} if args.test_pci_range_799 else {}),
                              **({'test_acpi_osl_818': True} if args.test_acpi_osl_818 else {}),
-                             **({'test_acpica_core_821': args.test_acpica_core_821, 'test_acpica_aml_822': args.test_acpica_aml_822, 'test_acpica_firmware_823': args.test_acpica_firmware_823, 'test_acpi_resources_824': args.test_acpi_resources_824, 'test_ecam_826': args.test_ecam_826, 'test_ecam_quarantine_827': args.test_ecam_quarantine_827, 'test_iommu_evidence_828': args.test_iommu_evidence_828, 'test_irq_sources_830': args.test_irq_sources_830, 'test_post_ebs_834': args.test_post_ebs_834, 'test_iommu_quarantine_835': args.test_iommu_quarantine_835, 'test_guest_plan_837': args.test_guest_plan_837, 'test_guest_observation_840': args.test_guest_observation_840, 'acpica_core_lib': args.acpica_core_lib, 'acpica_core_include': args.acpica_core_include} if args.test_acpica_core_821 or args.test_acpica_aml_822 or args.test_acpica_firmware_823 else {}),
+                             **({'test_acpica_core_821': args.test_acpica_core_821, 'test_acpica_aml_822': args.test_acpica_aml_822, 'test_acpica_firmware_823': args.test_acpica_firmware_823, 'test_acpi_resources_824': args.test_acpi_resources_824, 'test_ecam_826': args.test_ecam_826, 'test_ecam_quarantine_827': args.test_ecam_quarantine_827, 'test_iommu_evidence_828': args.test_iommu_evidence_828, 'test_irq_sources_830': args.test_irq_sources_830, 'test_post_ebs_834': args.test_post_ebs_834, 'test_iommu_quarantine_835': args.test_iommu_quarantine_835, 'test_guest_plan_837': args.test_guest_plan_837, 'test_guest_observation_840': args.test_guest_observation_840, 'test_alias_census_841': args.test_alias_census_841, 'acpica_core_lib': args.acpica_core_lib, 'acpica_core_include': args.acpica_core_include} if args.test_acpica_core_821 or args.test_acpica_aml_822 or args.test_acpica_firmware_823 else {}),
                              **({'test_acpica_bridge_819': True} if args.test_acpica_bridge_819 else {}),
                              **({'test_acpi_namespace_816': True} if args.test_acpi_namespace_816 else {}),
                              **({'test_acpi_hostbridge_815': True} if args.test_acpi_hostbridge_815 else {}),
@@ -1000,6 +1008,7 @@ def main():
         **({'test_iommu_quarantine_835': True} if args.test_iommu_quarantine_835 else {}),
         **({'test_guest_plan_837': True} if args.test_guest_plan_837 else {}),
         **({'test_guest_observation_840': True} if args.test_guest_observation_840 else {}),
+        **({'test_alias_census_841': True} if args.test_alias_census_841 else {}),
         'compiler': version,
         'invalid_boot_info': args.invalid_boot_info,
         'invalid_memory_map': args.invalid_memory_map,

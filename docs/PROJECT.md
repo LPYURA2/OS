@@ -317,3 +317,13 @@ activate APIC routing in native Desktop or authorize production CR3.
 
 ### Stage 806 — ACPI MADT/IOAPIC read-only topology
 A separate terminal diagnostic observes trusted QEMU/OVMF RSDP/XSDT/MADT without changing standard Desktop. Only topology and checksums; IRQ routing and delivery unverified. See `docs/architecture/ACPI_MADT_IOAPIC_TOPOLOGY_806.md`.
+
+## Утверждённый владельцем порядок дальнейшей разработки (24.11.2026)
+
+1. Завершение фундамента системы: память, защитные механизмы, аппаратные зависимости, прерывания, изоляция и проверка безопасного перехода на собственные таблицы. Диагностические успехи не означают готовность production.
+2. Файловая система: сохранность, восстановление, права доступа, совместимость данных при обновлении.
+3. Независимые родные приложения .tea и их системные контракты.
+4. Проводник.
+5. Экран приветствия, входа, выбора пользователя и блокировки.
+
+Интерфейс строго по утверждённым макетам (docs/design/APPROVED_UI_REFERENCES.md); существующий Desktop не изменять в фундаментальных этапах. Порядок выше заменяет прежнюю очередность, но не отменяет уже принятые результаты. Каждый новый этап в отдельной ветке, main и принятые refs неизменны.

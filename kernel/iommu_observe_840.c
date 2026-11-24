@@ -72,6 +72,76 @@ static bool target(void *ptr,uint64_t pa,uint16_t slot,uint64_t *v){
  }
  *v=((const volatile uint64_t *)(uintptr_t)pa)[slot];record("READ",pa,slot,*v);return consistent(c->in,pa,slot,*v);
 }
+#ifdef STYLEOS_TEST_ALIAS_CENSUS_841
+/* Separate diagnostic profile. Scan each reachable table path, not just
+ * unique physical pages: a shared page can create distinct virtual aliases.
+ * No raw data/MMIO read; use exactly the S840 RAM admission gates. */
+#define S841_MAX_PATHS 64u
+struct census {struct context *ctx;unsigned visited,denied;};
+static bool quiet_known(void *ptr,uint64_t pa,uint16_t slot,uint64_t *v){
+ const struct context *c=ptr;
+ if(!v||slot>=512||!safe(c,pa))return false;
+ for(size_t i=0;i<c->in->nr_walks;i++){
+  const struct op_walk *w=&c->in->walks[i];
+  if(w->kind==OP_WALK_TABLE&&w->va==pa&&w->pa==pa){
+   *v=((const volatile uint64_t *)(uintptr_t)pa)[slot];
+   return consistent(c->in,pa,slot,*v);
+  }
+ }
+ return false;
+}
+static bool admit841(struct context *c,uint64_t pa){
+ const struct s839_snapshot *s=c->snapshot;
+ struct cache801_translation a={0},b={0};
+ return safe(c,pa)&&cache801_walk(s->root,pa,s->pat,s->physical_bits,quiet_known,c,&a)&&
+  cache801_walk(s->root,pa+4095,s->pat,s->physical_bits,quiet_known,c,&b)&&
+  a.present&&b.present&&a.physical==pa&&b.physical==pa+4095&&a.leaf_entry==b.leaf_entry&&
+  a.page_size==b.page_size&&a.pat_type==6&&b.pat_type==6;
+}
+static int scan841(struct census *q,uint64_t pa,uint64_t prefix,unsigned level){
+ struct context *c=q->ctx;
+ arch_puts("STYLEOS S841 PATH");field("pa",pa);field("prefix",prefix);field("level",level);
+ if(q->visited>=S841_MAX_PATHS||!admit841(c,pa)){
+  field("admitted",0);arch_putc('\n');q->denied++;return 1;
+ }
+ field("admitted",1);arch_putc('\n');q->visited++;
+ /* Keep a single local immutable snapshot per path. Four levels maximum. */
+ uint64_t entries[512];
+ for(unsigned i=0;i<512;i++){
+  entries[i]=((const volatile uint64_t *)(uintptr_t)pa)[i];
+  if(!consistent(c->in,pa,(uint16_t)i,entries[i]))return 0;
+ }
+ for(unsigned i=0;i<512;i+=16){
+  arch_puts("STYLEOS S841 ROW");field("slot",i);
+  for(unsigned j=0;j<16;j++)field("e",entries[i+j]);
+  arch_putc('\n');
+ }
+ uint64_t mask=((UINT64_C(1)<<c->snapshot->physical_bits)-1)&~UINT64_C(4095);
+ for(unsigned i=0;i<512;i++){
+  uint64_t e=entries[i];
+  if(!(e&1))continue;
+  if(e&(((UINT64_C(1)<<52)-1)&~(mask|UINT64_C(4095))))return 0;
+  if(level==4&&(e&128))return 0;
+  if(level==1||(e&128)){
+   uint64_t size=UINT64_C(1)<<(12u+9u*(level-1u));
+   if(level==3&&!(c->in->snapshot.features&2u))return 0;
+   if(level>1&&(e&(size-1)&~UINT64_C(0x1fff)))return 0;
+   continue;
+  }
+  if(!scan841(q,e&mask,prefix|((uint64_t)i<<(12u+9u*(level-1u))),level-1))return 0;
+ }
+ return 1;
+}
+static int census841(struct context *ctx){
+ const struct op_snapshot *s=&ctx->in->snapshot;
+ if(s->aux0&(UINT64_C(1)<<12))return 0; /* no LA57 */
+ struct census q={ctx,0,0};
+ if(!scan841(&q,ctx->snapshot->root&~UINT64_C(4095),0,4))return 0;
+ arch_puts("STYLEOS S841 TOTAL");field("paths",q.visited);field("denied",q.denied);arch_putc('\n');
+ arch_puts("STYLEOS S841 POLICY target-read=no mappings-changed=no dma-grants=no production-cr3=deny\n");
+ return 1;
+}
+#endif
 int s840_observe_guest(const struct boot_info *boot,const struct op_input *in,const struct op_output *plan,struct boot_range cover){
  struct op_snapshot now;
  if(!boot||!in||!plan||in->nr_walks>OP_WALKS_MAX||!op_arch_unchanged(in,&now))return 0;
@@ -97,5 +167,9 @@ int s840_observe_guest(const struct boot_info *boot,const struct op_input *in,co
   field("mtrr",p->physical_cache.type);field("matches",p->physical_cache.matched);arch_putc('\n');
  }
  arch_puts("STYLEOS S840 POLICY target-read=no mappings-changed=no dma-grants=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_ALIAS_CENSUS_841
+ if(!census841(&ctx)||!op_arch_unchanged(in,&now)||msr(0xfe)!=s.cap||msr(0x2ff)!=s.def)return 0;
+ for(uint8_t i=0;i<s.count;i++)if(msr(0x200u+2u*i)!=s.pairs[i].base||msr(0x201u+2u*i)!=s.pairs[i].mask)return 0;
+#endif
  return 1;
 }

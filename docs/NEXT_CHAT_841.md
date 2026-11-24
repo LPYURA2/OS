@@ -1,0 +1,3 @@
+# S841 continuation
+
+Accepted S840 b11d18dfec1c38faf7b54f847c1c068aa6d4d037, CI 45423685392 SUCCESS (188 PASS, 5 SKIPPED), independent raw replay and source/binary hashes verified. Current branch feature/styleos-alias-census-841. Read AGENTS.md, docs/PROJECT.md, docs/ROADMAP.md and docs/architecture/ALIAS_CENSUS_841.md. Verify latest CI, replay original S841 data independently, add strict counterfeit tests before accepting if not already present. Continue foundation only; then filesystem, independent .tea apps, Explorer, welcome/login/user selection/lock, strict approved mockups. Preserve main, accepted branches and protections. FOUNDATION NOT COMPLETE.

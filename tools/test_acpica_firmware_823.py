@@ -14,10 +14,12 @@ def main():
  ap.add_argument('--native-quarantine-835',action='store_true')
  ap.add_argument('--guest-plan-837',action='store_true')
  ap.add_argument('--guest-observation-840',action='store_true')
+ ap.add_argument('--alias-census-841',action='store_true')
  ap.add_argument('--output',required=True,type=Path)
  ap.add_argument('--core-lib',required=True,type=Path)
  ap.add_argument('--core-include',required=True,type=Path)
  args=ap.parse_args()
+ if args.alias_census_841 and not args.guest_observation_840:ap.error('S841 requires S840')
  if args.guest_observation_840 and not args.guest_plan_837:ap.error('S840 requires S837')
  if args.guest_plan_837 and not (args.native_quarantine_835 and args.capture_post_ebs_834 and args.irq_sources_830):ap.error('S837 requires S835 and paired snapshots')
  if args.native_quarantine_835 and not args.capture_post_ebs_834:ap.error('S835 requires paired snapshots')
@@ -44,7 +46,7 @@ def main():
  build=output/'build'
  with (output/'compile.log').open('w') as log:
   subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',
-   ('--test-guest-observation-840' if args.guest_observation_840 else '--test-guest-plan-837' if args.guest_plan_837 else '--test-iommu-quarantine-835' if args.native_quarantine_835 else '--test-post-ebs-834' if args.capture_post_ebs_834 else '--test-irq-sources-830' if args.irq_sources_830 else '--test-iommu-evidence-828' if args.iommu_evidence_828 else '--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
+   ('--test-alias-census-841' if args.alias_census_841 else '--test-guest-observation-840' if args.guest_observation_840 else '--test-guest-plan-837' if args.guest_plan_837 else '--test-iommu-quarantine-835' if args.native_quarantine_835 else '--test-post-ebs-834' if args.capture_post_ebs_834 else '--test-irq-sources-830' if args.irq_sources_830 else '--test-iommu-evidence-828' if args.iommu_evidence_828 else '--test-ecam-quarantine-827' if args.ecam_quarantine_827 else '--test-ecam-826' if args.ecam_826 else '--test-acpi-resources-824' if args.resources_824 else '--test-acpica-firmware-823'),'--acpica-core-lib',str(args.core_lib), '--acpica-core-include',str(args.core_include), '--output',str(build)],
    stdout=log,stderr=subprocess.STDOUT,check=True)
  if args.guest_plan_837:
   from test import verified_ownership_site
@@ -166,6 +168,7 @@ def main():
   'firmware_acpi_root_reconciled':False,'upstream_version':'20260930','full_core_compiled':True,
   'efi_sha256':hashlib.sha256((build/'x86_64'/'BOOTX64.EFI').read_bytes()).hexdigest()}
  if args.guest_observation_840:result['guest_observation_840']=True
+ if args.alias_census_841:result['alias_census_841']=True
  if args.capture_mtree_833:result['qmp_833_capture']=True
  if args.capture_post_ebs_834:result['qmp_834_capture']=True
  if args.native_quarantine_835:result['native_quarantine_835']=True
