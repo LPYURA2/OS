@@ -31,6 +31,10 @@ static struct pci813_live live813;
 static uint8_t mcfg_copy[PCI813_MAX_MCFG_BYTES];
 static uint32_t mcfg_size;
 static unsigned mcfg_seen;
+#ifdef STYLEOS_TEST_IRQ_SOURCES_830
+static uint8_t madt830_copy[4096];
+static unsigned madt830_size,madt830_seen;
+#endif
 static uint8_t dmar_copy[DMAR808_MAX_TABLE],ivrs_copy[IOMMU810_MAX_TABLE];
 static uint32_t dmar_size,ivrs_size,root_count,saved_cf8;
 static enum iommu810_backend backend=IOMMU810_REFUSED;
@@ -172,6 +176,9 @@ void pci816_capture(const struct efi_system_table *st){
   0x8868e871,0xe4f1,0x11d3,{0xbc,0x22,0x00,0x80,0xc7,0x3c,0x88,0x81}};
  valid=0;backend=IOMMU810_REFUSED;root_count=0;dmar_size=0;ivrs_size=0;mcfg_size=0;mcfg_seen=0;
  dsdt_length=0;fadt_seen=0;ssdt_seen=0;
+#ifdef STYLEOS_TEST_IRQ_SOURCES_830
+ madt830_size=0;madt830_seen=0;
+#endif
  root_capture_ok=capture_bridges(st);
  if(!st||!st->configuration_table||!st->number_of_table_entries||
     st->number_of_table_entries>256)return;
@@ -221,6 +228,14 @@ void pci816_capture(const struct efi_system_table *st){
    ssdt_physical_819[ssdt_seen]=entries[i];
 #endif
    ssdt_length[ssdt_seen++]=size;
+#ifdef STYLEOS_TEST_IRQ_SOURCES_830
+  }else if(p[0]=='A'&&p[1]=='P'&&p[2]=='I'&&p[3]=='C'){
+   if(madt830_seen++)return;
+   unsigned size=u32(p+4);struct acpi806_topology t={0};
+   if(size<44u||size>sizeof madt830_copy||!acpi806_madt(p,size,&t))return;
+   for(unsigned k=0;k<size;k++)madt830_copy[k]=p[k];
+   madt830_size=size;
+#endif
   }else if(p[0]=='M'&&p[1]=='C'&&p[2]=='F'&&p[3]=='G'){
    if(mcfg_seen++)return;
    unsigned size=u32(p+4);struct pci813_mcfg candidate={0};
@@ -244,6 +259,9 @@ void pci816_capture(const struct efi_system_table *st){
    }
   }
  }
+#ifdef STYLEOS_TEST_IRQ_SOURCES_830
+ if(madt830_seen!=1u||!madt830_size)return;
+#endif
  backend=iommu810_select(dm,dv,iv,ivv);
  valid=(backend!=IOMMU810_REFUSED&&mcfg_seen==1u&&mcfg_size!=0u&&fadt_seen==1u&&dsdt_length!=0u);
 }
@@ -396,6 +414,12 @@ _Noreturn void pci816_terminal(const struct boot_info *boot){
   if(found==1)matched++;else unknown++;
   for(unsigned j=0;j<audit.aliases;j++)if(audit.alias[j].from==rid)alias_present++;
  }
+#ifdef STYLEOS_TEST_IRQ_SOURCES_830
+ struct acpi806_topology t830={0};
+ if(!acpi806_madt(madt830_copy,madt830_size,&t830))die("830-madt");
+ arch_puts("STYLEOS S830 MADT data=");bytes824(madt830_copy,madt830_size);
+ arch_puts("STYLEOS S830 POLICY observation-only=yes interrupt-remapping=no dma-grants=no production-cr3=deny\n");
+#endif
 #ifdef STYLEOS_TEST_ACPI_RESOURCES_824
  resources824();
 #endif
