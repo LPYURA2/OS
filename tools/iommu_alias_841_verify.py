@@ -70,24 +70,25 @@ def replay(raw,efi,mode):
         ok=visited<64 and admitted(pa)
         need(take('PATH','pa','prefix','level','admitted')==(pa,prefix,level,int(ok)),'S841 path admission')
         if not ok:denied+=1;return
-        visited+=1;entries=[]
+        visited+=1
         for i in range(0,512,16):
-            row=take('ROW','slot',*(['e']*16));need(row[0]==i,'S841 row order');entries.extend(row[1:])
+            row=take('ROW','slot',*(['e']*16));need(row[0]==i,'S841 row order')
             for j,e in enumerate(row[1:]):record(pa,i+j,e)
-        for slot,e in enumerate(entries):
-            if not e&1:continue
-            need(not e&(((1<<52)-1)&~(mask|4095)) and not(level==4 and e&128),'S841 invalid physical bits')
-            va=prefix|(slot<<(12+9*(level-1)))
-            if level==1 or e&128:
-                size=1<<(12+9*(level-1));need(level==1 or not e&(size-1)&~0x1fff,'S841 leaf alignment')
-                need(level!=3 or owner['state_before']['features']&2,'S841 unsupported 1GiB leaf')
-                lo=e&mask&~(size-1);hi=lo+size;leaves+=1
-                if a<b and lo<b and a<hi:
-                    start=max(a,lo);end=min(b,hi);v=va+start-lo
-                    if v&(1<<47):v|=0xffff000000000000
-                    idx=((e>>(7 if level==1 else 12))&1)*4+((e>>4)&1)*2+((e>>3)&1)
-                    aliases.append(dict(physical=start,end=end,virtual=v,pat=(pat>>(8*idx))&255,identity=v==start))
-            else:scan(e&mask,va,level-1)
+            for j,e in enumerate(row[1:]):
+                slot=i+j
+                if not e&1:continue
+                need(not e&(((1<<52)-1)&~(mask|4095)) and not(level==4 and e&128),'S841 invalid physical bits')
+                va=prefix|(slot<<(12+9*(level-1)))
+                if level==1 or e&128:
+                    size=1<<(12+9*(level-1));need(level==1 or not e&(size-1)&~0x1fff,'S841 leaf alignment')
+                    need(level!=3 or owner['state_before']['features']&2,'S841 unsupported 1GiB leaf')
+                    lo=e&mask&~(size-1);hi=lo+size;leaves+=1
+                    if a<b and lo<b and a<hi:
+                        start=max(a,lo);end=min(b,hi);v=va+start-lo
+                        if v&(1<<47):v|=0xffff000000000000
+                        idx=((e>>(7 if level==1 else 12))&1)*4+((e>>4)&1)*2+((e>>3)&1)
+                        aliases.append(dict(physical=start,end=end,virtual=v,pat=(pat>>(8*idx))&255,identity=v==start))
+                else:scan(e&mask,va,level-1)
     scan(root&~4095,0,4)
     need(take('TOTAL','paths','denied')==(visited,denied) and obs[cursor:]==[POLICY],'S841 totals/policy')
     need(visited>0,'S841 no root evidence')

@@ -585,6 +585,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-841
+          clang --target=x86_64-pc-win32-coff -O2 -ffreestanding -fno-stack-protector -fno-builtin -mno-red-zone -mno-sse -mno-mmx -msoft-float -Wall -Wextra -Werror -I include -DSTYLEOS_TEST_ALIAS_CENSUS_841=1 -c kernel/iommu_observe_840.c -o build/recovery-canonical/acpi-841/census.obj
+          objdump -t build/recovery-canonical/acpi-841/census.obj > build/recovery-canonical/acpi-841/census-symbols.log
+          if grep -q '__chkstk' build/recovery-canonical/acpi-841/census-symbols.log; then echo 'Unexpected compiler stack probe'; exit 1; fi
           python3 tools/test_acpica_firmware_823.py --irq-sources-830 --capture-post-ebs-834 --native-quarantine-835 --guest-plan-837 --guest-observation-840 --alias-census-841 \
             --core-lib build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib \
             --core-include build/recovery-canonical/acpica-820/verified/source/include \

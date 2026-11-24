@@ -105,30 +105,32 @@ static int scan841(struct census *q,uint64_t pa,uint64_t prefix,unsigned level){
   field("admitted",0);arch_putc('\n');q->denied++;return 1;
  }
  field("admitted",1);arch_putc('\n');q->visited++;
- /* Keep a single local immutable snapshot per path. Four levels maximum. */
- uint64_t entries[512];
- for(unsigned i=0;i<512;i++){
-  entries[i]=((const volatile uint64_t *)(uintptr_t)pa)[i];
-  if(!consistent(c->in,pa,(uint16_t)i,entries[i]))return 0;
- }
- for(unsigned i=0;i<512;i+=16){
-  arch_puts("STYLEOS S841 ROW");field("slot",i);
-  for(unsigned j=0;j<16;j++)field("e",entries[i+j]);
-  arch_putc('\n');
- }
+ /* Read and emit a bounded row, then follow exactly its child entries.
+  * Four recursive levels; no full-page stack frame or compiler stack probe. */
  uint64_t mask=((UINT64_C(1)<<c->snapshot->physical_bits)-1)&~UINT64_C(4095);
- for(unsigned i=0;i<512;i++){
-  uint64_t e=entries[i];
-  if(!(e&1))continue;
-  if(e&(((UINT64_C(1)<<52)-1)&~(mask|UINT64_C(4095))))return 0;
-  if(level==4&&(e&128))return 0;
-  if(level==1||(e&128)){
-   uint64_t size=UINT64_C(1)<<(12u+9u*(level-1u));
-   if(level==3&&!(c->in->snapshot.features&2u))return 0;
-   if(level>1&&(e&(size-1)&~UINT64_C(0x1fff)))return 0;
-   continue;
+ uint64_t entries[16];
+ for(unsigned base=0;base<512;base+=16){
+  for(unsigned j=0;j<16;j++){
+   unsigned i=base+j;
+   entries[j]=((const volatile uint64_t *)(uintptr_t)pa)[i];
+   if(!consistent(c->in,pa,(uint16_t)i,entries[j]))return 0;
   }
-  if(!scan841(q,e&mask,prefix|((uint64_t)i<<(12u+9u*(level-1u))),level-1))return 0;
+  arch_puts("STYLEOS S841 ROW");field("slot",base);
+  for(unsigned j=0;j<16;j++)field("e",entries[j]);
+  arch_putc('\n');
+  for(unsigned j=0;j<16;j++){
+   unsigned i=base+j;uint64_t e=entries[j];
+   if(!(e&1))continue;
+   if(e&(((UINT64_C(1)<<52)-1)&~(mask|UINT64_C(4095))))return 0;
+   if(level==4&&(e&128))return 0;
+   if(level==1||(e&128)){
+    uint64_t size=UINT64_C(1)<<(12u+9u*(level-1u));
+    if(level==3&&!(c->in->snapshot.features&2u))return 0;
+    if(level>1&&(e&(size-1)&~UINT64_C(0x1fff)))return 0;
+    continue;
+   }
+   if(!scan841(q,e&mask,prefix|((uint64_t)i<<(12u+9u*(level-1u))),level-1))return 0;
+  }
  }
  return 1;
 }
