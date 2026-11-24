@@ -2,7 +2,7 @@
 import sys,json,tempfile
 from pathlib import Path
 from qmp_aperture_833 import COMMANDS,extract,aperture,capture
-from iommu_aperture_833 import correlate,union
+from iommu_aperture_833 import correlate,union,page_cover
 from irq_sources_830_verify import BACKEND,verify
 
 def row(a,b,name,kind='i/o'):
@@ -22,11 +22,17 @@ def main(folder):
         try:fn()
         except ValueError:n+=1
         else:raise AssertionError('bad fixture accepted')
-    b=0xfed90000;u=[{'base':b}];a=0xfed80000;v=[{'base':a}];t=mtree(b)
-    assert aperture(extract(trace(t)),1,u)==[[b,b+4096]];n+=1
+    b=0xfed90000;u=[{'base':b}];a=0xfed80000;v=[{'base':a}];t=mtree(b,560)
+    assert aperture(extract(trace(t)),1,u)==[[b,b+560]];n+=1
+    for size in (1,560,4095,4096,4097,1024*1024):
+        assert aperture(mtree(b,size),1,u)==[[b,b+size]]
+        assert page_cover(b,b+size)==[b,b+((size+4095)//4096)*4096];n+=1
+    assert page_cover(2**64-4096,2**64)==[2**64-4096,2**64];n+=1
+    for lo,hi in ((b,b),(b+1,b+560),(b,b+1024*1024+1),(2**64-4096,2**64+1)):
+        bad(lambda lo=lo,hi=hi:page_cover(lo,hi))
     assert aperture(mtree(a,16384,'amdvi-mmio'),2,v)==[[a,a+16384]];n+=1
     assert aperture(mtree(),0,[])==[];n+=1
-    for txt,backend,units in [(t,0,[]),(t,2,v),(t,1,[]),(mtree(),1,u),(mtree(b+4096),1,u),(mtree(b,4095),1,u),(mtree(b,2**21),1,u),(t.replace('(prio 0, i/o): intel_iommu','(prio 0, ram): intel_iommu'),1,u),(t.replace('AS "memory"','AS "other"'),1,u),(t+t,1,u),(t.replace('FlatView #1',row(b+1,b+2,'duplicate')+'FlatView #1'),1,u),(t.replace('FlatView #1',row(b+4096,b+8192,'intel_iommu')+'FlatView #1'),1,u),(t.replace('FlatView #1',' invalid row\nFlatView #1'),1,u)]:bad(lambda txt=txt,backend=backend,units=units:aperture(txt,backend,units))
+    for txt,backend,units in [(t,0,[]),(t,2,v),(t,1,[]),(mtree(),1,u),(mtree(b+4096),1,u),(mtree(b+1,560),1,u),(mtree(b,2**21),1,u),(t.replace('(prio 0, i/o): intel_iommu','(prio 0, ram): intel_iommu'),1,u),(t.replace('AS "memory"','AS "other"'),1,u),(t+t,1,u),(t.replace('FlatView #1',row(b+1,b+2,'duplicate')+'FlatView #1'),1,u),(t.replace('FlatView #1',row(b+4096,b+8192,'intel_iommu')+'FlatView #1'),1,u),(t.replace('FlatView #1',' invalid row\nFlatView #1'),1,u)]:bad(lambda txt=txt,backend=backend,units=units:aperture(txt,backend,units))
     import copy
     for i in (0,1,2,3,4,5,6,7,8):
         r=trace(t);r.pop(i);bad(lambda r=r:extract(r))
@@ -44,9 +50,14 @@ def main(folder):
         p=folder/mode/'serial.log'
         if mode=='amd' and not p.exists():continue
         raw=p.read_bytes();ok,d=verify(raw,33,mode);assert ok
-        unit=d['s828_inventory']['units'];txt=mtree() if not unit else mtree(unit[0]['base'],16384 if backend==2 else 4096,'amdvi-mmio' if backend==2 else 'intel_iommu')
+        unit=d['s828_inventory']['units'];txt=mtree() if not unit else mtree(unit[0]['base'],16384 if backend==2 else 560,'amdvi-mmio' if backend==2 else 'intel_iommu')
         result=correlate(raw,33,mode,trace(txt));assert not result['physical_aperture_verified'] and not result['ownership'] and not result['dma_authorized']
-        for entry in result['initial_qemu_model_apertures']:assert entry['uefi_status']=='GAP'
+        for entry in result['initial_qemu_model_apertures']:
+            base,end=entry['interval'];size=16384 if backend==2 else 560
+            assert end-base==entry['bytes']==size and entry['uefi_status']=='GAP'
+            assert entry['denied_page_interval']==[base,base+(16384 if backend==2 else 4096)]
+            assert entry['padding_bytes']==(0 if backend==2 else 3536)
+            assert any(a<=base and b>=entry['denied_page_interval'][1] for a,b in result['detached_denied'])
         count+=1
         for rc in (0,32,None):bad(lambda rc=rc:correlate(raw,rc,mode,trace(txt)))
     print(f'{count}/{count} original UART replays with SYNTHETIC monitor data PASS; no new QEMU')

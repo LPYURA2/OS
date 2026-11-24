@@ -17,18 +17,23 @@ def union(spans):
         else:out.append([a,b])
     return out
 
+def page_cover(a,b):
+    need(0<=a<b<=2**64 and a%4096==0 and b-a<=1024*1024,'byte aperture extent')
+    return [a,(b+4095)//4096*4096]
+
 def correlate(raw,rc,mode,trace):
     ok,d=verify(raw,rc,mode);need(ok,'S830 UART replay')
     units=d['s828_inventory']['units'];spans=aperture(extract(trace),BACKEND[mode],units)
     m=d['s826_map_audit'];e=d['s827_exclusion'];w=reconcile(d)
     windows=[v[1:] for v in w['producer_windows'] if v[0]==0]+[[v['start'],v['end']] for v in w['allocated_windows'] if v['kind']==0]
     other=[w['ecam_interval']]+windows+[[v['address'],v['address']+4096] for v in d['s830_ioapics']]
-    result=[]
+    result=[];pages=[]
     for a,b in spans:
-        hit=audit(d['_s826_raw']['final-map.bin'],m['descriptor_size'],m['descriptor_version'],a,b)
-        need(not hit['conflicts'] and not any(overlaps([a,b],r) for r in other+e['candidates']),'aperture conflicts with observed resources')
-        result.append(dict(interval=[a,b],bytes=b-a,uefi_status=hit['status'],covered=hit['covered'],gaps=hit['gaps'],conflicts=hit['conflicts']))
-    denied=union(e['reserved']+spans);need(not any(overlaps(a,b) for a in denied for b in e['candidates']),'deny map conflict')
+        page=page_cover(a,b);pages.append(page)
+        hit=audit(d['_s826_raw']['final-map.bin'],m['descriptor_size'],m['descriptor_version'],*page)
+        need(not hit['conflicts'] and not any(overlaps(page,r) for r in other+e['candidates']),'aperture page cover conflicts with observed resources')
+        result.append(dict(interval=[a,b],bytes=b-a,denied_page_interval=page,denied_page_bytes=page[1]-page[0],padding_bytes=page[1]-b,uefi_status=hit['status'],covered=hit['covered'],gaps=hit['gaps'],conflicts=hit['conflicts']))
+    denied=union(e['reserved']+pages);need(not any(overlaps(a,b) for a in denied for b in e['candidates']),'deny map conflict')
     return dict(mode=mode,initial_qemu_model_apertures=result,detached_denied=denied,unchanged_candidates=e['candidates'],post_ebs_qemu_aperture_verified=False,physical_aperture_verified=False,ownership=False,mmio_authorized=False,dma_authorized=False,production_cr3_authorized=False)
 
 def run(folder):

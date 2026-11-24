@@ -75,5 +75,5 @@ def aperture(text,backend,units):
         require(not found and not units,'unexpected controller');return []
     require(backend in NAMES and len(units)==len(found)==1,'unsupported controller count')
     a,b,kind,name=found[0];u=units[0]
-    require(name==NAMES[backend] and kind=='i/o' and a==u['base'] and a%4096==b%4096==0 and 4096<=b-a<=1024*1024,'controller aperture mismatch')
+    require(name==NAMES[backend] and kind=='i/o' and a==u['base'] and a%4096==0 and 0<b-a<=1024*1024,'controller aperture mismatch')
     return [[a,b]]
