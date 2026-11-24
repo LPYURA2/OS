@@ -1,0 +1,69 @@
+/* Isolated diagnostic: no control-register changes, no compiler-generated FP. */
+#include <styleos/fx_guest_849.h>
+#include <styleos/arch.h>
+struct s849_image s849_kernel_image,s849_user_capture,s849_user_restore;
+static struct s849_image kernel_check;
+volatile uint64_t s849_live;
+static struct s849_bank bank;
+static uint64_t safe849;
+static unsigned seen[2];
+static uint64_t cr3_849(void){uint64_t x;__asm__ volatile("mov %%cr3,%0":"=r"(x));return x;}
+static uint64_t flags849(void){uint64_t x;__asm__ volatile("pushfq;popq %0":"=r"(x));return x;}
+static uint32_t u32(const uint8_t *b){return (uint32_t)b[0]|((uint32_t)b[1]<<8)|((uint32_t)b[2]<<16)|((uint32_t)b[3]<<24);}
+static uint64_t u64(const uint8_t *b){return u32(b)|((uint64_t)u32(b+4)<<32);}
+static void field(const char *k,uint64_t x){arch_putc(' ');arch_puts(k);arch_puts("=0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(x>>(unsigned)i)&15]);}
+static bool mapped(const struct s846_root *r,const void *v,size_t n){uint64_t x=(uintptr_t)v;for(size_t i=0;i<r->plan.count;i++){const struct pg_mapping *m=&r->plan.maps[i];if(m->va==m->pa&&m->flags==PG_WRITE&&x>=m->va&&x-m->va<m->bytes&&n<=m->bytes-(x-m->va))return true;}return false;}
+static void scrub(void *p,size_t n){volatile uint8_t *b=p;while(n--)*b++=0;}
+static bool allzero(const void *p,size_t n){const uint8_t *b=p;while(n--)if(*b++)return false;return true;}
+bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
+ if(safe849||s849_live||cr3_849()!=safe||(flags849()&0x200))return false;
+ for(unsigned i=0;i<2;i++)if(!mapped(&child[i],&bank,sizeof bank)||!mapped(&child[i],&s849_kernel_image,sizeof s849_kernel_image)||!mapped(&child[i],&s849_user_capture,sizeof s849_user_capture)||!mapped(&child[i],&s849_user_restore,sizeof s849_user_restore)||!mapped(&child[i],&kernel_check,sizeof kernel_check)||!mapped(&child[i],(const void *)&s849_live,sizeof s849_live))return false;
+ struct s849_caps c={0};uint32_t a,b,mask;
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c.leaf1_ecx),"=d"(c.leaf1_edx):"a"(1),"c"(0));
+ __asm__ volatile("mov %%cr0,%0;mov %%cr4,%1":"=r"(c.cr0),"=r"(c.cr4));
+ arch_puts("STYLEOS S849 MODE");field("ecx",c.leaf1_ecx);field("edx",c.leaf1_edx);field("cr0",c.cr0);field("cr4",c.cr4);arch_putc('\n');
+ if(!s849_admit(&c,&mask))return false;
+ __asm__ volatile("fxsave64 %0":"=m"(s849_kernel_image)::"memory");
+ c.mxcsr_mask=u32(s849_kernel_image.bytes+28);
+ if(!s849_init(&bank,&c,child[0].built.root,child[1].built.root)||!s849_image_valid(&s849_kernel_image,bank.mxcsr_mask)||(bank.mxcsr_mask&0x3f80)!=0x3f80)return false;
+ safe849=safe;arch_puts("STYLEOS S849 READY");field("mask",bank.mxcsr_mask);field("safe",safe);arch_putc('\n');return true;
+}
+bool s849_guest_dispatch(unsigned id,uint64_t root){
+ if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||s849_live||!s849_dispatch(&bank,id,root,1,&s849_user_restore))return false;
+ scrub(&s849_user_capture,sizeof s849_user_capture);s849_live=1;return true;
+}
+bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
+ if(!safe849||id>1||cr3_849()!=root||(flags849()&0x200)||s849_live!=2||!s849_suspend(&bank,id,root,1,&s849_user_capture))return false;
+ /* Fixtures set XMM14/15 once, before recording integer progress. All
+  * other XMM lanes stay zero. Verify each actual trap capture. */
+ uint64_t x14=UINT64_C(0x8480000000000000)|((uint64_t)id<<32)|13;
+ uint64_t x15=UINT64_C(0x8480000000000000)|((uint64_t)id<<32)|14;
+ const uint8_t *p=s849_user_capture.bytes;
+ /* User fixture uses one x87 value and distinct MXCSR, without resetting
+  * them at each dispatch. Compare only architectural fields. */
+ uint64_t st0=u64(p+32);uint32_t exp=(uint32_t)p[40]|((uint32_t)p[41]<<8);
+ uint32_t mx=id?0x3f80:0x1f80;
+ if(p[0]!=0x7f||p[1]!=3||p[2]||p[3]!=0x38||p[4]!=0x80||st0!=(id?0:UINT64_C(0x8000000000000000))||exp!=(id?0:0x3fff))return false;
+ __asm__ volatile("fxsave64 %0":"=m"(kernel_check)::"memory");
+ const uint8_t *k=s849_kernel_image.bytes,*q=kernel_check.bytes;
+ /* FIP/FDP/FOP and empty x87 payloads are not assumed portable.
+  * Compare defined control/status/tag, active logical ST slots, MXCSR, XMM. */
+ for(unsigned j=0;j<5;j++)if(k[j]!=q[j])return false;
+ if(u32(k+24)!=u32(q+24)||u32(k+28)!=u32(q+28))return false;
+ unsigned top=(k[3]>>3)&7u;
+ for(unsigned j=0;j<8;j++)if(k[4]&(1u<<((top+j)&7u)))for(unsigned n=0;n<10;n++)if(k[32+16*j+n]!=q[32+16*j+n])return false;
+ for(unsigned j=160;j<416;j++)if(k[j]!=q[j])return false;
+ scrub(&kernel_check,sizeof kernel_check);
+ if(!allzero(p+160,14*16)||u64(p+160+14*16)!=x14||u64(p+160+15*16)!=x15||u64(p+160+14*16+8)||u64(p+160+15*16+8)||u32(p+24)!=mx)return false;
+ ++seen[id];arch_puts("STYLEOS S849 CAPTURE");field("id",id);field("root",root);field("n",seen[id]);field("xmm14",x14);field("xmm15",x15);field("mxcsr",u32(p+24));field("st0",st0);field("exp",exp);field("kernel-restored",1);field("terminal",terminal);arch_putc('\n');
+ scrub(&s849_user_capture,sizeof s849_user_capture);scrub(&s849_user_restore,sizeof s849_user_restore);s849_live=0;
+ /* Retirement happens later under the safe root. */
+ return true;
+}
+bool s849_guest_finish(uint64_t safe){
+ if(safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live||seen[0]!=4||seen[1]!=6||bank.active!=-1)return false;
+ for(unsigned i=0;i<2;i++)if(!s849_retire(&bank,i,bank.slot[i].root,1)||!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
+ scrub(&s849_kernel_image,sizeof s849_kernel_image);scrub(&bank,sizeof bank);safe849=0;
+ if(!allzero(&s849_kernel_image,sizeof s849_kernel_image)||!allzero(&bank,sizeof bank)||!allzero(&s849_user_capture,sizeof s849_user_capture)||!allzero(&s849_user_restore,sizeof s849_user_restore)||!allzero(&kernel_check,sizeof kernel_check))return false;
+ arch_puts("STYLEOS S849 CLEAN slots-zero=yes kernel-copy-zero=yes\n");return true;
+}

@@ -29,6 +29,14 @@ s847_enter:
     xorq %rax,%rax
     movw %ss,%ax
     movw %ax,s847_kernel_ss(%rip)
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+    cmpq $0,s849_live(%rip)
+    je .Lfxenter_done849
+    cmpq $1,s849_live(%rip)
+    jne .Lbad847
+    fxrstor64 s849_user_restore(%rip)
+.Lfxenter_done849:
+#endif
     movq %rdx,%cr3
     movq %rcx,%r11
     pushq 280(%r11)
@@ -96,6 +104,16 @@ s848_irq_entry:
     movq %cr3,%r8
     cmpq s847_child_root(%rip),%r8
     jne .Lbad847
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+    cmpq $0,s849_live(%rip)
+    je .Lfxtrap_done849
+    cmpq $1,s849_live(%rip)
+    jne .Lbad847
+    fxsave64 s849_user_capture(%rip)
+    fxrstor64 s849_kernel_image(%rip)
+    movq $2,s849_live(%rip)
+.Lfxtrap_done849:
+#endif
     movq %rsp,%rcx
     movq %cr2,%rdx
     andq $-16,%rsp
@@ -221,6 +239,12 @@ s847_1_end:
 .text
 .globl s848_a_start,s848_a_loop_end,s848_a_fault,s848_a_end
 s848_a_start:
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+    movq %r14,%xmm14
+    movq %r15,%xmm15
+    fld1
+    ldmxcsr .Lmxcsr_a849(%rip)
+#endif
 1:  incq (%rdi)
     cmpq $0,8(%rdi)
     je 1b
@@ -229,9 +253,18 @@ s848_a_loop_end:
 s848_a_fault:
     movq (%rax),%rax
     ud2
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+.Lmxcsr_a849: .long 0x1f80
+#endif
 s848_a_end:
 .globl s848_b_start,s848_b_loop_end,s848_b_exit,s848_b_end
 s848_b_start:
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+    movq %r14,%xmm14
+    movq %r15,%xmm15
+    fldz
+    ldmxcsr .Lmxcsr_b849(%rip)
+#endif
 2:  incq (%rdi)
     cmpq $0,8(%rdi)
     je 2b
@@ -240,5 +273,8 @@ s848_b_loop_end:
     int $0x80
 s848_b_exit:
     ud2
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+.Lmxcsr_b849: .long 0x3f80
+#endif
 s848_b_end:
 #endif

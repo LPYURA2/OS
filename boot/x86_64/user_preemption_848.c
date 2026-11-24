@@ -2,6 +2,9 @@
 #include <styleos/user_preempt_848.h>
 #include <styleos/acpi_madt_806.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+#include <styleos/fx_guest_849.h>
+#endif
 #define P UINT64_C(4096)
 #define V 0x50u
 #define BIT 0x10000u
@@ -33,6 +36,9 @@ static uint64_t pattern848(unsigned id,unsigned i){return i==5?S846_DATA:UINT64_
 bool s848_active(void){return active848;}
 unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  int id=ctl848.current;if(!active848||id<0||id>1||root!=root848()||root!=ctl848.slot[id].root)fail848("origin");
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+ if(!s849_guest_suspend((unsigned)id,root,f->vector!=V))fail848("fx-suspend");
+#endif
  if(f->vector==V){
   uint32_t isr=rd848(0x120);uint64_t p=word848(S846_DATA);
   if(!armed848||rd848(0x390)||f->rip<sites848[id][0]||f->rip>=sites848[id][1]||f->rsp!=S846_STACK+P||p<=progress848[id]||word848(S846_DATA+8))fail848("tick-progress");
@@ -84,11 +90,17 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
  __asm__ volatile("lgdt %0;lidt %1"::"m"(g),"m"(d):"memory");
  wr848(0x80,0);wr848(0xf0,(svr&~255u)|0x1ffu);wr848(0x320,BIT|V);wr848(0x3e0,3); /* divide by 16 */
  if(rd848(0x320)!=(BIT|V)||rd848(0x3e0)!=3||rd848(0x80)||rd848(0xf0)!=((svr&~255u)|0x1ffu))fail848("setup");
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+ if(!s849_guest_init(child,safe))fail848("fx-mode");
+#endif
  active848=true;
  arch_puts("STYLEOS S848 READY");fld848("safe",safe);fld848("a",child[0].built.root);fld848("b",child[1].built.root);fld848("lapic",lapic848);fld848("cs",sel.cs);fld848("ss",sel.ss);fld848("a-loop-end",sites848[0][1]);fld848("b-loop-end",sites848[1][1]);fld848("a-fault",sites848[0][2]);fld848("b-exit",sites848[1][2]);fld848("count",COUNT);arch_putc('\n');
  for(unsigned step=0;step<10;step++){
   static const unsigned order[10]={0,1,0,1,0,1,0,1,1,1};unsigned id;struct up_context ctx;uint64_t sp0,sp1;
   if(!s848_user_dispatch(&ctl848,root848(),&id,&ctx)||id!=order[step]||armed848||rd848(0x390)||(rd848(0x120)&BIT)||(rd848(0x220)&BIT))fail848("dispatch");
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+  if(!s849_guest_dispatch(id,child[id].built.root))fail848("fx-dispatch");
+#endif
   bool terminal=step==6||step==9;
   if(terminal)put848(leases[id].pa+P+8,1);
   else{armed848=true;wr848(0x320,V);wr848(0x380,COUNT);}
@@ -99,9 +111,17 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
   arch_puts("STYLEOS S848 BACK");fld848("step",step);fld848("id",id);fld848("safe",safe);fld848("state",ctl848.slot[id].state);fld848("a",progress848[0]);fld848("b",progress848[1]);fld848("stack-same",1);arch_putc('\n');
  }
  unsigned id;struct up_context ctx;if(ticks848!=8||local848[0]!=3||local848[1]!=5||s848_user_dispatch(&ctl848,safe,&id,&ctx))fail848("final");
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+ if(!s849_guest_finish(safe))fail848("fx-finish");
+#endif
  active848=false;wr848(0x320,BIT|V);wr848(0x380,0);wr848(0x3e0,div);wr848(0x320,lvt);wr848(0x80,tpr);wr848(0xf0,svr);
  __asm__ volatile("lidt %0;lgdt %1"::"m"(i0),"m"(g0):"memory");volatile unsigned char *tail=(void *)(uintptr_t)(g0.base+g0.limit+1);for(unsigned i=0;i<16;i++)tail[i]=0;
  __asm__ volatile("sgdt %0":"=m"(check));if(check.base!=g0.base||check.limit!=g0.limit)fail848("restore-gdt");__asm__ volatile("sidt %0":"=m"(check));if(check.base!=i0.base||check.limit!=i0.limit||rd848(0x320)!=lvt||rd848(0x380)||rd848(0x390)||rd848(0x3e0)!=div||rd848(0x80)!=tpr||rd848(0xf0)!=svr||pending848(0x100)||pending848(0x200))fail848("restore-apic");
  arch_puts("STYLEOS S848 TOTAL");fld848("ticks",ticks848);fld848("a",local848[0]);fld848("b",local848[1]);fld848("config-restored",1);fld848("timer-stopped",1);arch_putc('\n');
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+ arch_puts("STYLEOS S848 POLICY cpl3-timer=yes integer-only=no single-cpu=yes firmware-timer-phase=discarded production-cr3=deny\n");
+ arch_puts("STYLEOS S849 POLICY cpl3-timer=yes fx-legacy=yes single-cpu=yes production-cr3=deny\n");
+#else
  arch_puts("STYLEOS S848 POLICY cpl3-timer=yes integer-only=yes single-cpu=yes firmware-timer-phase=discarded production-cr3=deny\n");
+#endif
 }

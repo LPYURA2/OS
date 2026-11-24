@@ -1,0 +1,24 @@
+#ifndef STYLEOS_FX_CONTEXT_849_H
+#define STYLEOS_FX_CONTEXT_849_H
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#define S849_BYTES 512u
+#define S849_MXCSR_FALLBACK UINT32_C(0xffbf)
+/* Bounded legacy x87/MMX/SSE context, not XSAVE or AVX. Only trusted kernel
+ * storage may be supplied to FXRSTOR, after mode and image validation. */
+struct s849_image { _Alignas(16) uint8_t bytes[S849_BYTES]; };
+struct s849_caps { uint32_t leaf1_ecx,leaf1_edx,mxcsr_mask; uint64_t cr0,cr4; };
+struct s849_slot { struct s849_image image; uint64_t root,generation; bool live; };
+struct s849_bank { struct s849_slot slot[2]; uint32_t mxcsr_mask; int active; bool admitted; };
+_Static_assert(sizeof(struct s849_image)==512,"FXSAVE extent");
+_Static_assert(_Alignof(struct s849_image)==16,"FXSAVE alignment");
+bool s849_admit(const struct s849_caps *,uint32_t *);
+bool s849_image_valid(const struct s849_image *,uint32_t);
+bool s849_init(struct s849_bank *,const struct s849_caps *,uint64_t,uint64_t);
+/* Dispatch/suspend metadata only. Caller must serialize and perform actual
+ * restore/save before changing execution domain, without using FP in kernel. */
+bool s849_dispatch(struct s849_bank *,unsigned,uint64_t,uint64_t,struct s849_image *);
+bool s849_suspend(struct s849_bank *,unsigned,uint64_t,uint64_t,const struct s849_image *);
+bool s849_retire(struct s849_bank *,unsigned,uint64_t,uint64_t);
+#endif

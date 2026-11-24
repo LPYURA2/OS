@@ -14,28 +14,30 @@ def parse(line,tag,keys):
     if not match:raise ValueError('S848 schema '+tag)
     return dict(zip(keys,(int(v,16) for v in match.groups())))
 
-def verify_stage(lines,obs):
+def verify_stage(lines,obs,*,fx=False):
+    prefix=19 if fx else 0
+    policy=POLICY.replace(b'integer-only=yes',b'integer-only=no') if fx else POLICY
     rec=[x for x in lines if x.startswith(b'STYLEOS S848 ')]
-    if len(rec)!=25 or rec[-1]!=POLICY:raise ValueError('S848 record count/policy')
+    if len(rec)!=25 or rec[-1]!=policy:raise ValueError('S848 record count/policy')
     parent=obs['child_roots'];safe=parent['safe'];sel=obs['process_selectors']
     admit=parse(rec[0],'ADMIT',('lvt','initial','current','div','isr','irr'))
     if any(v>0xffffffff for v in admit.values()) or not admit['lvt']&0x10000 or admit['lvt']&~0x300ff or admit['div']&~0xb or admit['current']>admit['initial'] or admit['isr'] or admit['irr']:raise ValueError('S848 timer admission')
     stop=parse(rec[1],'STOP',('lvt','initial','current','isr','irr'))
     if tuple(stop.values())!=(admit['lvt'],0,0,0,0):raise ValueError('S848 timer quiescence')
     r=parse(rec[2],'READY',('safe','a','b','lapic','cs','ss','a-loop-end','b-loop-end','a-fault','b-exit','count'))
-    if tuple(r.values())!=(safe,parent['a'],parent['b'],0xfee00000,sel['cs'],sel['ss'],CODE+10,CODE+10,CODE+20,CODE+19,5000000):raise ValueError('S848 roots/sites')
+    if tuple(r.values())!=(safe,parent['a'],parent['b'],0xfee00000,sel['cs'],sel['ss'],CODE+prefix+10,CODE+prefix+10,CODE+prefix+20,CODE+prefix+19,5000000):raise ValueError('S848 roots/sites')
     i=3;ticks=0;local=[0,0];progress=[0,0];seen=[];backs=[];ends=[]
     for step,id in enumerate(ORDER):
         terminal=step in (6,9)
         if terminal:
             v=parse(rec[i],'END',('id','root','rip','vector','error','cr2','state','ticks'))
-            if tuple(v.values())!=(id,parent['ab'[id]],CODE+(19 if id else 20),128 if id else 14,0 if id else 5,0 if id else IST,4 if id else 3,ticks):raise ValueError('S848 terminal evidence')
+            if tuple(v.values())!=(id,parent['ab'[id]],CODE+prefix+(19 if id else 20),128 if id else 14,0 if id else 5,0 if id else IST,4 if id else 3,ticks):raise ValueError('S848 terminal evidence')
             ends.append(v)
         else:
             v=parse(rec[i],'TICK',('n','id','root','rip','rsp','flags','frame','cs','ss','progress','isr','eoi')+GPRS)
             ticks+=1;local[id]+=1
             if (v['n'],v['id'],v['root'],v['rsp'],v['frame'],v['cs'],v['ss'],v['eoi'])!=(ticks,id,parent['ab'[id]],0x11001000,IST+4096-16-176,sel['cs'],sel['ss'],1):raise ValueError('S848 hardware context')
-            if v['rip'] not in (CODE,CODE+3,CODE+8) or v['flags']&0x202!=0x202 or v['flags']&~0xad7 or not v['isr']&0x10000 or v['progress']<=progress[id]:raise ValueError('S848 progress/IRQ')
+            if v['rip'] not in (CODE+prefix,CODE+prefix+3,CODE+prefix+8) or v['flags']&0x202!=0x202 or v['flags']&~0xad7 or not v['isr']&0x10000 or v['progress']<=progress[id]:raise ValueError('S848 progress/IRQ')
             for j,k in enumerate(GPRS):
                 if v[k]!=(0x12000000 if j==5 else 0x8480000000000000|(id<<32)|j):raise ValueError('S848 GPR '+k)
             progress[id]=v['progress'];seen.append(v)
@@ -60,12 +62,14 @@ def verify(raw,rc):
         return True,obs
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)
 
-def verify_link_map(path):
+def verify_link_map(path,*,fx=False):
+    prefix=19 if fx else 0
+    suffix=4 if fx else 0
     prior_map(path)
     symbols={}
     for line in path.read_text().splitlines():
         m=re.search(r'\bs848_([ab])_(start|loop_end|fault|exit|end)\s+([0-9a-fA-F]{16})\b',line)
         if m:symbols[m[1]+'-'+m[2]]=int(m[3],16)
     for id,term,offset,size in [('a','fault',20,25),('b','exit',19,21)]:
-        for site,want in [('loop_end',10),(term,offset),('end',size)]:
+        for site,want in [('loop_end',10+prefix),(term,offset+prefix),('end',size+prefix+suffix)]:
             if symbols[id+'-'+site]-symbols[id+'-start']!=want:raise ValueError('S848 link map '+id+'-'+site)
