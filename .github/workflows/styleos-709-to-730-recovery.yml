@@ -560,6 +560,14 @@ jobs:
           cmp build/recovery-canonical/acpi-839/normal.json build/recovery-canonical/acpi-839/ubsan.json
           clang --target=x86_64-pc-windows-msvc -ffreestanding -fno-builtin -O2 -Wall -Wextra -Werror -I include -c kernel/iommu_collect_839.c -o build/recovery-canonical/acpi-839/collector.obj
 
+      - name: 840 Reject synthetic forged observation records on verified S837 evidence
+        if: github.ref_name == 'feature/styleos-guest-observation-840'
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpi-840
+          clang --target=x86_64-pc-windows-msvc -ffreestanding -fno-builtin -O2 -Wall -Wextra -Werror -I include -c kernel/iommu_observe_840.c -o build/recovery-canonical/acpi-840/observe.obj
+          python3 tools/test_iommu_observe_840_negative.py --input build/recovery-canonical/acpi-837/qemu | tee build/recovery-canonical/acpi-840/negative.log
+
       - name: 840 Observe actual inherited IOMMU cover mappings in independent QEMU boots
         if: github.ref_name == 'feature/styleos-guest-observation-840'
         run: |
@@ -1843,7 +1851,22 @@ jobs:
             build/recovery-canonical/acpica-821/qemu/qemu-device-help.log
             build/recovery-canonical/acpica-821/qemu/upstream-core/core-manifest.json
             build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
-            build/recovery-canonical/acpi-840/**
+            build/recovery-canonical/acpi-840/*.log
+            build/recovery-canonical/acpi-840/results.json
+            build/recovery-canonical/acpi-840/qemu/results.json
+            build/recovery-canonical/acpi-840/qemu/*.log
+            build/recovery-canonical/acpi-840/qemu/qemu-version.txt
+            build/recovery-canonical/acpi-840/qemu/qemu-device-help.log
+            build/recovery-canonical/acpi-840/qemu/build/manifest.json
+            build/recovery-canonical/acpi-840/qemu/build/x86_64/BOOTX64.EFI
+            build/recovery-canonical/acpi-840/qemu/build/x86_64/kernel.map
+            build/recovery-canonical/acpi-840/qemu/build/x86_64/styleos.img
+            build/recovery-canonical/acpi-840/qemu/build/x86_64/ownership-site.json
+            build/recovery-canonical/acpi-840/qemu/disabled/**
+            build/recovery-canonical/acpi-840/qemu/intel/**
+            build/recovery-canonical/acpi-840/qemu/bridge-intel/**
+            build/recovery-canonical/acpi-840/qemu/bridge-two-hop-intel/**
+            build/recovery-canonical/acpi-840/qemu/amd/**
             build/recovery-canonical/acpi-839/*.log
             build/recovery-canonical/acpi-839/*.json
             build/recovery-canonical/acpi-838/*.log

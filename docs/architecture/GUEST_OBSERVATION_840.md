@@ -1,3 +1,5 @@
 # S840 — same-boot observation
 
 Base S839 abd1ddb97c6338ccdc6c34b2bce2531578aa0854, CI 45417684618 SUCCESS. Independently downloaded and replayed five original S837 scenarios, GCC and UBSan 135/135 each, identical JSON and COFF PASS; archive source and binary hashes verified. New profile --test-guest-observation-840 composes S837 then invokes S839 on inherited CR3/PAT and MTRR readbacks. Table reads require full baseline reservation, no candidate overlap, EFI BootServicesData WB and live identity endpoint proof through previously verified S837 table pages. Emit ordered raw reads, replay independently. Unknown mappings are UNSUPPORTED, never authority. No target MMIO read, allocator integration, CR3 or DMA authorization. Full CI and raw artifact review pending. Foundation not complete.
+
+Additional pre-acceptance hardening: require physical WB MTRR at both ends of table pages and bind all previously sampled entries to S837 (only A/D bits may change). Add explicitly synthetic host positive/refusal replay before guest execution. These changes do not establish actual guest success; CI must finish and be replayed independently.

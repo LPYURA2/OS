@@ -3,7 +3,7 @@
 /* Q35/OVMF diagnostic only. No target VA or MMIO dereference. New table
  * pages require full baseline reservation, EFI BootServicesData, and live
  * endpoint identity walks through previously proved S837 table pages. */
-struct context {const struct boot_info *boot;const struct op_input *in;};
+struct context {const struct boot_info *boot;const struct op_input *in;const struct s839_snapshot *snapshot;};
 static void field(const char *k,uint64_t v){
  arch_putc(' ');arch_puts(k);arch_puts("=0x");
  for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15u]);
@@ -12,7 +12,11 @@ static uint64_t msr(uint32_t n){uint32_t a,d;__asm__ volatile("rdmsr":"=a"(a),"=
 static uint32_t caps(void){uint32_t a=1,b,c,d;__asm__ volatile("cpuid":"+a"(a),"=b"(b),"=c"(c),"=d"(d):"c"(0));return d;}
 static uint64_t le(const uint8_t *p,unsigned n){uint64_t v=0;for(unsigned i=0;i<n;i++)v|=(uint64_t)p[i]<<(8u*i);return v;}
 static bool safe(const struct context *c,uint64_t pa){
- if(!pa||(pa&4095u)||pa>=UINT64_C(0x08000000))return false;
+ if(!pa||(pa&4095u)||pa>=UINT64_C(0x08000000)||!c->snapshot)return false;
+ struct cache800_result lo,hi;const struct s839_snapshot *s=c->snapshot;
+ if(!cache800_physical_type(pa,s->physical_bits,s->cap,s->def,s->pairs,s->count,&lo)||
+    !cache800_physical_type(pa+4095,s->physical_bits,s->cap,s->def,s->pairs,s->count,&hi)||
+    !lo.mtrr_enabled||!hi.mtrr_enabled||lo.type!=6||hi.type!=6)return false;
  const struct boot_memory_map *m=c->in->map;
  if(!m||m->nr_reserved>BOOT_MEMORY_INPUT_MAX||m->nr_candidates>BOOT_MEMORY_RANGE_MAX)return false;
  bool reserved=false;
@@ -33,13 +37,25 @@ static bool safe(const struct context *c,uint64_t pa){
 static void record(const char *tag,uint64_t pa,uint16_t slot,uint64_t value){
  arch_puts("STYLEOS S840 ");arch_puts(tag);field("table",pa);field("slot",slot);field("entry",value);arch_putc('\n');
 }
+/* Bind sampled entries to the original S837 identity proof. Hardware A/D
+ * changes are the only tolerated difference. */
+static bool consistent(const struct op_input *in,uint64_t pa,uint16_t slot,uint64_t entry){
+ for(size_t i=0;i<in->nr_walks;i++){
+  const struct op_walk *w=&in->walks[i];
+  if(w->levels>4)return false;
+  for(unsigned j=0;j<w->levels;j++)
+   if(w->tables[j]==pa&&((w->va>>(39u-9u*j))&511u)==slot&&
+      ((w->entries[j]^entry)&~UINT64_C(0x60)))return false;
+ }
+ return true;
+}
 static bool known(void *ptr,uint64_t pa,uint16_t slot,uint64_t *v){
  const struct context *c=ptr;
  if(!v||slot>=512||!safe(c,pa))return false;
  for(size_t i=0;i<c->in->nr_walks;i++){
   const struct op_walk *w=&c->in->walks[i];
   if(w->kind==OP_WALK_TABLE&&w->va==pa&&w->pa==pa){
-   *v=((const volatile uint64_t *)(uintptr_t)pa)[slot];record("IDENTITY",pa,slot,*v);return true;
+   *v=((const volatile uint64_t *)(uintptr_t)pa)[slot];record("IDENTITY",pa,slot,*v);return consistent(c->in,pa,slot,*v);
   }
  }
  return false;
@@ -54,7 +70,7 @@ static bool target(void *ptr,uint64_t pa,uint16_t slot,uint64_t *v){
     a.leaf_entry!=b.leaf_entry||a.page_size!=b.page_size||a.pat_type!=6||b.pat_type!=6){
   record("DENY",pa,slot,0);return false;
  }
- *v=((const volatile uint64_t *)(uintptr_t)pa)[slot];record("READ",pa,slot,*v);return true;
+ *v=((const volatile uint64_t *)(uintptr_t)pa)[slot];record("READ",pa,slot,*v);return consistent(c->in,pa,slot,*v);
 }
 int s840_observe_guest(const struct boot_info *boot,const struct op_input *in,const struct op_output *plan,struct boot_range cover){
  struct op_snapshot now;
@@ -69,7 +85,7 @@ int s840_observe_guest(const struct boot_info *boot,const struct op_input *in,co
   s.pairs[i].base=msr(0x200u+2u*i);s.pairs[i].mask=msr(0x201u+2u*i);
   arch_puts("STYLEOS S840 MTRR");field("index",i);field("base",s.pairs[i].base);field("mask",s.pairs[i].mask);arch_putc('\n');
  }
- struct s839_result result={0};struct context ctx={boot,in};
+ struct s839_result result={0};struct context ctx={boot,in,&s};
  int ok=s839_collect(plan,cover,&s,target,&ctx,&result);
  if(!op_arch_unchanged(in,&now)||msr(0xfe)!=s.cap||msr(0x2ff)!=s.def)return 0;
  for(uint8_t i=0;i<s.count;i++)if(msr(0x200u+2u*i)!=s.pairs[i].base||msr(0x201u+2u*i)!=s.pairs[i].mask)return 0;

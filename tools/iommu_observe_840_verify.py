@@ -35,7 +35,14 @@ def replay(raw,efi,mode):
     for j in range(num):
         idx,b,m=take('MTRR','index','base','mask');need(idx==j,'MTRR order');pairs.append(dict(base=b,mask=m))
     seen={}
+    for w in owner['walks']:
+        for step in w['steps']:
+            level=step['level'];need(0<=level<4,'S837 level')
+            key=(step['table'],(w['va']>>(39-9*level))&511);e=step['entry']
+            need(key not in seen or (seen[key]^e)&~0x60==0,'S837 unstable entry');seen[key]=e
     def safe(pa):
+        if default&~0xcff or any((p['base']&255) not in (0,1,4,5,6) for p in pairs):return False
+        if any((lambda t:t[0]!=6 or not t[2])(model(x,bits,cap,default,pairs)) for x in (pa,pa+4095)):return False
         return bool(pa and pa%4096==0 and pa<0x8000000 and any(a<=pa and pa+4096<=b for a,b in baseline) and not any(a<pa+4096 and pa<b for a,b in candidate) and any(r['type']==4 and r['attributes']&8 and r['start']<=pa and pa+4096<=r['end_exclusive'] for r in maps))
     def read(tag,pa,slot):
         a,b,e=take(tag,'table','slot','entry');need((a,b)==(pa,slot),'S840 read path')
@@ -101,6 +108,8 @@ def run(folder):
         p=folder/mode
         modes[mode]=replay((p/'serial.log').read_bytes(),(p/'final-map.bin').read_bytes(),mode)
     need(set(modes)==set(COVERS) and modes['disabled']['status']=='NO_APERTURE','S840 mode coverage')
+    need(all(modes[m]['status'] in ('OBSERVED','UNSUPPORTED') for m in ('intel','bridge-intel','bridge-two-hop-intel')),'S840 required Intel guest modes')
+    need(modes['amd']['status'] in ('OBSERVED','UNSUPPORTED','SKIPPED'),'S840 AMD mode')
     # A successful diagnostic still distinguishes unavailable mappings from observations.
     need(any(r['status']=='OBSERVED' for r in modes.values()),'S840 no nonempty hardware observation')
     return {'stage':840,'status':'PASS','modes':modes,'foundation_complete':False}
