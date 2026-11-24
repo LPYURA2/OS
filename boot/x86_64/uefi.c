@@ -1,7 +1,7 @@
 #include "exit_boot.h"
 #include <styleos/arch.h>
 #include <styleos/boot_memory.h>
-#if defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801) || defined(STYLEOS_TEST_CACHE_803) || defined(STYLEOS_TEST_CACHE_804)
+#if defined(STYLEOS_TEST_DESKTOP_PREFLIGHT_850) || defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801) || defined(STYLEOS_TEST_CACHE_803) || defined(STYLEOS_TEST_CACHE_804)
 #include "desktop_display.h"
 #endif
 

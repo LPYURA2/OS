@@ -600,6 +600,22 @@ enum pg_error arch_paging_attest_image_writable(struct pg_experiment *x,
        !identity_tables(s)) return PG_PLATFORM;
     return PG_OK;
 }
+#ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
+/* Same-boot inherited walker, restricted to the already validated old root.
+ * Trusts OVMF's low identity table-read contract, not arbitrary memory. */
+bool s850_read_inherited_entry(void *ctx,uint64_t pa,uint16_t slot,uint64_t *out){
+    struct pg_experiment *x=ctx;struct x86_state *s=&saved;
+    if(!x||!x->evidence||!out||slot>=512||!pa||(pa&4095u)||pa>=UINT64_C(0x08000000)||x->old_root!=s->cr3||read_cr3()!=s->cr3||read_flags()&BIT(9))return false;
+    const struct boot_memory_map *map=x->evidence->map;bool reserved=false;
+    if(!map||map->nr_reserved>BOOT_MEMORY_INPUT_MAX||map->nr_candidates>BOOT_MEMORY_RANGE_MAX)return false;
+    for(size_t i=0;i<map->nr_reserved;i++)if(map->reserved[i].start<=pa&&pa+4096u<=map->reserved[i].end)reserved=true;
+    for(size_t i=0;i<map->nr_candidates;i++)if(pa<map->candidates[i].end&&map->candidates[i].start<pa+4096u)return false;
+    if(!reserved)return false;
+    struct old_mapping m;
+    if(old_walk(s,pa,&m)!=WALK_OK||m.pa!=pa||m.type!=6u||!identity_tables(s))return false;
+    *out=((const volatile uint64_t *)(uintptr_t)pa)[slot];return true;
+}
+#endif
 #endif
 
 #if defined(STYLEOS_TEST_PAGING_ROUNDTRIP) || defined(STYLEOS_TEST_FRAME_GRANTS)

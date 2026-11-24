@@ -810,6 +810,17 @@ jobs:
           done
           echo 'S850 COFF compilation PASS' | tee build/recovery-canonical/desktop-root-850/coff.log
 
+      - name: 850 Prove same-boot GOP BAR and detached guarded Desktop preflight
+        if: github.ref_name == 'feature/styleos-desktop-root-850'
+        run: |
+          set -euo pipefail
+          python3 tools/test_desktop_preflight_850_negative.py \
+            2>&1 | tee build/recovery-canonical/desktop-root-850/parser-model.log
+          python3 tools/test_desktop_preflight_850_guest.py --output build/recovery-canonical/desktop-root-850/qemu \
+            2>&1 | tee build/recovery-canonical/desktop-root-850/qemu.log
+          python3 tools/test_desktop_preflight_850_negative.py --serial build/recovery-canonical/desktop-root-850/qemu/serial.log \
+            2>&1 | tee build/recovery-canonical/desktop-root-850/negative.log
+
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
           set -euo pipefail
@@ -2085,6 +2096,12 @@ jobs:
             --output build/recovery-canonical/acpi-841/qemu 2>&1 | tee build/recovery-canonical/acpi-841/qemu.log
             build/recovery-canonical/fx-849/*.log
             build/recovery-canonical/desktop-root-850/*.log
+            build/recovery-canonical/desktop-root-850/qemu/serial.log
+            build/recovery-canonical/desktop-root-850/qemu/results.json
+            build/recovery-canonical/desktop-root-850/qemu/qemu.log
+            build/recovery-canonical/desktop-root-850/qemu/compile.log
+            build/recovery-canonical/desktop-root-850/qemu/build/x86_64/BOOTX64.EFI
+            build/recovery-canonical/desktop-root-850/qemu/build/x86_64/kernel.map
             build/recovery-canonical/fx-849/qemu/*.log
             build/recovery-canonical/fx-849/qemu/results.json
             build/recovery-canonical/fx-849/qemu/build/manifest.json

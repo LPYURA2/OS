@@ -14,6 +14,10 @@ _Noreturn void irq842_terminal(const struct boot_info *,uint64_t,uint64_t);
 void irq807_unexpected(void);
 static struct s842_root apic842;
 static struct s842_cache cache842;
+#ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
+#include <styleos/desktop_root_850.h>
+_Noreturn void s850_preflight(const struct s842_root *,const struct s842_cache *,struct pg_experiment *,const struct s846_guard *,uint64_t,uint64_t,uint64_t,uint64_t);
+#endif
 #ifdef STYLEOS_TEST_USER_ROOTS_846
 bool s846_bind(const struct s842_root *,const struct s842_cache *,struct pg_experiment *,const struct igp785_tables *,uint64_t,uint64_t,uint64_t,uint64_t);
 #endif
@@ -383,6 +387,10 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
     field(" lapic=",apic842.lapic);field(" ioapic=",apic842.ioapic);
     field(" uc-index=",apic842.uc_index);field(" pat=",cache842.pat);
     field(" ist=",IGP785_IST_ALIAS);arch_putc('\n');
+#endif
+#ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
+    const struct s846_guard g850={{q.pages[IGP785_IST1],ist2_pa,ist3_pa}};
+    s850_preflight(&apic842,&cache842,p,&g850,q.pages[IGP785_GDT],q.pages[IGP785_NEW_IDT],q.pages[IGP785_TSS],q.pages[IGP785_RSP0]);
 #endif
     attested=(struct state790){p->old_root,plan.new_root_pa,
         e->live.stack.start,e->live.stack.end,inherited_rsp,
