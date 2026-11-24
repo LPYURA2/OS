@@ -76,6 +76,7 @@ on:
       - feature/styleos-iommu-evidence-828
       - feature/styleos-requester-plan-829
       - feature/styleos-irq-sources-830
+      - feature/styleos-dma-association-831
   workflow_dispatch:
 
 permissions:
@@ -257,7 +258,7 @@ jobs:
             2>&1 | tee build/recovery-canonical/acpica-823/negative.log
 
       - name: 824 Refuse malformed resource descriptors and forged UART
-        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-824
@@ -265,7 +266,7 @@ jobs:
             2>&1 | tee build/recovery-canonical/acpi-824/negative.log
 
       - name: 824 Capture evaluated PCI0 CRS and correlate UEFI MCFG live buses
-        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-acpi-resources-824' || github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-824
@@ -288,7 +289,7 @@ jobs:
           PYCODE
 
       - name: 825 Audit same-boot allocated UEFI windows against AML producer windows and ECAM exclusion
-        if: github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-acpi-windows-825' || github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-825
@@ -296,7 +297,7 @@ jobs:
             --output build/recovery-canonical/acpi-825 2>&1 | tee build/recovery-canonical/acpi-825/run.log
 
       - name: 826 Test final map capture and replay guards on authentic parent UART with synthetic records
-        if: github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-826
@@ -307,7 +308,7 @@ jobs:
           python3 tools/test_acpi_ecam_826_verify.py build/recovery-canonical/acpi-824/qemu/disabled | tee build/recovery-canonical/acpi-826/negative.log
 
       - name: 826 Evaluate DRAC native AML and capture exact final UEFI map in QEMU
-        if: github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-ecam-evidence-826' || github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --ecam-826 \
@@ -329,7 +330,7 @@ jobs:
           PYCODE
 
       - name: 827 Test native ECAM quarantine with actual MCFG DRAC and synthetic EFI maps
-        if: github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-827
@@ -343,7 +344,7 @@ jobs:
           python3 tools/test_ecam_quarantine_827_negative.py build/recovery-canonical/acpi-826/qemu/disabled | tee build/recovery-canonical/acpi-827/negative.log
 
       - name: 827 Prove detached native ECAM exclusion against same-boot UEFI map in QEMU
-        if: github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-ecam-quarantine-827' || github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --ecam-quarantine-827 \
@@ -365,14 +366,14 @@ jobs:
           PYCODE
 
       - name: 828 Test independent IOMMU inventory decoder and forged records
-        if: github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-828
           python3 tools/test_iommu_evidence_828.py build/recovery-canonical/acpi-827/qemu/disabled | tee build/recovery-canonical/acpi-828/negative.log
 
       - name: 828 Capture same-boot DMAR IVRS and live requester topology in QEMU
-        if: github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-iommu-evidence-828' || github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --iommu-evidence-828 \
@@ -381,7 +382,7 @@ jobs:
             --output build/recovery-canonical/acpi-828/qemu 2>&1 | tee build/recovery-canonical/acpi-828/run.log
 
       - name: 829 Verify conservative requester association and replay fresh S828 inventory
-        if: github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-requester-plan-829' || github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-829
@@ -389,7 +390,7 @@ jobs:
           python3 tools/replay_requester_plan_829.py --input build/recovery-canonical/acpi-828/qemu --output build/recovery-canonical/acpi-829 | tee build/recovery-canonical/acpi-829/run.log
 
       - name: 830 Test IOAPIC source classification and forged MADT records
-        if: github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           mkdir -p build/recovery-canonical/acpi-830
@@ -397,13 +398,22 @@ jobs:
           python3 tools/test_irq_sources_830_uart.py build/recovery-canonical/acpi-828/qemu | tee build/recovery-canonical/acpi-830/negative.log
 
       - name: 830 Capture MADT and correlate Intel AMD interrupt sources in same QEMU boot
-        if: github.ref_name == 'feature/styleos-irq-sources-830'
+        if: github.ref_name == 'feature/styleos-irq-sources-830' || github.ref_name == 'feature/styleos-dma-association-831'
         run: |
           set -euo pipefail
           python3 tools/test_acpica_firmware_823.py --irq-sources-830 \
             --core-lib build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib \
             --core-include build/recovery-canonical/acpica-820/verified/source/include \
             --output build/recovery-canonical/acpi-830/qemu 2>&1 | tee build/recovery-canonical/acpi-830/run.log
+
+      - name: 831 Refine diagnostic DMA associations using fresh verified MADT inventory
+        if: github.ref_name == 'feature/styleos-dma-association-831'
+        run: |
+          set -euo pipefail
+          mkdir -p build/recovery-canonical/acpi-831
+          python3 tools/test_blockers_831.py | tee build/recovery-canonical/acpi-831/blockers.log
+          python3 tools/test_dma_association_831.py build/recovery-canonical/acpi-828/qemu | tee build/recovery-canonical/acpi-831/synthetic.log
+          python3 tools/replay_dma_association_831.py --input build/recovery-canonical/acpi-830/qemu --output build/recovery-canonical/acpi-831 | tee build/recovery-canonical/acpi-831/run.log
 
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
@@ -1677,6 +1687,8 @@ jobs:
             build/recovery-canonical/acpica-821/qemu/qemu-device-help.log
             build/recovery-canonical/acpica-821/qemu/upstream-core/core-manifest.json
             build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
+            build/recovery-canonical/acpi-831/*.log
+            build/recovery-canonical/acpi-831/results.json
             build/recovery-canonical/acpi-830/*.log
             build/recovery-canonical/acpi-830/qemu/results.json
             build/recovery-canonical/acpi-830/qemu/*.log
