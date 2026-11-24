@@ -10,11 +10,20 @@
  * All MMIO, timer and IDT changes occur after ExitBootServices. */
 static volatile uint32_t irq807_hits,irq807_isr_seen,irq807_eoi_clear;
 static volatile uint8_t *irq807_lapic_ptr;
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+static volatile uint64_t irq842_root_seen,irq842_frame_seen;
+#endif
 __asm__(
  ".global irq807_handler\n"
  "irq807_handler:\n"
  "pushq %rax\n"
  "pushq %rdx\n"
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+ "movq %cr3,%rax\n"
+ "movq %rax,irq842_root_seen(%rip)\n"
+ "leaq 16(%rsp),%rax\n"
+ "movq %rax,irq842_frame_seen(%rip)\n"
+#endif
  "incl irq807_hits(%rip)\n"
  "movq irq807_lapic_ptr(%rip),%rax\n"
  "movl 0x120(%rax),%edx\n" /* vector 0x50 ISR register, bit 16 */
@@ -56,7 +65,15 @@ static void io_write(uintptr_t io,uint32_t index,uint32_t value){mmio_write(io,0
 static void hx(uint64_t v){arch_puts("0x");for(int k=60;k>=0;k-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)k)&15u]);}
 static void fld(const char *key,uint64_t val){arch_putc(' ');arch_puts(key);arch_putc('=');hx(val);}
 static _Noreturn void fail(const char *reason){__asm__ volatile("cli");arch_puts("STYLEOS S807 FAIL ");arch_puts(reason);arch_putc('\n');arch_halt();}
-_Noreturn void irq807_terminal(const struct boot_info *b){
+static _Noreturn void irq_run(const struct boot_info *b
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+,uint64_t expected_root,uint64_t ist
+#endif
+){
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+ uint64_t initial;__asm__ volatile("mov %%cr3,%0":"=r"(initial));
+ if(!expected_root||initial!=expected_root||!ist)fail("s842-initial-root");
+#endif
  if(!b||b->magic!=STYLEOS_BOOT_MAGIC||b->flags!=STYLEOS_BOOT_EXITED_SERVICES)fail("handoff");
  struct acpi806_topology t={0};if(!acpi806_copy_capture(&t))fail("acpi-topology");
  if(t.ioapic_count!=1||t.enabled_lapics!=1)fail("unsupported-multiprocessor-or-ioapic");
@@ -80,6 +97,10 @@ _Noreturn void irq807_terminal(const struct boot_info *b){
  uint16_t cs;__asm__ volatile("movw %%cs,%0":"=r"(cs));
  for(uint32_t v=0;v<256;v++)gate(v,irq807_unexpected,cs);
  gate(0x50,irq807_handler,cs);
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+ for(unsigned v=0;v<256;v++)idt[v].ist=3;
+ idt[0x50].ist=1;irq842_root_seen=0;irq842_frame_seen=0;
+#endif
  irq807_hits=0;irq807_isr_seen=0;irq807_eoi_clear=0;irq807_lapic_ptr=(volatile uint8_t *)lapic;
  arch_puts("STYLEOS S807 TOPOLOGY");fld("ioapic-physical",io);fld("ioapic-id",io_id);fld("ioapic-count",counts[0]);fld("gsi",plan.gsi);fld("pin",plan.pin);fld("lapic-physical",lapic);fld("lapic-id",dest);arch_putc('\n');
  arch_puts("STYLEOS S807 BEFORE");fld("ioapic-low",original_low);fld("ioapic-high",original_high);fld("tpr",original_tpr);fld("svr",original_svr);fld("if",0);arch_putc('\n');
@@ -109,8 +130,22 @@ _Noreturn void irq807_terminal(const struct boot_info *b){
  arch_puts("STYLEOS S807 RESTORE");fld("ioapic-low",restored_low);fld("ioapic-high",restored_high);fld("tpr",restored_tpr);fld("svr",restored_svr);fld("if",0);arch_putc('\n');
  if(!irq807_hits||!irq807_isr_seen||!irq807_eoi_clear)fail("missing-delivery-or-eoi");
  if(original_low!=restored_low||original_high!=restored_high||original_tpr!=restored_tpr||original_svr!=restored_svr)fail("restore-mismatch");
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+ uint64_t final;__asm__ volatile("mov %%cr3,%0":"=r"(final));
+ if(final!=expected_root||irq842_root_seen!=expected_root||irq842_frame_seen<ist||
+ irq842_frame_seen>ist+4096-40||(irq842_frame_seen&7u))fail("s842-irq-root-or-ist");
+ arch_puts("STYLEOS S842 IRQ");fld("before",initial);fld("during",irq842_root_seen);fld("after",final);
+ fld("frame",irq842_frame_seen);fld("ist",ist);arch_putc('\n');
+ arch_puts("STYLEOS S842 POLICY isolated-own-root=yes pit-restored=no production-cr3=deny dma-grants=no\n");
+#endif
  arch_puts("STYLEOS S807 POLICY madt=verified ioapic-route=verified pit-irq0-delivery=verified lapic-isr-eoi=verified ioapic-lapic-restored=yes pit-restored=no ordinary-desktop=unchanged dma-iommu=unverified uefi-runtime=unverified production-cr3=deny\n");
  arch_puts("STYLEOS S807 PASS\n");
  __asm__ volatile("outl %0,%1"::"a"(0x10u),"Nd"((uint16_t)0xf4u));
  arch_halt();
 }
+
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+_Noreturn void irq842_terminal(const struct boot_info *b,uint64_t root,uint64_t ist){irq_run(b,root,ist);}
+#else
+_Noreturn void irq807_terminal(const struct boot_info *b){irq_run(b);}
+#endif

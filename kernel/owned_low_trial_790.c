@@ -8,6 +8,13 @@
 #include <styleos/tss_ist_stage_782.h>
 #include <styleos/paging.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+#include <styleos/apic_pe_842.h>
+_Noreturn void irq842_terminal(const struct boot_info *,uint64_t,uint64_t);
+void irq807_unexpected(void);
+static struct s842_root apic842;
+static struct s842_cache cache842;
+#endif
 
 #ifdef STYLEOS_TEST_OWNED_LOW_790
 #define PAGE 4096u
@@ -53,6 +60,27 @@ static uint64_t cr4(void) { uint64_t n; __asm__ volatile("mov %%cr4,%0":"=r"(n))
 static uint64_t rflags(void) { uint64_t n; __asm__ volatile("pushfq;popq %0":"=r"(n));return n; }
 static uint16_t current_cs(void) { uint16_t n; __asm__ volatile("mov %%cs,%0":"=r"(n));return n; }
 static uint16_t current_tr(void) { uint16_t n; __asm__ volatile("str %0":"=r"(n));return n; }
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+static uint64_t msr842(uint32_t n){uint32_t a,d;__asm__ volatile("rdmsr":"=a"(a),"=d"(d):"c"(n));return ((uint64_t)d<<32)|a;}
+static void cp842(uint32_t leaf,uint32_t *a,uint32_t *d){
+ uint32_t b,c;__asm__ volatile("cpuid":"=a"(*a),"=b"(b),"=c"(c),"=d"(*d):"a"(leaf),"c"(0));(void)b;(void)c;
+}
+static bool snap842(struct s842_cache *s){
+ uint32_t a,d;cp842(1,&a,&d);if((d&0x1120u)!=0x1120u||!(d&(1u<<16)))return false;
+ cp842(0x80000000u,&a,&d);if(a<0x80000008u)return false;
+ cp842(0x80000008u,&a,&d);s->bits=(uint8_t)a;
+ if(s->bits<36||s->bits>52||cr0()&(UINT64_C(3)<<29))return false;
+ s->pat=msr842(0x277);s->cap=msr842(0xfe);s->def=msr842(0x2ff);s->count=(uint8_t)s->cap;
+ if(s->count>CACHE800_MAX_VAR)return false;
+ for(unsigned i=0;i<s->count;i++){s->pairs[i].base=msr842(0x200+2*i);s->pairs[i].mask=msr842(0x201+2*i);}
+ return true;
+}
+static bool cache_unchanged842(const struct s842_cache *s){
+ if(msr842(0x277)!=s->pat||msr842(0xfe)!=s->cap||msr842(0x2ff)!=s->def)return false;
+ for(unsigned i=0;i<s->count;i++)if(msr842(0x200+2*i)!=s->pairs[i].base||msr842(0x201+2*i)!=s->pairs[i].mask)return false;
+ return true;
+}
+#endif
 static uint64_t efer(void) { uint32_t lo,hi;__asm__ volatile("rdmsr":"=a"(lo),"=d"(hi):"c"(0xc0000080u));return ((uint64_t)hi<<32u)|lo; }
 static void field(const char *s,uint64_t v) { arch_puts(s);paging_hex(v); }
 __attribute__((noreturn)) static void stop_vm(unsigned status) {
@@ -258,8 +286,19 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
        !s790_audit_owned_low(&owned_low,low_request.required_exec,
              low_request.required_write,low_request.required_rsp))
         fail("cannot-stage-owned-pe-low-hierarchy");
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+    const struct boot_info *boot842=(const struct boot_info *)(uintptr_t)e->live.handoff.start;
+    struct acpi806_topology topo842={0};
+    if(!acpi806_copy_capture(&topo842)||!snap842(&cache842)||
+       !s842_build_pe_efi(&low_request,e,boot842,&cache842,&topo842,msr842(0x1b),&apic842)||
+       !s842_audit(&apic842,&cache842)||!cache_unchanged842(&cache842))fail("s842-apic-root-admission");
+#endif
     for(size_t i=0;i<512u;++i)if(i!=128u)t->pml4[i]=0;
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+    t->pml4[0]=apic842.plan.tables[0][0];
+#else
     t->pml4[0]=owned_low.new_low_slot;
+#endif
     if((t->pml4[0]&UINT64_C(0x000ffffffffff000))==
            (old_pml4[0]&UINT64_C(0x000ffffffffff000)) ||
        t->pml4[128]!=(q.pages[IGP785_NEW_PDPT]|3u))
@@ -320,6 +359,19 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
        read64(tss+36u)!=stage.ist1_top || read64(tss+4u)!=stage.rsp0_top ||
        read64(tss+44u)!=ist2_top || read64(tss+52u)!=ist3_top)
         fail("df-idt-gate");
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+    /* No inherited handler may be reached under the detached root. Use
+     * guarded IST3 for unexpected vectors, including transition faults. */
+    uintptr_t unexpected=(uintptr_t)&irq807_unexpected;
+    for(unsigned i=0;i<256;i++)((struct idt_gate_790*)(void*)idt)[i]=
+       (struct idt_gate_790){(uint16_t)unexpected,cs,3u,0x8eu,
+       (uint16_t)(unexpected>>16u),(uint32_t)(unexpected>>32u),0};
+    field("STYLEOS S842 READY old=",p->old_root);field(" new=",plan.new_root_pa);
+    field(" low-table=",apic842.built.root);field(" low-used=",apic842.built.used);
+    field(" lapic=",apic842.lapic);field(" ioapic=",apic842.ioapic);
+    field(" uc-index=",apic842.uc_index);field(" pat=",cache842.pat);
+    field(" ist=",IGP785_IST_ALIAS);arch_putc('\n');
+#endif
     attested=(struct state790){p->old_root,plan.new_root_pa,
         e->live.stack.start,e->live.stack.end,inherited_rsp,
         q.pages[IGP785_NEW_IDT],q.pages[IGP785_GDT],cs,desc.tss_selector,IST_MARKER,
@@ -366,6 +418,15 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
         fail("alias-physical-store");
     /* INT3 → IST1 → absent guard #PF → absent #PF gate → #DF IST3.
      * Any return instead triggers UD2; no emulated PASS is possible. */
+#ifdef STYLEOS_TEST_APIC_ROOT_842
+    if(!s842_audit(&apic842,&cache842)||!cache_unchanged842(&cache842)||
+       ((t->pml4[0]^apic842.plan.tables[0][0])&~UINT64_C(0x20))||
+       (t->pml4[128]&~UINT64_C(0x20))!=(q.pages[IGP785_NEW_PDPT]|3u))
+        fail("s842-post-switch-audit");
+    for(unsigned i=0;i<512;i++)if(i!=0&&i!=128&&t->pml4[i])fail("s842-root-slot");
+    irq842_terminal(boot842,plan.new_root_pa,IGP785_IST_ALIAS);
+#else
     s790_int3();
+#endif
 }
 #endif

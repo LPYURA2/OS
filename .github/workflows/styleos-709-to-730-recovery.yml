@@ -633,6 +633,13 @@ jobs:
           objdump -t build/recovery-canonical/apic-842/pe.obj > build/recovery-canonical/apic-842/pe-symbols.log
           if grep -q '__chkstk' build/recovery-canonical/apic-842/pe-symbols.log; then exit 1; fi
 
+      - name: 842 Deliver actual PIT interrupt with own root and guarded IST
+        if: github.ref_name == 'feature/styleos-apic-root-842'
+        run: |
+          set -euo pipefail
+          python3 tools/test_apic_root_842_guest.py --output build/recovery-canonical/apic-842/qemu | tee build/recovery-canonical/apic-842/guest.log
+          python3 tools/test_apic_root_842_negative.py --input build/recovery-canonical/apic-842/qemu/serial.log | tee build/recovery-canonical/apic-842/negative.log
+
       - name: 820 Reject malicious ACPICA archives and counterfeit source claims
         run: |
           set -euo pipefail
@@ -1907,6 +1914,12 @@ jobs:
             build/recovery-canonical/acpica-821/qemu/upstream-core/libacpica-core-821.lib
             --output build/recovery-canonical/acpi-841/qemu 2>&1 | tee build/recovery-canonical/acpi-841/qemu.log
             build/recovery-canonical/apic-842/*.log
+            build/recovery-canonical/apic-842/qemu/*.log
+            build/recovery-canonical/apic-842/qemu/results.json
+            build/recovery-canonical/apic-842/qemu/build/manifest.json
+            build/recovery-canonical/apic-842/qemu/build/x86_64/BOOTX64.EFI
+            build/recovery-canonical/apic-842/qemu/build/x86_64/kernel.map
+            build/recovery-canonical/apic-842/qemu/build/x86_64/styleos.img
             build/recovery-canonical/acpi-841/*.log
             build/recovery-canonical/acpi-841/results.json
             build/recovery-canonical/acpi-841/qemu/results.json
