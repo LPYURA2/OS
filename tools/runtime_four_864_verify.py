@@ -61,6 +61,8 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
         traps=[x for x in lines if x.startswith((b'STYLEOS S863M CALL ',b'STYLEOS S848 TICK ',b'STYLEOS S848 END '))]
         if any(len(s)!=N for s in streams) or len(traps)!=N:raise ValueError('event count')
         returns=group(b'STYLEOS S863M RESUME',('id','pc','rax','ticks'),4)
+        ranges=group(b'STYLEOS S864 RANGE',('id','root','address','bytes'),2)
+        for i,r in enumerate(ranges,2):eq(r,(i,tasks[i]['root'],0x12000000 if i==2 else IST,8),'range request')
         ticks=[0]*4;seen=[0]*4;prog=[0]*4;saved=[(CODE,SP,2)]*4;events=[];windows=4
         for step,(i,kind) in enumerate(order()):
             en,fp,frame,commit,boundary,event,progress,back=(s[step] for s in streams)
@@ -75,8 +77,8 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
             err=5 if vec==14 else 0
             if kind=='call':
                 rip=t['yield']
-                check(traps[step],b'STYLEOS S863M CALL',('id','root','rip','rsp','flags','frame','rax','timer','isr','irr'),(i,child,rip,SP,flags,IST+4096-16-176,1,0,0,0),'yield')
-                eq(returns[i],(i,rip,0,0),'yield result')
+                check(traps[step],b'STYLEOS S863M CALL',('id','root','rip','rsp','flags','frame','rax','timer','isr','irr'),(i,child,rip,SP,flags,IST+4096-16-176,3 if i>=2 else 1,0,0,0),'returning syscall')
+                eq(returns[i],(i,rip,3 if i==3 else 0,0),'syscall result')
             elif kind=='tick':
                 r=row(traps[step],b'STYLEOS S848 TICK',('n','id','root','rip','rsp','flags','frame','cs','ss','progress','isr','eoi')+GPRS)
                 ticks[i]+=1;rip=r['rip']
@@ -167,7 +169,10 @@ def trace_check(text,o):
             if e['error'] and val(r'^CR0=[^\n]*\bCR2=([0-9a-fA-F]+)')!=IST:raise ValueError('CR2')
             for t,name in enumerate(GPRS):
                 expected=0x12000000 if t==5 else 0x8480000000000000|(e['id']<<32)|t
-                if t==0 and e['kind']=='call':expected=1
+                if e['kind']=='call':
+                    if t==0:expected=3 if e['id']>=2 else 1
+                    elif e['id']>=2 and t==1:expected=0x12000000 if e['id']==2 else IST
+                    elif e['id']>=2 and t==2:expected=8
                 elif t==0 and e['kind']=='end' and e['id']<2:expected=2 if e['id']==1 else IST
                 if val(r'\b'+name.upper()+r'\s*=([0-9a-fA-F]+)\b')!=expected:raise ValueError('CPU GPR '+name)
         if rec!=want or (records and int(m[1])!=records[-1][0]+1):raise ValueError('CPU binding')

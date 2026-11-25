@@ -175,8 +175,10 @@ s848_irq_entry:
     iretq
 .Lbad847:
     cli
+#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
     movl $0x26,%eax
     outl %eax,$0xf4
+#endif
 .Lhalt847:
     hlt
     jmp .Lhalt847
@@ -312,18 +314,20 @@ s848_b_exit:
 #endif
 s848_b_end:
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
-.macro extra848 name, tag, op
+.macro extra848 name, tag, op, result
 .globl s848_\name\()_start,s848_\name\()_yield,s848_\name\()_loop_end,s848_\name\()_fault,s848_\name\()_end
 s848_\name\()_start:
     movq %r14,%xmm14
     movq %r15,%xmm15
     fldz
     ldmxcsr .Lmxcsr\name(%rip)
-    movq $1,%rax
+    movq $3,%rax
     int $0x80
 s848_\name\()_yield:
-    testq %rax,%rax
+    cmpq $\result,%rax
     jnz .Lbad\name
+    movabs $(\tag+1),%rbx
+    movabs $(\tag+2),%rcx
     movabs $\tag,%rax
 1:  incq (%rdi)
     cmpq $0,8(%rdi)
@@ -336,7 +340,7 @@ s848_\name\()_fault:
 .Lmxcsr\name: .long 0x3f80
 s848_\name\()_end:
 .endm
-extra848 c,0x8480000200000000,ud2
-extra848 d,0x8480000300000000,cli
+extra848 c,0x8480000200000000,ud2,0
+extra848 d,0x8480000300000000,cli,3
 #endif
 #endif

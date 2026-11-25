@@ -105,10 +105,36 @@ static uint8_t in848(uint16_t p){uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):
 static uint64_t word848(uint64_t p){return *(volatile uint64_t *)(uintptr_t)p;}
 static void put848(uint64_t p,uint64_t v){*(volatile uint64_t *)(uintptr_t)p=v;}
 static void fld848(const char *k,uint64_t v){arch_putc(' ');arch_puts(k);arch_putc('=');arch_puts("0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15]);}
-static _Noreturn void fail848(const char *s){__asm__ volatile("cli");arch_puts("STYLEOS S848 FAIL ");arch_puts(s);arch_putc('\n');__asm__ volatile("outl %0,%1"::"a"(0x27u),"Nd"((uint16_t)0xf4));arch_halt();}
+static _Noreturn void fail848(const char *s){__asm__ volatile("cli");arch_puts("STYLEOS S848 FAIL ");arch_puts(s);arch_putc('\n');
+#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+ __asm__ volatile("outl %0,%1"::"a"(0x27u),"Nd"((uint16_t)0xf4));
+#endif
+ arch_halt();}
 static bool writable848(const struct s846_root *r,uint64_t x,uint64_t n){for(size_t i=0;i<r->plan.count;i++){const struct pg_mapping *m=&r->plan.maps[i];if(m->va==m->pa&&m->flags==PG_WRITE&&x>=m->va&&x-m->va<m->bytes&&n<=m->bytes-(x-m->va))return true;}return false;}
 static void gate848(unsigned i,void(*p)(void),uint16_t cs,uint8_t ist,uint8_t type){uint64_t v=(uintptr_t)p;idt848[i]=(struct gate848){(uint16_t)v,cs,ist,type,(uint16_t)(v>>16),(uint32_t)(v>>32),0};}
 static uint64_t pattern848(unsigned id,unsigned i){return i==5?S846_DATA:UINT64_C(0x8480000000000000)|((uint64_t)id<<32)|i;}
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+static uint64_t first_call848(unsigned id){
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ return id>=2?S847_CALL_RANGE:S847_CALL_YIELD;
+#else
+ (void)id;return S847_CALL_YIELD;
+#endif
+}
+static uint64_t first_result848(unsigned id){
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ return id==3?3u:0u;
+#else
+ (void)id;return 0;
+#endif
+}
+static uint64_t first_arg848(unsigned id,unsigned reg){
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ if(id>=2){if(reg==1)return id==2?S846_DATA:S846_IST;if(reg==2)return 8;}
+#endif
+ return pattern848(id,reg);
+}
+#endif
 bool s848_active(void){return active848;}
 unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
@@ -119,7 +145,7 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #endif
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
- bool returning=f->vector==128&&f->gpr[0]==S847_CALL_YIELD;
+ bool returning=f->vector==128&&f->gpr[0]==first_call848((unsigned)id);
  if(!s849_guest_suspend((unsigned)id,root,f->vector!=V&&!returning))fail848("fx-suspend");
 #else
  if(!s849_guest_suspend((unsigned)id,root,f->vector!=V))fail848("fx-suspend");
@@ -135,9 +161,12 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
      f->rip!=mixed_pc848[id]||f->rsp!=S846_STACK+P||f->error||
      (f->rflags&0x202)!=0x202||(f->rflags&~UINT64_C(0xad7))||f->cs!=bank862.cs||f->ss!=bank862.ss||
      (uintptr_t)f!=S846_IST+P-16-sizeof *f)fail848("863-mixed-origin");
-  for(unsigned j=1;j<15;j++)if(f->gpr[j]!=pattern848((unsigned)id,j))fail848("863-mixed-gpr");
+  for(unsigned j=1;j<15;j++)if(f->gpr[j]!=first_arg848((unsigned)id,j))fail848("863-mixed-gpr");
   pending860=*f;frame860=(uintptr_t)f;cr2862=0;receipt860=true;++mixed_calls848[id];
   arch_puts("STYLEOS S863M CALL");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("rsp",f->rsp);fld848("flags",f->rflags);fld848("frame",(uintptr_t)f);fld848("rax",f->gpr[0]);fld848("timer",rd848(0x390));fld848("isr",pending848(0x100));fld848("irr",pending848(0x200));arch_putc('\n');
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+  if(id>=2){arch_puts("STYLEOS S864 RANGE");fld848("id",id);fld848("root",root);fld848("address",f->gpr[1]);fld848("bytes",f->gpr[2]);arch_putc('\n');}
+#endif
   return 0;
  }
 #endif
@@ -359,7 +388,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   if(!leases[i].generation||leases[i].pages!=3||leases[i].owner!=S846_OWNER_A+i||!child[i].ready)fail848("864-lease");
   handle860[i]=leases[i].generation;
   struct up_context initial={.pc=S846_CODE,.sp=S846_STACK+P,.status=2,.cs=sel.cs,.ss=sel.ss};
-  for(unsigned j=0;j<15;j++)initial.gpr[j]=pattern848(i,j);
+  for(unsigned j=0;j<15;j++)initial.gpr[j]=first_arg848(i,j);
   if(rt863_bank_admit_initial(&bank862,runtime860,safe,i,handle860[i],child[i].built.root,"S864 process",&initial,&pid860[i])!=PS_OK||
      pr_account(pr_global(),pid860[i],handle860[i],0,3*P)!=PR_OK||
      ws_open_app(ws_global(),pr_global(),pid860[i],"S864 process",(struct ws_bounds){0,0,400,300},&win860[i])!=WS_OK)fail848("864-admit");
@@ -547,7 +576,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
      &&pending860.vector!=6&&pending860.vector!=13
 #endif
-     ):call_slice?(pending860.vector!=128||pending860.error||pending860.gpr[0]!=S847_CALL_YIELD):pending860.vector!=V)fail848("863-event-kind");
+     ):call_slice?(pending860.vector!=128||pending860.error||pending860.gpr[0]!=first_call848(id)):pending860.vector!=V)fail848("863-event-kind");
   struct rt860_tick t={.slot=id,.dispatch=runtime860->dispatcher.dispatches,.pid=pid860[id],.handle=handle860[id],.child_root=child[id].built.root,.safe_root=root848(),.frame_va=frame860,.vector=pending860.vector,.isr=pending860.vector==V,.eoi=pending860.vector==V,.safe_flags=flags848(),.frame=pending860};
   if(rt863_bank_event(&bank862,runtime860,&selection,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
 #else
@@ -562,7 +591,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   const struct up_context *stored=&bank862.slots[id].context;unsigned zeroed=1;const unsigned char *bytes=(const void *)stored;for(size_t j=0;j<sizeof *stored;j++)if(bytes[j])zeroed=0;
   if(zeroed!=terminal)fail848("862-bank-context");
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
-  if(call_slice&&(mixed_calls848[id]!=1||stored->pc!=mixed_pc848[id]||stored->gpr[0]||stored->sp!=S846_STACK+P))fail848("863-mixed-resume");
+  if(call_slice&&(mixed_calls848[id]!=1||stored->pc!=mixed_pc848[id]||stored->gpr[0]!=first_result848(id)||stored->sp!=S846_STACK+P))fail848("863-mixed-resume");
   if(call_slice){arch_puts("STYLEOS S863M RESUME");fld848("id",id);fld848("pc",stored->pc);fld848("rax",stored->gpr[0]);fld848("ticks",local848[id]);arch_putc('\n');}
 #endif
   arch_puts("STYLEOS S862B COMMIT");fld848("step",step);fld848("id",id);fld848("pid",pid860[id]);fld848("state",pr_find(pr_global(),pid860[id])->state);fld848("pc",stored->pc);fld848("sp",stored->sp);fld848("flags",stored->status);fld848("zero",zeroed);arch_putc('\n');

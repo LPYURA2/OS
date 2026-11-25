@@ -32,7 +32,11 @@ extern void s847_bad_entry(void);
 extern const unsigned char s847_0_start[],s847_0_end[],s847_0_ok[],s847_0_deny[],s847_0_yield[],s847_0_fault[];
 extern const unsigned char s847_1_start[],s847_1_end[],s847_1_ok[],s847_1_deny[],s847_1_yield[],s847_1_exit[];
 static void fld(const char *key,uint64_t v){arch_putc(' ');arch_puts(key);arch_putc('=');arch_puts("0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15]);}
-static _Noreturn void fail847(const char *s){arch_puts("STYLEOS S847 FAIL ");arch_puts(s);arch_putc('\n');__asm__ volatile("cli;outl %0,%1"::"a"(0x26u),"Nd"((uint16_t)0xf4));arch_halt();}
+static _Noreturn void fail847(const char *s){arch_puts("STYLEOS S847 FAIL ");arch_puts(s);arch_putc('\n');__asm__ volatile("cli");
+#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+ __asm__ volatile("outl %0,%1"::"a"(0x26u),"Nd"((uint16_t)0xf4));
+#endif
+ arch_halt();}
 static uint64_t cr3_847(void){uint64_t v;__asm__ volatile("mov %%cr3,%0":"=r"(v));return v;}
 static uint64_t read847(uint64_t p){return *(volatile uint64_t *)(uintptr_t)p;}
 static bool rw_image847(const struct s846_root *r,uint64_t x,uint64_t n){
