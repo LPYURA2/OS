@@ -228,7 +228,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
     dispatch_base848%S863_DISPATCHES_PER_BATCH||dispatch_base848/S863_DISPATCHES_PER_BATCH>=S863_LAUNCH_LIMIT||
 #else
-    (dispatch_base848!=0&&dispatch_base848!=10)||
+    (dispatch_base848!=0&&dispatch_base848!=10+EXTRA_DISPATCH848)||
 #endif
     armed848||receipt860||frame860||cr2862||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail848("862-recycle-start");
  ticks848=0;for(unsigned i=0;i<2;i++){local848[i]=0;progress848[i]=0;

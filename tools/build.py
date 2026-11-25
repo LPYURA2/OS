@@ -1049,10 +1049,15 @@ def main():
                           help='Restricted Q35/TCG cold owned-root preview, no writable data disk or test-exit key')
     negative.add_argument('--desktop-v0', action='store_true',
                           help='Experimental interactive x86-64 UEFI desktop image')
+    parser.add_argument('--mixed-cold-tasks-864', action='store_true', help='Extend only the isolated cold task/storage fixture with mixed INT80/IRQ')
     parser.add_argument('--update-build', type=int, help='Guest update build number')
     parser.add_argument('--update-public-key', type=Path, help='Raw Ed25519 verification key')
     parser.add_argument('--test-update-fail', action='store_true', help='Trial intentionally never becomes ready')
     args = parser.parse_args()
+    if args.mixed_cold_tasks_864:
+        if not args.test_desktop_cold_tasks_863 or args.update_build is not None:
+            parser.error('864 mixed extension requires isolated --test-desktop-cold-tasks-863')
+        args.test_runtime_mixed_863 = True
     if args.desktop_owned_root_preview:
         args.test_desktop_autonomous_863 = True
     if args.test_desktop_autonomous_863:

@@ -112,7 +112,9 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    if mixed and not tasks:p.error('--mixed requires --tasks')
+    out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base);original=base.read_bytes();base.chmod(0o444)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
@@ -123,13 +125,13 @@ def main():
     if args.build_from:
         # Only the repeated cold-storage workload shares a previously built image.
         # The stress orchestrator verifies the immutable linked artifacts for every run.
-        if not cold or tasks:raise ValueError('build reuse restricted to cold storage stress')
+        if not cold or (tasks and not mixed):raise ValueError('build reuse restricted to cold storage or mixed cold-task stress')
         build=args.build_from.resolve(strict=True)
         (out/'compile.log').write_text('Reusing exact cold image: '+str(build)+'\n')
     else:
-        with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863','--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
+        with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
-    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp)
+    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
     def run(name,write):
         folder=out/name;folder.mkdir();serial=folder/'serial.log';shutil.copyfile(vars,folder/'OVMF_VARS.fd')
@@ -203,7 +205,7 @@ def main():
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
         if cold:
-            root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks)
+            root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks,mixed=mixed)
         else:
             ok,obs=prior(prefix,33,site,ref)
             if not ok:raise ValueError('prior lifecycle '+str(obs))
@@ -230,6 +232,6 @@ def main():
         path=out/(tag+'.raw');image('convert','-f','qcow2','-O','raw',str(top),str(path))
         if path.read_bytes()!=expected or base.read_bytes()!=original or sha(boot.read_bytes())!=boot_sha:raise ValueError('exact disk contents')
     check('after-write');second=run('second',False);check('after-reboot')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,ordinary_desktop_verified=False,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,ordinary_desktop_verified=False,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()

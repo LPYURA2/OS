@@ -31,7 +31,7 @@ static bool boundary861(const struct dpr_service *d,const struct s842_cache *cac
  10
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
- ||d->dispatcher.dispatches==20
+ ||d->dispatcher.dispatches==2*S863_DISPATCHES_PER_BATCH
 #endif
  )&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
 #endif
