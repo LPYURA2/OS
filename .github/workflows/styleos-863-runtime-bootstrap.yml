@@ -41,6 +41,14 @@ jobs:
             "build/s863-host/storage-$cc" | tee "build/s863-host/storage-$cc.log"
           done
           clang --target=x86_64-w64-windows-gnu -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -fno-stack-protector -mno-red-zone -Iinclude -c kernel/storage_runtime_863.c -o build/s863-host/storage-runtime.obj
+      - name: Fixed-fixture PIO write transport and flush refusal matrix
+        run: |
+          set -euo pipefail
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_ata_runtime_863.c kernel/{ata_runtime_863,ata_diag_857}.c -o "build/s863-host/ata-$cc"
+            "build/s863-host/ata-$cc" | tee "build/s863-host/ata-$cc.log"
+          done
+          clang --target=x86_64-w64-windows-gnu -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -fno-stack-protector -mno-red-zone -Iinclude -c kernel/ata_runtime_863.c -o build/s863-host/ata-runtime.obj
       - name: Build ordinary Desktop and verify linked shared-bootstrap calls
         run: |
           set -euo pipefail
