@@ -33,6 +33,14 @@ jobs:
             "build/s863-host/rtc-$cc" | tee "build/s863-host/rtc-$cc.log"
           done
           clang --target=x86_64-w64-windows-gnu -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -fno-stack-protector -mno-red-zone -Iinclude -c kernel/rtc_runtime_863.c -o build/s863-host/rtc-runtime.obj
+      - name: Bounded storage admission, verified commit and sticky quarantine
+        run: |
+          set -euo pipefail
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_storage_runtime_863.c kernel/storage_runtime_863.c -o "build/s863-host/storage-$cc"
+            "build/s863-host/storage-$cc" | tee "build/s863-host/storage-$cc.log"
+          done
+          clang --target=x86_64-w64-windows-gnu -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -fno-stack-protector -mno-red-zone -Iinclude -c kernel/storage_runtime_863.c -o build/s863-host/storage-runtime.obj
       - name: Build ordinary Desktop and verify linked shared-bootstrap calls
         run: |
           set -euo pipefail
