@@ -69,3 +69,34 @@ bool s848_suspend_tick(struct s847_control *c,const struct up_context *f,uint64_
  if(s->root!=live_root)return false;
  s->context=*f;s->state=S847_READY;c->current=-1;return true;
 }
+
+#ifdef STYLEOS_TEST_RUNTIME_SELECT_862
+#include <styleos/runtime_select_862.h>
+bool rt862_selected_context(struct s847_control *c,const struct ps_dispatcher *d,
+ const struct rt862_selection *t,uint64_t live_root,struct up_context *out){
+ if(!shape(c)||c->current!=-1||!region(d,sizeof *d,_Alignof(struct ps_dispatcher))||
+ !region(t,sizeof *t,_Alignof(struct rt862_selection))||!region(out,sizeof *out,_Alignof(struct up_context))||
+ !region(d->registry,sizeof *d->registry,_Alignof(struct pr_table)))return false;
+ const void *ptr[]={c,d,t,out,d->registry};
+ const size_t len[]={sizeof *c,sizeof *d,sizeof *t,sizeof *out,sizeof *d->registry};
+ for(unsigned i=0;i<5;i++)for(unsigned j=0;j<i;j++)if(!separate(ptr[i],len[i],ptr[j],len[j]))return false;
+ if(t->slot>=PS_MAX_SLOTS||d->current!=(int)t->slot||!d->dispatches||t->dispatch!=d->dispatches||
+ d->next>=PS_MAX_SLOTS||live_root!=c->safe||t->safe_root!=live_root||d->safe_root!=live_root)return false;
+ for(unsigned i=0;i<PS_MAX_SLOTS;i++){
+  const struct ps_slot *s=&d->slots[i];const struct pr_entry *p=pr_find(d->registry,s->pid);
+  if(!p||!s->handle||s->user_root!=c->slot[i].root||p->type!=PR_NATIVE_USER||
+     p->scheduler_handle!=s->handle||p->page_root!=s->user_root)return false;
+  if(i==t->slot){
+   if(t->pid!=s->pid||t->handle!=s->handle||t->child_root!=s->user_root||
+      c->slot[i].state!=S847_READY||p->state!=PR_RUNNING)return false;
+  }else{
+   enum pr_state expected=c->slot[i].state==S847_READY?PR_READY:
+      c->slot[i].state==S847_FAULTED?PR_FAULTED:PR_EXITED;
+   if(p->state!=expected||s->pid==t->pid||s->handle==t->handle)return false;
+  }
+ }
+ /* Only the trusted selected slot is bound; no iteration to choose it. */
+ *out=c->slot[t->slot].context;out->status|=UINT64_C(0x200);
+ c->slot[t->slot].state=S847_RUNNING;c->current=(int)t->slot;return true;
+}
+#endif

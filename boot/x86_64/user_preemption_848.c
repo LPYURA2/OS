@@ -9,6 +9,9 @@
 #include <styleos/runtime_tick_860.h>
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
 #include <styleos/runtime_entry_858.h>
+#ifdef STYLEOS_TEST_RUNTIME_SELECT_862
+#include <styleos/runtime_select_862.h>
+#endif
 #endif
 static struct dpr_service *runtime860;
 static struct s847_raw pending860,saved860[2];
@@ -160,7 +163,18 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
   __asm__ volatile("lgdt %0;lidt %1"::"m"(g),"m"(d):"memory");
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_SELECT_862
+  /* The dispatcher owns selection; deliberately keep the legacy cursor at A.
+   * The fixed order below remains a fixture assertion, not a selector. */
+  const struct rt862_selection selection={.slot=chosen,.dispatch=runtime860->dispatcher.dispatches,.pid=chosen_pid,.handle=handle860[chosen],.child_root=child[chosen].built.root,.safe_root=safe};
+  unsigned cursor=ctl848.next;
+  if(!rt862_selected_context(&ctl848,&runtime860->dispatcher,&selection,root848(),&ctx)||ctl848.next!=cursor)fail848("862-selected-context");
+  id=chosen;
+  arch_puts("STYLEOS S862 SELECT");fld848("step",step);fld848("id",id);fld848("pid",chosen_pid);fld848("dispatch",selection.dispatch);fld848("cursor",cursor);fld848("safe",safe);fld848("root",selection.child_root);arch_putc('\n');
+  if(id!=order[step]||armed848||rd848(0x390)||(rd848(0x120)&BIT)||(rd848(0x220)&BIT))fail848("862-fixture");
+#else
   if(!s848_user_dispatch(&ctl848,root848(),&id,&ctx)||id!=order[step]||armed848||rd848(0x390)||(rd848(0x120)&BIT)||(rd848(0x220)&BIT))fail848("dispatch");
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860
   /* Legacy S848 control remains a context checker; actual registry chooses first. */
   if(id!=chosen)fail848("860-choice");
@@ -208,7 +222,11 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
   progress848[id]=a;
   arch_puts("STYLEOS S848 BACK");fld848("step",step);fld848("id",id);fld848("safe",safe);fld848("state",ctl848.slot[id].state);fld848("a",progress848[0]);fld848("b",progress848[1]);fld848("stack-same",1);arch_putc('\n');
  }
+#ifdef STYLEOS_TEST_RUNTIME_SELECT_862
+ if(ticks848!=8||local848[0]!=3||local848[1]!=5||ctl848.current!=-1||ctl848.slot[0].state!=S847_FAULTED||ctl848.slot[1].state!=S847_EXITED||ctl848.next!=0)fail848("862-final");
+#else
  unsigned id;struct up_context ctx;if(ticks848!=8||local848[0]!=3||local848[1]!=5||s848_user_dispatch(&ctl848,safe,&id,&ctx))fail848("final");
+#endif
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
  if(!s849_guest_finish(safe))fail848("fx-finish");
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860

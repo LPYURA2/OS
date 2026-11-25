@@ -1,0 +1,36 @@
+name: StyleOS 862 selected-context authority
+on:
+  push:
+    branches: [feature/styleos-runtime-select-862]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU and OVMF build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Selected-context contract on both compilers with sanitizers
+        run: |
+          set -euo pipefail
+          mkdir -p build/s862-host
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -DSTYLEOS_TEST_RUNTIME_SELECT_862 -DSTYLEOS_TEST_RUNTIME_TICK_860 -Iinclude kernel/process_trap_847.c tests/test_runtime_select_862.c kernel/{process_scheduler,process_runtime,user_preempt_848,process_entry_847,user_copy_772}.c -o "build/s862-host/$cc"
+            "build/s862-host/$cc" | tee "build/s862-host/$cc.log"
+          done
+      - name: Actual selected-context CPL3, LAPIC, FP, safe root and retained Desktop
+        run: python3 tools/test_runtime_select_862_guest.py --output build/s862-guest
+      - name: Preserve raw guest evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-862-selected-context
+          path: |
+            build/s862-guest/
+            build/s862-host/*.log
+          if-no-files-found: warn
