@@ -90,6 +90,40 @@ bool rt864_services_boundary(uint64_t live_root){
   if(matches!=1||p->type!=PR_NATIVE_USER||p->state==PR_RUNNING||p->state==PR_WAITING)return 0;
   for(unsigned j=0;j<i;j++)if(ps->registry->processes[j].state!=PR_UNUSED&&ps->registry->processes[j].pid==p->pid)return 0;
  }
+ /* Validate existing user/window capabilities at every safe point. A missing
+  * optional binding is allowed; a stale or duplicated binding never is. */
+ unsigned active=0;
+ for(unsigned i=0;i<USR_MAX_SESSIONS;i++){
+  const struct usr_session *s=&u->sessions[i];
+  if(!s->id){if(s->account_id||s->state!=USR_CLOSED)return false;continue;}
+  if(!s->account_id||s->id>=u->next_session||(s->state!=USR_ACTIVE&&s->state!=USR_LOCKED))return false;
+  if(s->state==USR_ACTIVE){if(s->id!=u->selected_session)return false;++active;}
+  for(unsigned j=0;j<i;j++)if(u->sessions[j].id&&(u->sessions[j].id==s->id||u->sessions[j].account_id==s->account_id))return false;
+ }
+ if(!u->next_session||active!=(u->selected_session?1u:0u))return false;
+ for(unsigned i=0;i<PR_MAX_PROCESSES;i++){
+  const struct usr_owner *o=&u->owners[i];
+  if(!o->pid){if(o->session_id||o->scheduler_handle)return false;continue;}
+  const struct pr_entry *p=pr_find(ps->registry,o->pid);
+  if(!p||p->state!=PR_READY||p->scheduler_handle!=o->scheduler_handle||!usr_find(u,o->session_id))return false;
+  for(unsigned j=0;j<i;j++)if(u->owners[j].pid&&(u->owners[j].pid==o->pid||u->owners[j].scheduler_handle==o->scheduler_handle))return false;
+ }
+ for(unsigned i=0;i<NWC_PORTS;i++){
+  const struct nwc_port *q=&n->ports[i];
+  if(!q->window_id){if(!zero_bytes(q,sizeof *q))return false;continue;}
+  const struct pr_entry *p=pr_find(ps->registry,q->owner_pid);
+  const struct ws_window *w=ws_find(n->windows,q->window_id);
+  if(!p||p->state!=PR_READY||p->page_root!=q->user_root||p->scheduler_handle!=q->scheduler_handle||!w||w->role!=WS_APP_WINDOW||w->owner_pid!=q->owner_pid||!q->next_sequence||q->head>=NWC_EVENTS||q->length>NWC_EVENTS||q->length>=q->next_sequence)return false;
+  unsigned matches=0;
+  for(unsigned j=0;j<PR_MAX_PROCESSES;j++)if(u->owners[j].pid==q->owner_pid&&u->owners[j].session_id==q->session_id&&u->owners[j].scheduler_handle==q->scheduler_handle)++matches;
+  if(matches!=1)return false;
+  for(unsigned j=0;j<i;j++)if(n->ports[j].window_id==q->window_id)return false;
+  for(unsigned j=0;j<q->length;j++){
+   const struct nwc_event *e=&q->events[(q->head+j)%NWC_EVENTS];
+   if(e->window_id!=q->window_id||e->sequence!=q->next_sequence-q->length+j||(e->kind!=NWC_KEY&&e->kind!=NWC_TEXT)||e->size>NWC_TEXT_BYTES)return false;
+  }
+  if(q->has_tile&&(!q->tile.generation||q->tile.window_id!=q->window_id||!q->tile.width||!q->tile.height||q->tile.width>NWC_TILE_WIDTH||q->tile.height>NWC_TILE_HEIGHT))return false;
+ }
  return true;
 }
 /* Shared shell boundary: an inherited root cannot carry native dispatch

@@ -543,7 +543,13 @@ static void shell_boundary863(void){
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  if(live_phase863==1){
   struct rt858_live v=capture861();
-  if(rt861_dispatcher(&v)!=shell_d863||!same_cache(&shell_cache863)||nwc_port_count(nwc_global()))fail("863-pump-boundary");
+  if(rt861_dispatcher(&v)!=shell_d863||!same_cache(&shell_cache863)||
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+     nwc_port_count(nwc_global())!=ws_snapshot(ws_global(),0,0)
+#else
+     nwc_port_count(nwc_global())
+#endif
+    )fail("863-pump-boundary");
   /* s845_arena is an empty-arena handoff, not an active-arena query.
    * Use only the already admitted pointer retained before the shell began. */
   unsigned dispatches=shell_d863->dispatcher.dispatches;

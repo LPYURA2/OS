@@ -50,9 +50,13 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
         ready=one(b'STYLEOS S861T READY',('safe','idt','cs','ss','limit'))
         eq(ready,(safe,lo+site['timer_idt_rva'],0x5b,0x63,0x67),'IDT')
         tasks=group(b'STYLEOS S864 TASK',('id','pid','root','gen','yield','end','term','budget'),4)
+        ipc_open=group(b'STYLEOS S864 IPC-OPEN',('id','pid','root','gen','window','session'),4)
+        ipc_recv=group(b'STYLEOS S864 IPC-RECV',('id','pid','dispatch','root','foreign','result','sequence','code'),4)
+        ipc_close=group(b'STYLEOS S864 IPC-CLOSE',('id','pid','dispatch','ports'),4)
         for i,t in enumerate(tasks):
             label='abcd'[i]
             eq(t,(i,i+1+base,roots[i]['child'],gen0+base+i,site[label+'_yield'],site[label+'_end'],site[label+'_term'],BUDGET[i]),'task identity')
+        for i,r in enumerate(ipc_open):eq(r,(i,base+i+1,roots[i]['child'],gen0+base+i,base+i+1,epoch+1),'IPC admission')
         ad=one(b'STYLEOS S848 ADMIT',('lvt','initial','current','div','isr','irr'))
         if not ad['lvt']&0x10000 or ad['lvt']&~0x300ff or ad['div']&~0xb or ad['current']>ad['initial'] or ad['isr'] or ad['irr']:raise ValueError('timer admission')
         eq(one(b'STYLEOS S848 STOP',('lvt','initial','current','isr','irr')),(ad['lvt'],0,0,0,0),'timer stop')
@@ -63,7 +67,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
         returns=group(b'STYLEOS S863M RESUME',('id','pc','rax','ticks'),4)
         ranges=group(b'STYLEOS S864 RANGE',('id','root','address','bytes'),2)
         for i,r in enumerate(ranges,2):eq(r,(i,tasks[i]['root'],0x12000000 if i==2 else IST,8),'range request')
-        ticks=[0]*4;seen=[0]*4;prog=[0]*4;saved=[(CODE,SP,2)]*4;events=[];windows=4
+        ticks=[0]*4;seen=[0]*4;prog=[0]*4;saved=[(CODE,SP,2)]*4;events=[];windows=4;recv_index=close_index=0
         for step,(i,kind) in enumerate(order()):
             en,fp,frame,commit,boundary,event,progress,back=(s[step] for s in streams)
             t=tasks[i];child=t['root'];tag=0x8480000000000000|(i<<32);end=kind=='end'
@@ -79,6 +83,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
                 rip=t['yield']
                 check(traps[step],b'STYLEOS S863M CALL',('id','root','rip','rsp','flags','frame','rax','timer','isr','irr'),(i,child,rip,SP,flags,IST+4096-16-176,3 if i>=2 else 1,0,0,0),'returning syscall')
                 eq(returns[i],(i,rip,3 if i==3 else 0,0),'syscall result')
+                eq(ipc_recv[recv_index],(i,base+i+1,offset+step+1,child,3,0 if i else 3,1 if i else 0xffffffff,0x41+i if i else 0),'IPC receive');recv_index+=1
             elif kind=='tick':
                 r=row(traps[step],b'STYLEOS S848 TICK',('n','id','root','rip','rsp','flags','frame','cs','ss','progress','isr','eoi')+GPRS)
                 ticks[i]+=1;rip=r['rip']
@@ -87,6 +92,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
                 prog[i]=r['progress']
             else:
                 rip=t['term'];windows-=1
+                eq(ipc_close[close_index],(i,base+i+1,offset+step+1,windows),'IPC retirement');close_index+=1
                 check(traps[step],b'STYLEOS S848 END',('id','root','rip','vector','error','cr2','state','ticks'),(i,child,rip,vec,err,IST if err else 0,4 if i==1 else 3,sum(ticks)),'terminal')
             state=(4 if i==1 else 5) if end else 1
             saved[i]=(0,0,0) if end else (rip,SP,flags&~0x200)
@@ -101,6 +107,8 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
             chain=[en,fp,frame,traps[step],commit,boundary,event,progress,back]
             if [lines.index(x) for x in chain]!=sorted(lines.index(x) for x in chain):raise ValueError('event order')
             events.append(dict(id=i,kind=kind,vector=vec,error=err,rip=rip,flags=flags,root=child))
+        eq(one(b'STYLEOS S864 IPC-CLEAN',('session','ports')),(epoch+1,0),'IPC cleanup')
+        if recv_index!=4 or close_index!=4:raise ValueError('IPC coverage')
         if ticks!=list(BUDGET) or seen!=[x+2 for x in BUDGET] or windows:raise ValueError('incomplete schedule')
         eq(one(b'STYLEOS S848 TOTAL',('ticks','a','b','config-restored','timer-stopped')),(18,5,3,1,1),'timer cleanup')
         eq(one(b'STYLEOS S862L EMPTY',('dispatches','safe','windows')),(N,safe,0),'empty scheduler')

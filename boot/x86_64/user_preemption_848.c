@@ -2,6 +2,11 @@
 #include <styleos/user_preempt_848.h>
 #include <styleos/acpi_madt_806.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#include <styleos/native_window_channel.h>
+#include <styleos/user_session_runtime.h>
+static uint32_t ipc_session864;
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
 #include <styleos/desktop_interactive_863.h>
 #endif
@@ -390,6 +395,11 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  sparse_admit862(0,child,safe);
 #elif defined(STYLEOS_TEST_FOUR_GUEST_864)
  if(!rt862_bank_open(&bank862,runtime860,safe,sel.cs,sel.ss))fail848("864-bank-open");
+ /* Explicit fixture identity; no account authentication or app IPC ABI.
+  * The singleton objects are kernel-owned; the public getters are read-only. */
+ struct usr_runtime *users=(struct usr_runtime *)usr_global();
+ struct nwc_service *channel=(struct nwc_service *)nwc_global();
+ if(ipc_session864||!users||!channel||nwc_port_count(channel)||usr_create(users,UINT64_C(0x864),&ipc_session864)!=USR_OK||usr_select(users,ipc_session864)!=USR_OK)fail848("864-ipc-session");
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   if(!leases[i].generation||leases[i].pages!=3||leases[i].owner!=S846_OWNER_A+i||!child[i].ready)fail848("864-lease");
   handle860[i]=leases[i].generation;
@@ -398,6 +408,8 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   if(rt863_bank_admit_initial(&bank862,runtime860,safe,i,handle860[i],child[i].built.root,"S864 process",&initial,&pid860[i])!=PS_OK||
      pr_account(pr_global(),pid860[i],handle860[i],0,3*P)!=PR_OK||
      ws_open_app(ws_global(),pr_global(),pid860[i],"S864 process",(struct ws_bounds){0,0,400,300},&win860[i])!=WS_OK)fail848("864-admit");
+  if(usr_bind(users,ipc_session864,pid860[i],handle860[i])!=USR_OK||nwc_claim(channel,pid860[i],handle860[i],child[i].built.root,win860[i])!=NWC_OK||nwc_send_key(channel,win860[i],0x41u+i,0,true)!=NWC_OK||nwc_send_key(channel,win860[i],0x51u+i,0,true)!=NWC_OK)fail848("864-ipc-admit");
+  arch_puts("STYLEOS S864 IPC-OPEN");fld848("id",i);fld848("pid",pid860[i]);fld848("root",child[i].built.root);fld848("gen",handle860[i]);fld848("window",win860[i]);fld848("session",ipc_session864);arch_putc('\n');
  }
  if(ws_set_minimized(ws_global(),pid860[0],win860[0],true)!=WS_OK)fail848("864-minimize");
 #else
@@ -620,6 +632,26 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   unsigned want_windows=step<6?2u:step<9?1u:0u;
 #endif
   pe=pr_find(pr_global(),pid860[id]);const struct ws_window *window=ws_find(ws_global(),win860[id]);
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+  struct usr_runtime *users=(struct usr_runtime *)usr_global();
+  struct nwc_service *channel=(struct nwc_service *)nwc_global();
+  /* Broker exercise only, at a real returning trap's safe boundary. No
+   * pointer supplied by CPL3 and no change to its existing syscall result. */
+  if(call_slice){
+   struct nwc_event event={.sequence=UINT32_MAX};
+   enum nwc_status foreign=nwc_receive(channel,pid860[id],handle860[id],child[id].built.root,win860[(id+1)%S846_ROOT_COUNT],&event);
+   if(foreign!=NWC_DENIED||event.sequence!=UINT32_MAX)fail848("864-ipc-foreign");
+   enum nwc_status result=nwc_receive(channel,pid860[id],handle860[id],child[id].built.root,win860[id],&event);
+   if(id?(result!=NWC_OK||event.sequence!=1||event.window_id!=win860[id]||event.kind!=NWC_KEY||event.code!=0x41u+id||!event.down):(result!=NWC_DENIED||event.sequence!=UINT32_MAX))fail848("864-ipc-receive");
+   arch_puts("STYLEOS S864 IPC-RECV");fld848("id",id);fld848("pid",pid860[id]);fld848("dispatch",runtime860->dispatcher.dispatches);fld848("root",child[id].built.root);fld848("foreign",foreign);fld848("result",result);fld848("sequence",event.sequence);fld848("code",event.code);arch_putc('\n');
+  }
+  if(terminal){
+   struct nwc_event event={.sequence=UINT32_MAX};
+   if(usr_reconcile(users)!=1||nwc_reconcile(channel)!=1||nwc_receive(channel,pid860[id],handle860[id],child[id].built.root,win860[id],&event)!=NWC_MISSING||event.sequence!=UINT32_MAX)fail848("864-ipc-retire");
+   arch_puts("STYLEOS S864 IPC-CLOSE");fld848("id",id);fld848("pid",pid860[id]);fld848("dispatch",runtime860->dispatcher.dispatches);fld848("ports",nwc_port_count(channel));arch_putc('\n');
+  }
+  if(nwc_port_count(channel)!=want_windows)fail848("864-ipc-count");
+#endif
   if(!pe||pe->cpu_ticks!=local848[id]||pe->resident_bytes!=3*P||pe->state!=(terminal?(normal_exit848(id)?PR_EXITED:PR_FAULTED):PR_READY)||runtime860->dispatcher.current!=-1||(terminal?window!=0:(!window||window->minimized!=(id==0)))||ws_snapshot(ws_global(),0,0)!=want_windows)fail848("860-event-state");
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
   struct rt858_live after=live848();if(rt861_dispatcher(&after)!=runtime860)fail848("861-timer-after");
@@ -649,6 +681,8 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
  if(completed!=TOTAL_TICKS848+S846_ROOT_COUNT+EXTRA_DISPATCH848||ticks848!=TOTAL_TICKS848||runtime860->dispatcher.current!=-1)fail848("864-loop-final");
+ if(!ipc_session864||nwc_port_count(nwc_global())||usr_lock((struct usr_runtime *)usr_global())!=USR_OK||usr_close((struct usr_runtime *)usr_global(),ipc_session864)!=USR_OK)fail848("864-ipc-final");
+ arch_puts("STYLEOS S864 IPC-CLEAN");fld848("session",ipc_session864);fld848("ports",0);arch_putc('\n');ipc_session864=0;
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(local848[i]!=s862_loop_budget[i]||!pr_find(pr_global(),pid860[i])||pr_find(pr_global(),pid860[i])->state!=(normal_exit848(i)?PR_EXITED:PR_FAULTED))fail848("864-final-state");
 #else
  if(completed!=s862_loop_budget[0]+s862_loop_budget[1]+2+EXTRA_DISPATCH848||ticks848!=s862_loop_budget[0]+s862_loop_budget[1]||local848[0]!=s862_loop_budget[0]||local848[1]!=s862_loop_budget[1]||runtime860->dispatcher.current!=-1||pr_find(pr_global(),pid860[0])->state!=PR_FAULTED||pr_find(pr_global(),pid860[1])->state!=PR_EXITED)fail848("862-loop-final");

@@ -68,6 +68,21 @@ int main(int argc,char **argv){
   NO(rt863_bootstrap_ready(e.root));
   OK(!pr_snapshot(p,0,0,true)&&ps->dispatches==PS_MAX_SLOTS);
   if(owned)OK(rt864_shell_boundary(e.root,&v));else NO(rt864_shell_boundary(e.root,0));
+  if(owned){
+   uint32_t sid,pid,win;struct usr_runtime *users=(struct usr_runtime *)u;struct nwc_service *channel=(struct nwc_service *)n;
+   OK(usr_create(users,1,&sid)==USR_OK&&usr_select(users,sid)==USR_OK);
+   OK(dpr_admit(runtime,0,999,0x90000,0,"ipc",&pid)==PS_OK&&usr_bind(users,sid,pid,999)==USR_OK);
+   OK(ws_open_app(w,p,pid,"ipc",(struct ws_bounds){0,0,400,300},&win)==WS_OK&&nwc_claim(channel,pid,999,0x90000,win)==NWC_OK);
+   OK(nwc_send_key(channel,win,65,0,true)==NWC_OK&&rt864_shell_boundary(e.root,&v));
+   struct nwc_port saved=channel->ports[0];channel->ports[0].user_root^=4096;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
+   channel->ports[0].head=NWC_EVENTS;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
+   channel->ports[0].events[0].sequence=8;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
+   channel->ports[1]=saved;NO(rt864_shell_boundary(e.root,&v));memset(&channel->ports[1],0,sizeof channel->ports[1]);
+   unsigned slot;uint32_t actual;OK(dpr_dispatch(runtime,&slot,&actual)==PS_OK&&actual==pid&&slot==0);
+   OK(dpr_observe(runtime,0,999,0x90000,e.root,PS_EXIT)==PS_OK);NO(rt864_shell_boundary(e.root,&v));
+   OK(usr_reconcile(users)==1&&nwc_reconcile(channel)==1&&rt864_shell_boundary(e.root,&v));
+   OK(dpr_release(runtime,0,999)==PS_OK&&usr_lock(users)==USR_OK&&usr_close(users,sid)==USR_OK&&rt864_shell_boundary(e.root,&v));
+  }
  }else{
   if(!strcmp(mode,"dpr"))OK(dpr_global_start(0x1000)==DPR_OK);
   else if(!strcmp(mode,"usr"))OK(usr_global_start()==USR_OK);
