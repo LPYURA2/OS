@@ -394,12 +394,20 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   if(!pe||pe->state!=PR_RUNNING||pe->resident_bytes!=3*P||!ws_find(ws_global(),win860[id]))fail848("860-before-event");
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
   if(!receipt860)fail848("862-bank-receipt");
+#ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
+  /* S863 pump: retain authenticated IRQ/FP/terminal capture.
+   * The existing fixture does not admit returning software traps yet. */
+  if(terminal?(pending860.vector!=14&&pending860.vector!=128):pending860.vector!=V)fail848("863-event-kind");
+  struct rt860_tick t={.slot=id,.dispatch=runtime860->dispatcher.dispatches,.pid=pid860[id],.handle=handle860[id],.child_root=child[id].built.root,.safe_root=root848(),.frame_va=frame860,.vector=pending860.vector,.isr=terminal?0:1,.eoi=terminal?0:1,.safe_flags=flags848(),.frame=pending860};
+  if(rt863_bank_event(&bank862,runtime860,&selection,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
+#else
   if(terminal){
    if(rt862_bank_finish(&bank862,runtime860,&selection,safe,flags848(),&pending860,frame860,cr2862)!=PS_OK)fail848("862-bank-end");
   }else{
    struct rt860_tick t={.slot=id,.dispatch=runtime860->dispatcher.dispatches,.pid=pid860[id],.handle=handle860[id],.child_root=child[id].built.root,.safe_root=root848(),.frame_va=frame860,.vector=V,.isr=1,.eoi=1,.safe_flags=flags848(),.frame=pending860};
    if(cr2862||rt862_bank_tick(&bank862,runtime860,&selection,safe,&t)!=PS_OK)fail848("862-bank-tick");
   }
+#endif
   receipt860=false;frame860=0;cr2862=0;volatile unsigned char *zero=(void *)&pending860;for(size_t j=0;j<sizeof pending860;j++)zero[j]=0;
   const struct up_context *stored=&bank862.slots[id].context;unsigned zeroed=1;const unsigned char *bytes=(const void *)stored;for(size_t j=0;j<sizeof *stored;j++)if(bytes[j])zeroed=0;
   if(zeroed!=terminal)fail848("862-bank-context");

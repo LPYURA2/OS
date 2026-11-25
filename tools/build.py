@@ -631,6 +631,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append("-DSTYLEOS_TEST_RUNTIME_LOOP_862=1")
     if test_runtime_bank_862:
         flags.append("-DSTYLEOS_TEST_RUNTIME_BANK_862=1")
+        if test_desktop_pump_863:
+            flags.append("-DSTYLEOS_TEST_RUNTIME_SYSCALL_863=1")
     if test_runtime_select_862:
         flags.append("-DSTYLEOS_TEST_RUNTIME_SELECT_862=1")
     if test_runtime_timer_861:
