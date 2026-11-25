@@ -16,7 +16,7 @@ static struct rt858_live capture861(void){return rt864_arch_capture();}
 static bool boundary861(const struct dpr_service *d,const struct s842_cache *cache){
  struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&(
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
-#ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
+#if defined(STYLEOS_TEST_DESKTOP_AUTONOMOUS_863) || defined(STYLEOS_INTEGRATED_RUNTIME_864)
  (d->dispatcher.dispatches&&d->dispatcher.dispatches%S863_DISPATCHES_PER_BATCH==0&&
   d->dispatcher.dispatches<=S863_DISPATCHES_PER_BATCH*S863_LAUNCH_LIMIT&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
 #endif
@@ -151,7 +151,10 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  s860_reap(safe);
  uint64_t after=UINT64_C(14695981039346656037);const volatile uint32_t *fb=(const void *)(uintptr_t)s->base;
  for(size_t i=0;i<(size_t)s->width*s->height;i++){uint32_t pixel=fb[i];for(unsigned j=0;j<4;j++){after^=(pixel>>(8*j))&255u;after*=UINT64_C(1099511628211);}}
- if(after!=before||!boundary861(d,cache)||arena->next!=gen+4||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-final");
+ if(after!=before)fail("864-final-frame");
+ if(!boundary861(d,cache))fail("864-final-boundary");
+ if(arena->next!=gen+4)fail("864-final-generation");
+ if(!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-final-root");
  arch_puts("STYLEOS S864 CLEAN");field("safe",safe);field("used",used);field("next",arena->next);field("tables-zero",1);field("leases-zero",1);field("fnv",after);arch_putc('\n');
  if(pr_global()->next_pid!=5+4*round||ws_global()->next_id!=5+4*round)fail("864-identities");
  arch_puts("STYLEOS S864 BATCH-END");field("round",round);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);arch_putc('\n');
