@@ -36,7 +36,11 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False, test_physical_arena_844=False, test_task_stacks_845=False, test_user_roots_846=False, test_process_trial_847=False, test_user_preempt_848=False, test_fx_context_849=False, test_desktop_preflight_850=False, test_desktop_switch_851=False, test_desktop_frame_852=False, test_desktop_input_853=False, test_desktop_rtc_854=False, test_desktop_time_855=False, test_storage_topology_856=False, test_storage_bmdma_857=False, test_storage_busmaster_857=False, test_storage_ata_read_857=False, test_runtime_entry_858=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False, test_physical_arena_844=False, test_task_stacks_845=False, test_user_roots_846=False, test_process_trial_847=False, test_user_preempt_848=False, test_fx_context_849=False, test_desktop_preflight_850=False, test_desktop_switch_851=False, test_desktop_frame_852=False, test_desktop_input_853=False, test_desktop_rtc_854=False, test_desktop_time_855=False, test_storage_topology_856=False, test_storage_bmdma_857=False, test_storage_busmaster_857=False, test_storage_ata_read_857=False, test_runtime_entry_858=False, test_runtime_arena_858=False):
+    if test_runtime_arena_858:
+        if test_physical_arena_844 or test_timer_scheduler_843 or test_task_stacks_845 or test_user_roots_846 or test_process_trial_847 or test_user_preempt_848 or test_fx_context_849:
+            raise ValueError("858 arena is a separate runtime profile")
+        test_runtime_entry_858 = True
     if test_runtime_entry_858:
         if test_desktop_input_853 or test_desktop_rtc_854 or test_desktop_time_855 or test_storage_topology_856 or test_storage_bmdma_857 or test_storage_busmaster_857 or test_storage_ata_read_857:
             raise ValueError("858 is a separate runtime entry profile")
@@ -375,7 +379,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/user_root_846.c','boot/x86_64/user_root_846.c']
     if test_task_stacks_845:
         common += ['kernel/task_stacks_845.c','kernel/task_stack_trace_845.c']
-    if test_physical_arena_844:
+    if test_physical_arena_844 or test_runtime_arena_858:
         common += ['kernel/physical_arena_844.c','boot/x86_64/physical_arena_844.c']
     if test_timer_scheduler_843:
         common += ['kernel/tasks.c','kernel/timer_context_843.c',
@@ -531,6 +535,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_DESKTOP_PREFLIGHT_850=1')
     if test_desktop_switch_851:
         flags.append('-DSTYLEOS_TEST_DESKTOP_SWITCH_851=1')
+    if test_runtime_arena_858:
+        flags.append('-DSTYLEOS_TEST_RUNTIME_ARENA_858=1')
     if test_runtime_entry_858:
         flags.append('-DSTYLEOS_TEST_RUNTIME_ENTRY_858=1')
     if test_desktop_frame_852:
@@ -826,6 +832,7 @@ def main():
     negative.add_argument('--test-desktop-time-855', action='store_true',help='855 terminal QEMU PIT/TSC observation under own CR3')
     negative.add_argument('--test-desktop-rtc-854', action='store_true',help='854 terminal QEMU RTC read under own CR3')
     negative.add_argument('--test-desktop-input-853', action='store_true',help='853 terminal QEMU PS/2 input and cursor damage under own CR3')
+    negative.add_argument('--test-runtime-arena-858', action='store_true',help='858 bounded EFI arena with existing runtime services')
     negative.add_argument('--test-runtime-entry-858', action='store_true',help='858 isolated runtime services on verified owned root')
     negative.add_argument('--test-desktop-frame-852', action='store_true',help='852 isolated first Desktop frame under own CR3, QEMU only')
     negative.add_argument('--test-desktop-switch-851', action='store_true',help='851 terminal protected root switch and reversible pixel probe, QEMU only')
@@ -891,6 +898,8 @@ def main():
     parser.add_argument('--update-public-key', type=Path, help='Raw Ed25519 verification key')
     parser.add_argument('--test-update-fail', action='store_true', help='Trial intentionally never becomes ready')
     args = parser.parse_args()
+    if args.test_runtime_arena_858:
+        args.test_runtime_entry_858 = True
     if args.test_runtime_entry_858:
         args.test_desktop_frame_852 = True
     if args.test_storage_ata_read_857:
@@ -1088,6 +1097,7 @@ def main():
                'desktop-time-855' if args.test_desktop_time_855 else
                'desktop-rtc-854' if args.test_desktop_rtc_854 else
                'desktop-input-853' if args.test_desktop_input_853 else
+               'runtime-arena-858' if args.test_runtime_arena_858 else
                'runtime-entry-858' if args.test_runtime_entry_858 else
                'desktop-frame-852' if args.test_desktop_frame_852 else
                'desktop-switch-851' if args.test_desktop_switch_851 else
@@ -1155,6 +1165,7 @@ def main():
                              **({'test_user_preempt_848': True} if args.test_user_preempt_848 else {}),
                              **({'test_desktop_preflight_850': True} if args.test_desktop_preflight_850 else {}),
                              **({'test_desktop_switch_851': True} if args.test_desktop_switch_851 else {}),
+                             **({'test_runtime_arena_858': True} if args.test_runtime_arena_858 else {}),
                              **({'test_runtime_entry_858': True} if args.test_runtime_entry_858 else {}),
                              **({'test_desktop_frame_852': True} if args.test_desktop_frame_852 else {}),
                              **({'test_desktop_input_853': True} if args.test_desktop_input_853 else {}),
@@ -1236,6 +1247,7 @@ def main():
         **({'test_user_preempt_848': True} if args.test_user_preempt_848 else {}),
                              **({'test_desktop_preflight_850': True} if args.test_desktop_preflight_850 else {}),
                              **({'test_desktop_switch_851': True} if args.test_desktop_switch_851 else {}),
+                             **({'test_runtime_arena_858': True} if args.test_runtime_arena_858 else {}),
                              **({'test_runtime_entry_858': True} if args.test_runtime_entry_858 else {}),
                              **({'test_desktop_frame_852': True} if args.test_desktop_frame_852 else {}),
                              **({'test_desktop_input_853': True} if args.test_desktop_input_853 else {}),

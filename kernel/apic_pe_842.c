@@ -1,6 +1,6 @@
 #include <styleos/apic_pe_842.h>
 #define P UINT64_C(4096)
-#ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
+#if defined(STYLEOS_TEST_PHYSICAL_ARENA_844) || defined(STYLEOS_TEST_RUNTIME_ARENA_858)
 bool s844_admit_efi(const struct boot_memory_evidence *,const struct boot_info *,struct boot_range *);
 #endif
 static bool inside(struct boot_range a,struct boot_range b){return a.start<a.end&&b.start<=a.start&&a.end<=b.end;}
@@ -94,7 +94,7 @@ bool s842_build_pe_efi(const struct s790_low_request *pe,
  }
  if(covered!=pe->image.end-pe->image.start||source_covered!=e->live.source.end-e->live.source.start)return false;
  struct boot_range extra={0};
-#ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
+#if defined(STYLEOS_TEST_PHYSICAL_ARENA_844) || defined(STYLEOS_TEST_RUNTIME_ARENA_858)
  if(!s844_admit_efi(e,b,&extra))return false;
 #endif
  return build_pe(pe,e->map,cache,t,msr,out,true,extra);

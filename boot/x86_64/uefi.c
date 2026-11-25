@@ -104,7 +104,7 @@ EFI_STATUS desk_update_boot(EFI_HANDLE, struct efi_boot_services *,
                             const struct efi_loaded_image *, struct efi_guid *);
 #endif
 
-#ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
+#if defined(STYLEOS_TEST_PHYSICAL_ARENA_844) || defined(STYLEOS_TEST_RUNTIME_ARENA_858)
 EFI_STATUS s844_reserve(struct efi_boot_services *);
 #endif
 static struct boot_range loaded_image;
@@ -199,7 +199,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
 #ifdef STYLEOS_TEST_PCI_REQUESTER_811
     pci811_capture(table);
 #endif
-#ifdef STYLEOS_TEST_PHYSICAL_ARENA_844
+#if defined(STYLEOS_TEST_PHYSICAL_ARENA_844) || defined(STYLEOS_TEST_RUNTIME_ARENA_858)
     status=s844_reserve(table->boot_services);
     if(status!=EFI_SUCCESS){arch_puts("STYLEOS S844 FAIL EFI reserve\n");arch_halt();}
 #endif

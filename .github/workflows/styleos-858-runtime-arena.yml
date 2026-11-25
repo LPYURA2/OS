@@ -1,0 +1,36 @@
+name: StyleOS 858 bounded arena with runtime services
+on:
+  push:
+    branches: [test/styleos-runtime-arena-858]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU and OVMF build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Bounded allocator existing host regression
+        run: |
+          set -euo pipefail
+          mkdir -p build/s858-arena-tests
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude kernel/physical_arena_844.c tests/test_physical_arena_844.c -o "build/s858-arena-tests/$cc"
+            "build/s858-arena-tests/$cc" | tee "build/s858-arena-tests/$cc.log"
+          done
+      - name: Start real owned-root services and verify bounded EFI arena
+        run: |
+          python3 tools/test_runtime_arena_858_guest.py --output build/s858-arena
+          python3 tools/test_runtime_arena_858_verify.py build/s858-arena
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-858-runtime-arena
+          path: |
+            build/s858-arena/
+            build/s858-arena-tests/*.log
+          if-no-files-found: warn

@@ -3,6 +3,12 @@
 #include <styleos/desktop_root_850.h>
 #include <styleos/arch.h>
 #include <styleos/ist_guard_plan_785.h>
+#ifdef STYLEOS_TEST_RUNTIME_ARENA_858
+#include <styleos/physical_arena_844.h>
+bool s845_extent(struct boot_range *);
+struct s844_arena *s845_arena(void);
+void s844_guest_run(uint64_t);
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
 #include <styleos/runtime_entry_858.h>
 #include <styleos/desktop_process_runtime.h>
@@ -145,6 +151,15 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
   arch_puts("STYLEOS S851 PIXEL");field("id",i);field("root",target);field("address",(uintptr_t)pixel);field("old",old);field("write",want);field("read",got);field("restored",restored);arch_putc('\n');
  }
  arch_puts("STYLEOS S851 POLICY terminal=yes own-root=yes hardware-ist=yes framebuffer-restored=yes firmware-return=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_RUNTIME_ARENA_858
+ /* Reuse the existing EFI reservation and full S842/S850 tree audits.
+  * This checks the live owned root before touching any external pages. */
+ struct boot_range arena858;
+ if(!s845_extent(&arena858)||arena858.end!=arena858.start+S844_BYTES||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-context");
+ for(uint64_t a=arena858.start;a<arena858.end;a+=4096)if(!identity(a,PG_WRITE))fail("858-arena-map");
+ s844_guest_run(target);
+ if(!s845_arena()||s845_arena()->base!=arena858.start||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-live");
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
  /* Initial service bootstrap only, after hardware proof. No legacy device
   * initialization, tasks, IRQ enabling or production-root authorization. */
@@ -175,6 +190,14 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
  if(!rt858_ready(read_cr3())||(flags()&0x200)||!same_cache(cache))fail("858-runtime-frame");
  arch_puts("STYLEOS S858 POLICY runtime-services=yes empty-registry=yes frame=yes irq=no app-admission=no storage=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_RUNTIME_ARENA_858
+ struct s844_arena *allocator858=s845_arena();unsigned used858;
+ if(!allocator858||allocator858->base!=arena858.start||allocator858->next!=4||!s844_count(allocator858,&used858)||used858||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-after");
+ for(uint64_t a=arena858.start;a<arena858.end;a+=4096)if(!identity(a,PG_WRITE))fail("858-arena-after-map");
+ for(uint64_t a=arena858.start;a<arena858.end;a++)if(*(volatile const unsigned char *)(uintptr_t)a)fail("858-arena-after-zero");
+ arch_puts("STYLEOS S858 ARENA");field("root",target);field("base",arena858.start);field("pages",S844_PAGES);field("used",used858);field("next",allocator858->next);field("zero",1);arch_putc('\n');
+ arch_puts("STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny\n");
+#endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_INPUT_853
  /* This is a fixed Q35/TCG terminal fixture, not general ACPI resource admission. */
