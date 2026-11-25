@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Cold boot without external permission/input, storage fail-closed, actual tasks."""
-import argparse,hashlib,json,os,shutil,subprocess,sys
+import argparse,hashlib,json,os,shutil,subprocess,sys,time
 from pathlib import Path
 from test_desktop_v0 import Desktop
 from test_desktop_interactive_863 import wait,recycle_site
@@ -120,7 +120,9 @@ def refuse_smp_preview(cmd,vars,out,iso,expected_hash):
     return result
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--preview',action='store_true');args=p.parse_args();preview=args.preview;out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--preview',action='store_true');p.add_argument('--rounds',type=int,choices=(4,32),default=4);args=p.parse_args();preview=args.preview;rounds=args.rounds
+    if rounds!=4 and not preview:p.error('extended workload requires the mixed ISO preview')
+    out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build'
     with (out/'compile.log').open('w') as f:
         subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--desktop-owned-root-preview' if preview else '--test-desktop-autonomous-863','--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
@@ -152,10 +154,14 @@ def main():
             wait(proc,serial,b'STYLEOS S863 READY ')
             d.screen('initial');d.key('f5');d.key('ctrl-n');d.key('a')
             d.screen('note')
-            d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',1);d.screen('after-first-launch')
-            d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',2);d.screen('after-tasks')
-            for i in (3,4):
-                d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',i);d.screen(f'after-launch-{i}')
+            elapsed=[]
+            started=time.monotonic_ns()
+            d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',1);elapsed.append(time.monotonic_ns()-started);d.screen('after-first-launch')
+            started=time.monotonic_ns()
+            d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',2);elapsed.append(time.monotonic_ns()-started);d.screen('after-tasks')
+            for i in range(3,rounds+1):
+                started=time.monotonic_ns()
+                d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',i);elapsed.append(time.monotonic_ns()-started);d.screen(f'after-launch-{i}')
             d.call('stop');stats=d.call('query-blockstats',**{'query-nodes':False})
             (out/'stats.json').write_text(json.dumps(stats,indent=2))
             if not stats or any(x['stats']['wr_operations'] or x['stats']['wr_bytes'] for x in stats):raise ValueError('unexpected write')
@@ -172,7 +178,10 @@ def main():
                 frame=d.screen('after-f12-language');previous=d.screen('final')
                 if frame.pixels!=previous.pixels:raise ValueError('unstable stopped frame')
                 from test_desktop_v0 import Frame
-                if frame.pixels==Frame(out/'after-launch-4.ppm').pixels:raise ValueError('no UI response after F12')
+                if frame.pixels==Frame(out/f'after-launch-{rounds}.ppm').pixels:raise ValueError('no UI response after F12')
+                final_stats=d.call('query-blockstats',**{'query-nodes':False})
+                (out/'final-stats.json').write_text(json.dumps(final_stats,indent=2))
+                if not final_stats or any(x['stats']['wr_operations'] or x['stats']['wr_bytes'] for x in final_stats):raise ValueError('unexpected final media write')
                 d.call('quit');rc=proc.wait(timeout=30)
             else:
                 d.call('human-monitor-command',**{'command-line':'sendkey f12 40'});rc=proc.wait(timeout=30)
@@ -191,9 +200,9 @@ def main():
     if lines.count(policy)!=1:raise ValueError('policy')
     cold=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))
     prefix=b'\n'.join(lines[:cold])+b'\n'
-    root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview,mixed=preview)
+    root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview,mixed=preview,round_count=rounds)
     pointer=verify_pointer_clock(lines,root) if preview else None
     smp_refusal=refuse_smp_preview(cmd,vars,out,iso,iso_before) if preview else None
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,smp_refusal=smp_refusal,pointer_clock=pointer,host_exit=rc),indent=2))
-    print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, {0} CPU events, four independent launch cycles, no storage writes'.format(len(events)))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,launch_rounds=rounds,host_request_to_done_ns=elapsed,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,smp_refusal=smp_refusal,pointer_clock=pointer,host_exit=rc),indent=2))
+    print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, {0} CPU events, {1} independent launch cycles, no storage writes'.format(len(events),rounds))
 if __name__=='__main__':main()

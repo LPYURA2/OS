@@ -33,12 +33,13 @@ def cold_trace(trace,obs):
     if len(events)!=1 or events[0][1]!=expected:raise ValueError('cold actual CPU binding')
     return events
 
-def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_preview=False,mixed=False):
+def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_preview=False,mixed=False,round_count=None):
     ok,obs=cold_prior(prefix,33,site['rva'],ref,cold=True)
     if not ok:raise ValueError('cold root '+str(obs))
     root=obs['active']['root']
     if tasks:
-        count=4 if repeatable else 2
+        count=(4 if repeatable else 2) if round_count is None else round_count
+        if count!=(4 if repeatable else 2) and not (repeatable and live_preview and mixed and count==32):raise ValueError('unsupported workload size')
         n=12 if mixed else 10
         polls=n+1
         begins=[x for x in lines if x.startswith(b'STYLEOS S863L BEGIN ')]
