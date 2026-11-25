@@ -37,3 +37,21 @@ jobs:
             build/s863-storage-tasks/
             build/s863-autonomous/
           if-no-files-found: warn
+
+  stability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install real guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools
+      - name: Eight independent cold save/reboot pairs on one linked image
+        run: python3 tools/test_desktop_storage_stability_863.py --output build/s863-storage-stability
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-863-storage-stability
+          path: build/s863-storage-stability/
+          if-no-files-found: warn
