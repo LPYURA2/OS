@@ -161,3 +161,23 @@ enum ps_status rt863_coop_commit(struct rt862_bank *b,struct dpr_service *d,
  return PS_OK;
 }
 #endif
+
+#ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
+/* Unified supervisor receipt, after the architecture has authenticated the
+ * real trap, suspended FP, restored the safe root/stack and retired the IRQ.
+ * A software receipt cannot itself prove any of those hardware facts. */
+enum ps_status rt863_bank_event(struct rt862_bank *b,struct dpr_service *d,
+ const struct rt862_selection *t,uint64_t live,const struct rt860_tick *r,uint64_t cr2){
+ if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),r,sizeof *r,_Alignof(struct rt860_tick))||
+    !ticket(b,d,t,live)||r->slot!=t->slot||r->dispatch!=t->dispatch||r->pid!=t->pid||
+    r->handle!=t->handle||r->child_root!=t->child_root||r->safe_root!=live||r->vector!=r->frame.vector)return PS_EVIDENCE;
+ if(r->vector==0x50){
+  if(cr2||r->isr!=1||r->eoi!=1)return PS_EVIDENCE;
+  return rt862_bank_tick(b,d,t,live,r);
+ }
+ if(r->isr||r->eoi||(r->vector!=128&&r->vector!=14)||(r->vector==128&&cr2))return PS_EVIDENCE;
+ if(r->vector==14||r->frame.gpr[0]==S847_CALL_EXIT)
+  return rt862_bank_finish(b,d,t,live,r->safe_flags,&r->frame,r->frame_va,cr2);
+ return rt863_bank_syscall(b,d,t,live,r->safe_flags,&r->frame,r->frame_va,cr2);
+}
+#endif

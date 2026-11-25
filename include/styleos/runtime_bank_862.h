@@ -26,6 +26,8 @@ enum ps_status rt862_bank_release(struct rt862_bank *,struct dpr_service *,uint6
  * Nonterminal INT80 range/yield/unknown; no user-memory copy or I/O. */
 enum ps_status rt863_bank_syscall(struct rt862_bank *,struct dpr_service *,
  const struct rt862_selection *,uint64_t,uint64_t,const struct s847_raw *,uint64_t,uint64_t);
+/* Common timer/syscall/terminal receipt; hardware proof belongs to caller. */
+enum ps_status rt863_bank_event(struct rt862_bank *,struct dpr_service *,const struct rt862_selection *,uint64_t,const struct rt860_tick *,uint64_t);
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_COOP_863
 bool rt863_coop_enter(const struct rt862_bank *,const struct dpr_service *,
