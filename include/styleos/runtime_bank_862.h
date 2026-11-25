@@ -21,4 +21,10 @@ bool rt862_bank_open(struct rt862_bank *,struct dpr_service *,uint64_t,uint16_t,
 enum ps_status rt862_bank_admit(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint64_t,uint64_t,const char *,uint32_t *);
 /* Architecture must first revoke/scrub mappings, lease and FP state. */
 enum ps_status rt862_bank_release(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint32_t,uint64_t,uint64_t);
+#ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
+/* Supervisor-only, after authenticated safe-root return and FP suspension.
+ * Nonterminal INT80 range/yield/unknown; no user-memory copy or I/O. */
+enum ps_status rt863_bank_syscall(struct rt862_bank *,struct dpr_service *,
+ const struct rt862_selection *,uint64_t,uint64_t,const struct s847_raw *,uint64_t,uint64_t);
+#endif
 #endif

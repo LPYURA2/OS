@@ -49,6 +49,13 @@ jobs:
             "build/s863-host/ata-$cc" | tee "build/s863-host/ata-$cc.log"
           done
           clang --target=x86_64-w64-windows-gnu -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -fno-stack-protector -mno-red-zone -Iinclude -c kernel/ata_runtime_863.c -o build/s863-host/ata-runtime.obj
+      - name: Nonterminal syscall continuation and stale receipt refusal
+        run: |
+          set -euo pipefail
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_TICK_860 -DSTYLEOS_TEST_RUNTIME_SYSCALL_863 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_syscall_863.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/s863-host/syscall-$cc"
+            "build/s863-host/syscall-$cc" | tee "build/s863-host/syscall-$cc.log"
+          done
       - name: Build ordinary Desktop and verify linked shared-bootstrap calls
         run: |
           set -euo pipefail

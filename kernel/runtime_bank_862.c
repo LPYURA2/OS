@@ -102,3 +102,31 @@ enum ps_status rt862_bank_release(struct rt862_bank *b,struct dpr_service *d,uin
  volatile unsigned char *p=(void *)c;for(size_t i=0;i<sizeof *c;i++)p[i]=0;
  return PS_OK;
 }
+
+#ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
+#include <styleos/user_copy_772.h>
+/* Supervisor receipt after actual trap, safe-root restoration and FP save.
+ * RANGE only validates a user interval; no user dereference. A returning
+ * syscall is a scheduling boundary: save the result, transition to READY,
+ * and let the existing dispatcher choose the next context. */
+enum ps_status rt863_bank_syscall(struct rt862_bank *b,struct dpr_service *d,
+ const struct rt862_selection *t,uint64_t live,uint64_t safe_flags,
+ const struct s847_raw *f,uint64_t va,uint64_t cr2){
+ if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),f,sizeof *f,_Alignof(struct s847_raw))||
+    !ticket(b,d,t,live)||(safe_flags&~UINT64_C(0x8d7))||!(safe_flags&2)||
+    (f->rflags&0x202)!=0x202||f->rsp<=S846_STACK||cr2||f->vector!=128||
+    f->gpr[0]==S847_CALL_EXIT)return PS_EVIDENCE;
+ struct s847_raw normalized=*f;normalized.rflags&=~IF;
+ struct up_context saved;struct up_event event;
+ if(!s847_decode(&normalized,va,cr2,t->child_root,b->cs,b->ss,&saved,&event)||
+    event.kind!=UP_EVENT_NONE||!context(b,&saved))return PS_EVIDENCE;
+ uint64_t result=UC772_BAD;
+ if(f->gpr[0]==S847_CALL_YIELD)result=0;
+ else if(f->gpr[0]==S847_CALL_RANGE){size_t offset=0;
+    result=uc772_plan(event.active_root,t->child_root,S846_DATA,f->gpr[1],f->gpr[2],&offset);}
+ saved.gpr[0]=result;
+ enum ps_status status=dpr_observe(d,t->slot,t->handle,t->child_root,live,PS_YIELD);
+ if(status!=PS_OK)return status;
+ b->slots[t->slot].context=saved;return PS_OK;
+}
+#endif
