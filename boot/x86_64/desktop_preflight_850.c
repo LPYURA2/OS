@@ -684,7 +684,9 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  field("processes",pr_snapshot(pr_global(),0,0,true));field("windows",ws_snapshot(ws_global(),0,0));arch_putc('\n');
 #endif
  arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
-#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+#ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
+ arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
+#elif defined(STYLEOS_TEST_DESKTOP_COLD_863)
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=legacy-fixture clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
 #elif defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=legacy-fixture clock=no reset=no dma-grant=no production-cr3=deny\n");
