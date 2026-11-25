@@ -38,7 +38,7 @@ static struct rtc_x86_854 rtc854;
 #include <styleos/pit_x86_855.h>
 static struct pit_x86_855 pit855;
 #endif
-#ifdef STYLEOS_TEST_STORAGE_BUSMASTER_857
+#if defined(STYLEOS_TEST_STORAGE_BUSMASTER_857) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
 #include <styleos/busmaster_857.h>
 #endif
 static _Alignas(4096) uint64_t tables[PG_TABLE_PAGES][512];
@@ -54,7 +54,7 @@ static uint32_t cfg(unsigned dev,unsigned fn,unsigned off){out32(0xcf8,cfgaddr(d
 static void cfgwrite(unsigned dev,unsigned fn,unsigned off,uint32_t v){out32(0xcf8,cfgaddr(dev,fn,off));out32(0xcfc,v);}
 static uint16_t cmd(unsigned dev,unsigned fn){out32(0xcf8,cfgaddr(dev,fn,4));return in16(0xcfc);}
 static void cmdwrite(unsigned dev,unsigned fn,uint16_t v){out32(0xcf8,cfgaddr(dev,fn,4));out16(0xcfc,v);}
-#ifdef STYLEOS_TEST_STORAGE_ATA_READ_857
+#if defined(STYLEOS_TEST_STORAGE_ATA_READ_857) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
 #include <styleos/ata_diag_857.h>
 struct ata857_live {uint64_t root;unsigned ops;};
 static bool ata857_live_check(struct ata857_live *x){
@@ -77,8 +77,10 @@ static bool ata857_write(void *ctx,unsigned reg,uint8_t v){
  __asm__ volatile("outb %0,%1"::"a"(v),"Nd"(port):"memory");return true;
 }
 static const struct ata857_ops ata857_io={ata857_alt,ata857_write,ata857_data};
+#ifdef STYLEOS_TEST_STORAGE_ATA_READ_857
 static void ata857_hex(const uint16_t *w){static const char hex[]="0123456789abcdef";for(unsigned i=0;i<ATA857_WORDS;i++){for(unsigned b=0;b<2;b++){unsigned v=(w[i]>>(8*b))&255u;arch_putc(hex[v>>4]);arch_putc(hex[v&15]);}}}
-#ifdef STYLEOS_TEST_STORAGE_PIO_RUNTIME_863
+#endif
+#if defined(STYLEOS_TEST_STORAGE_PIO_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
 #include <styleos/ata_runtime_863.h>
 #include <styleos/storage_runtime_863.h>
 struct pio863 {struct ata857_live *live;struct ata_runtime_863 ata;bool writable;};
@@ -104,7 +106,15 @@ static bool pio_observe863(void *ctx,struct storage_obs_863 *o){
  .dma_denied=true,.disposable_data=true,.flush_supported=p->ata.flush_supported};return true;
 }
 static bool pio_read863(void *ctx,uint32_t lba,uint8_t *out){struct pio863*p=ctx;return ata_runtime_read_863(&p->ata,lba,out);}
-static bool pio_write863(void *ctx,uint32_t lba,const uint8_t *in){struct pio863*p=ctx;return p->writable&&lba==2049&&ata_runtime_write_863(&p->ata,lba,in);}
+static bool pio_write863(void *ctx,uint32_t lba,const uint8_t *in){
+ struct pio863*p=ctx;
+#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+ /* Four legacy note slots, two nine-sector banks per slot; never LBA 0. */
+ return p->writable&&lba>=1&&lba<=72&&ata_runtime_write_863(&p->ata,lba,in);
+#else
+ return p->writable&&lba==2049&&ata_runtime_write_863(&p->ata,lba,in);
+#endif
+}
 static bool pio_flush863(void *ctx){struct pio863*p=ctx;return p->writable&&ata_runtime_flush_863(&p->ata);}
 static const struct storage_ops_863 store_ops863={pio_observe863,pio_read863,pio_write863,pio_flush863};
 #endif
@@ -302,6 +312,76 @@ bool s863_shell_clock(unsigned *hour,unsigned *minute){
  return true;
 }
 #endif
+#endif
+#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+static _Alignas(4096) union {
+ struct {struct ata857_live live;struct pio863 pio;struct storage_runtime_863 store;bool ready;} s;
+ unsigned char page[4096];
+} disk863;
+_Static_assert(sizeof disk863==4096,"disk service page");
+static bool disk_preflight863;
+static struct bm857_snapshot disk_snapshot863(void){
+ uint32_t old=in32(0xcf8);
+ struct bm857_snapshot v={.root=read_cr3(),.id=cfg(5,0,0),.class_revision=cfg(5,0,8),.command_status=cfg(5,0,4),.bar4=cfg(5,0,0x20)};
+ out32(0xcf8,old);
+ if(in32(0xcf8)!=old||v.id!=0x70108086u||v.class_revision!=0x01018000u||v.bar4!=0x60e1u)fail("863-shell-storage-pci");
+ const uint16_t ports[]={0x60e0,0x60e2,0x60e8,0x60ea};
+ for(unsigned i=0;i<4;i++)__asm__ volatile("inb %1,%0":"=a"(v.bm[i]):"Nd"(ports[i]):"memory");
+ return v;
+}
+static void disk_admit863(void){
+ s863_shell_guard();
+ if(!disk_preflight863||disk863.s.ready||!shell_fixture863()||!same_cache(&shell_cache863)||
+    !identity((uintptr_t)&disk863,PG_WRITE)||!identity((uintptr_t)&disk863+4095,PG_WRITE)||
+    !identity((uintptr_t)storage_commit_863,PG_EXEC)||!identity((uintptr_t)storage_read_863,PG_EXEC)||
+    desk_input_init()!=3)fail("863-shell-storage-admit");
+ /* Host must pause and attest the exact isolated overlay before acknowledging. */
+ arch_puts("STYLEOS S863S WAIT\n");
+ bool ack=false;
+ for(unsigned i=0;i<20000000u;i++){
+  struct desk_event e={0};if(!desk_input_next(&e)){__asm__ volatile("pause");continue;}
+  if(e.mouse||e.key!=0x30||e.modifiers)fail("863-shell-storage-ack");
+  ack=true;break;
+ }
+ if(!ack||!shell_fixture863()||!same_cache(&shell_cache863))fail("863-shell-storage-host");
+ struct bm857_snapshot before=disk_snapshot863();
+ uint16_t word=0;
+ if(!bm857_plan(&before,shell_root863,&word))fail("863-shell-storage-dma");
+ uint32_t old=in32(0xcf8);
+ cmdwrite(5,0,word);out32(0xcf8,old);
+ struct bm857_snapshot after=disk_snapshot863();
+ if(!bm857_confirm(&after,shell_root863))fail("863-shell-storage-master");
+ disk863.s.live.root=shell_root863;
+ disk863.s.pio.live=&disk863.s.live;
+ uint8_t super[512];
+ if(!ata_runtime_bind_863(&disk863.s.pio.ata,&pio_ops863,&disk863.s.pio)||
+    !ata_runtime_read_863(&disk863.s.pio.ata,0,super))fail("863-shell-storage-identify");
+ static const char magic[]="STYLEOS-DESK-V01";
+ for(unsigned i=0;i<512;i++)if(super[i]!=(i<sizeof magic-1?(uint8_t)magic[i]:0))fail("863-shell-storage-signature");
+ disk863.s.pio.writable=true;
+ if(!storage_bind_863(&disk863.s.store,&store_ops863,&disk863.s.pio,shell_root863,1,UINT64_C(0x701080862800),0,4096,true))fail("863-shell-storage-bind");
+ disk863.s.ready=true;
+ arch_puts("STYLEOS S863S ADMIT");field("root",shell_root863);field("first-write",1);field("last-write",72);field("dma",0);arch_putc('\n');
+}
+static bool disk_ready863(void){
+ if(!disk863.s.ready||disk863.s.store.quarantined||disk863.s.pio.ata.quarantined)return false;
+ s863_shell_guard();return same_cache(&shell_cache863)&&ata857_live_check(&disk863.s.live);
+}
+uint32_t s863_disk_probe(void){return disk_ready863()?4096:0;}
+bool s863_disk_read(uint32_t lba,uint8_t out[512]){
+ return disk_ready863()&&storage_read_863(&disk863.s.store,lba,out);
+}
+bool s863_disk_write(uint32_t lba,const uint8_t in[512]){
+ if(!in||lba<1||lba>72||!disk_ready863())return false;
+ /* Every successful write already includes hardware flush and readback. */
+ if(!storage_commit_863(&disk863.s.store,lba,in))return false;
+ arch_puts("STYLEOS S863S COMMIT");field("root",shell_root863);field("lba",lba);arch_putc('\n');
+ return true;
+}
+bool s863_disk_flush(void){
+ /* No queued writes exist after verified commit; check actual live transport. */
+ return disk_ready863()&&!disk863.s.pio.ata.pending_flush&&!disk863.s.store.busy;
+}
 #endif
 static void shell_boundary863(void){
  s863_shell_guard();unsigned used;
@@ -508,11 +588,16 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #endif
 #endif
  shell_boundary863();
+#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+ disk_admit863();
+#endif
 #if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
  rtc_admit863();
 #endif
  arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
-#ifdef STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863
+#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+ arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=legacy-fixture clock=no reset=no dma-grant=no production-cr3=deny\n");
+#elif defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
 #else
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
@@ -793,6 +878,11 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
   struct pg_lookup x;
   if(arch_paging_attest_image_writable(p,desc[i],4096)!=PG_OK||pg_lookup(&composed.plan,desc[i],&x)!=PG_OK||x.pa!=desc[i]||x.flags!=PG_WRITE)fail("descriptor-closure");
  }
+#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+ if(disk_preflight863||arch_paging_attest_image_writable(p,(uintptr_t)&disk863,sizeof disk863)!=PG_OK||
+    !identity((uintptr_t)&disk863,PG_WRITE)||!identity((uintptr_t)&disk863+4095,PG_WRITE))fail("863-shell-storage-page");
+ disk_preflight863=true;
+#endif
 #if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
  /* The old walker is legal ONLY here, with the inherited CR3 active.
   * The detached plan has already passed the guarded-tree audit. */
