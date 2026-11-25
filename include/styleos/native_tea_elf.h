@@ -26,4 +26,12 @@ enum nte_status nte_load_x64_page(const uint8_t *elf, size_t elf_bytes,
                                   uint8_t *page, size_t page_bytes,
                                   struct nte_loaded *loaded);
 
+/* Bounded native image loader for a trusted, immutable ELF buffer. Same
+ * single RX PT_LOAD ABI; permit a nonzero entry inside actual file bytes.
+ * Destination page and result must be distinct from all input spans.
+ * Caller establishes package trust, owned lease, safe root and serialization.
+ * This is not a general multi-segment ELF loader. */
+enum nte_status nte_load_x64_image(const uint8_t *,size_t,const uint8_t[32],
+ uint8_t *,size_t,struct nte_loaded *);
+
 #endif

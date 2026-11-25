@@ -382,3 +382,26 @@ jobs:
           name: styleos-865-image-admission
           path: build/s865-image-admission/
           if-no-files-found: error
+
+
+  native-image-loader-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Bounded ELF image loader, independent of guest workload
+        run: |
+          set -euo pipefail
+          mkdir -p build/s865-native-image-loader
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude kernel/native_tea_elf.c tests/test_native_image_loader_865.c -o "build/s865-native-image-loader/$cc"
+            "build/s865-native-image-loader/$cc" | tee "build/s865-native-image-loader/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-865-native-image-loader
+          path: build/s865-native-image-loader/
+          if-no-files-found: error

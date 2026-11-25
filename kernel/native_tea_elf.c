@@ -64,13 +64,27 @@ void nte_sha256(const uint8_t *input,size_t bytes,uint8_t out[32])
     }
 }
 
-enum nte_status nte_load_x64_page(const uint8_t *elf,size_t elf_bytes,
+static bool nte_span(const void *ptr,size_t n){
+ return ptr&&n&&n<=UINTPTR_MAX-(uintptr_t)ptr;
+}
+static bool nte_distinct(const void *a,size_t n,const void *b,size_t m){
+ return nte_span(a,n)&&nte_span(b,m)&&
+  ((uintptr_t)a+n<=(uintptr_t)b||(uintptr_t)b+m<=(uintptr_t)a);
+}
+static enum nte_status load_page(const uint8_t *elf,size_t elf_bytes,
                                   const uint8_t hash[32],uint8_t *page,
-                                  size_t page_bytes,struct nte_loaded *loaded)
+                                  size_t page_bytes,struct nte_loaded *loaded,bool allow_entry_offset)
 {
     if(!elf || !hash || !page || !loaded || page_bytes!=NTE_PAGE ||
        elf_bytes<120u || elf_bytes>16u*1024u*1024u ||
        (uintptr_t)page%NTE_PAGE) return NTE_ARGUMENT;
+    if(allow_entry_offset&&(
+       (uintptr_t)loaded%_Alignof(struct nte_loaded)||
+       !nte_distinct(page,page_bytes,elf,elf_bytes)||
+       !nte_distinct(page,page_bytes,hash,32)||
+       !nte_distinct(loaded,sizeof *loaded,page,page_bytes)||
+       !nte_distinct(loaded,sizeof *loaded,elf,elf_bytes)||
+       !nte_distinct(loaded,sizeof *loaded,hash,32)))return NTE_ARGUMENT;
     if(elf[0]!=127u || elf[1]!='E' || elf[2]!='L' || elf[3]!='F' ||
        elf[4]!=2u || elf[5]!=1u || elf[6]!=1u ||
        le16(elf+16)!=2u || le16(elf+18)!=62u || le32(elf+20)!=1u ||
@@ -83,9 +97,10 @@ enum nte_status nte_load_x64_page(const uint8_t *elf,size_t elf_bytes,
     const uint64_t offset=le64(ph+8),vaddr=le64(ph+16);
     const uint64_t filesz=le64(ph+32),memsz=le64(ph+40),align=le64(ph+48);
     if(type!=1u || flags!=5u || vaddr!=NTE_USER_CODE_VA ||
-       entry!=NTE_USER_CODE_VA || align!=NTE_PAGE ||
+       (!allow_entry_offset&&entry!=NTE_USER_CODE_VA) || align!=NTE_PAGE ||
        filesz==0 || filesz>memsz || memsz>NTE_PAGE)
         return NTE_RIGHTS;
+    if(entry<vaddr||entry-vaddr>=filesz)return NTE_RIGHTS;
     if(offset>elf_bytes || filesz>elf_bytes-offset ||
        (offset&(NTE_PAGE-1u)) || memsz>UINT32_MAX) return NTE_BOUNDS;
     uint8_t actual[32];nte_sha256(elf,elf_bytes,actual);
@@ -97,4 +112,11 @@ enum nte_status nte_load_x64_page(const uint8_t *elf,size_t elf_bytes,
     for(size_t i=0;i<(size_t)filesz;i++)page[i]=elf[offset+i];
     *loaded=(struct nte_loaded){entry,(uint32_t)filesz,(uint32_t)memsz};
     return NTE_OK;
+}
+
+enum nte_status nte_load_x64_page(const uint8_t *elf,size_t bytes,const uint8_t hash[32],uint8_t *page,size_t page_bytes,struct nte_loaded *loaded){
+ return load_page(elf,bytes,hash,page,page_bytes,loaded,false);
+}
+enum nte_status nte_load_x64_image(const uint8_t *elf,size_t bytes,const uint8_t hash[32],uint8_t *page,size_t page_bytes,struct nte_loaded *loaded){
+ return load_page(elf,bytes,hash,page,page_bytes,loaded,true);
 }
