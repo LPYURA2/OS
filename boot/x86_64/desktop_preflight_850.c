@@ -468,6 +468,12 @@ static void disk_admit863(void){
     !identity((uintptr_t)&disk863,PG_WRITE)||!identity((uintptr_t)&disk863+4095,PG_WRITE)||
     !identity((uintptr_t)storage_commit_863,PG_EXEC)||!identity((uintptr_t)storage_read_863,PG_EXEC)||
     desk_input_init()!=3)fail("863-shell-storage-admit");
+#ifdef STYLEOS_PROVISIONED_STORAGE_864
+ /* Explicitly selected, isolated Q35 profile. Trusted launcher owns the
+  * disposable overlay and prohibits hotplug; serial/tag are identity, not
+  * cryptographic proof. Never request keyboard confirmation. */
+ arch_puts("STYLEOS S863S PROVISIONED-BOOT\n");
+#else
  /* Host must pause and attest the exact isolated overlay before acknowledging. */
  arch_puts("STYLEOS S863S WAIT\n");
  bool ack=false;
@@ -477,6 +483,7 @@ static void disk_admit863(void){
   ack=true;break;
  }
  if(!ack||!shell_fixture863()||!same_cache(&shell_cache863))fail("863-shell-storage-host");
+#endif
  struct bm857_snapshot before=disk_snapshot863(0);
  disk_dma_receipt863("BEFORE",&before);
  uint16_t word=0;
@@ -495,8 +502,14 @@ static void disk_admit863(void){
  arch_puts("STYLEOS S863S BAR4");field("root",shell_root863);field("bar4",before.bar4);arch_putc('\n');
  disk863.s.pio.live=&disk863.s.live;
  uint8_t super[512];
- if(!ata_runtime_bind_863(&disk863.s.pio.ata,&pio_ops863,&disk863.s.pio)||
-    !ata_runtime_read_863(&disk863.s.pio.ata,0,super))fail("863-shell-storage-identify");
+ #ifdef STYLEOS_PROVISIONED_STORAGE_864
+ if(!ata_runtime_bind_serial_864(&disk863.s.pio.ata,&pio_ops863,&disk863.s.pio,ATA864_PROVISIONED_SERIAL))fail("864-provisioned-serial");
+ if(!ata_runtime_read_863(&disk863.s.pio.ata,4095,super)||!ata864_tag_match(super))fail("864-provisioned-tag");
+ arch_puts("STYLEOS S863S PROVISIONED-IDENTITY\n");
+#else
+ if(!ata_runtime_bind_863(&disk863.s.pio.ata,&pio_ops863,&disk863.s.pio))fail("863-shell-storage-identify");
+#endif
+ if(!ata_runtime_read_863(&disk863.s.pio.ata,0,super))fail("863-shell-storage-identify");
  static const char magic[]="STYLEOS-DESK-V01";
  for(unsigned i=0;i<512;i++)if(super[i]!=(i<sizeof magic-1?(uint8_t)magic[i]:0))fail("863-shell-storage-signature");
  disk863.s.pio.writable=true;

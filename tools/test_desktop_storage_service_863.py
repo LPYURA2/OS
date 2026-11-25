@@ -206,14 +206,19 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write):
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
     if args.iso and args.build_from:p.error('ISO proof requires a fresh linked build')
+    if args.provisioned and not args.iso:p.error('--provisioned requires --iso')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
-    provision(base);original=base.read_bytes();base.chmod(0o444)
+    provision(base)
+    if args.provisioned:
+        with base.open('r+b') as stream:
+            stream.seek(4095*512);stream.write(b'STYLEOS-S864-PROVISIONED-V1'.ljust(512,b'\0'))
+    original=base.read_bytes();base.chmod(0o444)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and img and code and vars):raise RuntimeError('real QEMU mandatory')
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
@@ -226,7 +231,7 @@ def main():
         build=args.build_from.resolve(strict=True)
         (out/'compile.log').write_text('Reusing exact cold image: '+str(build)+'\n')
     else:
-        with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),*(['--four-live-864'] if args.four else []),'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
+        with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),*(['--four-live-864'] if args.four else []),*(['--provisioned-storage-864'] if args.provisioned else []),'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
     efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=None if args.four else bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
     if args.four:
@@ -239,7 +244,7 @@ def main():
         subprocess.run([sys.executable,str(ROOT/'tools/make_desktop_iso.py'),'--efi',str(efi),'--output',str(iso)],check=True)
         iso_sha=sha(iso.read_bytes());media=verify_preview_media(iso,efi,out)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
-    def run(name,write):
+    def run(name,write,foreign=False):
         folder=out/name;folder.mkdir();serial=folder/'serial.log';shutil.copyfile(vars,folder/'OVMF_VARS.fd')
         cmd=[q,'-machine','q35','-accel','tcg,thread=single','-smp','1','-rtc','base=2026-11-25T12:34:00,clock=vm','-m','128M','-display','none','-vga','std','-serial',f'file:{serial}','-monitor','none','-qmp','stdio','-net','none','-no-reboot','-S','-device','isa-debug-exit,iobase=0xf4,iosize=0x04','-drive',f'if=pflash,format=raw,readonly=on,file={code}','-drive',f'if=pflash,format=raw,file={folder/"OVMF_VARS.fd"}','-drive',f'if=none,id=styleos,format=raw,readonly=on,file={boot}','-device','virtio-blk-pci,drive=styleos,bootindex=1','-device','piix3-ide,id=styleos-ide,bus=pcie.0,addr=0x5']
         if args.iso:
@@ -248,7 +253,7 @@ def main():
                 i=cmd.index(item);del cmd[i-1:i+1]
             cmd+=['-boot','order=d,strict=on','-cdrom',str(iso)]
         for node in ({'driver':'file','filename':str(base),'node-name':FILE,'read-only':True},{'driver':'raw','file':FILE,'node-name':RAW,'read-only':True},{'driver':'file','filename':str(top),'node-name':TOPFILE,'read-only':False},{'driver':'qcow2','file':TOPFILE,'backing':RAW,'node-name':TOP,'read-only':False}):cmd+=['-blockdev',json.dumps(node)]
-        cmd+=['-device',f'ide-hd,id={DEVICE},bus={CONTROLLER}.1,unit=0,drive={TOP}']
+        cmd+=['-device',f'ide-hd,id={DEVICE},bus={CONTROLLER}.1,unit=0,drive={TOP}'+(',serial='+('FOREIGN-S864-DATA' if foreign else 'STYLEOS-S864-DATA') if args.provisioned else '')]
         trace=folder/'cpu-trace.log';cmd+=['-d','int,guest_errors','-D',str(trace)]
         (folder/'command.json').write_text(json.dumps(cmd))
         with (folder/'qemu.log').open('wb') as err:
@@ -267,9 +272,21 @@ def main():
                     return o
                 if 'QMP' not in d.receive():raise RuntimeError('QMP greeting')
                 d.call('qmp_capabilities');snapshot('prelaunch',True);d.call('cont')
-                wait(proc,serial,b'STYLEOS S863S WAIT');d.call('stop')
-                gate=snapshot('gate',True);verify_ready(gate);verify_bar(gate['pci'],gate['mtree'],0x6060 if args.iso else 0x60e0);d.call('cont')
-                d.key('b');wait(proc,serial,b'STYLEOS S863 READY ');d.wait_uart('DATA MOUNT');d.screen('initial');d.x,d.y=640,600
+                if args.provisioned:
+                    if foreign:
+                        wait(proc,serial,b'STYLEOS S850 FAIL 864-provisioned-serial' if False else b'864-provisioned-serial')
+                        # Diagnostic fail-stop may exit via the existing test device;
+                        # either way never accept mount/admission or a media change.
+                        raw=serial.read_bytes()
+                        if b'STYLEOS S863S ADMIT ' in raw or b'STYLEOS DESKTOP READY' in raw or b'STYLEOS S863S COMMIT ' in raw or b'STYLEOS S863S WAIT' in raw:raise ValueError('foreign identity crossed admission')
+                        return {'refusal':'864-provisioned-serial','uart_sha256':sha(raw)}
+                    wait(proc,serial,b'STYLEOS S863 READY ')
+                    d.call('stop');gate=snapshot('gate',True);verify_ready(gate);verify_bar(gate['pci'],gate['mtree'],0x6060);d.call('cont')
+                else:
+                    wait(proc,serial,b'STYLEOS S863S WAIT');d.call('stop')
+                    gate=snapshot('gate',True);verify_ready(gate);verify_bar(gate['pci'],gate['mtree'],0x6060 if args.iso else 0x60e0);d.call('cont')
+                    d.key('b');wait(proc,serial,b'STYLEOS S863 READY ')
+                d.wait_uart('DATA MOUNT');d.screen('initial');d.x,d.y=640,600
                 if write:
                     d.key('f5');d.key('ctrl-n');d.key('a')
                     if not mixed:d.key('ctrl-s');d.wait_uart('DOCUMENT SAVE')
@@ -325,7 +342,10 @@ def main():
         lines=raw.splitlines();commits=[x for x in lines if x.startswith(b'STYLEOS S863S COMMIT ')]
         if len(commits)!=(2 if write else 0):raise ValueError('commit count')
         if write and [int(x.split()[-1].split(b'=')[1],16) for x in commits]!=[20,19]:raise ValueError('payload then header')
-        gate=lines.index(b'STYLEOS S863S WAIT')
+        if args.provisioned:
+            if lines.count(b'STYLEOS S863S PROVISIONED-BOOT')!=1 or lines.count(b'STYLEOS S863S PROVISIONED-IDENTITY')!=1 or b'STYLEOS S863S WAIT' in lines:raise ValueError('autonomous provisioned identity proof')
+            gate=lines.index(b'STYLEOS S863S PROVISIONED-BOOT')
+        else:gate=lines.index(b'STYLEOS S863S WAIT')
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
         if args.four:
@@ -373,6 +393,8 @@ def main():
         path=out/(tag+'.raw');image('convert','-f','qcow2','-O','raw',str(top),str(path))
         if path.read_bytes()!=expected or base.read_bytes()!=original or sha(boot.read_bytes())!=boot_sha or (args.iso and sha(iso.read_bytes())!=iso_sha):raise ValueError('exact disk contents')
     check('after-write');second=run('second',False);check('after-reboot')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
+    foreign=run('foreign-identity',False,True) if args.provisioned else None
+    if args.provisioned:check('after-foreign-refusal')
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()

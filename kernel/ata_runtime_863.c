@@ -48,7 +48,7 @@ static bool delay(struct ata_runtime_863 *a)
  * paths; the existing read-only S857 command allowlist remains unchanged. */
 static bool reg(struct ata_runtime_863 *a,unsigned r,uint8_t v)
 {return a->ops->read_ops.write_reg(a->ctx,r,v)||fault(a,ATA863_REGISTER_IO);}
-bool ata_runtime_bind_863(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx)
+static bool bind_identity(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx,const char *serial)
 {
     if(!a||!ops||!ops->read_ops.status||!ops->read_ops.write_reg||
        !ops->read_ops.read_data||!ops->write_data||a->ops||a->ctx||a->bound||
@@ -57,11 +57,15 @@ bool ata_runtime_bind_863(struct ata_runtime_863 *a,const struct ata_runtime_ops
        a->reader.identified||a->reader.busy||a->reader.quarantined)return false;
     a->ops=ops;a->ctx=ctx;a->busy=true;a->phase=ATA863_BIND;
     uint16_t w[ATA857_WORDS];
-    if(!ata857_identify(&a->reader,&ops->read_ops,ctx,w))return finish(a,fault(a,ATA863_IDENTIFY));
+    if(!ata857_identify(&a->reader,&ops->read_ops,ctx,w)||(serial&&!ata864_serial_match(w,serial)))return finish(a,fault(a,ATA863_IDENTIFY));
     /* IDENTIFY word 83 validity + FLUSH CACHE. No unsupported device writes. */
     if((w[83]&0xc000u)!=0x4000u||!(w[83]&0x1000u))return finish(a,fault(a,ATA863_FLUSH_UNSUPPORTED));
     a->flush_supported=true;a->bound=true;return finish(a,true);
 }
+bool ata_runtime_bind_863(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx)
+{return bind_identity(a,ops,ctx,0);}
+bool ata_runtime_bind_serial_864(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx,const char serial[20])
+{return serial&&bind_identity(a,ops,ctx,serial);}
 static bool enter(struct ata_runtime_863 *a)
 {
     if(!a||!a->bound||a->busy||a->quarantined||!a->flush_supported||

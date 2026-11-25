@@ -36,6 +36,24 @@ struct ata_runtime_863 {
     uint8_t last_status;
 };
 bool ata_runtime_bind_863(struct ata_runtime_863 *,const struct ata_runtime_ops_863 *,void *);
+/* Exact 20-byte ATA IDENTIFY serial field, space padded and word swapped.
+ * A device identity, NOT cryptographic authentication. */
+#define ATA864_PROVISIONED_SERIAL "STYLEOS-S864-DATA   "
+#define ATA864_PROVISIONED_TAG "STYLEOS-S864-PROVISIONED-V1"
+static inline bool ata864_serial_match(const uint16_t words[ATA857_WORDS],const char expected[20])
+{
+    if(!words||!expected)return false;
+    for(unsigned i=0;i<20;i++)if((uint8_t)(words[10+i/2]>>(i%2?0:8))!=(uint8_t)expected[i])return false;
+    return true;
+}
+static inline bool ata864_tag_match(const uint8_t sector[512])
+{
+    if(!sector)return false;
+    static const char tag[]=ATA864_PROVISIONED_TAG;
+    for(unsigned i=0;i<512;i++)if(sector[i]!=(i<sizeof tag-1?(uint8_t)tag[i]:0))return false;
+    return true;
+}
+bool ata_runtime_bind_serial_864(struct ata_runtime_863 *,const struct ata_runtime_ops_863 *,void *,const char [20]);
 bool ata_runtime_read_863(void *,uint32_t,uint8_t [512]);
 bool ata_runtime_write_863(void *,uint32_t,const uint8_t [512]);
 bool ata_runtime_flush_863(void *);
