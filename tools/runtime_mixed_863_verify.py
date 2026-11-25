@@ -99,6 +99,9 @@ def verify(raw,rc,site,ref):
         eq(row(exact(b'STYLEOS S861T SCRUB '),b'STYLEOS S861T SCRUB',('safe','used','tables-zero','leases-zero')),(safe,0,1,1),'scrub')
         eq(row(exact(b'STYLEOS S860 CLEAN '),b'STYLEOS S860 CLEAN',('safe','dispatches','processes','windows')),(safe,12,0,0),'clean')
         eq(row(exact(b'STYLEOS S862B CLEAN '),b'STYLEOS S862B CLEAN',('safe','bank-zero','pending-zero')),(safe,1,1),'bank cleanup')
+        eq(row(exact(b'STYLEOS S862L READY '),b'STYLEOS S862L READY',('a','b','watchdog')),(5,3,32),'loop plan')
+        eq(row(exact(b'STYLEOS S862L EMPTY '),b'STYLEOS S862L EMPTY',('dispatches','safe','windows')),(12,safe,0),'loop empty')
+        if not lines.index(exact(b'STYLEOS S862L READY '))<lines.index(enter[0])<lines.index(backs[-1])<lines.index(exact(b'STYLEOS S862L EMPTY '))<lines.index(exact(b'STYLEOS S849 CLEAN ')):raise ValueError('mixed loop order')
         if exact(b'STYLEOS S849 CLEAN ')!=b'STYLEOS S849 CLEAN slots-zero=yes kernel-copy-zero=yes' or ticks!=[5,3] or seen!=[7,5] or windows:raise ValueError('mixed final')
         o.update(mixed_events=events,timer_ready=ready);return True,o
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)

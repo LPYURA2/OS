@@ -17,6 +17,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 ovmf dosfstools mtools
       - name: Two returning INT80, eight LAPIC ticks, two terminal traps
         run: python3 tools/test_runtime_mixed_863_guest.py --output build/s863-mixed
+      - name: Independent replay of original mixed CPU and UART capture
+        run: python3 tools/test_runtime_mixed_863_replay.py build/s863-mixed
       - uses: actions/upload-artifact@v4
         if: always()
         with:
