@@ -63,24 +63,25 @@ bool rt858_start(const struct rt858_expected *e,const struct rt858_live *v){
 }
 bool rt858_ready(uint64_t root){return phase==2&&root==active_root&&rt863_bootstrap_ready(root);}
 
-#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
-/* Trusted supervisor snapshot, NOT a CPU attestation. Call only between
- * dispatches with the original safe descriptors and stack restored. */
-struct dpr_service *rt861_dispatcher(const struct rt858_live *live){
- if(phase!=2||active_root!=started_contract.root||!rt858_validate(&started_contract,live))return 0;
- struct dpr_service *d=dpr_tick_global_860();
+/* Shared ongoing service-graph validation. The root comes from the trusted
+ * architecture, not from an app. Unlike initial-ready this allows admitted
+ * native tasks and completed lifecycle counters. It never activates a root,
+ * exposes an app ABI, or authorizes a hardware dispatch. */
+bool rt864_services_boundary(uint64_t live_root){
+ if(bootstrap_phase!=2||!page(live_root)||live_root!=bootstrap_root)return false;
+ const struct dpr_service *d=dpr_global_state();
  const struct usr_runtime *u=usr_global();const struct nwc_service *n=nwc_global();
- if(!d||d!=dpr_global_state()||!u||!u->ready||!n||!n->ready||
-    d->dispatcher.safe_root!=active_root||d->dispatcher.registry!=pr_global()||d->windows!=ws_global()||
+ if(!d||!d->started||!u||!u->ready||!n||!n->ready||
+    d->dispatcher.safe_root!=live_root||d->dispatcher.registry!=pr_global()||d->windows!=ws_global()||
     u->processes!=pr_global()||u->windows!=ws_global()||n->registry!=pr_global()||n->windows!=ws_global()||n->sessions!=u||
     d->dispatcher.current!=-1||d->dispatcher.next>=PS_MAX_SLOTS)return 0;
  const struct ps_dispatcher *ps=&d->dispatcher;
- /* Narrow two-native-context contract; no kernel-task admission here. */
+ /* Native user contexts only; do not invent kernel tasks from UI sessions. */
  for(unsigned i=0;i<PS_MAX_SLOTS;i++){
   const struct ps_slot *s=&ps->slots[i];
   if(!s->pid){if(s->handle||s->user_root)return 0;continue;}
   const struct pr_entry *p=pr_find(ps->registry,s->pid);
-  if(!p||p->type!=PR_NATIVE_USER||!s->handle||!page(s->user_root)||s->user_root==active_root||
+  if(!p||p->type!=PR_NATIVE_USER||!s->handle||!page(s->user_root)||s->user_root==live_root||
      p->scheduler_handle!=s->handle||p->page_root!=s->user_root||
      (p->state!=PR_READY&&p->state!=PR_EXITED&&p->state!=PR_FAULTED))return 0;
   for(unsigned j=0;j<i;j++)if(ps->slots[j].pid&&(ps->slots[j].pid==s->pid||ps->slots[j].handle==s->handle||ps->slots[j].user_root==s->user_root))return 0;
@@ -91,6 +92,15 @@ struct dpr_service *rt861_dispatcher(const struct rt858_live *live){
   if(matches!=1||p->type!=PR_NATIVE_USER||p->state==PR_RUNNING||p->state==PR_WAITING)return 0;
   for(unsigned j=0;j<i;j++)if(ps->registry->processes[j].state!=PR_UNUSED&&ps->registry->processes[j].pid==p->pid)return 0;
  }
- return d;
+ return true;
+}
+#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
+/* The owned-root adapter additionally requires its original descriptor and
+ * stack contract. The common software boundary does not replace that proof. */
+struct dpr_service *rt861_dispatcher(const struct rt858_live *live){
+ if(phase!=2||active_root!=started_contract.root||
+    !rt858_validate(&started_contract,live)||!rt864_services_boundary(live->root))return 0;
+ struct dpr_service *d=dpr_tick_global_860();
+ return d==dpr_global_state()?d:0;
 }
 #endif

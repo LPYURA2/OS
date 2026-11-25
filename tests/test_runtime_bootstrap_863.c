@@ -14,7 +14,7 @@ static unsigned good,bad;
 static void unchanged(const struct pr_table *p,const struct ws_service *w){OK(!memcmp(p,pr_global(),sizeof *p)&&!memcmp(w,ws_global(),sizeof *w));}
 int main(int argc,char **argv){
  assert(argc==2);const char *mode=argv[1];struct pr_table *p=pr_global();struct ws_service *w=ws_global();
- NO(rt863_bootstrap_ready(0x2000));
+ NO(rt863_bootstrap_ready(0x2000));NO(rt864_services_boundary(0x2000));
  if(!strcmp(mode,"ordinary")||!strcmp(mode,"owned")){
   const struct pr_table p0=*p;const struct ws_service w0=*w;
   NO(rt863_bootstrap(0));for(unsigned i=0;i<12;i++)NO(rt863_bootstrap(0x2000|B(i)));for(unsigned i=47;i<64;i++)NO(rt863_bootstrap(0x2000|B(i)));
@@ -33,6 +33,29 @@ int main(int argc,char **argv){
   p->processes[0].pid=7;NO(rt863_bootstrap_ready(e.root));p->processes[0].pid=0;
   w->windows[0].owner_pid=7;NO(rt863_bootstrap_ready(e.root));w->windows[0].owner_pid=0;
   OK(rt863_bootstrap_ready(e.root));
+  OK(rt864_services_boundary(e.root));NO(rt864_services_boundary(e.old_root));
+  struct dpr_service *runtime=(struct dpr_service *)d;
+  uint32_t ids[PS_MAX_SLOTS]={0};
+  for(unsigned i=0;i<PS_MAX_SLOTS;i++){
+   OK(dpr_admit(runtime,i,i+1,0x10000+4096*i,0,"native",&ids[i])==PS_OK);
+   OK(rt864_services_boundary(e.root));NO(rt863_bootstrap_ready(e.root));
+  }
+  struct ps_dispatcher *ps=&runtime->dispatcher;
+  struct ps_slot old=ps->slots[1];ps->slots[1].handle=ps->slots[0].handle;
+  NO(rt864_services_boundary(e.root));ps->slots[1]=old;
+  ps->slots[1].user_root=e.root;NO(rt864_services_boundary(e.root));ps->slots[1]=old;
+  ps->slots[1].pid=0;NO(rt864_services_boundary(e.root));ps->slots[1]=old;
+  for(unsigned i=0;i<PS_MAX_SLOTS;i++){
+   unsigned chosen=99;uint32_t pid=0;
+   OK(dpr_dispatch(runtime,&chosen,&pid)==PS_OK&&chosen==i&&pid==ids[i]);
+   NO(rt864_services_boundary(e.root));
+   OK(dpr_observe(runtime,i,i+1,0x10000+4096*i,e.root,PS_EXIT)==PS_OK);
+   OK(rt864_services_boundary(e.root));
+   OK(dpr_release(runtime,i,i+1)==PS_OK);
+   OK(rt864_services_boundary(e.root));
+  }
+  NO(rt863_bootstrap_ready(e.root));
+  OK(!pr_snapshot(p,0,0,true)&&ps->dispatches==PS_MAX_SLOTS);
  }else{
   if(!strcmp(mode,"dpr"))OK(dpr_global_start(0x1000)==DPR_OK);
   else if(!strcmp(mode,"usr"))OK(usr_global_start()==USR_OK);
@@ -46,7 +69,7 @@ int main(int argc,char **argv){
   else if(!strcmp(mode,"dead-process")){uint32_t pid;struct pr_admission a={.type=PR_NATIVE_USER,.scheduler_handle=7,.page_root=0x4000,.label="dead"};OK(pr_admit(p,&a,&pid)==PR_OK);OK(pr_transition(p,pid,7,PR_RUNNING)==PR_OK);OK(pr_transition(p,pid,7,PR_EXITED)==PR_OK);}
   else assert(0);
   const struct pr_table p0=*p;const struct ws_service w0=*w;const struct dpr_service *d=dpr_global_state();const struct usr_runtime *u=usr_global();const struct nwc_service *n=nwc_global();
-  NO(rt863_bootstrap(e.root));NO(rt863_bootstrap(e.root));NO(rt863_bootstrap_ready(e.root));NO(rt858_start(&e,&v));NO(rt858_ready(e.root));
+  NO(rt863_bootstrap(e.root));NO(rt863_bootstrap(e.root));NO(rt863_bootstrap_ready(e.root));NO(rt858_start(&e,&v));NO(rt858_ready(e.root));NO(rt864_services_boundary(e.root));
   unchanged(&p0,&w0);OK(d==dpr_global_state()&&u==usr_global()&&n==nwc_global());
  }
  printf("S863 shared bootstrap HOST ONLY %s: %u positive / %u refusals PASS\n",mode,good,bad);return 0;

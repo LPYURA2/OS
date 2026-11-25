@@ -17,6 +17,9 @@ struct rt858_live {
  * describes the untouched initial service state, not general runtime health. */
 bool rt863_bootstrap(uint64_t root);
 bool rt863_bootstrap_ready(uint64_t root);
+/* Ongoing quiescent service graph; trusted live root required. Does not
+ * attest descriptors or enable user dispatch, even when true. */
+bool rt864_services_boundary(uint64_t live_root);
 bool rt858_validate(const struct rt858_expected *,const struct rt858_live *);
 /* Exactly once, fail closed after a partial initialization. No task admission,
  * IRQ activation, allocator transfer, or device I/O. */

@@ -18,6 +18,7 @@ MARKERS = (
     b'STYLEOS DESKTOP SCHEDULER READY registered=0',
     b'STYLEOS DESKTOP PROCESS SERVICE READY registered=0',
     b'STYLEOS DESKTOP WINDOW SERVICE READY registered=0',
+    b'STYLEOS DESKTOP RUNTIME BOUNDARY PASS',
     b'STYLEOS DESKTOP READY',
 )
 
@@ -66,7 +67,7 @@ def site(efi, map_text):
 
 def check_uart(raw, count):
     seen = [line for line in raw.splitlines() if line in MARKERS]
-    if seen != list(MARKERS)*count or any(line.startswith(b'STYLEOS DESKTOP RUNTIME SERVICE ERROR') for line in raw.splitlines()):
+    if seen != list(MARKERS)*count or any(line.startswith((b'STYLEOS DESKTOP RUNTIME SERVICE ERROR',b'STYLEOS DESKTOP RUNTIME BOUNDARY ERROR')) for line in raw.splitlines()):
         raise ValueError('shared bootstrap markers missing, duplicated or out of order')
     return count
 
