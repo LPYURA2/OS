@@ -8,7 +8,8 @@ struct fixture {
     unsigned calls,fail_at,command,index,commands,write_words,flushes;
     uint8_t regs[9];
     bool timeout,completion_timeout,flush_timeout;
-    unsigned completion_busy,flush_busy;
+    unsigned completion_busy,flush_busy,pauses;
+    bool pause_fail;
 };
 static bool call(struct fixture*f)
 {
@@ -53,7 +54,13 @@ static bool wr(void*p,uint16_t v)
     assert(f->command==0x30&&f->index<256);
     f->media[f->index++]=v;f->write_words++;return true;
 }
-static const struct ata_runtime_ops_863 ops={{status,reg,rd},wr};
+static bool pace(void*p)
+{
+    struct fixture*f=p;
+    assert(f->a->busy&&(f->a->phase==ATA863_WRITE_COMPLETE||f->a->phase==ATA863_FLUSH));
+    ++f->pauses;return !f->pause_fail;
+}
+static const struct ata_runtime_ops_863 ops={{status,reg,rd},wr,pace};
 static struct fixture fixture(struct ata_runtime_863 *a)
 {
     struct fixture f={.a=a};f.identify[0]=0x40;f.identify[49]=0x200;
@@ -111,5 +118,19 @@ int main(void)
     assert(!ata_runtime_flush_863(&a)&&a.quarantined&&a.pending_flush&&a.phase==ATA863_FLUSH&&a.fault==ATA863_STATUS_TIMEOUT&&a.last_status==0xc0&&a.status_polls==ATA863_COMPLETION_POLLS&&f.commands==3&&f.flushes==1);refused++;
     stopped=f.calls;
     assert(!ata_runtime_flush_863(&a)&&!ata_runtime_write_863(&a,20,in)&&!ata_runtime_read_863(&a,20,out)&&stopped==f.calls);refused+=3;
+    /* Pacing occurs only between BUSY completion polls. Last BUSY refuses
+     * without an extra delay, and pacing failure quarantines without replay. */
+    a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));
+    f.completion_busy=9;f.flush_busy=11;
+    assert(ata_runtime_write_863(&a,20,in)&&f.pauses==5&&f.commands==2);positive++;
+    assert(ata_runtime_flush_863(&a)&&f.pauses==12&&f.commands==3);positive++;
+    a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));
+    f.completion_busy=5;f.pause_fail=true;
+    assert(!ata_runtime_write_863(&a,20,in)&&a.quarantined&&a.fault==ATA863_PACING_IO&&
+           f.pauses==1&&f.commands==2&&f.write_words==256&&!a.pending_flush);refused++;
+    stopped=f.calls;assert(!ata_runtime_flush_863(&a)&&!ata_runtime_write_863(&a,20,in)&&f.calls==stopped);refused+=2;
+    a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));
+    f.completion_timeout=true;
+    assert(!ata_runtime_write_863(&a,20,in)&&f.pauses==ATA863_COMPLETION_POLLS-1&&f.commands==2);refused++;
     printf("S863 PIO write transport: %u positive, %u refusals PASS (host model only)\n",positive,refused);
 }

@@ -103,7 +103,18 @@ static bool pio_writeword863(void *ctx,uint16_t v){
  struct pio863*p=ctx;if(!p||!p->writable||!p->ata.busy||!ata857_live_check(p->live))return false;
  out16(0x170,v);return true;
 }
-static const struct ata_runtime_ops_863 pio_ops863={{pio_status863,pio_reg863,pio_readword863},pio_writeword863};
+/* Pace only the already-issued WRITE/FLUSH completion on the bounded
+ * QEMU PIO fixture. Every next status sample still revalidates PCI/DMA.
+ * PAUSE count is not a calibrated wall-clock deadline. */
+static bool pio_pause863(void *ctx){
+ struct pio863*p=ctx;
+ if(!p||!p->live||!p->writable||!p->ata.busy||
+    (p->ata.phase!=ATA863_WRITE_COMPLETE&&p->ata.phase!=ATA863_FLUSH)||
+    read_cr3()!=p->live->root||(flags()&0x200))return false;
+ for(unsigned i=0;i<256;i++)__asm__ volatile("pause":::"memory");
+ return read_cr3()==p->live->root&&!(flags()&0x200);
+}
+static const struct ata_runtime_ops_863 pio_ops863={{pio_status863,pio_reg863,pio_readword863},pio_writeword863,pio_pause863};
 static bool pio_observe863(void *ctx,struct storage_obs_863 *o){
  struct pio863*p=ctx;
  if(!p||!o||!p->ata.bound||p->ata.quarantined||!ata857_live_check(p->live))return false;

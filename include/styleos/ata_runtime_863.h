@@ -6,6 +6,8 @@
 struct ata_runtime_ops_863 {
     struct ata857_ops read_ops;
     bool (*write_data)(void *,uint16_t);
+    /* Optional finite pacing after BUSY completion samples, never reissue I/O. */
+    bool (*completion_pause)(void *);
 };
 /* Completion of the already issued WRITE/FLUSH may wait for host I/O.
  * Only those two completion waits receive this larger finite poll budget.
@@ -17,7 +19,7 @@ enum ata863_fault {
     ATA863_NONE, ATA863_IDENTIFY, ATA863_FLUSH_UNSUPPORTED,
     ATA863_STATUS_IO, ATA863_STATUS_INVALID, ATA863_STATUS_ERROR,
     ATA863_STATUS_TIMEOUT, ATA863_REGISTER_IO, ATA863_DATA_IO,
-    ATA863_READ_TRANSFER
+    ATA863_READ_TRANSFER, ATA863_PACING_IO
 };
 enum ata863_phase {
     ATA863_IDLE, ATA863_BIND, ATA863_READ, ATA863_WRITE_SETUP,

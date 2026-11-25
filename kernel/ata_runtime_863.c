@@ -26,7 +26,11 @@ static bool wait_status(struct ata_runtime_863 *a,bool data,unsigned budget)
         ++a->status_polls;
         uint8_t s;
         if(!sample(a,&s))return false;
-        if(s&BSY)continue;
+        if(s&BSY){
+            if(budget==ATA863_COMPLETION_POLLS&&i+1<budget&&a->ops->completion_pause&&
+               !a->ops->completion_pause(a->ctx))return fault(a,ATA863_PACING_IO);
+            continue;
+        }
         if(s&(DF|ERR))return fault(a,ATA863_STATUS_ERROR);
         if((s&DRDY)&&!!(s&DRQ)==data)return true;
     }
