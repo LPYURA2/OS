@@ -22,6 +22,12 @@ enum ps_status rt862_bank_admit(struct rt862_bank *,struct dpr_service *,uint64_
 /* Architecture must first revoke/scrub mappings, lease and FP state. */
 enum ps_status rt862_bank_release(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint32_t,uint64_t,uint64_t);
 #ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
+/* Admission from a trusted loader's already audited initial context.
+ * Fixed S846 address bounds; no user pointer, loader or mapping authority.
+ * The scheduler is quiescent. Validate before publishing PID or context.
+ * Failure preserves registry, bank and output. */
+enum ps_status rt863_bank_admit_initial(struct rt862_bank *,struct dpr_service *,
+ uint64_t,unsigned,uint64_t,uint64_t,const char *,const struct up_context *,uint32_t *);
 /* Supervisor-only, after authenticated safe-root return and FP suspension.
  * Nonterminal INT80 range/yield/unknown; no user-memory copy or I/O. */
 enum ps_status rt863_bank_syscall(struct rt862_bank *,struct dpr_service *,

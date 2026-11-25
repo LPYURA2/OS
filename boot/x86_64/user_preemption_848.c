@@ -171,9 +171,18 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 static void sparse_admit862(unsigned id,const struct s846_root child[2],uint64_t safe){
  if(root848()!=safe||(flags848()&0x200)||runtime860->dispatcher.current!=-1||pr_snapshot(pr_global(),0,0,true)!=id||ws_snapshot(ws_global(),0,0)!=id)fail848("862-sparse-before");
  if(id){const struct pr_entry *a=pr_find(pr_global(),pid860[0]);if(!a||a->state!=PR_READY||a->cpu_ticks!=(EXTRA_DISPATCH848?0u:1u)||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+1)fail848("862-sparse-A");}
- if(rt862_bank_admit(&bank862,runtime860,safe,id,handle860[id],child[id].built.root,id?"S860 B":"S860 A",&pid860[id])!=PS_OK||pr_account(pr_global(),pid860[id],handle860[id],0,3*P)!=PR_OK||ws_open_app(ws_global(),pr_global(),pid860[id],id?"S860 B":"S860 A",(struct ws_bounds){0,0,400,300},&win860[id])!=WS_OK)fail848("862-sparse-admit");
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+ struct up_context initial={.pc=S846_CODE,.sp=S846_STACK+P,.status=2,.cs=bank862.cs,.ss=bank862.ss};
+ for(unsigned j=0;j<15;j++)initial.gpr[j]=pattern848(id,j);
+ enum ps_status admission=rt863_bank_admit_initial(&bank862,runtime860,safe,id,handle860[id],child[id].built.root,id?"S860 B":"S860 A",&initial,&pid860[id]);
+#else
+ enum ps_status admission=rt862_bank_admit(&bank862,runtime860,safe,id,handle860[id],child[id].built.root,id?"S860 B":"S860 A",&pid860[id]);
+#endif
+ if(admission!=PS_OK||pr_account(pr_global(),pid860[id],handle860[id],0,3*P)!=PR_OK||ws_open_app(ws_global(),pr_global(),pid860[id],id?"S860 B":"S860 A",(struct ws_bounds){0,0,400,300},&win860[id])!=WS_OK)fail848("862-sparse-admit");
  if(!id&&ws_set_minimized(ws_global(),pid860[id],win860[id],true)!=WS_OK)fail848("862-sparse-window");
+#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
  for(unsigned j=0;j<15;j++)bank862.slots[id].context.gpr[j]=pattern848(id,j);
+#endif
  arch_puts("STYLEOS S862S ADMIT");fld848("id",id);fld848("pid",pid860[id]);fld848("handle",handle860[id]);fld848("root",child[id].built.root);fld848("safe",safe);fld848("dispatches",runtime860->dispatcher.dispatches);fld848("processes",pr_snapshot(pr_global(),0,0,true));fld848("windows",ws_snapshot(ws_global(),0,0));arch_putc('\n');
 }
 #endif

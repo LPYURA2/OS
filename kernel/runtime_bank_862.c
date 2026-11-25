@@ -105,6 +105,29 @@ enum ps_status rt862_bank_release(struct rt862_bank *b,struct dpr_service *d,uin
 
 #ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
 #include <styleos/user_copy_772.h>
+enum ps_status rt863_bank_admit_initial(struct rt862_bank *b,struct dpr_service *d,
+ uint64_t live,unsigned slot,uint64_t handle,uint64_t child,const char *name,
+ const struct up_context *initial,uint32_t *pid)
+{
+ /* Validate all independently owned objects before reading initial or
+  * changing the registry. Copy once under the serialized supervisor. */
+ if(!layout(b,d,initial,sizeof *initial,_Alignof(struct up_context),
+            pid,sizeof *pid,_Alignof(uint32_t))||
+    !binding(b,d)||live!=b->safe||d->dispatcher.current!=-1||
+    slot>=PS_MAX_SLOTS)return PS_EVIDENCE;
+ const struct up_context proposed=*initial;
+ if(!context(b,&proposed)||proposed.status!=2||(proposed.sp&15u))
+    return PS_EVIDENCE;
+ uint32_t assigned=0;
+ enum ps_status status=rt862_bank_admit(b,d,live,slot,handle,child,name,&assigned);
+ if(status!=PS_OK)return status;
+ /* No further fallible operation and no dispatch can interleave here.
+  * The sole published context is the validated loader-supplied state. */
+ b->slots[slot].context=proposed;
+ *pid=assigned;
+ return PS_OK;
+}
+
 /* Supervisor receipt after actual trap, safe-root restoration and FP save.
  * RANGE only validates a user interval; no user dereference. A returning
  * syscall is a scheduling boundary: save the result, transition to READY,

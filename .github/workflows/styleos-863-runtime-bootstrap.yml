@@ -77,6 +77,13 @@ jobs:
             "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_TICK_860 -DSTYLEOS_TEST_RUNTIME_SYSCALL_863 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_mixed_863.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/s863-host/mixed-$cc"
             "build/s863-host/mixed-$cc" | tee "build/s863-host/mixed-$cc.log"
           done
+      - name: Trusted initial context atomic admission and refusal matrix
+        run: |
+          set -euo pipefail
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_TICK_860 -DSTYLEOS_TEST_RUNTIME_SYSCALL_863 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_initial_863.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/s863-host/initial-$cc"
+            "build/s863-host/initial-$cc" | tee "build/s863-host/initial-$cc.log"
+          done
       - name: Build ordinary Desktop and verify linked shared-bootstrap calls
         run: |
           set -euo pipefail
