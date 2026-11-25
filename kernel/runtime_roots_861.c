@@ -7,14 +7,7 @@ static bool tables_apart(const struct pg_plan *a,const struct pg_plan *b){
  return apart(a->tables_pa,a->capacity*P,b->tables_pa,b->capacity*P)&&
         apart((uintptr_t)a->tables,a->capacity*P,(uintptr_t)b->tables,b->capacity*P);
 }
-bool rt861_roots_audit(const struct s842_root *base,const struct s850_gop_request *req,
- const struct s844_arena *arena,const struct s844_lease leases[2],const struct s846_guard *guard,
- const struct s850_desktop_root *desktop,const struct s846_root *a,const struct s846_root *b){
- if(!base||!req||!arena||!leases||!guard||!desktop||!a||!b)return false;
- /* Reuse the complete existing tree/cache/lease audits with identical base
-  * and guard evidence; do not introduce another page table builder. */
- if(!s850_desktop_audit_guarded(base,req,guard,desktop)||
-    !s846_audit_pair(base,req->cache,arena,leases,guard,a,b))return false;
+static bool cross(const struct s844_arena *arena,const struct s850_desktop_root *desktop,const struct s846_root *a,const struct s846_root *b){
  const struct pg_plan *d=&desktop->plan;
  if(!tables_apart(d,&a->plan)||!tables_apart(d,&b->plan)||
     !apart(d->tables_pa,d->capacity*P,arena->base,S844_BYTES)||
@@ -30,3 +23,21 @@ bool rt861_roots_audit(const struct s842_root *base,const struct s850_gop_reques
  }
  return true;
 }
+
+bool rt861_roots_audit(const struct s842_root *base,const struct s850_gop_request *req,
+ const struct s844_arena *arena,const struct s844_lease leases[2],const struct s846_guard *guard,
+ const struct s850_desktop_root *desktop,const struct s846_root *a,const struct s846_root *b){
+ if(!base||!req||!arena||!leases||!guard||!desktop||!a||!b)return false;
+ /* Reuse the complete existing tree/cache/lease audits with identical base
+  * and guard evidence; do not introduce another page table builder. */
+ if(!s850_desktop_audit_guarded(base,req,guard,desktop)||
+    !s846_audit_pair(base,req->cache,arena,leases,guard,a,b))return false;
+ return cross(arena,desktop,a,b);
+}
+
+#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+bool rt861_roots_audit_frozen(const struct s842_root *base,const struct s842_cache *cache,const struct s850_gop_plan *proof,const struct boot_memory_evidence *e,const struct s844_arena *arena,const struct s844_lease leases[2],const struct s846_guard *guard,const struct s850_desktop_root *desktop,const struct s846_root *a,const struct s846_root *b){
+ return base&&cache&&proof&&e&&arena&&leases&&guard&&desktop&&a&&b&&
+  s850_desktop_audit_frozen_861(base,cache,proof,e,guard,desktop)&&s846_audit_pair(base,cache,arena,leases,guard,a,b)&&cross(arena,desktop,a,b);
+}
+#endif

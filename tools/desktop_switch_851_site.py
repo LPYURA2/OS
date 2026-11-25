@@ -3,7 +3,7 @@ import re
 from fault_site import _range, _unpack
 
 
-def bp_site(data, map_text):
+def bp_site(data, map_text, symbol="s851_bp_return"):
     if _range(data, 0, 64, 'DOS header')[:2] != b'MZ':
         raise ValueError('DOS magic')
     pe, = _unpack('<I', data, 60, 'PE pointer')
@@ -22,10 +22,10 @@ def bp_site(data, map_text):
     if '\0' in map_text:
         raise ValueError('map NUL')
     bases = re.findall(r'^\s*Preferred load address is ([0-9a-fA-F]{16})\s*$', map_text, re.M)
-    rows = [line for line in map_text.splitlines() if 's851_bp_return' in line.split()]
+    rows = [line for line in map_text.splitlines() if symbol in line.split()]
     if len(bases) != 1 or int(bases[0], 16) != base or len(rows) != 1:
         raise ValueError('map provenance')
-    m = re.fullmatch(r'\s*([0-9a-fA-F]{4}):([0-9a-fA-F]{8})\s+s851_bp_return\s+([0-9a-fA-F]{16})\s+boot_x86_64_desktop_preflight_850\.o\s*', rows[0])
+    m = re.fullmatch(r'\s*([0-9a-fA-F]{4}):([0-9a-fA-F]{8})\s+'+re.escape(symbol)+r'\s+([0-9a-fA-F]{16})\s+boot_x86_64_desktop_preflight_850\.o\s*', rows[0])
     if not m:
         raise ValueError('map symbol row')
     seg, rel, absolute = (int(v,16) for v in m.groups())
@@ -46,4 +46,4 @@ def bp_site(data, map_text):
         raise ValueError('symbol must be in executable non-writable section')
     if _range(data,ro+rel-1,1,'INT3')!=b'\xcc':
         raise ValueError('return symbol does not immediately follow INT3')
-    return {'symbol':'s851_bp_return','rva':rva,'preferred_base':base,'int3_offset':ro+rel-1}
+    return {'symbol':symbol,'rva':rva,'preferred_base':base,'int3_offset':ro+rel-1}

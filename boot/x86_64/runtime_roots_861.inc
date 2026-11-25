@@ -1,0 +1,63 @@
+/* S861 diagnostic only: included after the S851 hardware helpers. No CPL3
+ * dispatch or new grants. All objects are image-owned, single CPU, IF=0. */
+#include <styleos/runtime_roots_861.h>
+static _Alignas(4096) uint64_t child_tables861[2][PG_TABLE_PAGES][512];
+static struct s846_root children861[2];
+static struct s850_gop_plan frozen861;
+static const struct s842_root *base861;
+static bool preflight861(struct pg_experiment *p,const struct s842_root *base,const struct s850_gop_request *req){
+ if(base861||read_cr3()!=p->old_root||arch_paging_attest_image_writable(p,(uintptr_t)child_tables861,sizeof child_tables861)!=PG_OK||!s850_gop_prepare(req,&frozen861))return false;
+ base861=base;return true;
+}
+static struct rt858_live capture861(void){
+ struct rt858_live v={0};struct s851_dt g,d;
+ __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3;mov %%rsp,%4;mov %%cr0,%5":"=m"(g),"=m"(d),"=r"(v.tr),"=r"(v.cs),"=r"(v.rsp),"=r"(v.cr0)::"memory");
+ v.root=read_cr3();v.gdt=g.base;v.idt=d.base;v.gdt_limit=g.limit;v.idt_limit=d.limit;v.cr4=reg4();v.efer=read_msr(0xc0000080);v.rflags=flags();return v;
+}
+static bool boundary861(const struct dpr_service *d,const struct s842_cache *cache){
+ struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&rt858_ready(v.root);
+}
+static void zero861(void *p,size_t n){volatile unsigned char *b=p;for(size_t i=0;i<n;i++)b[i]=0;}
+static bool iszero861(uint64_t p,size_t n){const volatile unsigned char *b=(const void *)(uintptr_t)p;for(size_t i=0;i<n;i++)if(b[i])return false;return true;}
+static __attribute__((noinline)) void roundtrip861(unsigned i,uint64_t root,uint64_t safe,uint64_t *out){
+ uint64_t pc,sp;
+ __asm__ volatile("mov %0,%%cr3"::"r"(root):"memory");
+ if(read_cr3()!=root||flags()&0x200)fail("861-child-live");
+ uint64_t value=*(volatile uint64_t *)(uintptr_t)S846_DATA;
+ *(volatile uint64_t *)(uintptr_t)S846_DATA=value^UINT64_C(0x86100000);
+ s851_frame_address=0;
+ __asm__ volatile("leaq s861_bp_return(%%rip),%0;mov %%rsp,%1;int3;.global s861_bp_return;s861_bp_return:":"=&r"(pc),"=&r"(sp)::"memory");
+ if(read_cr3()!=root||s851_frame_address!=S846_IST+4096-16-40||s851_frame[0]!=pc||s851_frame[3]!=sp||s851_frame[2]&0x200)fail("861-child-ist");
+ __asm__ volatile("mov %0,%%cr3"::"r"(safe):"memory");
+ if(read_cr3()!=safe||value!=UINT64_C(0x86110000)+i)fail("861-child-return");
+ out[0]=pc;out[1]=sp;out[2]=value;out[3]=s851_frame[1];out[4]=s851_frame[2];
+}
+static void guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena,const struct desktop_surface *s,uint64_t before){
+ const uint64_t safe=composed.built.root;const struct dpr_service *d=dpr_global_state();
+ struct s844_lease l[2];unsigned used;
+ if(!base861||!arena||!boundary861(d,cache)||!s844_count(arena,&used)||used||arena->next!=4||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("861-admit");
+ for(unsigned i=0;i<2;i++){
+  if(!s844_acquire(arena,i?S846_OWNER_B:S846_OWNER_A,3,&l[i])||!iszero861(l[i].pa,3*4096))fail("861-lease");
+  *(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)=UINT64_C(0x86110000)+i;
+ }
+ for(unsigned i=0;i<2;i++)if(!s846_build(base861,cache,arena,l,i,guard,child_tables861[i],(uintptr_t)child_tables861[i],&children861[i]))fail("861-build");
+ if(!rt861_roots_audit_frozen(base861,cache,&frozen861,p->evidence,arena,l,guard,&composed,&children861[0],&children861[1]))fail("861-audit");
+ arch_puts("STYLEOS S861 ROOTS");field("safe",safe);field("a",children861[0].built.root);field("b",children861[1].built.root);field("pa-a",l[0].pa);field("pa-b",l[1].pa);field("gen-a",l[0].generation);field("gen-b",l[1].generation);arch_putc('\n');
+ for(unsigned i=0;i<2;i++){
+  if(!boundary861(d,cache)||!rt861_roots_audit_frozen(base861,cache,&frozen861,p->evidence,arena,l,guard,&composed,&children861[0],&children861[1]))fail("861-before-switch");
+  uint64_t r[5];roundtrip861(i,children861[i].built.root,safe,r);
+  uint64_t own=*(volatile uint64_t *)(uintptr_t)(l[i].pa+4096),other=*(volatile uint64_t *)(uintptr_t)(l[1-i].pa+4096);
+  uint64_t wantother=UINT64_C(0x86110000)+(1-i);if(i)wantother^=UINT64_C(0x86100000);
+  if(own!=(r[2]^UINT64_C(0x86100000))||other!=wantother||!boundary861(d,cache)||!rt861_roots_audit_frozen(base861,cache,&frozen861,p->evidence,arena,l,guard,&composed,&children861[0],&children861[1]))fail("861-after-switch");
+  arch_puts("STYLEOS S861 SWITCH");field("id",i);field("child",children861[i].built.root);field("safe",read_cr3());field("rip",r[0]);field("rsp",r[1]);field("cs",r[3]);field("flags",r[4]);field("frame",s851_frame_address);field("own",own);field("other",other);arch_putc('\n');
+ }
+ zero861(children861,sizeof children861);zero861(child_tables861,sizeof child_tables861);
+ if(!iszero861((uintptr_t)child_tables861,sizeof child_tables861))fail("861-table-zero");
+ for(unsigned i=0;i<2;i++)if(!s844_release(arena,i?S846_OWNER_B:S846_OWNER_A,l[i])||!iszero861(l[i].pa,3*4096))fail("861-release");
+ if(!s844_count(arena,&used)||used||!boundary861(d,cache)||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("861-final");
+ uint64_t after=UINT64_C(14695981039346656037);const volatile uint32_t *fb=(const void *)(uintptr_t)s->base;
+ for(size_t i=0;i<(size_t)s->width*s->height;i++){uint32_t pixel=fb[i];for(unsigned b=0;b<4;b++){after^=(pixel>>(8*b))&255u;after*=UINT64_C(1099511628211);}}
+ if(after!=before||!boundary861(d,cache))fail("861-frame");
+ arch_puts("STYLEOS S861 CLEAN");field("safe",safe);field("used",used);field("next",arena->next);field("tables-zero",1);field("leases-zero",1);field("fnv",after);arch_putc('\n');
+ arch_puts("STYLEOS S861 POLICY cpl0-only=yes shared-desktop=yes inherited-return=no cpl3=no timer=no production-cr3=deny\n");
+}

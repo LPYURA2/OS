@@ -17,4 +17,9 @@ bool s850_desktop_audit(const struct s842_root *,const struct s850_gop_request *
  * audit must use the same independently attested frame identities. */
 bool s850_desktop_build_guarded(const struct s842_root *,const struct s850_gop_request *,const struct s846_guard *,uint64_t (*)[512],uint64_t,struct s850_desktop_root *);
 bool s850_desktop_audit_guarded(const struct s842_root *,const struct s850_gop_request *,const struct s846_guard *,const struct s850_desktop_root *);
+#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+/* Only with the exact pre-transition GOP proof, owned memory evidence and
+ * unchanged cache/PCI configuration; never re-read inherited tables. */
+bool s850_desktop_audit_frozen_861(const struct s842_root *,const struct s842_cache *,const struct s850_gop_plan *,const struct boot_memory_evidence *,const struct s846_guard *,const struct s850_desktop_root *);
+#endif
 #endif

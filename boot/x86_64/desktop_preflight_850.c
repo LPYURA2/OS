@@ -123,6 +123,9 @@ static bool same_cache(const struct s842_cache *c){if(read_msr(0x277)!=c->pat||r
 static bool identity(uint64_t va,unsigned rights){struct pg_lookup x;return pg_lookup(&composed.plan,va,&x)==PG_OK&&x.pa==va&&x.flags==rights;}
 static bool absent(uint64_t va){struct pg_lookup x;return pg_lookup(&composed.plan,va,&x)==PG_RANGE;}
 static uint64_t bytes64(const unsigned char *p){uint64_t v=0;for(unsigned i=0;i<8;i++)v|=(uint64_t)p[i]<<(8*i);return v;}
+#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+#include "runtime_roots_861.inc"
+#endif
 static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,const struct desktop_surface *s,uint64_t gdt,uint64_t idt,uint64_t tss,uint64_t rsp0,uint16_t limit,uint16_t selector){
  uint16_t cs,tr;uint64_t rsp,cr0;__asm__ volatile("mov %%cs,%0;str %1;mov %%rsp,%2;mov %%cr0,%3":"=r"(cs),"=r"(tr),"=r"(rsp),"=r"(cr0));
  uint64_t cr4=reg4(),target=composed.built.root,bridge_pa=(uintptr_t)bridge;
@@ -200,6 +203,9 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  for(uint64_t a=arena858.start;a<arena858.end;a++)if(*(volatile const unsigned char *)(uintptr_t)a)fail("858-arena-after-zero");
  arch_puts("STYLEOS S858 ARENA");field("root",target);field("base",arena858.start);field("pages",S844_PAGES);field("used",used858);field("next",allocator858->next);field("zero",1);arch_putc('\n');
  arch_puts("STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+ guest861(p,cache,guard,allocator858,s,hash);
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_IRQ_859
  if(read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("859-map-context");
  if(!irq859_uc_page(&composed.plan,&composed.built,cache,0xfee00000))fail("859-map-lapic-uc");
@@ -423,6 +429,9 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
  if(!capture(surface,&bar,&mask,&dev,&fn,&command))fail("vga-bar");
  struct s850_gop_request req={boot,p->evidence,surface,&bar,mask,0,cache,p->old_root,s850_read_inherited_entry,p};
  if(!s850_desktop_build_guarded(base,&req,guard,tables,(uintptr_t)tables,&composed)||!s850_desktop_audit_guarded(base,&req,guard,&composed))fail("tree");
+#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+ if(!preflight861(p,base,&req))fail("861-preflight");
+#endif
  const uint64_t desc[]={gdt,idt,tss,rsp0};
  for(unsigned i=0;i<4;i++){
   struct pg_lookup x;
