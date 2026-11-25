@@ -14,7 +14,7 @@ def parse(line,tag,keys):
     if not match:raise ValueError('S848 schema '+tag)
     return dict(zip(keys,(int(v,16) for v in match.groups())))
 
-def verify_stage(lines,obs,*,fx=False):
+def verify_stage(lines,obs,*,fx=False,before_tag=b'STYLEOS S847 POLICY ',after_tag=b'STYLEOS S846 CLEAN '):
     prefix=19 if fx else 0
     policy=POLICY.replace(b'integer-only=yes',b'integer-only=no') if fx else POLICY
     rec=[x for x in lines if x.startswith(b'STYLEOS S848 ')]
@@ -48,8 +48,8 @@ def verify_stage(lines,obs,*,fx=False):
         progress[id]=b['ab'[id]];backs.append(b)
     total=parse(rec[i],'TOTAL',('ticks','a','b','config-restored','timer-stopped'));i+=1
     if i!=24 or tuple(total.values())!=(8,3,5,1,1) or ticks!=8 or local!=[3,5]:raise ValueError('S848 totals')
-    before=next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S847 POLICY '))
-    after=next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S846 CLEAN '))
+    before=next(j for j,x in enumerate(lines) if x.startswith(before_tag))
+    after=next(j for j,x in enumerate(lines) if x.startswith(after_tag))
     indices=[before]+[lines.index(x) for x in rec]+[after]
     if any(x>=y for x,y in zip(indices,indices[1:])):raise ValueError('S848 phase order')
     return dict(user_preempt_verified=True,user_preempt_admission=admit,user_preempt_stop=stop,user_preempt_ready=r,user_preempt_ticks=seen,user_preempt_returns=backs,user_preempt_ends=ends,user_preempt_total=total)

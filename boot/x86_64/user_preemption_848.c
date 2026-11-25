@@ -7,6 +7,9 @@
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860
 #include <styleos/runtime_tick_860.h>
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+#include <styleos/runtime_entry_858.h>
+#endif
 static struct dpr_service *runtime860;
 static struct s847_raw pending860,saved860[2];
 static uint64_t frame860,handle860[2];
@@ -18,6 +21,14 @@ static bool receipt860,have860[2];
 #define BIT 0x10000u
 #define COUNT 5000000u
 struct desc848 {uint16_t limit;uint64_t base;}__attribute__((packed));
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+static struct rt858_live live848(void){
+ struct rt858_live v={0};struct desc848 g,d;
+ __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3;mov %%rsp,%4;mov %%cr0,%5;mov %%cr4,%6;mov %%cr3,%7;pushfq;popq %8":"=m"(g),"=m"(d),"=r"(v.tr),"=r"(v.cs),"=r"(v.rsp),"=r"(v.cr0),"=r"(v.cr4),"=r"(v.root),"=r"(v.rflags)::"memory");
+ uint32_t lo,hi;__asm__ volatile("rdmsr":"=a"(lo),"=d"(hi):"c"(0xc0000080));v.efer=((uint64_t)hi<<32)|lo;
+ v.gdt=g.base;v.idt=d.base;v.gdt_limit=g.limit;v.idt_limit=d.limit;return v;
+}
+#endif
 struct gate848 {uint16_t lo,cs;uint8_t ist,type;uint16_t mid;uint32_t hi,zero;}__attribute__((packed));
 static _Alignas(16) struct gate848 idt848[256];
 static struct s847_control ctl848;
@@ -47,6 +58,9 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
  if(!s849_guest_suspend((unsigned)id,root,f->vector!=V))fail848("fx-suspend");
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+ arch_puts("STYLEOS S861T FRAME");fld848("step",runtime860->dispatcher.dispatches-1);fld848("flags",f->rflags);arch_putc('\n');
+#endif
  if(f->vector==V){
   uint32_t isr=rd848(0x120);uint64_t p=word848(S846_DATA);
   if(!armed848||rd848(0x390)||f->rip<sites848[id][0]||f->rip>=sites848[id][1]||f->rsp!=S846_STACK+P||p<=progress848[id]||word848(S846_DATA+8))fail848("tick-progress");
@@ -71,10 +85,18 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  if(!s848_user_trap(&ctl848,f,(uintptr_t)f,cr2,root,flags848(),&d)||d.action!=(id?S847_EXIT:S847_FAULT))fail848("terminal-model");
  arch_puts("STYLEOS S848 END");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("vector",f->vector);fld848("error",f->error);fld848("cr2",id?0:cr2);fld848("state",ctl848.slot[id].state);fld848("ticks",ticks848);arch_putc('\n');return 0;
 }
-void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2],uint64_t safe,uint64_t admitted_lapic){
+void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2],uint64_t safe,uint64_t admitted_lapic
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+ ,bool (*audit)(void *),void *opaque
+#endif
+){
  struct desc848 g0={0},i0={0},check={0};uint16_t tr,cs;struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  if(root848()!=safe||(flags848()&0x200)||active848||!acpi806_copy_capture(&topo)||topo.enabled_lapics!=1||topo.lapic_physical!=admitted_lapic||!(apic&0x800)||(apic&0x400)||(apic&UINT64_C(0xfffff000))!=admitted_lapic||in848(0x21)!=0xff||in848(0xa1)!=0xff)fail848("apic-admission");
  lapic848=admitted_lapic;
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+ struct rt858_live original=live848();runtime860=rt861_dispatcher(&original);
+ if(!runtime860||!audit||!audit(opaque))fail848("861-timer-join");
+#endif
  __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3":"=m"(g0),"=m"(i0),"=r"(tr),"=r"(cs));
  for(unsigned i=0;i<2;i++)if(!writable848(&child[i],lapic848,P)||!writable848(&child[i],g0.base,P)||!writable848(&child[i],(uintptr_t)idt848,sizeof idt848))fail848("mapping");
  uint32_t lvt=rd848(0x320),div=rd848(0x3e0),tpr=rd848(0x80),svr=rd848(0xf0);
@@ -107,7 +129,11 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
  if(!s849_guest_init(child,safe))fail848("fx-mode");
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860
+#ifndef STYLEOS_TEST_RUNTIME_TIMER_861
  if(dpr_global_start(safe)!=DPR_OK||!(runtime860=dpr_tick_global_860()))fail848("860-runtime-start");
+#else
+ __asm__ volatile("lidt %0;lgdt %1"::"m"(i0),"m"(g0):"memory");
+#endif
  for(unsigned i=0;i<2;i++){
   if(!leases[i].generation||leases[i].pages!=3||leases[i].owner!=(i?S846_OWNER_B:S846_OWNER_A)||!child[i].ready)fail848("860-lease");
   handle860[i]=leases[i].generation;
@@ -116,13 +142,23 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
  if(ws_set_minimized(ws_global(),pid860[0],win860[0],true)!=WS_OK)fail848("860-minimize");
  arch_puts("STYLEOS S860 READY");fld848("safe",safe);fld848("pid-a",pid860[0]);fld848("pid-b",pid860[1]);fld848("handle-a",handle860[0]);fld848("handle-b",handle860[1]);fld848("win-a",win860[0]);fld848("win-b",win860[1]);arch_putc('\n');
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+ arch_puts("STYLEOS S861T READY");fld848("safe",safe);fld848("idt",(uintptr_t)idt848);fld848("cs",sel.cs);fld848("ss",sel.ss);fld848("limit",sel.limit);arch_putc('\n');
+#endif
  active848=true;
  arch_puts("STYLEOS S848 READY");fld848("safe",safe);fld848("a",child[0].built.root);fld848("b",child[1].built.root);fld848("lapic",lapic848);fld848("cs",sel.cs);fld848("ss",sel.ss);fld848("a-loop-end",sites848[0][1]);fld848("b-loop-end",sites848[1][1]);fld848("a-fault",sites848[0][2]);fld848("b-exit",sites848[1][2]);fld848("count",COUNT);arch_putc('\n');
  for(unsigned step=0;step<10;step++){
   static const unsigned order[10]={0,1,0,1,0,1,0,1,1,1};unsigned id;struct up_context ctx;uint64_t sp0,sp1;
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+  struct rt858_live boundary=live848();
+  if(rt861_dispatcher(&boundary)!=runtime860||!audit(opaque))fail848("861-timer-before");
+#endif
   unsigned chosen;uint32_t chosen_pid;
   if(receipt860||dpr_dispatch(runtime860,&chosen,&chosen_pid)!=PS_OK||chosen>1||chosen_pid!=pid860[chosen])fail848("860-dispatch");
+#endif
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+  __asm__ volatile("lgdt %0;lidt %1"::"m"(g),"m"(d):"memory");
 #endif
   if(!s848_user_dispatch(&ctl848,root848(),&id,&ctx)||id!=order[step]||armed848||rd848(0x390)||(rd848(0x120)&BIT)||(rd848(0x220)&BIT))fail848("dispatch");
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860
@@ -144,6 +180,11 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
   uint64_t a=word848(leases[id].pa+P),b=word848(leases[1-id].pa+P);
   if(root848()!=safe||(flags848()&0x200)||sp0!=sp1||armed848||ctl848.current!=-1||ctl848.slot[id].state!=(terminal?(id?S847_EXITED:S847_FAULTED):S847_READY)||b!=progress848[1-id]||a<progress848[id]||(!terminal&&a!=progress848[id]))fail848("safe-return");
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+  __asm__ volatile("lidt %0;lgdt %1"::"m"(i0),"m"(g0):"memory");
+  struct rt858_live returned=live848();
+  if(returned.root!=safe||returned.gdt!=original.gdt||returned.idt!=original.idt||returned.gdt_limit!=original.gdt_limit||returned.idt_limit!=original.idt_limit||returned.tr!=original.tr||returned.cs!=original.cs||(returned.rflags&0x200)||!audit(opaque))fail848("861-timer-restore");
+#endif
   const struct pr_entry *pe=pr_find(pr_global(),pid860[id]);
   if(!pe||pe->state!=PR_RUNNING||pe->resident_bytes!=3*P||!ws_find(ws_global(),win860[id]))fail848("860-before-event");
   if(terminal){
@@ -158,6 +199,10 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
   }
   pe=pr_find(pr_global(),pid860[id]);const struct ws_window *window=ws_find(ws_global(),win860[id]);
   if(!pe||pe->cpu_ticks!=local848[id]||pe->resident_bytes!=3*P||pe->state!=(terminal?(id?PR_EXITED:PR_FAULTED):PR_READY)||runtime860->dispatcher.current!=-1||(terminal?window!=0:(!window||window->minimized!=(id==0)))||ws_snapshot(ws_global(),0,0)!=(step<6?2u:step<9?1u:0u))fail848("860-event-state");
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+  struct rt858_live after=live848();if(rt861_dispatcher(&after)!=runtime860)fail848("861-timer-after");
+  arch_puts("STYLEOS S861T BOUNDARY");fld848("step",step);fld848("safe",after.root);fld848("gdt",after.gdt);fld848("idt",after.idt);fld848("pid",pid860[id]);arch_putc('\n');
+#endif
   arch_puts("STYLEOS S860 EVENT");fld848("step",step);fld848("id",id);fld848("pid",pid860[id]);fld848("handle",handle860[id]);fld848("dispatch",runtime860->dispatcher.dispatches);fld848("safe",safe);fld848("root",child[id].built.root);fld848("ticks",pe->cpu_ticks);fld848("state",pe->state);fld848("resident",pe->resident_bytes);fld848("window",window?window->id:0);fld848("minimized",window?window->minimized:0);arch_putc('\n');
 #endif
   progress848[id]=a;

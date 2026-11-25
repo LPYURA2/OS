@@ -1,0 +1,26 @@
+name: StyleOS 861 LAPIC and FP on shared Desktop runtime
+on:
+  push:
+    branches: [feature/styleos-runtime-join-861]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU and OVMF build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Actual LAPIC ticks, FP contexts, shared dispatcher and preserved Desktop
+        run: python3 tools/test_runtime_timer_861_guest.py --output build/s861-timer
+      - name: Preserve original guest evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-861-timer-guest
+          path: build/s861-timer/
+          if-no-files-found: warn

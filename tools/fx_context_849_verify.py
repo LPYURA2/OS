@@ -12,7 +12,7 @@ def parse(line,tag,keys):
     if not m:raise ValueError('S849 schema '+tag)
     return dict(zip(keys,(int(x,16) for x in m.groups())))
 
-def verify_fx(lines,obs):
+def verify_fx(lines,obs,*,after_tag=b'STYLEOS S846 CLEAN '):
     rec=[x for x in lines if x.startswith(b'STYLEOS S849 ')]
     if len(rec)!=14 or rec[-2:]!=[CLEAN,POLICY]:raise ValueError('S849 records/policy')
     mode=parse(rec[0],'MODE',('ecx','edx','cr0','cr4'))
@@ -33,7 +33,7 @@ def verify_fx(lines,obs):
         previous=s848[2+2*step][0];event=s848[3+2*step][0];back=s848[4+2*step][0]
         if not previous<indices[2+step]<event<back:raise ValueError('S849 capture ordering')
         captures.append(v)
-    after=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S846 CLEAN '))
+    after=next(i for i,x in enumerate(lines) if x.startswith(after_tag))
     if counts!=[4,6] or not s848[22][0]<indices[-2]<s848[23][0]<s848[24][0]<indices[-1]<after:raise ValueError('S849 cleanup ordering')
     return dict(fx_context_verified=True,fx_mode=mode,fx_ready=ready,fx_captures=captures,fx_scrubbed=True)
 
