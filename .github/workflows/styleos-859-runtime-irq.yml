@@ -29,6 +29,7 @@ jobs:
         run: |
           python3 tools/test_runtime_irq_859_guest.py --output build/s859-irq
           python3 tools/test_runtime_irq_859_verify.py build/s859-irq
+          python3 tools/irq_trace_accept_859.py build/s859-irq
       - name: Preserve evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4

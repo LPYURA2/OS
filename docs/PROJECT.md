@@ -1,3 +1,7 @@
+## Stage 859 — final IRQ candidate after first successful actual guest
+
+Targeted IRQ0/ISR/EOI/restore PASS on d93724eea24afb75894bf787b0184ad172f478bd. Final exact-SHA acceptance requires full and focused regression plus CPU trace proof; see [handoff](NEXT_CHAT_859.md). No production IRQ or scheduling grant. KFA gates open.
+
 ## Stage 859 — IRQ0 under owned runtime root (candidate, exact LVT bank correction)
 
 Third real guest refused at `859-lvt-plan`: inherited LINT1 NMI 0x400. Exact captured LVT bank admission and terminal mask/readback/restore of both LINT entries; real retry required.
