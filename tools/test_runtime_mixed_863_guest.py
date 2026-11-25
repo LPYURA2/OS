@@ -8,9 +8,13 @@ from desktop_switch_851_site import bp_site
 from test import firmware_path
 ROOT=Path(__file__).resolve().parents[1]
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',required=True,type=Path);out=p.parse_args().output.resolve();out.mkdir(parents=True,exist_ok=True);build=out/'build'
-    with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-runtime-mixed-863','--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
-    efi=build/'x86_64/BOOTX64.EFI';map_file=build/'x86_64/kernel.map';site=loop_site(efi.read_bytes(),map_file)
+    p=argparse.ArgumentParser();p.add_argument('--output',required=True,type=Path);p.add_argument('--four',action='store_true');args=p.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True);build=out/'build'
+    if args.four:
+        from runtime_four_864_verify import verify,trace_check
+    else:
+        from runtime_mixed_863_verify import verify,trace_check
+    with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-runtime-mixed-863',*(['--four-guest-864'] if args.four else []),'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
+    efi=build/'x86_64/BOOTX64.EFI';map_file=build/'x86_64/kernel.map';site=loop_site(efi.read_bytes(),map_file,four=args.four)
     (out/'site.json').write_text(json.dumps(site,indent=2)+'\n')
     ref=reference(out/'host-reference',cc='gcc');san=reference(out/'host-reference-san',cc='clang',sanitize=True)
     if ref!=san:raise RuntimeError('host renderer disagreement')
@@ -35,7 +39,7 @@ def main():
             try:events=trace_check(data.decode('ascii'),obs)
             except (ValueError,KeyError,TypeError,IndexError) as exc:ok=False;obs=str(exc)
     elif ok:ok=False;obs='missing CPU trace'
-    (out/'results.json').write_text(json.dumps({'stage':863,'registry_bank_verified':ok,'registry_loop_verified':ok,'cpu_events':events,'trace_sha256':trace_sha,'cpl3_verified':ok,'timer_verified':ok,'fx_context_verified':ok,'status':'PASS' if ok else 'FAIL','qemu_exit_code':rc,'detached_preflight_verified':ok,'desktop_root_switch':ok,'framebuffer_write_restored':ok,'hardware_ist_verified':ok,'desktop_first_frame_verified':ok,'runtime_services_on_owned_root':ok,'bounded_arena_on_owned_root':ok,'child_roots_cpl0_verified':ok,'ordinary_desktop_verified':False,'device_io_authorized':False,'production_cr3_authorized':False,'uart_sha256':hashlib.sha256(raw).hexdigest(),'efi_sha256':hashlib.sha256((build/'x86_64/BOOTX64.EFI').read_bytes()).hexdigest(),'map_sha256':hashlib.sha256(map_file.read_bytes()).hexdigest(),'site':site,'observations':obs if ok else None,'failure':None if ok else obs},indent=2)+'\n')
+    (out/'results.json').write_text(json.dumps({'stage':864 if args.four else 863,'four_guest':args.four,'registry_bank_verified':ok,'registry_loop_verified':ok,'cpu_events':events,'trace_sha256':trace_sha,'cpl3_verified':ok,'timer_verified':ok,'fx_context_verified':ok,'status':'PASS' if ok else 'FAIL','qemu_exit_code':rc,'detached_preflight_verified':ok,'desktop_root_switch':ok,'framebuffer_write_restored':ok,'hardware_ist_verified':ok,'desktop_first_frame_verified':ok,'runtime_services_on_owned_root':ok,'bounded_arena_on_owned_root':ok,'child_roots_cpl0_verified':ok,'ordinary_desktop_verified':False,'device_io_authorized':False,'production_cr3_authorized':False,'uart_sha256':hashlib.sha256(raw).hexdigest(),'efi_sha256':hashlib.sha256((build/'x86_64/BOOTX64.EFI').read_bytes()).hexdigest(),'map_sha256':hashlib.sha256(map_file.read_bytes()).hexdigest(),'site':site,'observations':obs if ok else None,'failure':None if ok else obs},indent=2)+'\n')
     print('STYLEOS S863 real mixed syscall and IRQ', 'PASS' if ok else 'FAIL',obs,flush=True)
     if not ok:raise SystemExit(1)
 if __name__=='__main__':main()

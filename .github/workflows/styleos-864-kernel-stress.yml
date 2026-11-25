@@ -126,3 +126,21 @@ jobs:
         with:
           name: styleos-864-joint-roots-host
           path: build/s864-joint/
+
+  four-real-cpl3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools
+      - name: Four independent actual CPL3 workloads and full CPU trace
+        run: python3 tools/test_runtime_mixed_863_guest.py --four --output build/s864-four-real
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-864-four-real
+          path: build/s864-four-real/
+          if-no-files-found: warn
