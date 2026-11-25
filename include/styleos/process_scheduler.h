@@ -4,7 +4,14 @@
 
 /* Bounded cooperative dispatcher for the existing two-context user-mode
  * hardware demo. No timer IRQ, preemption or production desktop integration. */
+/* Wide contract is currently host-only: the x86 hardware adapter still owns
+ * exactly two roots, leases and FP contexts. Never enable this flag in an
+ * existing guest image until the full architecture closure is generalized. */
+#ifdef STYLEOS_TEST_WIDE_SCHEDULER_864
+enum { PS_MAX_SLOTS = PR_MAX_PROCESSES };
+#else
 enum { PS_MAX_SLOTS = 2 };
+#endif
 enum ps_status {
     PS_OK = 0, PS_ARGUMENT, PS_STATE, PS_FULL, PS_EMPTY, PS_EVIDENCE,
     PS_REGISTRY_ERROR, PS_EXHAUSTED

@@ -41,3 +41,25 @@ jobs:
           name: styleos-864-mixed-storage
           path: build/s864-mixed-storage/
           if-no-files-found: warn
+
+  wide-scheduler-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Thirty-two slot existing scheduler and bank lifecycle (host only)
+        run: |
+          set -euo pipefail
+          mkdir -p build/s864-wide
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_WIDE_SCHEDULER_864 -DSTYLEOS_TEST_RUNTIME_TICK_860 -DSTYLEOS_TEST_RUNTIME_SYSCALL_863 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_wide_864.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/s864-wide/$cc"
+            "build/s864-wide/$cc" | tee "build/s864-wide/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-864-wide-host
+          path: build/s864-wide/
+          if-no-files-found: warn
