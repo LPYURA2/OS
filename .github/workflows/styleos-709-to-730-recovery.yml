@@ -105,6 +105,7 @@ on:
       - feature/styleos-storage-read-857
       - feature/styleos-runtime-entry-858
       - feature/styleos-runtime-irq-859
+      - feature/styleos-runtime-tick-860
   workflow_dispatch:
 
 permissions:
