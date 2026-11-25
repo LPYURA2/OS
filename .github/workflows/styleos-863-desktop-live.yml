@@ -1,0 +1,28 @@
+name: StyleOS 863 live shell native runtime
+on:
+  push:
+    branches: [feature/styleos-desktop-runtime-863]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install build and real guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 ovmf dosfstools mtools
+      - name: Actual native execution requested by running Desktop
+        run: python3 tools/test_desktop_live_863.py --output build/s863-live
+      - name: Independent replay of original CPU trace, UART and frames
+        run: python3 tools/test_desktop_live_863_replay.py build/s863-live
+      - name: Preserve raw evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-863-live-shell
+          path: build/s863-live/
+          if-no-files-found: warn

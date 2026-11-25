@@ -3,7 +3,7 @@ import re
 from runtime_arena_858_verify import verify as prior, POLICY as ARENA
 from irq_trace_accept_859 import HEADER
 POLICY=b'STYLEOS S861 POLICY cpl0-only=yes shared-desktop=yes inherited-return=no cpl3=no timer=no production-cr3=deny'
-def verify(raw,rc,site,reference,*,generation_base=4):
+def verify(raw,rc,site,reference,*,generation_base=4,clean_fnv=None):
     try:
         if generation_base not in (4,6):raise ValueError('861 generation profile')
         ok,obs=prior(raw,rc,site['rva'],reference)
@@ -35,7 +35,7 @@ def verify(raw,rc,site,reference,*,generation_base=4):
             if not sl<=v['rsp']<sh or v['flags']&0x200 or not v['flags']&2:raise ValueError('861 frame')
             proof.append(v)
         clean=row(rows[3],b'CLEAN',('safe','used','next','tables-zero','leases-zero','fnv'))
-        if tuple(clean.values())!=(safe,0,generation_base+2,1,1,reference['fnv']):raise ValueError('861 cleanup')
+        if tuple(clean.values())!=(safe,0,generation_base+2,1,1,reference['fnv'] if clean_fnv is None else clean_fnv):raise ValueError('861 cleanup')
         obs.update(join_roots=r,join_switches=proof,join_clean=clean);return True,obs
     except (ValueError,KeyError,TypeError,IndexError,StopIteration) as exc:return False,str(exc)
 def trace_check(trace,obs,*,initial_bp=True):

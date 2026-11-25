@@ -20,7 +20,7 @@ def recycle_site(efi,map_file):
         site[name+'_rva']=rva
     return site
 
-def verify(raw,rc,site,reference):
+def verify(raw,rc,site,reference,*,clean_fnv=None):
     try:
         if not site.get('s849_guest_bind_leases_rva') or not site.get('stale862_rva'):raise ValueError('S862R linked policy')
         lines=raw.splitlines()
@@ -44,7 +44,7 @@ def verify(raw,rc,site,reference):
             # Shared, genuine boot prefix plus the unmodified records of this round.
             # Each original line is retained; only the other round is excluded.
             part=prefix+lines[begins[epoch]+1:ends[epoch]]
-            ok,obs=sparse_verify(b'\n'.join(part)+b'\n',rc,site,reference,epoch=epoch)
+            ok,obs=sparse_verify(b'\n'.join(part)+b'\n',rc,site,reference,epoch=epoch,clean_fnv=clean_fnv)
             if not ok:raise ValueError('round '+str(epoch)+': '+str(obs))
             root=obs['join_roots'];safe=root['safe'];gen=4+2*epoch
             begin=row(begins[epoch],b'BEGIN',('round','safe','dispatches','next'))

@@ -22,6 +22,9 @@ void s844_guest_run(uint64_t);
 #include <styleos/desktop_v0.h>
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
 #include <styleos/desktop_interactive_863.h>
+#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+#include <styleos/desktop_sessions.h>
+#endif
 #endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_RTC_854
@@ -134,6 +137,17 @@ static const struct dpr_service *shell_d863;
 static struct s842_cache shell_cache863;
 static uint64_t shell_root863;
 static unsigned shell_events863;
+#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+static struct pg_experiment *live_p863;
+static const struct s846_guard *live_guard863;
+static struct s844_arena *live_arena863;
+static const struct desktop_surface *live_surface863;
+static unsigned live_phase863;
+static uint64_t live_hash863(const volatile unsigned char *p,size_t n){
+ uint64_t h=UINT64_C(14695981039346656037);
+ for(size_t i=0;i<n;i++){h^=p[i];h*=UINT64_C(1099511628211);}return h;
+}
+#endif
 static bool shell_fixture863(void){
  uint32_t a,b,c,d;
  __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
@@ -148,15 +162,46 @@ void s863_shell_guard(void){
 }
 static void shell_boundary863(void){
  s863_shell_guard();unsigned used;
- if(!boundary861(shell_d863,&shell_cache863)||shell_d863->dispatcher.dispatches!=20||pr_global()->next_pid!=5||ws_global()->next_id!=5||nwc_port_count(nwc_global())||!s844_count(s845_arena(),&used)||used||s845_arena()->next!=8)fail("863-shell-boundary");
+ unsigned dispatches=20,next=5,generation=8;
+#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+ if(live_phase863==1)fail("863-live-reentry");
+ if(!live_phase863){dispatches=0;next=1;generation=4;}
+#endif
+ if(!boundary861(shell_d863,&shell_cache863)||shell_d863->dispatcher.dispatches!=dispatches||pr_global()->next_pid!=next||ws_global()->next_id!=next||nwc_port_count(nwc_global())||!s844_count(s845_arena(),&used)||used||s845_arena()->next!=generation)fail("863-shell-boundary");
 }
+#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+/* Called only from the completed input/render boundary of the running shell.
+ * Reuse the bounded S862 trial, not an independent scheduler or new grant. */
+__attribute__((noinline)) void s863_live_run(void){
+ shell_boundary863();
+ if(live_phase863||!live_p863||!live_guard863||!live_arena863||!live_surface863||live_arena863!=s845_arena()||live_surface863->stride!=live_surface863->width||live_surface863->format!=DESKTOP_BGR_BYTES)fail("863-live-admission");
+ const struct desk_sessions *sessions=desk_sessions_global();
+ if(!sessions->notes.dirty||!sessions->notes.length||!desk_sessions_pid(sessions,DESK_SESSION_NOTES))fail("863-live-draft");
+ uint64_t draft=live_hash863((const volatile unsigned char *)sessions,sizeof *sessions);
+ size_t bytes=(size_t)live_surface863->width*live_surface863->height*4;
+ if(bytes>live_surface863->bytes)fail("863-live-frame-range");
+ uint64_t frame=live_hash863((const volatile unsigned char *)live_surface863->base,bytes);
+ live_phase863=1;
+ arch_puts("STYLEOS S863L BEGIN");field("root",shell_root863);field("dispatches",shell_d863->dispatcher.dispatches);field("frame",frame);field("sessions",draft);arch_putc('\n');
+ guest861(live_p863,&shell_cache863,live_guard863,live_arena863,live_surface863,frame);
+ if(live_hash863((const volatile unsigned char *)sessions,sizeof *sessions)!=draft||live_hash863((const volatile unsigned char *)live_surface863->base,bytes)!=frame)fail("863-live-state");
+ live_phase863=2;shell_boundary863();
+ arch_puts("STYLEOS S863L DONE");field("root",shell_root863);field("dispatches",shell_d863->dispatcher.dispatches);field("frame",frame);field("sessions",draft);arch_putc('\n');
+}
+#endif
 void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsigned active,bool ru,unsigned restarts,size_t text,uint64_t text_hash,bool text_dirty,unsigned note_session,size_t writes,unsigned inputs,unsigned batch){
  shell_boundary863();
  if(inputs!=3||batch>32||(!ev)!=(!batch))fail("863-shell-input");
  if(!ev){arch_puts("STYLEOS S863 READY");field("root",shell_root863);field("dispatches",shell_d863->dispatcher.dispatches);field("next-pid",pr_global()->next_pid);field("next-window",ws_global()->next_id);field("input",inputs);field("x",x);field("y",y);field("writes",writes);arch_putc('\n');return;}
  if(shell_events863==UINT32_MAX)fail("863-shell-counter");
  arch_puts("STYLEOS S863 EVENT");field("root",shell_root863);field("n",++shell_events863);field("batch",batch);field("mouse",ev->mouse);field("key",ev->key);field("dx",(uint64_t)(int64_t)ev->dx);field("dy",(uint64_t)(int64_t)ev->dy);field("buttons",ev->buttons);field("modifiers",ev->modifiers);field("x",x);field("y",y);field("active",active);field("ru",ru);field("restarts",restarts);field("text",text);field("text-hash",text_hash);field("text-dirty",text_dirty);field("note-session",note_session);field("writes",writes);arch_putc('\n');
+#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+ if(batch==1&&!ev->mouse&&ev->key==0x43&&!ev->modifiers)s863_live_run();
+#endif
  if(batch==1&&!ev->mouse&&ev->key==0x58&&!ev->modifiers){
+#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+  if(live_phase863!=2)fail("863-live-incomplete");
+#endif
   arch_puts("STYLEOS S863 EXIT");field("root",shell_root863);field("events",shell_events863);field("dispatches",shell_d863->dispatcher.dispatches);field("used",0);arch_putc('\n');
   out32(0xf4,0x10);arch_halt();
  }
@@ -240,13 +285,19 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  arch_puts("STYLEOS S858 ARENA");field("root",target);field("base",arena858.start);field("pages",S844_PAGES);field("used",used858);field("next",allocator858->next);field("zero",1);arch_putc('\n');
  arch_puts("STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny\n");
 #ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+#ifndef STYLEOS_TEST_DESKTOP_LIVE_863
  guest861(p,cache,guard,allocator858,s,hash);
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
  /* Existing shell only after two actual lifecycle rounds on this same root.
   * Storage/clock/reset are explicitly denied. No new task ABI or DMA grant. */
  if(!shell_fixture863()||!identity((uintptr_t)desktop_v0_run,PG_EXEC)||!identity((uintptr_t)desk_input_init,PG_EXEC)||!identity((uintptr_t)desk_input_next,PG_EXEC))fail("863-shell-admission");
- shell_root863=target;shell_d863=dpr_global_state();shell_cache863=*cache;shell_boundary863();
- arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",20);arch_putc('\n');
+ shell_root863=target;shell_d863=dpr_global_state();shell_cache863=*cache;
+#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+ live_p863=p;live_guard863=guard;live_arena863=allocator858;live_surface863=s;
+#endif
+ shell_boundary863();
+ arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
  desktop_v0_run(s);
 #endif

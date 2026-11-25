@@ -16,10 +16,10 @@ def sparse_site(efi,map_file):
         _range(efi,ro+rel,1,'S862S entry byte');site[name+'_rva']=rva
     return site
 
-def verify(raw,rc,site,reference,*,epoch=0):
+def verify(raw,rc,site,reference,*,epoch=0,clean_fnv=None):
     try:
         if not all(site.get(x+'_rva') for x in ('sparse_admit862','rt862_bank_open','rt862_bank_admit','rt862_bank_release')):raise ValueError('S862S linked policy')
-        ok,obs=prior(raw,rc,site,reference,sparse=True,epoch=epoch)
+        ok,obs=prior(raw,rc,site,reference,sparse=True,epoch=epoch,clean_fnv=clean_fnv)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S862S ')]
         def pos(prefix):

@@ -22,9 +22,9 @@ def bank_site(efi,map_file):
         site[name+'_rva']=rva
     return site
 
-def verify(raw,rc,site,reference,*,budgets=(3,5),sparse=False,epoch=0):
+def verify(raw,rc,site,reference,*,budgets=(3,5),sparse=False,epoch=0,clean_fnv=None):
     try:
-        ok,obs=prior(raw,rc,site,reference,budgets=budgets,sparse=sparse,epoch=epoch)
+        ok,obs=prior(raw,rc,site,reference,budgets=budgets,sparse=sparse,epoch=epoch,clean_fnv=clean_fnv)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S862B ')]
         def indices(tag):return [i for i,x in enumerate(lines) if x.startswith(tag)]
