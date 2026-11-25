@@ -84,7 +84,10 @@ static bool ata857_live_check(struct ata857_live *x){
  out32(0xcf8,old);if(!ok||in32(0xcf8)!=old||read_cr3()!=x->root||(flags()&0x200))return false;
  const uint16_t base=(uint16_t)(bar&~3u);
  const uint16_t ports[4]={base,(uint16_t)(base+2),(uint16_t)(base+8),(uint16_t)(base+10)};
- for(unsigned i=0;i<4;i++){uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):"Nd"(ports[i]):"memory");if(v)return false;}
+ for(unsigned i=0;i<4;i++){
+  uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):"Nd"(ports[i]):"memory");
+  if(bar==0x6061u?!bm864_optical_byte(i,v):v!=0)return false;
+ }
  return true;
 }
 static bool ata857_alt(void *ctx,uint8_t *v){if(!v||!ata857_live_check(ctx))return false;__asm__ volatile("inb %1,%0":"=a"(*v):"Nd"((uint16_t)0x376):"memory");return true;}

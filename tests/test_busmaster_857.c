@@ -54,5 +54,22 @@ int main(void) {
     optical.command_status=0x02800005;optical.bm[0]=1;word=0xabcd;
     assert(!bm864_optical_plan(&optical,root,&word)&&word==0xabcd);
     optical.bm[0]=0;optical.command_status^=0x10000;assert(!bm864_optical_plan(&optical,root,&word));negative+=2;
+    /* Actual S864 optical guest receipt: primary IRQ latch, secondary
+     * direction; neither engine is started or active. Exhaust every byte
+     * separately for both planning and confirmation; no errors accepted. */
+    optical=base;optical.bar4=0x6061;optical.bm[1]=4;optical.bm[2]=8;
+    assert(bm864_optical_plan(&optical,root,&word)&&word==3);
+    optical.command_status=0x02800003;assert(bm864_optical_confirm(&optical,root,3));
+    assert(!bm857_confirm_at(&optical,root,0x6061));positive+=2;negative++;
+    for(unsigned i=0;i<4;i++)for(unsigned v=0;v<256;v++){
+      struct bm857_snapshot sample=optical;sample.bm[i]=(uint8_t)v;
+      bool ok=v==0||v==((i&1u)?4u:8u);
+      assert(bm864_optical_byte(i,(uint8_t)v)==ok);
+      assert(bm864_optical_confirm(&sample,root,3)==ok);
+      sample.command_status=0x02800007;word=0xabcd;
+      assert(bm864_optical_plan(&sample,root,&word)==ok);
+      assert(word==(ok?3:0xabcd));positive+=2*ok;negative+=2*!ok;
+    }
+    assert(!bm864_optical_byte(4,0));negative++;
     printf("BM857 plan/readback: %u positive, %u refusals PASS\n",positive,negative);
 }

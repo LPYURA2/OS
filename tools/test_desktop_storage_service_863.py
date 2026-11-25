@@ -353,7 +353,8 @@ def main():
             match=re.fullmatch(b'STYLEOS S863S DMA-'+tag+b' '+b' '.join(k+b'=0x([0-9a-f]{16})' for k in keys),line)
             if not match:raise ValueError('DMA receipt format')
             rr,bar,cmd_status,*bm=map(lambda x:int(x,16),match.groups())
-            if rr!=root or bar!=(0x6061 if args.iso else 0x60e1) or any(bm):raise ValueError('DMA receipt context')
+            if rr!=root or bar!=(0x6061 if args.iso else 0x60e1):raise ValueError('DMA receipt context')
+            if any(v not in ((0,4 if i%2 else 8) if args.iso else (0,)) for i,v in enumerate(bm)):raise ValueError('DMA engine started, active, error or unknown bits')
             vals.append(cmd_status)
         if vals[0] not in ((0x02800001,0x02800003,0x02800005,0x02800007) if args.iso else (0x02800007,)) or vals[1]!=(vals[0]&~4):raise ValueError('DMA command transition')
         bars=[x for x in lines if x.startswith(b'STYLEOS S863S BAR4 ')]
