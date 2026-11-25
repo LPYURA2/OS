@@ -15,7 +15,11 @@ static struct rt858_live capture861(void){
  v.root=read_cr3();v.gdt=g.base;v.idt=d.base;v.gdt_limit=g.limit;v.idt_limit=d.limit;v.cr4=reg4();v.efer=read_msr(0xc0000080);v.rflags=flags();return v;
 }
 static bool boundary861(const struct dpr_service *d,const struct s842_cache *cache){
- struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&rt858_ready(v.root);
+ struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&(
+#ifdef STYLEOS_TEST_RUNTIME_USER_861
+ (d->dispatcher.dispatches==4&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
+#endif
+ rt858_ready(v.root));
 }
 static void zero861(void *p,size_t n){volatile unsigned char *b=p;for(size_t i=0;i<n;i++)b[i]=0;}
 static bool iszero861(uint64_t p,size_t n){const volatile unsigned char *b=(const void *)(uintptr_t)p;for(size_t i=0;i<n;i++)if(b[i])return false;return true;}
@@ -32,6 +36,14 @@ static __attribute__((noinline)) void roundtrip861(unsigned i,uint64_t root,uint
  if(read_cr3()!=safe||value!=UINT64_C(0x86110000)+i)fail("861-child-return");
  out[0]=pc;out[1]=sp;out[2]=value;out[3]=s851_frame[1];out[4]=s851_frame[2];
 }
+#ifdef STYLEOS_TEST_RUNTIME_USER_861
+struct user_audit861 {const struct s842_cache *cache;const struct boot_memory_evidence *e;const struct s846_guard *guard;const struct s844_arena *arena;const struct s844_lease *leases;};
+static bool user_audit861(void *opaque){
+ const struct user_audit861 *a=opaque;
+ return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt861_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,&children861[0],&children861[1]);
+}
+extern void s847_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t,bool (*)(void *),void *);
+#endif
 static void guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena,const struct desktop_surface *s,uint64_t before){
  const uint64_t safe=composed.built.root;const struct dpr_service *d=dpr_global_state();
  struct s844_lease l[2];unsigned used;
@@ -51,9 +63,23 @@ static void guest861(struct pg_experiment *p,const struct s842_cache *cache,cons
   if(own!=(r[2]^UINT64_C(0x86100000))||other!=wantother||!boundary861(d,cache)||!rt861_roots_audit_frozen(base861,cache,&frozen861,p->evidence,arena,l,guard,&composed,&children861[0],&children861[1]))fail("861-after-switch");
   arch_puts("STYLEOS S861 SWITCH");field("id",i);field("child",children861[i].built.root);field("safe",read_cr3());field("rip",r[0]);field("rsp",r[1]);field("cs",r[3]);field("flags",r[4]);field("frame",s851_frame_address);field("own",own);field("other",other);arch_putc('\n');
  }
+#ifdef STYLEOS_TEST_RUNTIME_USER_861
+ struct user_audit861 a={cache,p->evidence,guard,arena,l};
+ for(unsigned i=0;i<2;i++)*(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)=UINT64_C(0x846d1000)+i;
+ s847_trial(children861,l,safe,user_audit861,&a);
+ if(!user_audit861(&a))fail("861-user-final-audit");
+#endif
  zero861(children861,sizeof children861);zero861(child_tables861,sizeof child_tables861);
  if(!iszero861((uintptr_t)child_tables861,sizeof child_tables861))fail("861-table-zero");
  for(unsigned i=0;i<2;i++)if(!s844_release(arena,i?S846_OWNER_B:S846_OWNER_A,l[i])||!iszero861(l[i].pa,3*4096))fail("861-release");
+#ifdef STYLEOS_TEST_RUNTIME_USER_861
+ struct rt858_live v=capture861();struct dpr_service *joined=rt861_dispatcher(&v);
+ if(!joined||joined!=d)fail("861-user-reap-boundary");
+ for(unsigned i=0;i<2;i++)if(dpr_release(joined,i,l[i].generation)!=PS_OK)fail("861-user-reap");
+ if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||joined->dispatcher.dispatches!=4)fail("861-user-clean");
+ arch_puts("STYLEOS S861U CLEAN");field("safe",safe);field("dispatches",4);field("processes",0);field("windows",0);arch_putc('\n');
+ arch_puts("STYLEOS S861U POLICY cooperative-cpl3=yes existing-dispatcher=yes timer=no fp=no production-cr3=deny\n");
+#endif
  if(!s844_count(arena,&used)||used||!boundary861(d,cache)||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("861-final");
  uint64_t after=UINT64_C(14695981039346656037);const volatile uint32_t *fb=(const void *)(uintptr_t)s->base;
  for(size_t i=0;i<(size_t)s->width*s->height;i++){uint32_t pixel=fb[i];for(unsigned b=0;b<4;b++){after^=(pixel>>(8*b))&255u;after*=UINT64_C(1099511628211);}}

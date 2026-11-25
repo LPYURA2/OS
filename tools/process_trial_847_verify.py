@@ -3,10 +3,13 @@ import re
 from user_roots_846_verify import verify as prior
 
 
-def verify(raw,rc):
+def verify(raw,rc,*,joined=None):
     try:
-        ok,obs=prior(raw,rc)
-        if not ok:raise ValueError(obs)
+        if joined is None:
+            ok,obs=prior(raw,rc)
+            if not ok:raise ValueError(obs)
+        else:
+            obs=dict(joined);obs['child_roots']=obs['join_roots']
         lines=raw.splitlines()
         rec=[x for x in lines if x.startswith(b'STYLEOS S847 ')]
         policy=b'STYLEOS S847 POLICY cpl3=yes user-fault-contained=yes range-only=yes if=0 production-cr3=deny'
@@ -35,8 +38,8 @@ def verify(raw,rc):
             b=parse(rec[i],'BACK',('step','id','root','state','value','foreign','stack-same'));i+=1
             if tuple(b.values())!=(step,id,root,1 if step<2 else 3 if step==2 else 4,0x847101 if step==3 else 0x847000+id,0x846d1001 if step==0 else 0x847000+1-id,1):raise ValueError('S847 back evidence')
             backs.append(b)
-        before=next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S846 SWITCH id=0x0000000000000001 '))
-        after=next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S846 CLEAN '))
+        before=next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S846 SWITCH id=0x0000000000000001 ' if joined is None else b'STYLEOS S861 SWITCH id=0x0000000000000001 '))
+        after=next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S846 CLEAN ' if joined is None else b'STYLEOS S861 CLEAN '))
         indices=[before]+[lines.index(x) for x in rec]+[after]
         if n!=8 or i!=13 or any(x>=y for x,y in zip(indices,indices[1:])):raise ValueError('S847 phase order')
         obs.update(cpl3_verified=True,process_traps=traps,process_returns=backs,process_selectors=r)
