@@ -148,16 +148,41 @@ static void sparse_admit862(unsigned id,const struct s846_root child[2],uint64_t
  arch_puts("STYLEOS S862S ADMIT");fld848("id",id);fld848("pid",pid860[id]);fld848("handle",handle860[id]);fld848("root",child[id].built.root);fld848("safe",safe);fld848("dispatches",runtime860->dispatcher.dispatches);fld848("processes",pr_snapshot(pr_global(),0,0,true));fld848("windows",ws_snapshot(ws_global(),0,0));arch_putc('\n');
 }
 #endif
-void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2],uint64_t safe,uint64_t admitted_lapic
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+bool
+#else
+void
+#endif
+s848_trial(const struct s846_root child[2],const struct s844_lease leases[2],uint64_t safe,uint64_t admitted_lapic
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
  ,bool (*audit)(void *),void *opaque
 #endif
 ){
- struct desc848 g0={0},i0={0},check={0};uint16_t tr,cs;struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ /* Only bounded supervisor state survives a poll. Never retain a stack frame. */
+ static struct desc848 g0,i0,g,d;
+ static struct rt858_live original;
+ static struct s847_selectors sel;
+ static uint32_t lvt,div,tpr,svr;
+ static unsigned step,completed,expected_windows;
+ static const struct s846_root *bound_child;
+ static const struct s844_lease *bound_leases;
+ struct desc848 check={0};uint16_t tr,cs;
+ if(!active848){
+  bound_child=child;bound_leases=leases;step=0;completed=0;expected_windows=1;
+#else
+ struct desc848 g0={0},i0={0},check={0};uint16_t tr,cs;
+#endif
+struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  if(root848()!=safe||(flags848()&0x200)||active848||!acpi806_copy_capture(&topo)||topo.enabled_lapics!=1||topo.lapic_physical!=admitted_lapic||!(apic&0x800)||(apic&0x400)||(apic&UINT64_C(0xfffff000))!=admitted_lapic||in848(0x21)!=0xff||in848(0xa1)!=0xff)fail848("apic-admission");
  lapic848=admitted_lapic;
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
- struct rt858_live original=live848();runtime860=rt861_dispatcher(&original);
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ original=live848();
+#else
+ struct rt858_live original=live848();
+#endif
+ runtime860=rt861_dispatcher(&original);
  if(!runtime860||!audit||!audit(opaque))fail848("861-timer-join");
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
  dispatch_base848=runtime860->dispatcher.dispatches;
@@ -167,7 +192,11 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
 #endif
  __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3":"=m"(g0),"=m"(i0),"=r"(tr),"=r"(cs));
  for(unsigned i=0;i<2;i++)if(!writable848(&child[i],lapic848,P)||!writable848(&child[i],g0.base,P)||!writable848(&child[i],(uintptr_t)idt848,sizeof idt848))fail848("mapping");
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ lvt=rd848(0x320);div=rd848(0x3e0);tpr=rd848(0x80);svr=rd848(0xf0);
+#else
  uint32_t lvt=rd848(0x320),div=rd848(0x3e0),tpr=rd848(0x80),svr=rd848(0xf0);
+#endif
  /* Post-EBS, terminal trial only: retire a masked firmware timer without
   * restoring its elapsed phase. Refuse unmasked/deadline/pending sources. */
  uint32_t initial=rd848(0x380),current=rd848(0x390),isr=pending848(0x100),irr=pending848(0x200);
@@ -184,7 +213,9 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
   for(size_t j=0;j<hi-lo;j++)if(dst[j]!=start[i][j])fail848("copy");
   sites848[i][0]=S846_CODE;sites848[i][1]=S846_CODE+mid-lo;sites848[i][2]=S846_CODE+last-lo;
  }
+#ifndef STYLEOS_TEST_DESKTOP_PUMP_863
  struct s847_selectors sel;
+#endif
  if(!s847_gdt_append((void *)(uintptr_t)g0.base,P,g0.limit,tr,cs,&sel))fail848("gdt");
 #ifndef STYLEOS_TEST_RUNTIME_BANK_862
  if(!s847_init(&ctl848,safe,child[0].built.root,child[1].built.root,sel.cs,sel.ss))fail848("gdt");
@@ -192,7 +223,11 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
 #endif
  for(unsigned i=0;i<256;i++)gate848(i,s847_bad_entry,cs,3,0x8e);
  gate848(V,s848_irq_entry,cs,1,0x8e);gate848(128,s847_call_entry,cs,1,0xee);gate848(14,s847_pf_entry,cs,2,0x8e);
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ g=(struct desc848){sel.limit,g0.base};d=(struct desc848){sizeof idt848-1,(uintptr_t)idt848};
+#else
  struct desc848 g={sel.limit,g0.base},d={sizeof idt848-1,(uintptr_t)idt848};
+#endif
  __asm__ volatile("lgdt %0;lidt %1"::"m"(g),"m"(d):"memory");
  wr848(0x80,0);wr848(0xf0,(svr&~255u)|0x1ffu);wr848(0x320,BIT|V);wr848(0x3e0,3); /* divide by 16 */
  if(rd848(0x320)!=(BIT|V)||rd848(0x3e0)!=3||rd848(0x80)||rd848(0xf0)!=((svr&~255u)|0x1ffu))fail848("setup");
@@ -235,14 +270,24 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
  active848=true;
  arch_puts("STYLEOS S848 READY");fld848("safe",safe);fld848("a",child[0].built.root);fld848("b",child[1].built.root);fld848("lapic",lapic848);fld848("cs",sel.cs);fld848("ss",sel.ss);fld848("a-loop-end",sites848[0][1]);fld848("b-loop-end",sites848[1][1]);fld848("a-fault",sites848[0][2]);fld848("b-exit",sites848[1][2]);fld848("count",COUNT);arch_putc('\n');
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
+ #ifndef STYLEOS_TEST_DESKTOP_PUMP_863
  unsigned completed=0;
 #ifdef STYLEOS_TEST_RUNTIME_SPARSE_862
  unsigned expected_windows=1;
 #else
  unsigned expected_windows=2;
 #endif
+#endif
  arch_puts("STYLEOS S862L READY");fld848("a",s862_loop_budget[0]);fld848("b",s862_loop_budget[1]);fld848("watchdog",32);arch_putc('\n');
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ }else{
+  struct rt858_live resumed=live848();
+  if(child!=bound_child||leases!=bound_leases||safe!=original.root||admitted_lapic!=lapic848||!audit||!audit(opaque)||rt861_dispatcher(&resumed)!=runtime860||armed848||receipt860||frame860||cr2862||rd848(0x390)||rd848(0x320)!=(BIT|V)||pending848(0x100)||pending848(0x200))fail848("863-pump-resume");
+ }
+ for(;;){
+#else
  for(unsigned step=0;;step++){
+#endif
   unsigned id;struct up_context ctx;uint64_t sp0,sp1;
 #else
  for(unsigned step=0;step<10;step++){
@@ -394,6 +439,9 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
   arch_puts("STYLEOS S848 BACK");fld848("step",step);fld848("id",id);fld848("safe",safe);fld848("state",back_state);fld848("a",progress848[0]);fld848("b",progress848[1]);fld848("stack-same",1);arch_putc('\n');
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
   ++completed;
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+  ++step;return false;
+#endif
 #endif
  }
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
@@ -431,6 +479,9 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
  arch_puts("STYLEOS S849 POLICY cpl3-timer=yes fx-legacy=yes single-cpu=yes production-cr3=deny\n");
 #else
  arch_puts("STYLEOS S848 POLICY cpl3-timer=yes integer-only=yes single-cpu=yes firmware-timer-phase=discarded production-cr3=deny\n");
+#endif
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ bound_child=0;bound_leases=0;return true;
 #endif
 }
 

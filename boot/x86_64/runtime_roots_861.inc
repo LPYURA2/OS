@@ -50,24 +50,46 @@ static bool user_audit861(void *opaque){
  return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt861_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,&children861[0],&children861[1]);
 }
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
-extern void s848_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t,uint64_t,bool (*)(void *),void *);
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+extern bool s848_trial(
+#else
+extern void s848_trial(
+#endif
+const struct s846_root [2],const struct s844_lease [2],uint64_t,uint64_t,bool (*)(void *),void *);
 extern void s860_reap(uint64_t);
 #else
 extern void s847_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t,bool (*)(void *),void *);
 #endif
 #endif
-static void guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena,const struct desktop_surface *s,uint64_t before){
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+static __attribute__((noinline)) bool
+#else
+static void
+#endif
+guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena,const struct desktop_surface *s,uint64_t before){
  const uint64_t safe=composed.built.root;const struct dpr_service *d=dpr_global_state();
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ static struct s844_lease old[2],l[2];
+ static unsigned round;static bool prepared;
+ unsigned used;
+ if(round>=2)fail("863-pump-completed");
+#else
  struct s844_lease old[2]={0};
  for(unsigned round=0;round<2;round++){
+#endif
  const uint64_t expected_generation=4+2*round;
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ if(!prepared){
+#endif
  if(d->dispatcher.dispatches!=10*round)fail("862-recycle-dispatch-start");
  arch_puts("STYLEOS S862R BEGIN");field("round",round);field("safe",safe);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);arch_putc('\n');
 #else
  const uint64_t expected_generation=4;
 #endif
+#ifndef STYLEOS_TEST_DESKTOP_PUMP_863
  struct s844_lease l[2];unsigned used;
+#endif
  if(!base861||!arena||!boundary861(d,cache)||!s844_count(arena,&used)||used||arena->next!=expected_generation||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("861-admit");
  for(unsigned i=0;i<2;i++){
   if(!s844_acquire(arena,i?S846_OWNER_B:S846_OWNER_A,3,&l[i])||!iszero861(l[i].pa,3*4096))fail("861-lease");
@@ -94,8 +116,15 @@ static void guest861(struct pg_experiment *p,const struct s842_cache *cache,cons
   arch_puts("STYLEOS S861 SWITCH");field("id",i);field("child",children861[i].built.root);field("safe",read_cr3());field("rip",r[0]);field("rsp",r[1]);field("cs",r[3]);field("flags",r[4]);field("frame",s851_frame_address);field("own",own);field("other",other);arch_putc('\n');
  }
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ prepared=true;}
+#endif
  struct user_audit861 a={cache,p->evidence,guard,arena,l};
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ if(!s848_trial(children861,l,safe,base861->lapic,user_audit861,&a))return false;
+#else
  s848_trial(children861,l,safe,base861->lapic,user_audit861,&a);
+#endif
  if(!user_audit861(&a))fail("861-timer-final-audit");
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_USER_861
@@ -131,6 +160,10 @@ static void guest861(struct pg_experiment *p,const struct s842_cache *cache,cons
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
  if(arena->next!=expected_generation+2||d->dispatcher.dispatches!=10*(round+1)||pr_global()->next_pid!=3+2*round||ws_global()->next_id!=3+2*round)fail("862-recycle-final");
  arch_puts("STYLEOS S862R DONE");field("round",round);field("safe",safe);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);field("next-pid",pr_global()->next_pid);field("next-window",ws_global()->next_id);field("used",used);arch_putc('\n');
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ prepared=false;return ++round==2;
+#else
  }
+#endif
 #endif
 }
