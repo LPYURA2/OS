@@ -30,6 +30,9 @@ bool s844_runtime_start(uint64_t);
 #include <styleos/desktop_interactive_863.h>
 #if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
 #include <styleos/rtc_runtime_863.h>
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#include <styleos/pointer_clock_863.h>
+#endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
 #include <styleos/desktop_sessions.h>
@@ -261,6 +264,11 @@ static _Alignas(4096) union {
 _Static_assert(sizeof rtc_page863==4096,"RTC page extent");
 #define rtc_runtime863 (rtc_page863.state)
 static bool rtc_preflight863,rtc_admitted863;
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+static _Alignas(4096) union {struct pc863_clock clock;unsigned char page[4096];} pointer_page863;
+_Static_assert(sizeof pointer_page863==4096,"pointer clock extent");
+static bool pointer_preflight863,pointer_attempted863;
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
 static unsigned rtc_samples863;
 #endif
@@ -303,6 +311,62 @@ static void rtc_admit863(void)
  rtc_admitted863=true;
  if(!rtc_runtime_bind_863(&rtc_runtime863,&rtc_ops863,&rtc_runtime863,shell_root863,1,initial))fail("863-rtc-bind");
 }
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+/* Read-only TSC calibrated against three consecutive edges from the
+ * already admitted RTC service. No PIT programming or new port grant. */
+static uint64_t pointer_counter863(void){
+ uint32_t lo,hi;__asm__ volatile("lfence;rdtsc;lfence":"=a"(lo),"=d"(hi)::"memory");
+ return ((uint64_t)hi<<32)|lo;
+}
+void s863_pointer_init(void){
+ s863_shell_guard();
+ if(pointer_attempted863)return;
+ pointer_attempted863=true;
+ uint32_t a,b,c,d;__asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
+ if(!pointer_preflight863||!rtc_admitted863||!preview_single_cpu863()||
+    !same_cache(&shell_cache863)||!(d&(1u<<4))||!(d&(1u<<26))||
+    !identity((uintptr_t)&pointer_page863,PG_WRITE)||
+    !identity((uintptr_t)&pointer_page863+4095,PG_WRITE))goto unavailable;
+ struct pc863_edge edges[3]={0};unsigned n=0,prev=86400;uint64_t last=0;
+ for(unsigned i=0;i<2000000u&&n<3;i++){
+  struct rtc_time_854 t={0};uint64_t before=pointer_counter863();
+  bool ok=rtc_runtime_read_863(&rtc_runtime863,&t);
+  uint64_t after=pointer_counter863();
+  if(after<before||before<last||rtc_runtime863.quarantined)goto unavailable;
+  if(!ok)continue;
+  unsigned sec=(unsigned)t.hour*3600u+(unsigned)t.min*60u+t.sec;
+  if(prev!=86400&&sec!=prev){
+   if(sec!=(prev+1)%86400||!last)goto unavailable;
+   edges[n++]=(struct pc863_edge){last,after,sec};
+  }
+  prev=sec;last=before;
+ }
+ if(n!=3||!same_cache(&shell_cache863)||
+    !pc863_init(&pointer_page863.clock,edges))goto unavailable;
+ s863_shell_guard();
+ for(unsigned i=0;i<3;i++){
+  arch_puts("STYLEOS S863T EDGE");field("root",shell_root863);field("n",i);
+  field("second",edges[i].second);field("lo",edges[i].lo);field("hi",edges[i].hi);arch_putc('\n');
+ }
+ uint64_t stamp=pc863_sample(&pointer_page863.clock,pointer_counter863());
+ if(!stamp)goto unavailable;
+ arch_puts("STYLEOS S863T POINTER");field("root",shell_root863);
+ field("min-hz",pointer_page863.clock.min_hz);field("max-hz",pointer_page863.clock.max_hz);
+ field("hz",pointer_page863.clock.mono.hz);field("stamp",stamp);arch_putc('\n');
+ return;
+unavailable:
+ arch_puts("STYLEOS S863T POINTER UNAVAILABLE\n");
+}
+uint64_t s863_pointer_read(void){
+ s863_shell_guard();
+ if(!pointer_page863.clock.mono.ready||pointer_page863.clock.mono.faulted)return 0;
+ if(!same_cache(&shell_cache863)){pointer_page863.clock.mono.faulted=true;return 0;}
+ return pc863_sample(&pointer_page863.clock,pointer_counter863());
+}
+bool s863_pointer_near(uint64_t a,uint64_t b){
+ s863_shell_guard();return pc863_near(&pointer_page863.clock,a,b);
+}
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
 static void rtc_sample863(void)
 {
@@ -1034,6 +1098,13 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
     !identity((uintptr_t)&rtc_page863,PG_WRITE)||
     !identity((uintptr_t)&rtc_page863+sizeof rtc_page863-1,PG_WRITE))fail("863-rtc-preflight-page");
  rtc_preflight863=true;
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+ if(pointer_preflight863||
+    arch_paging_attest_image_writable(p,(uintptr_t)&pointer_page863,sizeof pointer_page863)!=PG_OK||
+    !identity((uintptr_t)&pointer_page863,PG_WRITE)||
+    !identity((uintptr_t)&pointer_page863+4095,PG_WRITE))fail("863-pointer-preflight");
+ pointer_preflight863=true;
+#endif
 #endif
  if(read_cr3()!=p->old_root||(flags()&0x200))fail("root-changed");
  arch_puts("STYLEOS S850 GOP");field("base",surface->base);field("bytes",surface->bytes);field("width",surface->width);field("height",surface->height);field("stride",surface->stride);field("format",surface->format);arch_putc('\n');

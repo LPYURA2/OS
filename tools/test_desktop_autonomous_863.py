@@ -37,6 +37,36 @@ def verify_preview_media(iso,efi,out):
     return dict(boot_lba=lba,esp_sha256=sha(image),tree_efi_sha256=sha(tree_efi.read_bytes()),
                 boot_efi_sha256=sha(boot_efi.read_bytes()))
 
+def verify_pointer_clock(lines,root):
+    """Recompute clock bounds from actual RTC edge receipts, not a PASS string."""
+    import re
+    def fields(tag,keys):
+        rows=[x for x in lines if x.startswith(tag)]
+        result=[]
+        for row in rows:
+            m=re.fullmatch(tag+b' '+b' '.join(k+b'=0x([0-9a-f]{16})' for k in keys),row)
+            if not m:raise ValueError('pointer timing receipt')
+            result.append(tuple(int(v,16) for v in m.groups()))
+        return rows,result
+    rows,edges=fields(b'STYLEOS S863T EDGE',[b'root',b'n',b'second',b'lo',b'hi'])
+    pr,ptr=fields(b'STYLEOS S863T POINTER',[b'root',b'min-hz',b'max-hz',b'hz',b'stamp'])
+    if len(edges)!=3 or len(ptr)!=1:raise ValueError('missing live pointer calibration')
+    lo,hi=0,10000000000
+    for i,(r,n,sec,start,end) in enumerate(edges):
+        if r!=root or n!=i or not 0<=sec<86400 or not 0<start<=end:
+            raise ValueError('pointer edge identity')
+        if i:
+            old=edges[i-1]
+            a,b=start-old[4],end-old[3]
+            if sec!=(old[2]+1)%86400 or not 0<a<=b<=10000000000 or b-a>a//100:
+                raise ValueError('pointer edge interval')
+            lo=max(lo,a);hi=min(hi,b)
+    if not 0<lo<=hi or ptr[0][:4]!=(root,lo,hi,lo+(hi-lo)//2) or not ptr[0][4]:
+        raise ValueError('pointer frequency')
+    if not lines.index(rows[0])<lines.index(rows[1])<lines.index(rows[2])<lines.index(pr[0])<lines.index(b'STYLEOS DESKTOP READY'):
+        raise ValueError('pointer receipt order')
+    return dict(min_hz=lo,max_hz=hi,estimate_hz=ptr[0][3],first_stamp=ptr[0][4])
+
 def refuse_smp_preview(cmd,vars,out,iso,expected_hash):
     """Use the same ISO, fresh firmware variables and actual two-vCPU QEMU."""
     folder=out/'refuse-smp';folder.mkdir()
@@ -162,7 +192,8 @@ def main():
     cold=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))
     prefix=b'\n'.join(lines[:cold])+b'\n'
     root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview)
+    pointer=verify_pointer_clock(lines,root) if preview else None
     smp_refusal=refuse_smp_preview(cmd,vars,out,iso,iso_before) if preview else None
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,smp_refusal=smp_refusal,host_exit=rc),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,smp_refusal=smp_refusal,pointer_clock=pointer,host_exit=rc),indent=2))
     print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, 49 CPU events, four independent launch cycles, no storage writes')
 if __name__=='__main__':main()

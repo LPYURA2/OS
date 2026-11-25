@@ -33,6 +33,13 @@ jobs:
             "build/s863-host/rtc-$cc" | tee "build/s863-host/rtc-$cc.log"
           done
           clang --target=x86_64-w64-windows-gnu -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -fno-stack-protector -mno-red-zone -Iinclude -c kernel/rtc_runtime_863.c -o build/s863-host/rtc-runtime.obj
+      - name: RTC edge bracket and monotonic pointer timing host contract
+        run: |
+          set -euo pipefail
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_pointer_clock_863.c kernel/{pointer_clock_863,monotonic_855}.c -o "build/s863-host/pointer-$cc"
+            "build/s863-host/pointer-$cc" | tee "build/s863-host/pointer-$cc.log"
+          done
       - name: Bounded storage admission, verified commit and sticky quarantine
         run: |
           set -euo pipefail

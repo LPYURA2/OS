@@ -492,6 +492,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         sources += ["kernel/ata_runtime_863.c", "kernel/storage_runtime_863.c"]
     if test_storage_ata_read_857 or test_desktop_storage_service_863:
         sources += ["kernel/ata_diag_857.c"]
+    if desktop_owned_root_preview:
+        sources += ["kernel/pointer_clock_863.c", "kernel/monotonic_855.c"]
     if test_desktop_time_855:
         sources += ["kernel/monotonic_855.c", "kernel/calibration_855.c", "kernel/pit_capture_855.c", "kernel/pit_x86_gate_855.c", "arch/x86_64/pit_x86_855.c"]
     if test_desktop_rtc_runtime_863 or test_desktop_clock_service_863:

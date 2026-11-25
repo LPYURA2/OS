@@ -11,9 +11,18 @@ bool desk_clock(unsigned *h,unsigned *m){return s863_shell_clock(h,m);}
 #else
 bool desk_clock(unsigned *h,unsigned *m){(void)h;(void)m;return false;}
 #endif
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+extern void s863_pointer_init(void);
+extern uint64_t s863_pointer_read(void);
+extern bool s863_pointer_near(uint64_t,uint64_t);
+void desk_pointer_clock_init(void){s863_pointer_init();}
+uint64_t desk_pointer_clock(void){return s863_pointer_read();}
+bool desk_pointer_near(uint64_t a,uint64_t b){return s863_pointer_near(a,b);}
+#else
 void desk_pointer_clock_init(void){arch_puts("STYLEOS S863 CLOCK DENIED\n");}
 uint64_t desk_pointer_clock(void){return 0;}
 bool desk_pointer_near(uint64_t a,uint64_t b){(void)a;(void)b;return false;}
+#endif
 void desk_reboot(void){arch_puts("STYLEOS S863 RESET DENIED\n");}
 #ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
 extern uint32_t s863_disk_probe(void);
