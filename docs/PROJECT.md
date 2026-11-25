@@ -2,6 +2,11 @@
 
 Accepted S862 `7b1c5d1187903dfd78f6bbf98f378aca42687b24`; all 16 CI SUCCESS, full 219 PASS / 5 historical SKIPPED / 0 FAIL, exact artifacts and two-round recycling replay verified. See [handoff](NEXT_CHAT_863.md). New ordinary cold-start path shares existing S858 runtime service bootstrap; hardware integration, normal guest and KFA acceptance pending. Style Kernel 1.0 only after full KFA acceptance.
 
+
+## Дополнительные требования владельца (25.11.2026)
+
+См. [STYLEOS_OWNER_REQUIREMENTS.md](STYLEOS_OWNER_REQUIREMENTS.md). Это обязательный перечень требований к последующим этапам, без изменения текущего приоритета: завершение 863, нагрузка 864, комплексная приёмка 865, затем Style Kernel 1.0 и оценка производительности. Не считать перечисленные функции реализованными.
+
 ## Stage 860 — actual CPL3 tick integration candidate
 
 Host contract CI SUCCESS. New opt-in S849-based real guest profile with existing global dispatcher, FP capture and window/lease retirement; actual guest verification pending. Shared Desktop root and KFA remain open. See [handoff](NEXT_CHAT_860.md).

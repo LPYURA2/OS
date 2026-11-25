@@ -317,3 +317,8 @@ scan, or authorization for production CR3. Preserve desktop CI and UI.
 
 
 S808 independent DMA/IOMMU observation: read-only ACPI DMAR parser and dual-mode QEMU/OVMF regression in `feature/styleos-dmar-iommu-discovery-808`; no DMA isolation authorized; production CR3 remains denied.
+
+
+## Owner requirements (25.11.2026)
+
+Read `docs/STYLEOS_OWNER_REQUIREMENTS.md` together with the current handoff. Preserve approved design, Deep Drop, independent .tea apps, and all future product requirements. Do not begin those features at the expense of completing S863–865 and full KFA acceptance. This docs-only addition does not grant hardware authority, alter acceptance criteria or authorize main changes.

@@ -91,3 +91,8 @@ Local verified-baseline compilation with exact new cooperative adapter and decla
 
 ## Cooperative guest ordering repair
 Source audit on 7cd43ff: rt861_dispatcher explicitly requires current==-1 and forbids PR_RUNNING, so the new guest's precommit call was guaranteed to refuse while the trap owner was RUNNING. Kept the original guard unchanged, verify current owner plus safe CPU/descriptor/mapping audit before commit, require rt861_dispatcher immediately after successful commit. Also deferred registry retirement until parent has zeroed child page-table spans, released and verified zeroed lease spans, and confirmed empty arena. Original S861U and timer profiles unchanged. Re-ran existing local cooperative host binaries: GCC and Clang each 787 positive /1281 refusals PASS (does not exercise hardware ordering). Prior exact guest checks still queued; latest guest/CI pending. No new stage; main/accepted refs untouched.
+
+
+## Дополнительные требования владельца (25.11.2026)
+
+См. [STYLEOS_OWNER_REQUIREMENTS.md](STYLEOS_OWNER_REQUIREMENTS.md). Это обязательный перечень требований к последующим этапам, без изменения текущего приоритета: завершение 863, нагрузка 864, комплексная приёмка 865, затем Style Kernel 1.0 и оценка производительности. Не считать перечисленные функции реализованными.
