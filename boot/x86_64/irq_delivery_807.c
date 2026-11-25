@@ -25,12 +25,18 @@ struct s844_arena *s845_arena(void);
 static volatile uint64_t irq859_rip,irq859_cs,irq859_flags,irq859_rsp,irq859_wait_rsp;
 extern const unsigned char irq859_wait_lo[],irq859_wait_hi[];
 extern void irq859_wait(void);
+extern uintptr_t irq859_publish_lapic(uintptr_t value);
+static volatile uint64_t irq859_handler_lapic __attribute__((used));
 #endif
 /* ISOLATED TERMINAL QEMU ONLY. No code is linked to ordinary Desktop.
  * PIT0 -> ISA IRQ0 -> MADT ISO GSI2 -> IOAPIC -> LAPIC vector 0x50.
  * All MMIO, timer and IDT changes occur after ExitBootServices. */
 static volatile uint32_t irq807_hits,irq807_isr_seen,irq807_eoi_clear;
+#ifdef STYLEOS_TEST_RUNTIME_IRQ_859
+static volatile uint8_t * volatile irq807_lapic_ptr __attribute__((used));
+#else
 static volatile uint8_t *irq807_lapic_ptr;
+#endif
 #ifdef STYLEOS_TEST_APIC_ROOT_842
 static volatile uint64_t irq842_root_seen,irq842_frame_seen;
 #endif
@@ -53,6 +59,12 @@ __asm__(
 #endif
  "incl irq807_hits(%rip)\n"
  "movq irq807_lapic_ptr(%rip),%rax\n"
+#ifdef STYLEOS_TEST_RUNTIME_IRQ_859
+ "movq %rax,irq859_handler_lapic(%rip)\n"
+ "movl $0xfee00000,%edx\n"
+ "cmpq %rdx,%rax\n"
+ "jne irq807_unexpected\n"
+#endif
  "movl 0x120(%rax),%edx\n" /* vector 0x50 ISR register, bit 16 */
  "testl $0x10000,%edx\n"
  "jz 1f\n"
@@ -395,7 +407,10 @@ _Noreturn void irq807_terminal(const struct boot_info *b){irq_run(b);}
 #ifdef STYLEOS_TEST_RUNTIME_IRQ_859
 /* Only STI inside a bounded leaf loop; no C call or scheduler mutation with IF=1.
  * The already-tested irq807_handler captures the interrupted root/IST and EOI. */
-__asm__(".text\n.global irq859_wait\nirq859_wait:\n"
+__asm__(".text\n.global irq859_publish_lapic\nirq859_publish_lapic:\n"
+ "movq %rcx,irq807_lapic_ptr(%rip)\n"
+ "movq irq807_lapic_ptr(%rip),%rax\nretq\n"
+ ".global irq859_wait\nirq859_wait:\n"
  "movq %rsp,irq859_wait_rsp(%rip)\nmovl $5000000,%ecx\n"
  "1: sti\n.global irq859_wait_lo\nirq859_wait_lo: nop\ncli\n.global irq859_wait_hi\nirq859_wait_hi:\n"
  "cmpl $0,irq807_hits(%rip)\njne 2f\ndecl %ecx\njnz 1b\n2: retq\n");
@@ -443,7 +458,10 @@ void irq859_once(uint64_t root,uint64_t idt_pa,uint16_t cs,uint64_t stack_lo,uin
  const uintptr_t handler=(uintptr_t)irq807_handler;
  live[IRQ859_VECTOR]=(struct idt_gate807){(uint16_t)handler,cs,1,0x8e,(uint16_t)(handler>>16),(uint32_t)(handler>>32),0};
  irq807_hits=irq807_isr_seen=irq807_eoi_clear=0;irq842_root_seen=irq842_frame_seen=0;irq859_rip=irq859_cs=irq859_flags=irq859_rsp=irq859_wait_rsp=0;
- irq807_lapic_ptr=(volatile uint8_t *)lapic;
+ irq859_handler_lapic=0;
+ /* Explicit MS x64 ABI leaf; compiler cannot elide the publication. */
+ uintptr_t published=irq859_publish_lapic(lapic);
+ if(published!=lapic||(uintptr_t)irq807_lapic_ptr!=lapic)irq859_fail("859-lapic-publish");
  /* Terminal fixture: mask LINT1 NMI first, then LINT0 ExtINT. IF=0
   * alone does not block NMI; unexpected events are terminal failures. */
  if(lvt_before[4]!=lvt_plan[4])mmio_write(lapic,0x360,lvt_plan[4]);
@@ -460,6 +478,8 @@ void irq859_once(uint64_t root,uint64_t idt_pa,uint16_t cs,uint64_t stack_lo,uin
  irq859_wait();
  io_write(io,reg,0x10050u); /* no source delivery while restoring */
  bool drained=irq859_clear(lapic);
+ uintptr_t cleared=irq859_publish_lapic(0);
+ if(cleared||(uintptr_t)irq807_lapic_ptr||irq859_handler_lapic!=lapic)irq859_fail("859-lapic-retire");
  io_write(io,reg+1,high[2]);io_write(io,reg,low[2]);mmio_write(lapic,0xf0,svr);
  live[IRQ859_VECTOR]=irq859_saved[IRQ859_VECTOR];
  /* The test route is masked/restored; IF remains clear. Restore LINT0
@@ -478,6 +498,6 @@ void irq859_once(uint64_t root,uint64_t idt_pa,uint16_t cs,uint64_t stack_lo,uin
  struct irq859_expected e={root,IRQ859_IST,cs,(uintptr_t)irq859_wait_lo,(uintptr_t)irq859_wait_hi,irq859_wait_rsp};
  struct irq859_observed o={irq842_root_seen,irq842_frame_seen,irq859_cs,irq859_rip,irq859_rsp,irq859_flags,irq807_hits,irq807_isr_seen,irq807_eoi_clear};
  if(!drained||!irq859_clear(lapic)||!irq859_frame_ok(&e,&o)||e.rsp<stack_lo||e.rsp>=stack_hi||irq859_root()!=root||irq859_rflags()&0x200||dt.base!=idt_pa||dt.limit!=4095||mmio_read(io,0)!=index||mmio_read(lapic,0x80)!=tpr||mmio_read(lapic,0xf0)!=svr||inb(0x21)!=255||inb(0xa1)!=255){arch_puts("STYLEOS S859 BLOCKED");fld("hits",o.hits);fld("isr",o.isr);fld("eoi",o.eoi);fld("rip",o.rip);fld("rsp",o.rsp);fld("wait-rsp",e.rsp);fld("frame",o.frame);fld("flags",o.rflags);fld("drained",drained);arch_putc('\n');irq859_fail("859-final-proof");}
- arch_puts("STYLEOS S859 IRQ");fld("root",root);fld("idt",idt_pa);fld("ist",e.ist);fld("frame",o.frame);fld("cs",o.cs);fld("rip",o.rip);fld("wait-lo",e.wait_lo);fld("wait-hi",e.wait_hi);fld("rsp",o.rsp);fld("wait-rsp",e.rsp);fld("flags",o.rflags);fld("hits",o.hits);fld("isr",o.isr);fld("eoi",o.eoi);fld("pin",plan.pin);fld("low",low[2]);fld("high",high[2]);fld("svr",svr);fld("tpr",tpr);fld("drained",1);arch_putc('\n');
+ arch_puts("STYLEOS S859 IRQ");fld("root",root);fld("idt",idt_pa);fld("ist",e.ist);fld("frame",o.frame);fld("cs",o.cs);fld("rip",o.rip);fld("wait-lo",e.wait_lo);fld("wait-hi",e.wait_hi);fld("rsp",o.rsp);fld("wait-rsp",e.rsp);fld("flags",o.rflags);fld("hits",o.hits);fld("isr",o.isr);fld("eoi",o.eoi);fld("pin",plan.pin);fld("low",low[2]);fld("high",high[2]);fld("svr",svr);fld("tpr",tpr);fld("drained",1);fld("published",published);fld("handler-lapic",irq859_handler_lapic);fld("cleared",cleared);arch_putc('\n');
 }
 #endif
