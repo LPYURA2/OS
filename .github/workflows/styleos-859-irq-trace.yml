@@ -1,0 +1,42 @@
+name: StyleOS 859 exact failed image CPU trace
+on:
+  push:
+    branches: [test/styleos-irq-trace-859]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU OVMF
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 ovmf
+      - name: Download exact failed run
+        uses: actions/download-artifact@v4
+        with:
+          name: styleos-859-runtime-irq
+          run-id: 45583927019
+          github-token: ${{ github.token }}
+          path: build/s859-original
+      - name: Trace parser model
+        run: python3 tools/test_trace_irq_859.py
+      - name: Replay unchanged original IMG and capture CPU exceptions and IRQ
+        run: |
+          set -euo pipefail
+          code=/usr/share/OVMF/OVMF_CODE_4M.fd
+          vars=/usr/share/OVMF/OVMF_VARS_4M.fd
+          if [ ! -f "$code" ]; then code=/usr/share/OVMF/OVMF_CODE.fd; fi
+          if [ ! -f "$vars" ]; then vars=/usr/share/OVMF/OVMF_VARS.fd; fi
+          python3 tools/trace_irq_859.py --original build/s859-original/s859-irq --output build/s859-trace --code "$code" --vars "$vars"
+      - name: Preserve diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-859-irq-trace
+          path: build/s859-trace/
+          if-no-files-found: warn
