@@ -86,4 +86,7 @@ void s846_guest_run(uint64_t root){
  if(!zero_span((uintptr_t)tables,sizeof tables)||!s844_release(a,S846_OWNER_A,leases[0])||!s844_release(a,S846_OWNER_B,leases[1])||!zero_span(leases[0].pa,3*P)||!zero_span(leases[1].pa,3*P)||!s844_count(a,&count)||count||!source_ok())fail("cleanup");
  arch_puts("STYLEOS S846 CLEAN");fld("root",cr3());fld("used",count);fld("tables-zero",1);fld("leases-zero",1);arch_putc('\n');
  arch_puts("STYLEOS S846 POLICY supervisor-switch=yes cpl3=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_RUNTIME_TICK_860
+ extern void s860_reap(uint64_t);s860_reap(root);
+#endif
 }

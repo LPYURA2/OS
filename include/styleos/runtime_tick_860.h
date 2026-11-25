@@ -7,6 +7,7 @@
  * ISR/EOI, saved full integer+FP context, owned roots and stack, and return
  * under the safe root with IF=0 before calling this single-CPU API.
  * A software receipt is not hardware evidence. No new scheduler state. */
+/* IST top has the existing S847/S848 16-byte reserved tail. */
 struct rt860_bounds {
     struct boot_range code, stack, ist;
     uint16_t cs, ss;
@@ -27,4 +28,6 @@ enum ps_status ps_tick_860(struct ps_dispatcher *,const struct rt860_tick *);
  * Inputs and saved output are distinct supervisor-owned non-overlapping objects. */
 enum ps_status dpr_tick_860(struct dpr_service *,const struct rt860_bounds *,
                           const struct rt860_tick *,struct s847_raw *saved);
+/* Boot-only privileged accessor for the existing singleton. */
+struct dpr_service *dpr_tick_global_860(void);
 #endif

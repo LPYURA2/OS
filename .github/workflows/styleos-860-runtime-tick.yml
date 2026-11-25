@@ -1,4 +1,4 @@
-name: StyleOS 860 dispatcher tick contract (host and COFF only)
+name: StyleOS 860 real CPL3 timer and dispatcher integration
 on:
   push:
     branches: [feature/styleos-runtime-tick-860]
@@ -32,12 +32,21 @@ jobs:
             objdump -t "build/s860/$name.obj" > "build/s860/$name-symbols.log"
             if grep -q __chkstk "build/s860/$name-symbols.log"; then exit 1; fi
           done
-      - name: Preserve model evidence
+      - name: Install real QEMU and image tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Real CPL3 timer events through existing dispatcher and FP bank
+        run: |
+          set -euo pipefail
+          python3 tools/test_runtime_tick_860_guest.py --output build/s860/guest
+          python3 tools/test_runtime_tick_860_verify.py build/s860/guest/serial.log
+          python3 tools/test_runtime_tick_860_trace.py build/s860/guest/serial.log build/s860/guest/cpu-trace.log.gz
+      - name: Preserve model and actual guest evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: styleos-860-tick-model
+          name: styleos-860-tick-guest
           path: |
             build/s860/**/*.log
             build/s860/*.obj
+            build/s860/guest/
           if-no-files-found: warn

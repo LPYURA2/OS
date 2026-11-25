@@ -22,7 +22,7 @@ int main(void){
  assert(ws_set_minimized(&w,a,win,true)==WS_OK);
  assert(dpr_dispatch(&s,&slot,&pid)==PS_OK&&slot==0&&pid==a);
  assert(pr_account(&p,a,101,7,8192)==PR_OK);
- tick=(struct rt860_tick){.slot=0,.dispatch=s.dispatcher.dispatches,.pid=a,.handle=101,.child_root=0x2000,.safe_root=0x1000,.frame_va=b.ist.end-sizeof tick.frame,.vector=0x50,.isr=1,.eoi=1,.safe_flags=2,.frame={.gpr={ [0]=0xaabb,[14]=0x1234 },.vector=0x50,.rip=b.code.start+2,.rsp=b.stack.end,.cs=b.cs,.ss=b.ss,.rflags=0x202}};
+ tick=(struct rt860_tick){.slot=0,.dispatch=s.dispatcher.dispatches,.pid=a,.handle=101,.child_root=0x2000,.safe_root=0x1000,.frame_va=b.ist.end-16-sizeof tick.frame,.vector=0x50,.isr=1,.eoi=1,.safe_flags=2,.frame={.gpr={ [0]=0xaabb,[14]=0x1234 },.vector=0x50,.rip=b.code.start+2,.rsp=b.stack.end,.cs=b.cs,.ss=b.ss,.rflags=0x202}};
  memset(&saved,0xa5,sizeof saved);
  #define MUT(member,width) do {for(unsigned i=0;i<(width);i++){struct rt860_tick t=tick;t.member^=UINT64_C(1)<<i;reject(&b,&t);}}while(0)
  MUT(slot,32);MUT(dispatch,32);MUT(pid,32);MUT(handle,64);MUT(child_root,64);MUT(safe_root,64);MUT(frame_va,64);MUT(vector,64);MUT(isr,64);MUT(eoi,64);MUT(frame.vector,64);MUT(frame.error,64);MUT(frame.cs,64);MUT(frame.ss,64);

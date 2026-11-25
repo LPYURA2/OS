@@ -15,7 +15,7 @@ enum ps_status dpr_tick_860(struct dpr_service *s,const struct rt860_bounds *b,
     if(!b||!t||!saved)return PS_ARGUMENT;
     if(!span(b->code)||!span(b->stack)||!span(b->ist)||
        overlap(b->code,b->stack)||overlap(b->code,b->ist)||overlap(b->stack,b->ist)||
-       b->ist.end-b->ist.start!=4096||t->frame_va!=b->ist.end-sizeof(t->frame)||
+       b->ist.end-b->ist.start!=4096||t->frame_va!=b->ist.end-16-sizeof(t->frame)||
        b->cs==b->ss||(b->cs&7u)!=3u||(b->ss&7u)!=3u||b->cs<8||b->ss<8||
        t->frame.vector!=t->vector||t->frame.error||
        t->frame.cs!=b->cs||t->frame.ss!=b->ss||

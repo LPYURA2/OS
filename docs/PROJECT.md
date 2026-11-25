@@ -1,3 +1,7 @@
+## Stage 860 — actual CPL3 tick integration candidate
+
+Host contract CI SUCCESS. New opt-in S849-based real guest profile with existing global dispatcher, FP capture and window/lease retirement; actual guest verification pending. Shared Desktop root and KFA remain open. See [handoff](NEXT_CHAT_860.md).
+
 ## Stage 860 — existing runtime dispatcher tick contract (host candidate)
 
 Accepted S859 0137edea0a27a0a35a02643d41e8c4bd0423bb14. See [handoff](NEXT_CHAT_860.md). New opt-in host/COFF contract only; no real hardware activation. KFA gates open.
