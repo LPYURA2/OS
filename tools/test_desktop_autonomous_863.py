@@ -125,13 +125,14 @@ def refuse_smp_preview(cmd,vars,out,iso,expected_hash):
     return result
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--preview',action='store_true');p.add_argument('--rounds',type=int,choices=(4,32),default=4);args=p.parse_args();preview=args.preview;rounds=args.rounds
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--preview',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--rounds',type=int,choices=(4,32),default=4);args=p.parse_args();preview=args.preview;rounds=args.rounds
+    if args.four and (not preview or rounds!=4):p.error('four live requires four-round preview')
     if rounds!=4 and not preview:p.error('extended workload requires the mixed ISO preview')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build'
     with (out/'compile.log').open('w') as f:
-        subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--desktop-owned-root-preview' if preview else '--test-desktop-autonomous-863','--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
-    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=recycle_site(efi.read_bytes(),mp,mixed=preview)
+        subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--desktop-owned-root-preview' if preview else '--test-desktop-autonomous-863',*(['--four-live-864'] if args.four else []),'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
+    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=recycle_site(efi.read_bytes(),mp,mixed=preview) if not args.four else __import__('runtime_mixed_863_verify').loop_site(efi.read_bytes(),mp,four=True)
     for forbidden in ('s863_disk_write','s863_disk_read','storage_commit_863','ata_runtime_write_863','disk_admit863'):
         if forbidden in mp.read_text():raise ValueError('storage backend linked '+forbidden)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
@@ -205,9 +206,49 @@ def main():
     if lines.count(policy)!=1:raise ValueError('policy')
     cold=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))
     prefix=b'\n'.join(lines[:cold])+b'\n'
-    root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview,mixed=preview,round_count=rounds)
+    if args.four:
+        from runtime_four_864_verify import verify,trace_check,N,order
+        from runtime_mixed_863_verify import row
+        from test_desktop_v0 import Frame
+        from test_desktop_interactive_863 import fnv_text
+        names=['note','after-first-launch','after-tasks','after-launch-3','after-launch-4']
+        frames=[Frame(out/(name+'.ppm')) for name in names]
+        first=frames[0]
+        if (first.w,first.h)!=(1280,800) or any((x.w,x.h,x.pixels)!=(first.w,first.h,first.pixels) for x in frames[1:]):raise ValueError('four live framebuffer preservation')
+        pixels=first.pixels;buf=bytearray(first.w*first.h*4);buf[0::4]=pixels[2::3];buf[1::4]=pixels[1::3];buf[2::4]=pixels[0::3]
+        fnv=fnv_text(buf)
+        ok,obs=verify(raw,33,site,ref,cold=True,clean_fnv=fnv)
+        if not ok:raise ValueError(obs)
+        root=obs['active']['root'];events=trace_check(data.decode('ascii'),obs)
+        def rows(tag):return [x for x in lines if x.startswith(tag+b' ')]
+        cold_rows=rows(b'STYLEOS S863B COLD')
+        if len(cold_rows)!=1 or tuple(row(cold_rows[0],b'STYLEOS S863B COLD',('root','dispatches','arena-next','processes','windows')).values())!=(root,0,1,0,0):raise ValueError('four cold registry')
+        req=rows(b'STYLEOS S863B REQUEST');beg=rows(b'STYLEOS S863L BEGIN');end=rows(b'STYLEOS S863L DONE');slices=rows(b'STYLEOS S863P SLICE')
+        rb=rows(b'STYLEOS S864 BATCH-BEGIN');re=rows(b'STYLEOS S864 BATCH-END')
+        if any(len(x)!=4 for x in (req,beg,end,rb,re)) or len(slices)!=108:raise ValueError('four live launch/poll count')
+        tags=(b'STYLEOS S864 ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S861T ',b'STYLEOS S862',b'STYLEOS S863M ')
+        workload=[]
+        before=0;session=None;prev=lines.index(b'STYLEOS DESKTOP READY')
+        for i in range(4):
+            if tuple(row(req[i],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted')).values())!=(root,i,N*i,1):raise ValueError('four request')
+            begin=row(beg[i],b'STYLEOS S863L BEGIN',('root','dispatches','frame','sessions'));se=begin['sessions']
+            if tuple(begin.values())!=(root,N*i,fnv,se) or tuple(row(end[i],b'STYLEOS S863L DONE',('root','dispatches','frame','sessions')).values())!=(root,N*(i+1),fnv,se) or (session is not None and session!=se):raise ValueError('four live session')
+            session=se
+            ids=[lines.index(x) for x in (req[i],beg[i],rb[i],slices[i*27],re[i],slices[i*27+26],end[i])]
+            if prev>=ids[0] or ids!=sorted(ids):raise ValueError('four live launch order')
+            prev=ids[-1];workload.extend(x for x in lines[ids[1]+1:ids[-1]] if x.startswith(tags))
+            windows=4
+            for j,(_,kind) in enumerate(list(order())+[(0,'cleanup')]):
+                cleanup=kind=='cleanup'
+                if kind=='end':windows-=1
+                n=i*27+j+1;want=(n,before,before+int(not cleanup),0 if cleanup else 12,0 if cleanup else 4,0 if cleanup else windows,int(cleanup))
+                if tuple(row(slices[n-1],b'STYLEOS S863P SLICE',('n','before','after','used','processes','windows','done')).values())!=want:raise ValueError('four live poll')
+                before=want[2]
+        if workload!=[x for x in lines if x.startswith(tags)] or before!=104 or rows(b'STYLEOS S863 EXIT'):raise ValueError('four live workload scope')
+    else:
+        root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview,mixed=preview,round_count=rounds)
     pointer=verify_pointer_clock(lines,root) if preview else None
     smp_refusal=refuse_smp_preview(cmd,vars,out,iso,iso_before) if preview else None
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,launch_rounds=rounds,host_request_to_done_ns=elapsed,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,smp_refusal=smp_refusal,pointer_clock=pointer,host_exit=rc),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',four_live=args.four,diagnostic_only=True,autonomous_boot=True,storage_authorized=False,launch_rounds=rounds,host_request_to_done_ns=elapsed,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,smp_refusal=smp_refusal,pointer_clock=pointer,host_exit=rc),indent=2))
     print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, {0} CPU events, {1} independent launch cycles, no storage writes'.format(len(events),rounds))
 if __name__=='__main__':main()

@@ -530,7 +530,7 @@ static void shell_boundary863(void){
 #ifdef STYLEOS_TEST_DESKTOP_COLD_863
  unsigned dispatches=0,next=1,generation=1;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- if(live_phase863==2){dispatches=S863_DISPATCHES_PER_BATCH*task_batches863;next=1+2*task_batches863;generation=1+2*task_batches863;}
+ if(live_phase863==2){dispatches=S863_DISPATCHES_PER_BATCH*task_batches863;next=1+S863_TASKS_PER_BATCH*task_batches863;generation=1+S863_TASKS_PER_BATCH*task_batches863;}
 #endif
 #else
  unsigned dispatches=20,next=5,generation=8;
@@ -550,8 +550,8 @@ static void shell_boundary863(void){
 #else
      dispatches>20||
 #endif
-     live_arena863->next!=S863_INITIAL_ARENA_NEXT+2*((dispatches+S863_DISPATCHES_PER_BATCH-1)/S863_DISPATCHES_PER_BATCH)||
-     (used!=0&&used!=6))fail("863-pump-arena");
+     live_arena863->next!=S863_INITIAL_ARENA_NEXT+S863_TASKS_PER_BATCH*((dispatches+S863_DISPATCHES_PER_BATCH-1)/S863_DISPATCHES_PER_BATCH)||
+     (used!=0&&used!=3*S863_TASKS_PER_BATCH))fail("863-pump-arena");
   if(!used){
    if(dispatches%S863_DISPATCHES_PER_BATCH||s845_arena()!=live_arena863||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail("863-pump-empty");
   }else if(!dispatches||s845_arena())fail("863-pump-occupied");

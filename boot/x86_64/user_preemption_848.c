@@ -221,7 +221,12 @@ s848_trial(const struct s846_root child[S846_ROOT_COUNT],const struct s844_lease
  static const struct s844_lease *bound_leases;
  struct desc848 check={0};uint16_t tr,cs;
  if(!active848){
-  bound_child=child;bound_leases=leases;step=0;completed=0;expected_windows=1;
+  bound_child=child;bound_leases=leases;step=0;completed=0;
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+  expected_windows=S846_ROOT_COUNT;
+#else
+  expected_windows=1;
+#endif
 #else
  struct desc848 g0={0},i0={0},check={0};uint16_t tr,cs;
 #endif

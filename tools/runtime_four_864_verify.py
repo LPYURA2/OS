@@ -14,7 +14,7 @@ def order():
         n[i]+=1
         if kind=='end':live[i]=False
         yield i,kind
-def verify_batch(lines,site,ref,o,epoch):
+def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
     try:
         base=4*epoch;offset=N*epoch
         lines=list(lines)
@@ -39,7 +39,7 @@ def verify_batch(lines,site,ref,o,epoch):
         spans=[(safe,safe+32*4096),(o['root']['source'],o['root']['source']+32*4096),(sl,sh),(o['bridge']['idt'],o['bridge']['idt']+4096),extent(b'HANDOFF'),extent(b'SOURCE')]+[(p,p+4096) for p in o['descriptors'].values()]
         for i,r in enumerate(roots):
             child=r['child']
-            eq(r,(i,safe,child,o['arena']['base']+i*3*4096,4+base+i),'lease')
+            eq(r,(i,safe,child,o['arena']['base']+i*3*4096,gen0+base+i),'lease')
             end=child+32*4096
             if child%4096 or not lo<=child<end<=hi or any(child<b and a<end for a,b in spans):raise ValueError('table overlap')
             spans.append((child,end))
@@ -52,7 +52,7 @@ def verify_batch(lines,site,ref,o,epoch):
         tasks=group(b'STYLEOS S864 TASK',('id','pid','root','gen','yield','end','term','budget'),4)
         for i,t in enumerate(tasks):
             label='abcd'[i]
-            eq(t,(i,i+1+base,roots[i]['child'],4+base+i,site[label+'_yield'],site[label+'_end'],site[label+'_term'],BUDGET[i]),'task identity')
+            eq(t,(i,i+1+base,roots[i]['child'],gen0+base+i,site[label+'_yield'],site[label+'_end'],site[label+'_term'],BUDGET[i]),'task identity')
         ad=one(b'STYLEOS S848 ADMIT',('lvt','initial','current','div','isr','irr'))
         if not ad['lvt']&0x10000 or ad['lvt']&~0x300ff or ad['div']&~0xb or ad['current']>ad['initial'] or ad['isr'] or ad['irr']:raise ValueError('timer admission')
         eq(one(b'STYLEOS S848 STOP',('lvt','initial','current','isr','irr')),(ad['lvt'],0,0,0,0),'timer stop')
@@ -90,7 +90,7 @@ def verify_batch(lines,site,ref,o,epoch):
             saved[i]=(0,0,0) if end else (rip,SP,flags&~0x200)
             check(commit,tags[3],('step','id','pid','state','pc','sp','flags','zero'),(step,i,i+1+base,state,*saved[i],int(end)),'commit')
             check(boundary,tags[4],('step','safe','gdt','idt','pid'),(step,safe,active['gdt'],active['idt'],i+1+base),'safe descriptors')
-            check(event,tags[5],('step','id','pid','handle','dispatch','safe','root','ticks','state','resident','window','minimized'),(step,i,i+1+base,4+base+i,step+1+offset,safe,child,ticks[i],state,12288,0 if end else i+1+base,0 if end else int(not i)),'registry')
+            check(event,tags[5],('step','id','pid','handle','dispatch','safe','root','ticks','state','resident','window','minimized'),(step,i,i+1+base,gen0+base+i,step+1+offset,safe,child,ticks[i],state,12288,0 if end else i+1+base,0 if end else int(not i)),'registry')
             p=row(progress,tags[6],('step','id','a','b','c','d'))
             values=[p[k] for k in 'abcd']
             if (p['step'],p['id'])!=(step,i) or any(values[j]!=prog[j] for j in range(4) if j!=i) or values[i]<prog[i] or (not end and values[i]!=prog[i]):raise ValueError('cross-process progress')
@@ -104,22 +104,25 @@ def verify_batch(lines,site,ref,o,epoch):
         eq(one(b'STYLEOS S862L EMPTY',('dispatches','safe','windows')),(N,safe,0),'empty scheduler')
         eq(one(b'STYLEOS S860 CLEAN',('safe','dispatches','processes','windows')),(safe,N+offset,0,0),'registry cleanup')
         eq(one(b'STYLEOS S862B CLEAN',('safe','bank-zero','pending-zero')),(safe,1,1),'bank cleanup')
-        eq(one(b'STYLEOS S864 CLEAN',('safe','used','next','tables-zero','leases-zero','fnv')),(safe,0,8+base,1,1,ref['fnv']),'memory/frame cleanup')
+        eq(one(b'STYLEOS S864 CLEAN',('safe','used','next','tables-zero','leases-zero','fnv')),(safe,0,gen0+4+base,1,1,ref['fnv'] if clean_fnv is None else clean_fnv),'memory/frame cleanup')
         if rows(b'STYLEOS S849 CLEAN')!=[b'STYLEOS S849 CLEAN slots-zero=yes kernel-copy-zero=yes']:raise ValueError('FP cleanup')
         reuse=group(b'STYLEOS S864 REUSE',('id','pa','old','new'),4 if epoch else 0)
         stale=group(b'STYLEOS S864 STALE',('id','pid','handle','dispatch','refused'),4 if epoch else 0)
         fx=group(b'STYLEOS S864 FX-STALE',('id','gen'),4 if epoch else 0)
         for i in range(4 if epoch else 0):
-            eq(reuse[i],(i,roots[i]['pa'],base+i,base+4+i),'stale lease')
-            eq(stale[i],(i,base-4+i+1,base+i,offset-N+i+1,3),'stale selection')
-            eq(fx[i],(i,base+i),'stale FX generation')
+            eq(reuse[i],(i,roots[i]['pa'],gen0+base+i-4,gen0+base+i),'stale lease')
+            eq(stale[i],(i,base-4+i+1,gen0+base+i-4,offset-N+i+1,3),'stale selection')
+            eq(fx[i],(i,gen0+base+i-4),'stale FX generation')
         releases=group(b'STYLEOS S862S RELEASE',('id','pid','handle','root','safe','processes'),4)
-        for i,x in enumerate(releases):eq(x,(i,base+i+1,base+i+4,roots[i]['child'],safe,3-i),'release')
+        for i,x in enumerate(releases):eq(x,(i,base+i+1,gen0+base+i,roots[i]['child'],safe,3-i),'release')
         return True,dict(four_roots=roots,four_switches=switches,four_events=events,timer_ready=ready)
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)
-def verify(raw,rc,site,ref):
+def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None):
     try:
-        ok,o=prior(raw,rc,site['rva'],ref)
+        lines=raw.splitlines()
+        prefix=raw if not cold else b'\n'.join(lines[:next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))])+b'\n'
+        gen0=1 if cold else 4
+        ok,o=prior(prefix,rc,site['rva'],ref,cold=cold)
         if not ok:raise ValueError(o)
         lines=raw.splitlines()
         begins=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S864 BATCH-BEGIN ')]
@@ -128,9 +131,9 @@ def verify(raw,rc,site,ref):
         batches=[]
         for i,(a,z) in enumerate(zip(begins,ends)):
             if not a<z or (i and a<=ends[i-1]):raise ValueError('batch order')
-            for k,tag,dispatch,gen in ((a,b'STYLEOS S864 BATCH-BEGIN',N*i,4+4*i),(z,b'STYLEOS S864 BATCH-END',N*(i+1),8+4*i)):
+            for k,tag,dispatch,gen in ((a,b'STYLEOS S864 BATCH-BEGIN',N*i,gen0+4*i),(z,b'STYLEOS S864 BATCH-END',N*(i+1),gen0+4*(i+1))):
                 if tuple(row(lines[k],tag,('round','dispatches','next')).values())!=(i,dispatch,gen):raise ValueError('batch identity')
-            ok,b=verify_batch(lines[:begins[0]]+lines[a+1:z],site,ref,o,i)
+            ok,b=verify_batch(lines[:begins[0]]+lines[a+1:z],site,ref,o,i,gen0=gen0,clean_fnv=clean_fnv)
             if not ok:raise ValueError(b)
             if i and [x['child'] for x in b['four_roots']]!=[x['child'] for x in batches[0]['four_roots']]:raise ValueError('root reuse')
             batches.append(b)

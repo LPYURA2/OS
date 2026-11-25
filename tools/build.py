@@ -36,7 +36,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False, test_physical_arena_844=False, test_task_stacks_845=False, test_user_roots_846=False, test_process_trial_847=False, test_user_preempt_848=False, test_fx_context_849=False, test_desktop_preflight_850=False, test_desktop_switch_851=False, test_desktop_frame_852=False, test_desktop_input_853=False, test_desktop_rtc_854=False, test_desktop_time_855=False, test_storage_topology_856=False, test_storage_bmdma_857=False, test_storage_busmaster_857=False, test_storage_ata_read_857=False, test_runtime_entry_858=False, test_runtime_arena_858=False, test_runtime_irq_859=False, test_runtime_tick_860=False, test_runtime_roots_861=False, test_runtime_user_861=False, test_runtime_timer_861=False, test_runtime_select_862=False, test_runtime_bank_862=False, test_runtime_loop_862=False, test_runtime_sparse_862=False, test_runtime_recycle_862=False, test_desktop_interactive_863=False, test_desktop_live_863=False, test_desktop_pump_863=False, test_desktop_rtc_runtime_863=False, test_storage_pio_runtime_863=False, test_runtime_coop_863=False, test_runtime_mixed_863=False, test_desktop_clock_service_863=False, test_desktop_storage_service_863=False, test_desktop_cold_863=False, test_desktop_cold_tasks_863=False, test_desktop_autonomous_863=False, desktop_owned_root_preview=False, four_guest_864=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False, test_physical_arena_844=False, test_task_stacks_845=False, test_user_roots_846=False, test_process_trial_847=False, test_user_preempt_848=False, test_fx_context_849=False, test_desktop_preflight_850=False, test_desktop_switch_851=False, test_desktop_frame_852=False, test_desktop_input_853=False, test_desktop_rtc_854=False, test_desktop_time_855=False, test_storage_topology_856=False, test_storage_bmdma_857=False, test_storage_busmaster_857=False, test_storage_ata_read_857=False, test_runtime_entry_858=False, test_runtime_arena_858=False, test_runtime_irq_859=False, test_runtime_tick_860=False, test_runtime_roots_861=False, test_runtime_user_861=False, test_runtime_timer_861=False, test_runtime_select_862=False, test_runtime_bank_862=False, test_runtime_loop_862=False, test_runtime_sparse_862=False, test_runtime_recycle_862=False, test_desktop_interactive_863=False, test_desktop_live_863=False, test_desktop_pump_863=False, test_desktop_rtc_runtime_863=False, test_storage_pio_runtime_863=False, test_runtime_coop_863=False, test_runtime_mixed_863=False, test_desktop_clock_service_863=False, test_desktop_storage_service_863=False, test_desktop_cold_863=False, test_desktop_cold_tasks_863=False, test_desktop_autonomous_863=False, desktop_owned_root_preview=False, four_guest_864=False, four_live_864=False):
+    if four_live_864 and (not desktop_owned_root_preview or four_guest_864 or desktop_v0 or update_build is not None):
+        raise ValueError('864 live four requires isolated owned-root preview')
     if four_guest_864 and (not test_runtime_mixed_863 or test_desktop_interactive_863 or test_runtime_recycle_862 or test_runtime_sparse_862 or desktop_v0 or desktop_owned_root_preview or update_build is not None):
         raise ValueError('864 four guest requires isolated terminal mixed runtime')
     if desktop_owned_root_preview:
@@ -67,7 +69,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_desktop_interactive_863:
         if desktop_v0 or arch != "x86_64" or update_build is not None:
             raise ValueError("863 requires isolated Q35 interactive profile")
-        test_runtime_recycle_862 = True
+        if not four_live_864:
+            test_runtime_recycle_862 = True
     if test_runtime_recycle_862:
         test_runtime_sparse_862 = True
     if test_runtime_sparse_862:
@@ -660,7 +663,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_STORAGE_TOPOLOGY_856=1')
     if test_desktop_time_855:
         flags.append('-DSTYLEOS_TEST_DESKTOP_TIME_855=1')
-    if four_guest_864:
+    if four_guest_864 or four_live_864:
         flags += ['-DSTYLEOS_TEST_FOUR_GUEST_864=1','-DSTYLEOS_TEST_WIDE_ROOTS_864=1','-DSTYLEOS_TEST_WIDE_FX_864=1']
     if test_runtime_recycle_862:
         flags.append("-DSTYLEOS_TEST_RUNTIME_RECYCLE_862=1")
@@ -1053,12 +1056,15 @@ def main():
                           help='Restricted Q35/TCG cold owned-root preview, no writable data disk or test-exit key')
     negative.add_argument('--desktop-v0', action='store_true',
                           help='Experimental interactive x86-64 UEFI desktop image')
+    parser.add_argument('--four-live-864', action='store_true', help='Four CPL3 contexts in restricted owned-root preview only')
     parser.add_argument('--four-guest-864', action='store_true', help='Four actual CPL3 contexts on terminal mixed fixture')
     parser.add_argument('--mixed-cold-tasks-864', action='store_true', help='Extend only the isolated cold task/storage fixture with mixed INT80/IRQ')
     parser.add_argument('--update-build', type=int, help='Guest update build number')
     parser.add_argument('--update-public-key', type=Path, help='Raw Ed25519 verification key')
     parser.add_argument('--test-update-fail', action='store_true', help='Trial intentionally never becomes ready')
     args = parser.parse_args()
+    if args.four_live_864 and (not args.desktop_owned_root_preview or args.four_guest_864 or args.mixed_cold_tasks_864 or args.test_runtime_recycle_862 or args.test_runtime_sparse_862 or args.test_desktop_storage_service_863 or args.update_build is not None):
+        parser.error('864 live four requires isolated --desktop-owned-root-preview')
     if args.four_guest_864:
         if not args.test_runtime_mixed_863 or not args.output or args.desktop_v0 or args.desktop_owned_root_preview or args.test_desktop_interactive_863 or args.test_desktop_live_863 or args.test_desktop_pump_863 or args.test_desktop_cold_863 or args.test_desktop_cold_tasks_863 or args.test_desktop_autonomous_863 or args.test_desktop_storage_service_863 or args.test_runtime_sparse_862 or args.test_runtime_recycle_862 or args.update_build is not None:
             parser.error('864 four guest requires isolated terminal --test-runtime-mixed-863')
@@ -1093,7 +1099,8 @@ def main():
     if args.test_desktop_interactive_863:
         if args.arch != "x86_64" or not args.output or args.desktop_v0 or args.update_build is not None:
             parser.error("863 requires isolated x86-64 --output")
-        args.test_runtime_recycle_862 = True
+        if not args.four_live_864:
+            args.test_runtime_recycle_862 = True
     if args.test_runtime_recycle_862:
         args.test_runtime_sparse_862 = True
     if args.test_runtime_sparse_862:
@@ -1439,6 +1446,7 @@ def main():
                              **({'test_runtime_bank_862': True} if args.test_runtime_bank_862 else {}),
                              **({'test_runtime_mixed_863': True} if args.test_runtime_mixed_863 else {}),
                              **({'four_guest_864': True} if args.four_guest_864 else {}),
+                             **({'four_live_864': True} if args.four_live_864 else {}),
                              **({'test_runtime_loop_862': True} if args.test_runtime_loop_862 else {}),
                              **({'test_runtime_sparse_862': True} if args.test_runtime_sparse_862 else {}),
                              **({'test_runtime_recycle_862': True} if args.test_runtime_recycle_862 else {}),
@@ -1545,6 +1553,7 @@ def main():
                              **({'test_runtime_bank_862': True} if args.test_runtime_bank_862 else {}),
                              **({'test_runtime_mixed_863': True} if args.test_runtime_mixed_863 else {}),
                              **({'four_guest_864': True} if args.four_guest_864 else {}),
+                             **({'four_live_864': True} if args.four_live_864 else {}),
                              **({'test_runtime_loop_862': True} if args.test_runtime_loop_862 else {}),
                              **({'test_runtime_sparse_862': True} if args.test_runtime_sparse_862 else {}),
                              **({'test_runtime_recycle_862': True} if args.test_runtime_recycle_862 else {}),
