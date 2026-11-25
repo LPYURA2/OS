@@ -125,8 +125,9 @@ def refuse_smp_preview(cmd,vars,out,iso,expected_hash):
     return result
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--preview',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--rounds',type=int,choices=(4,32),default=4);args=p.parse_args();preview=args.preview;rounds=args.rounds
-    if args.four and (not preview or rounds!=4):p.error('four live requires four-round preview')
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--preview',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--rounds',type=int,choices=(4,8,32),default=4);args=p.parse_args();preview=args.preview;rounds=args.rounds
+    if args.four and (not preview or rounds not in (4,8)):p.error('four live requires four- or eight-round preview')
+    if not args.four and rounds==8:p.error('eight rounds require four live contexts')
     if rounds!=4 and not preview:p.error('extended workload requires the mixed ISO preview')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build'
@@ -211,13 +212,13 @@ def main():
         from runtime_mixed_863_verify import row
         from test_desktop_v0 import Frame
         from test_desktop_interactive_863 import fnv_text
-        names=['note','after-first-launch','after-tasks','after-launch-3','after-launch-4']
+        names=['note','after-first-launch','after-tasks']+[f'after-launch-{i}' for i in range(3,rounds+1)]
         frames=[Frame(out/(name+'.ppm')) for name in names]
         first=frames[0]
         if (first.w,first.h)!=(1280,800) or any((x.w,x.h,x.pixels)!=(first.w,first.h,first.pixels) for x in frames[1:]):raise ValueError('four live framebuffer preservation')
         pixels=first.pixels;buf=bytearray(first.w*first.h*4);buf[0::4]=pixels[2::3];buf[1::4]=pixels[1::3];buf[2::4]=pixels[0::3]
         fnv=fnv_text(buf)
-        ok,obs=verify(raw,33,site,ref,cold=True,clean_fnv=fnv)
+        ok,obs=verify(raw,33,site,ref,cold=True,clean_fnv=fnv,round_count=rounds)
         if not ok:raise ValueError(obs)
         root=obs['active']['root'];events=trace_check(data.decode('ascii'),obs)
         def rows(tag):return [x for x in lines if x.startswith(tag+b' ')]
@@ -225,11 +226,11 @@ def main():
         if len(cold_rows)!=1 or tuple(row(cold_rows[0],b'STYLEOS S863B COLD',('root','dispatches','arena-next','processes','windows')).values())!=(root,0,1,0,0):raise ValueError('four cold registry')
         req=rows(b'STYLEOS S863B REQUEST');beg=rows(b'STYLEOS S863L BEGIN');end=rows(b'STYLEOS S863L DONE');slices=rows(b'STYLEOS S863P SLICE')
         rb=rows(b'STYLEOS S864 BATCH-BEGIN');re=rows(b'STYLEOS S864 BATCH-END')
-        if any(len(x)!=4 for x in (req,beg,end,rb,re)) or len(slices)!=108:raise ValueError('four live launch/poll count')
+        if any(len(x)!=rounds for x in (req,beg,end,rb,re)) or len(slices)!=27*rounds:raise ValueError('four live launch/poll count')
         tags=(b'STYLEOS S864 ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S861T ',b'STYLEOS S862',b'STYLEOS S863M ')
         workload=[]
         dispatch_before=0;session=None;prev=lines.index(b'STYLEOS DESKTOP READY')
-        for i in range(4):
+        for i in range(rounds):
             if tuple(row(req[i],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted')).values())!=(root,i,N*i,1):raise ValueError('four request')
             begin=row(beg[i],b'STYLEOS S863L BEGIN',('root','dispatches','frame','sessions'));se=begin['sessions']
             if tuple(begin.values())!=(root,N*i,fnv,se) or tuple(row(end[i],b'STYLEOS S863L DONE',('root','dispatches','frame','sessions')).values())!=(root,N*(i+1),fnv,se) or (session is not None and session!=se):raise ValueError('four live session')
@@ -244,7 +245,7 @@ def main():
                 n=i*27+j+1;want=(n,dispatch_before,dispatch_before+int(not cleanup),0 if cleanup else 12,0 if cleanup else 4,0 if cleanup else windows,int(cleanup))
                 if tuple(row(slices[n-1],b'STYLEOS S863P SLICE',('n','before','after','used','processes','windows','done')).values())!=want:raise ValueError('four live poll')
                 dispatch_before=want[2]
-        if workload!=[x for x in lines if x.startswith(tags)] or dispatch_before!=104 or rows(b'STYLEOS S863 EXIT'):raise ValueError('four live workload scope')
+        if workload!=[x for x in lines if x.startswith(tags)] or dispatch_before!=N*rounds or rows(b'STYLEOS S863 EXIT'):raise ValueError('four live workload scope')
     else:
         root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview,mixed=preview,round_count=rounds)
     pointer=verify_pointer_clock(lines,root) if preview else None

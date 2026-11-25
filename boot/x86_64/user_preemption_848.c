@@ -282,7 +282,13 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  if(!runtime860||!audit||!audit(opaque))fail848("861-timer-join");
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
  dispatch_base848=runtime860->dispatcher.dispatches;
- if(dispatch_base848%26||dispatch_base848>=104||runtime860->dispatcher.next||armed848||receipt860||frame860||cr2862||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail848("864-restart-boundary");
+ if(dispatch_base848%26||
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+    dispatch_base848/26>=S863_LAUNCH_LIMIT||
+#else
+    dispatch_base848>=104||
+#endif
+    runtime860->dispatcher.next||armed848||receipt860||frame860||cr2862||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail848("864-restart-boundary");
  ticks848=0;
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){local848[i]=0;progress848[i]=0;mixed_calls848[i]=0;mixed_pc848[i]=0;}
 #elif defined(STYLEOS_TEST_RUNTIME_RECYCLE_862)

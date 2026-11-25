@@ -99,7 +99,7 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  static unsigned round;
  static bool prepared;
  unsigned used;
- if(round>=4)fail("864-live-limit");
+ if(round>=S863_LAUNCH_LIMIT)fail("864-live-limit");
  const uint64_t gen=S863_INITIAL_ARENA_NEXT+4*round;
  if(!prepared){
 #else

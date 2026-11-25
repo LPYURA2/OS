@@ -119,8 +119,9 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
         for i,x in enumerate(releases):eq(x,(i,base+i+1,gen0+base+i,roots[i]['child'],safe,3-i),'release')
         return True,dict(four_roots=roots,four_switches=switches,four_events=events,timer_ready=ready)
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)
-def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False):
+def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count=4):
     try:
+        if round_count!=4 and (not cold or storage or round_count!=8):raise ValueError('unsupported four workload')
         lines=raw.splitlines()
         prefix=raw if not cold else b'\n'.join(lines[:next(i for i,x in enumerate(lines) if (x==b'STYLEOS S863S WAIT' if storage else x.startswith(b'STYLEOS S863B COLD ')))])+b'\n'
         gen0=1 if cold else 4
@@ -129,7 +130,7 @@ def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False):
         lines=raw.splitlines()
         begins=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S864 BATCH-BEGIN ')]
         ends=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S864 BATCH-END ')]
-        if len(begins)!=4 or len(ends)!=4 or any(b' FAIL ' in x for x in lines):raise ValueError('batch count')
+        if len(begins)!=round_count or len(ends)!=round_count or any(b' FAIL ' in x for x in lines):raise ValueError('batch count')
         batches=[]
         for i,(a,z) in enumerate(zip(begins,ends)):
             if not a<z or (i and a<=ends[i-1]):raise ValueError('batch order')
@@ -177,5 +178,5 @@ def trace_check(text,o):
                 if val(r'\b'+name.upper()+r'\s*=([0-9a-fA-F]+)\b')!=expected:raise ValueError('CPU GPR '+name)
         if rec!=want or (records and int(m[1])!=records[-1][0]+1):raise ValueError('CPU binding')
         records.append((int(m[1]),rec))
-    if len(records)!=len(plan) or len(plan)!=121:raise ValueError('CPU count')
+    if len(records)!=len(plan) or len(plan)!=1+30*len(o['batches']):raise ValueError('CPU count')
     return records

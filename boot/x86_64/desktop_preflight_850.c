@@ -601,6 +601,11 @@ bool s863_request_tasks(void){
  s863_shell_guard();
  shell_boundary863();
  bool accept=live_phase863!=1&&!task_requested863&&task_batches863<S863_LAUNCH_LIMIT;
+#if defined(STYLEOS_TEST_FOUR_GUEST_864) && defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW)
+ /* Reserve sufficient registry serial space before admitting an entire
+  * four-context batch. Never begin a workload that can exhaust it mid-flight. */
+ accept=accept&&pr_global()->change_serial<=UINT32_MAX-128u;
+#endif
  if(accept)task_requested863=true;
  arch_puts("STYLEOS S863B REQUEST");field("root",shell_root863);field("completed",task_batches863);
  field("dispatches",shell_d863->dispatcher.dispatches);field("accepted",accept);arch_putc('\n');
