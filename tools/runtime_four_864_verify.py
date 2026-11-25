@@ -71,7 +71,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
             check(fp,tags[1],('id','root','n','xmm14','xmm15','mxcsr','st0','exp','kernel-restored','terminal'),(i,child,seen[i],tag|13,tag|14,0x3f80 if i else 0x1f80,0 if i else 0x8000000000000000,0 if i else 0x3fff,1,int(end)),'FP')
             ff=row(frame,tags[2],('step','flags'));flags=ff['flags']
             if ff['step']!=step or flags&0x202!=0x202 or flags&~0xad7:raise ValueError('flags')
-            vec=128 if kind=='call' or (end and i) else 14 if end else 0x50
+            vec=128 if kind=='call' else (14,128,6,13)[i] if end else 0x50
             err=5 if vec==14 else 0
             if kind=='call':
                 rip=t['yield']
@@ -85,8 +85,8 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
                 prog[i]=r['progress']
             else:
                 rip=t['term'];windows-=1
-                check(traps[step],b'STYLEOS S848 END',('id','root','rip','vector','error','cr2','state','ticks'),(i,child,rip,vec,err,IST if err else 0,4 if i else 3,sum(ticks)),'terminal')
-            state=(4 if i else 5) if end else 1
+                check(traps[step],b'STYLEOS S848 END',('id','root','rip','vector','error','cr2','state','ticks'),(i,child,rip,vec,err,IST if err else 0,4 if i==1 else 3,sum(ticks)),'terminal')
+            state=(4 if i==1 else 5) if end else 1
             saved[i]=(0,0,0) if end else (rip,SP,flags&~0x200)
             check(commit,tags[3],('step','id','pid','state','pc','sp','flags','zero'),(step,i,i+1+base,state,*saved[i],int(end)),'commit')
             check(boundary,tags[4],('step','safe','gdt','idt','pid'),(step,safe,active['gdt'],active['idt'],i+1+base),'safe descriptors')
@@ -95,7 +95,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
             values=[p[k] for k in 'abcd']
             if (p['step'],p['id'])!=(step,i) or any(values[j]!=prog[j] for j in range(4) if j!=i) or values[i]<prog[i] or (not end and values[i]!=prog[i]):raise ValueError('cross-process progress')
             prog=values
-            check(back,tags[7],('step','id','safe','state','a','b','stack-same'),(step,i,safe,4 if end and i else 3 if end else 1,*prog[:2],1),'safe stack')
+            check(back,tags[7],('step','id','safe','state','a','b','stack-same'),(step,i,safe,4 if end and i==1 else 3 if end else 1,*prog[:2],1),'safe stack')
             chain=[en,fp,frame,traps[step],commit,boundary,event,progress,back]
             if [lines.index(x) for x in chain]!=sorted(lines.index(x) for x in chain):raise ValueError('event order')
             events.append(dict(id=i,kind=kind,vector=vec,error=err,rip=rip,flags=flags,root=child))
@@ -167,7 +167,8 @@ def trace_check(text,o):
             if e['error'] and val(r'^CR0=[^\n]*\bCR2=([0-9a-fA-F]+)')!=IST:raise ValueError('CR2')
             for t,name in enumerate(GPRS):
                 expected=0x12000000 if t==5 else 0x8480000000000000|(e['id']<<32)|t
-                if t==0 and e['kind']!='tick':expected=1 if e['kind']=='call' else 2 if e['id'] else IST
+                if t==0 and e['kind']=='call':expected=1
+                elif t==0 and e['kind']=='end' and e['id']<2:expected=2 if e['id']==1 else IST
                 if val(r'\b'+name.upper()+r'\s*=([0-9a-fA-F]+)\b')!=expected:raise ValueError('CPU GPR '+name)
         if rec!=want or (records and int(m[1])!=records[-1][0]+1):raise ValueError('CPU binding')
         records.append((int(m[1]),rec))

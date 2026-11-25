@@ -88,8 +88,12 @@ extern void s848_irq_entry(void),s847_bad_entry(void);
 extern const unsigned char s848_a_start[],s848_a_loop_end[],s848_a_fault[],s848_a_end[];
 extern const unsigned char s848_b_start[],s848_b_loop_end[],s848_b_exit[],s848_b_end[];
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
-extern const unsigned char s848_c_start[],s848_c_loop_end[],s848_c_exit[],s848_c_end[],s848_c_yield[];
-extern const unsigned char s848_d_start[],s848_d_loop_end[],s848_d_exit[],s848_d_end[],s848_d_yield[];
+extern const unsigned char s848_c_start[],s848_c_loop_end[],s848_c_fault[],s848_c_end[],s848_c_yield[];
+extern const unsigned char s848_d_start[],s848_d_loop_end[],s848_d_fault[],s848_d_end[],s848_d_yield[];
+extern void s864_ud_entry(void),s864_gp_entry(void);
+static bool normal_exit848(unsigned id){return id==1;}
+#else
+static bool normal_exit848(unsigned id){return id!=0;}
 #endif
 static uint64_t root848(void){uint64_t v;__asm__ volatile("mov %%cr3,%0":"=r"(v));return v;}
 static uint64_t flags848(void){uint64_t v;__asm__ volatile("pushfq;popq %0":"=r"(v));return v;}
@@ -167,11 +171,17 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  ||local848[id]!=(id?5u:3u)
 #endif
  )fail848("terminal-origin");
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ if(id==2||id==3){
+  if(f->vector!=(id==2?6u:13u)||f->error||(uintptr_t)f!=S846_IST+4*P-16-sizeof *f)fail848("864-fault-origin");
+  for(unsigned j=0;j<15;j++)if(f->gpr[j]!=pattern848((unsigned)id,j))fail848("864-fault-gpr");
+ }else
+#endif
  if(id==0?(f->vector!=14||f->error!=5||cr2!=S846_IST):(f->vector!=128||f->gpr[0]!=S847_CALL_EXIT))fail848("terminal-trap");
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
  if((f->rflags&0x202)!=0x202||f->cs!=bank862.cs||f->ss!=bank862.ss)fail848("862-terminal-frame");
  pending860=*f;frame860=(uintptr_t)f;cr2862=id?0:cr2;receipt860=true;
- unsigned terminal_state=id?S847_EXITED:S847_FAULTED;
+ unsigned terminal_state=normal_exit848(id)?S847_EXITED:S847_FAULTED;
 #else
  struct s847_decision d;
  if(!s848_user_trap(&ctl848,f,(uintptr_t)f,cr2,root,flags848(),&d)||d.action!=(id?S847_EXIT:S847_FAULT))fail848("terminal-model");
@@ -279,7 +289,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  arch_puts("STYLEOS S848 STOP");fld848("lvt",rd848(0x320));fld848("initial",initial);fld848("current",current);fld848("isr",isr);fld848("irr",irr);arch_putc('\n');
  if(initial||current||isr||irr||rd848(0x320)!=lvt)fail848("timer-stop");
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
- const unsigned char *start[4]={s848_a_start,s848_b_start,s848_c_start,s848_d_start},*loop[4]={s848_a_loop_end,s848_b_loop_end,s848_c_loop_end,s848_d_loop_end},*end[4]={s848_a_end,s848_b_end,s848_c_end,s848_d_end},*term[4]={s848_a_fault,s848_b_exit,s848_c_exit,s848_d_exit};
+ const unsigned char *start[4]={s848_a_start,s848_b_start,s848_c_start,s848_d_start},*loop[4]={s848_a_loop_end,s848_b_loop_end,s848_c_loop_end,s848_d_loop_end},*end[4]={s848_a_end,s848_b_end,s848_c_end,s848_d_end},*term[4]={s848_a_fault,s848_b_exit,s848_c_fault,s848_d_fault};
  const unsigned char *calls[4]={s848_a_yield,s848_b_yield,s848_c_yield,s848_d_yield};
 #else
  const unsigned char *start[2]={s848_a_start,s848_b_start},*loop[2]={s848_a_loop_end,s848_b_loop_end},*end[2]={s848_a_end,s848_b_end},*term[2]={s848_a_fault,s848_b_exit};
@@ -309,6 +319,9 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #endif
  for(unsigned i=0;i<256;i++)gate848(i,s847_bad_entry,cs,3,0x8e);
  gate848(V,s848_irq_entry,cs,1,0x8e);gate848(128,s847_call_entry,cs,1,0xee);gate848(14,s847_pf_entry,cs,2,0x8e);
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ gate848(6,s864_ud_entry,cs,2,0x8e);gate848(13,s864_gp_entry,cs,2,0x8e);
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  g=(struct desc848){sel.limit,g0.base};d=(struct desc848){sizeof idt848-1,(uintptr_t)idt848};
 #else
@@ -515,7 +528,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   for(unsigned j=0;j<S846_ROOT_COUNT;j++)if(j!=id&&word848(leases[j].pa+P)!=progress848[j])fail848("safe-other-progress");
   if(root848()!=safe||(flags848()&0x200)||sp0!=sp1||armed848||a<progress848[id]||(!terminal&&a!=progress848[id]))fail848("safe-return");
 #ifndef STYLEOS_TEST_RUNTIME_BANK_862
-  if(ctl848.current!=-1||ctl848.slot[id].state!=(terminal?(id?S847_EXITED:S847_FAULTED):S847_READY))fail848("safe-return-state");
+  if(ctl848.current!=-1||ctl848.slot[id].state!=(terminal?(normal_exit848(id)?S847_EXITED:S847_FAULTED):S847_READY))fail848("safe-return-state");
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
@@ -530,7 +543,11 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
   /* S863 pump: retain authenticated IRQ/FP/terminal capture.
    * The existing fixture does not admit returning software traps yet. */
-  if(terminal?(pending860.vector!=14&&pending860.vector!=128):call_slice?(pending860.vector!=128||pending860.error||pending860.gpr[0]!=S847_CALL_YIELD):pending860.vector!=V)fail848("863-event-kind");
+  if(terminal?(pending860.vector!=14&&pending860.vector!=128
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+     &&pending860.vector!=6&&pending860.vector!=13
+#endif
+     ):call_slice?(pending860.vector!=128||pending860.error||pending860.gpr[0]!=S847_CALL_YIELD):pending860.vector!=V)fail848("863-event-kind");
   struct rt860_tick t={.slot=id,.dispatch=runtime860->dispatcher.dispatches,.pid=pid860[id],.handle=handle860[id],.child_root=child[id].built.root,.safe_root=root848(),.frame_va=frame860,.vector=pending860.vector,.isr=pending860.vector==V,.eoi=pending860.vector==V,.safe_flags=flags848(),.frame=pending860};
   if(rt863_bank_event(&bank862,runtime860,&selection,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
 #else
@@ -568,7 +585,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   unsigned want_windows=step<6?2u:step<9?1u:0u;
 #endif
   pe=pr_find(pr_global(),pid860[id]);const struct ws_window *window=ws_find(ws_global(),win860[id]);
-  if(!pe||pe->cpu_ticks!=local848[id]||pe->resident_bytes!=3*P||pe->state!=(terminal?(id?PR_EXITED:PR_FAULTED):PR_READY)||runtime860->dispatcher.current!=-1||(terminal?window!=0:(!window||window->minimized!=(id==0)))||ws_snapshot(ws_global(),0,0)!=want_windows)fail848("860-event-state");
+  if(!pe||pe->cpu_ticks!=local848[id]||pe->resident_bytes!=3*P||pe->state!=(terminal?(normal_exit848(id)?PR_EXITED:PR_FAULTED):PR_READY)||runtime860->dispatcher.current!=-1||(terminal?window!=0:(!window||window->minimized!=(id==0)))||ws_snapshot(ws_global(),0,0)!=want_windows)fail848("860-event-state");
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
   struct rt858_live after=live848();if(rt861_dispatcher(&after)!=runtime860)fail848("861-timer-after");
   arch_puts("STYLEOS S861T BOUNDARY");fld848("step",step);fld848("safe",after.root);fld848("gdt",after.gdt);fld848("idt",after.idt);fld848("pid",pid860[id]);arch_putc('\n');
@@ -597,7 +614,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
  if(completed!=TOTAL_TICKS848+S846_ROOT_COUNT+EXTRA_DISPATCH848||ticks848!=TOTAL_TICKS848||runtime860->dispatcher.current!=-1)fail848("864-loop-final");
- for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(local848[i]!=s862_loop_budget[i]||!pr_find(pr_global(),pid860[i])||pr_find(pr_global(),pid860[i])->state!=(i?PR_EXITED:PR_FAULTED))fail848("864-final-state");
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(local848[i]!=s862_loop_budget[i]||!pr_find(pr_global(),pid860[i])||pr_find(pr_global(),pid860[i])->state!=(normal_exit848(i)?PR_EXITED:PR_FAULTED))fail848("864-final-state");
 #else
  if(completed!=s862_loop_budget[0]+s862_loop_budget[1]+2+EXTRA_DISPATCH848||ticks848!=s862_loop_budget[0]+s862_loop_budget[1]||local848[0]!=s862_loop_budget[0]||local848[1]!=s862_loop_budget[1]||runtime860->dispatcher.current!=-1||pr_find(pr_global(),pid860[0])->state!=PR_FAULTED||pr_find(pr_global(),pid860[1])->state!=PR_EXITED)fail848("862-loop-final");
 #endif
@@ -653,7 +670,7 @@ void s860_reap(uint64_t safe){
  const unsigned char *pending=(const void *)&pending860;for(size_t j=0;j<sizeof pending860;j++)if(pending[j])fail848("862-pending-zero");
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   const struct pr_entry *pe=pr_find(pr_global(),pid860[i]);const struct rt862_bank_slot *slot=&bank862.slots[i];
-  if(!pe||pe->state!=(i?PR_EXITED:PR_FAULTED)||slot->pid!=pid860[i]||slot->handle!=handle860[i]||slot->root!=pe->page_root)fail848("862-bank-reap-binding");
+  if(!pe||pe->state!=(normal_exit848(i)?PR_EXITED:PR_FAULTED)||slot->pid!=pid860[i]||slot->handle!=handle860[i]||slot->root!=pe->page_root)fail848("862-bank-reap-binding");
   const unsigned char *bytes=(const void *)&slot->context;for(size_t j=0;j<sizeof slot->context;j++)if(bytes[j])fail848("862-context-zero");
  }
 #if defined(STYLEOS_TEST_RUNTIME_SPARSE_862) || defined(STYLEOS_TEST_FOUR_GUEST_864)

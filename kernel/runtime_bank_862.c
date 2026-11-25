@@ -198,8 +198,12 @@ enum ps_status rt863_bank_event(struct rt862_bank *b,struct dpr_service *d,
   if(cr2||r->isr!=1||r->eoi!=1)return PS_EVIDENCE;
   return rt862_bank_tick(b,d,t,live,r);
  }
- if(r->isr||r->eoi||(r->vector!=128&&r->vector!=14)||(r->vector==128&&cr2))return PS_EVIDENCE;
- if(r->vector==14||r->frame.gpr[0]==S847_CALL_EXIT)
+ if(r->isr||r->eoi||(r->vector!=128&&r->vector!=14
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+     &&r->vector!=6&&r->vector!=13
+#endif
+     )||(r->vector!=14&&cr2))return PS_EVIDENCE;
+ if(r->vector!=128||r->frame.gpr[0]==S847_CALL_EXIT)
   return rt862_bank_finish(b,d,t,live,r->safe_flags,&r->frame,r->frame_va,cr2);
  return rt863_bank_syscall(b,d,t,live,r->safe_flags,&r->frame,r->frame_va,cr2);
 }

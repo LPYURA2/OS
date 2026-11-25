@@ -228,7 +228,7 @@ def main():
         if any(len(x)!=4 for x in (req,beg,end,rb,re)) or len(slices)!=108:raise ValueError('four live launch/poll count')
         tags=(b'STYLEOS S864 ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S861T ',b'STYLEOS S862',b'STYLEOS S863M ')
         workload=[]
-        before=0;session=None;prev=lines.index(b'STYLEOS DESKTOP READY')
+        dispatch_before=0;session=None;prev=lines.index(b'STYLEOS DESKTOP READY')
         for i in range(4):
             if tuple(row(req[i],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted')).values())!=(root,i,N*i,1):raise ValueError('four request')
             begin=row(beg[i],b'STYLEOS S863L BEGIN',('root','dispatches','frame','sessions'));se=begin['sessions']
@@ -241,10 +241,10 @@ def main():
             for j,(_,kind) in enumerate(list(order())+[(0,'cleanup')]):
                 cleanup=kind=='cleanup'
                 if kind=='end':windows-=1
-                n=i*27+j+1;want=(n,before,before+int(not cleanup),0 if cleanup else 12,0 if cleanup else 4,0 if cleanup else windows,int(cleanup))
+                n=i*27+j+1;want=(n,dispatch_before,dispatch_before+int(not cleanup),0 if cleanup else 12,0 if cleanup else 4,0 if cleanup else windows,int(cleanup))
                 if tuple(row(slices[n-1],b'STYLEOS S863P SLICE',('n','before','after','used','processes','windows','done')).values())!=want:raise ValueError('four live poll')
-                before=want[2]
-        if workload!=[x for x in lines if x.startswith(tags)] or before!=104 or rows(b'STYLEOS S863 EXIT'):raise ValueError('four live workload scope')
+                dispatch_before=want[2]
+        if workload!=[x for x in lines if x.startswith(tags)] or dispatch_before!=104 or rows(b'STYLEOS S863 EXIT'):raise ValueError('four live workload scope')
     else:
         root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview,mixed=preview,round_count=rounds)
     pointer=verify_pointer_clock(lines,root) if preview else None

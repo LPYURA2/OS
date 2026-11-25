@@ -23,12 +23,12 @@ def loop_site(efi,map_file,*,four=False):
     site['timer_idt_rva'],_=sym('idt848',r'boot_x86_64_user_preemption_848\.o',True)
     site['common_event_rva'],_=sym('rt863_bank_event',r'kernel_runtime_bank_862\.o')
     fixtures=[('a','fault',20),('b','exit',19)]
-    if four:fixtures += [('c','exit',19),('d','exit',19)]
+    if four:fixtures += [('c','fault',10),('d','fault',10)]
     for label,last,delta in fixtures:
         symbols={k:sym('s848_'+label+'_'+k,r'arch_x86_64_process_entry_847\.o') for k in ('start','yield','loop_end',last)}
         start=symbols['start'][0];y,yo=symbols['yield'];end=symbols['loop_end'][0];term,to=symbols[last]
         if y-start!=28 or end-start!=53 or term-start!=43+delta:raise ValueError('mixed linked offsets')
-        if _range(efi,yo-2,2,'yield')!=b'\xcd\x80' or (label=='a' and _range(efi,to,3,'fault')!=b'\x48\x8b\x00') or (label!='a' and _range(efi,to-2,2,'exit')!=b'\xcd\x80'):raise ValueError('mixed linked instruction')
+        if _range(efi,yo-2,2,'yield')!=b'\xcd\x80' or (label=='a' and _range(efi,to,3,'fault')!=b'\x48\x8b\x00') or (label=='b' and _range(efi,to-2,2,'exit')!=b'\xcd\x80') or (label=='c' and _range(efi,to,2,'ud2')!=b'\x0f\x0b') or (label=='d' and _range(efi,to,1,'cli')!=b'\xfa'):raise ValueError('mixed linked instruction')
         site[label+'_yield']=CODE+y-start;site[label+'_end']=CODE+end-start;site[label+'_term']=CODE+term-start
     return site
 def row(line,prefix,keys):

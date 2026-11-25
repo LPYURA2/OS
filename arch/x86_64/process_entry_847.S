@@ -64,6 +64,16 @@ s847_enter:
 s847_pf_entry:
     pushq $14
     jmp .Ltrap847
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+.globl s864_ud_entry,s864_gp_entry
+s864_ud_entry:
+    pushq $0
+    pushq $6
+    jmp .Ltrap847
+s864_gp_entry:
+    pushq $13
+    jmp .Ltrap847
+#endif
 .globl s847_call_entry
 s847_call_entry:
     pushq $0
@@ -302,8 +312,8 @@ s848_b_exit:
 #endif
 s848_b_end:
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
-.macro extra848 name, tag
-.globl s848_\name\()_start,s848_\name\()_yield,s848_\name\()_loop_end,s848_\name\()_exit,s848_\name\()_end
+.macro extra848 name, tag, op
+.globl s848_\name\()_start,s848_\name\()_yield,s848_\name\()_loop_end,s848_\name\()_fault,s848_\name\()_end
 s848_\name\()_start:
     movq %r14,%xmm14
     movq %r15,%xmm15
@@ -319,15 +329,14 @@ s848_\name\()_yield:
     cmpq $0,8(%rdi)
     je 1b
 s848_\name\()_loop_end:
-    movq $2,%rax
-    int $0x80
-s848_\name\()_exit:
+s848_\name\()_fault:
+    \op
 .Lbad\name:
     ud2
 .Lmxcsr\name: .long 0x3f80
 s848_\name\()_end:
 .endm
-extra848 c,0x8480000200000000
-extra848 d,0x8480000300000000
+extra848 c,0x8480000200000000,ud2
+extra848 d,0x8480000300000000,cli
 #endif
 #endif

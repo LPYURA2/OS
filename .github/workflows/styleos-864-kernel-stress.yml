@@ -136,6 +136,14 @@ jobs:
           persist-credentials: false
       - name: Install guest build tools
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools
+      - name: Extended user fault-frame admission (GCC and Clang)
+        run: |
+          set -euo pipefail
+          mkdir -p build/s864-four-fault-host
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -Wl,--gc-sections -DSTYLEOS_TEST_FOUR_GUEST_864 -Iinclude kernel/process_entry_847.c tests/test_fault_entry_wide_864.c -o "build/s864-four-fault-host/$cc"
+            "build/s864-four-fault-host/$cc" | tee "build/s864-four-fault-host/$cc.log"
+          done
       - name: Four independent actual CPL3 workloads and full CPU trace
         run: python3 tools/test_runtime_mixed_863_guest.py --four --output build/s864-four-real
       - uses: actions/upload-artifact@v4

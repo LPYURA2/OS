@@ -21,11 +21,17 @@ bool s847_decode(const struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root
  uint64_t ist;
  if(f->vector==128){if(f->error)return false;ist=S846_IST;}
  else if(f->vector==14){if(!(f->error&4)||(f->error&~UINT64_C(7))||cr2>=LOW)return false;ist=S846_IST+3*P;}
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ /* Only zero-error-code GP and UD in the currently admitted user ABI.
+  * CR2 is meaningful only for PF; the trusted adapter supplies zero
+  * for the other vectors. Both exceptions use the guarded fault IST. */
+ else if(f->vector==6||f->vector==13){if(f->error||cr2)return false;ist=S846_IST+3*P;}
+#endif
  else return false;
  if(va!=ist+P-16-sizeof *f)return false;
  struct up_context c={.sp=f->rsp,.pc=f->rip,.status=f->rflags,.cs=f->cs,.ss=f->ss};
  for(unsigned i=0;i<15;i++)c.gpr[i]=f->gpr[i];
- struct up_event e={.kind=f->vector==14?UP_FAULT:UP_EVENT_NONE,.vector=f->vector,.syndrome=f->error,.fault_va=f->vector==14?cr2:0,.active_root=root,.kernel_sp=va};
+ struct up_event e={.kind=f->vector!=128?UP_FAULT:UP_EVENT_NONE,.vector=f->vector,.syndrome=f->error,.fault_va=f->vector==14?cr2:0,.active_root=root,.kernel_sp=va};
  *out=c;*ev=e;return true;
 }
 
