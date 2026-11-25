@@ -2,6 +2,9 @@
 #include <styleos/user_preempt_848.h>
 #include <styleos/acpi_madt_806.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
+#include <styleos/desktop_interactive_863.h>
+#endif
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
 #include <styleos/fx_guest_849.h>
 #endif
@@ -212,7 +215,13 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  if(!runtime860||!audit||!audit(opaque))fail848("861-timer-join");
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
  dispatch_base848=runtime860->dispatcher.dispatches;
- if((dispatch_base848!=0&&dispatch_base848!=10)||armed848||receipt860||frame860||cr2862||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail848("862-recycle-start");
+ if(
+#ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
+    dispatch_base848%10||dispatch_base848/10>=S863_LAUNCH_LIMIT||
+#else
+    (dispatch_base848!=0&&dispatch_base848!=10)||
+#endif
+    armed848||receipt860||frame860||cr2862||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail848("862-recycle-start");
  ticks848=0;for(unsigned i=0;i<2;i++){local848[i]=0;progress848[i]=0;}
 #endif
 #endif
@@ -363,7 +372,11 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
     bad=selection;bad.handle=stale862.handle;if(rt862_bank_enter(&bank862,runtime860,&bad,root848(),&rejected))fail848("862-recycle-stale-handle");
     const unsigned char *bytes=(const void *)&rejected;for(size_t j=0;j<sizeof rejected;j++)if(bytes[j])fail848("862-recycle-stale-output");
     arch_puts("STYLEOS S862R STALE");fld848("slot",selection.slot);fld848("root",selection.child_root);fld848("old-pid",stale862.pid);fld848("new-pid",selection.pid);fld848("old-handle",stale862.handle);fld848("new-handle",selection.handle);fld848("old-dispatch",stale862.dispatch);fld848("new-dispatch",selection.dispatch);fld848("refused",3);arch_putc('\n');
+#ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
+    stale862=selection; /* retain only the immediately preceding authenticated ticket */
+#else
     volatile unsigned char *wipe=(void *)&stale862;for(size_t j=0;j<sizeof stale862;j++)wipe[j]=0;
+#endif
    }
   }
 #endif

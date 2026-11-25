@@ -34,7 +34,8 @@ def main():
             d.screen('note')
             d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',1);d.screen('after-first-launch')
             d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',2);d.screen('after-tasks')
-            d.key('f9');wait(proc,serial,b'STYLEOS S863B REQUEST ',3)
+            for i in (3,4):
+                d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',i);d.screen(f'after-launch-{i}')
             d.call('stop');stats=d.call('query-blockstats',**{'query-nodes':False})
             (out/'stats.json').write_text(json.dumps(stats,indent=2))
             if not stats or any(x['stats']['wr_operations'] or x['stats']['wr_bytes'] for x in stats):raise ValueError('unexpected write')
@@ -50,7 +51,7 @@ def main():
     if lines.count(policy)!=1:raise ValueError('policy')
     cold=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))
     prefix=b'\n'.join(lines[:cold])+b'\n'
-    root,events=verify_cold(lines,prefix,data,site,ref,out,True)
+    root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True)
     (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before),indent=2))
-    print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, 25 CPU events, two launch cycles, no storage writes')
+    print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, 49 CPU events, four independent launch cycles, no storage writes')
 if __name__=='__main__':main()

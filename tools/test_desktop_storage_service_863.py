@@ -33,19 +33,24 @@ def cold_trace(trace,obs):
     if len(events)!=1 or events[0][1]!=expected:raise ValueError('cold actual CPU binding')
     return events
 
-def verify_cold(lines,prefix,data,site,ref,folder,tasks):
+def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False):
     ok,obs=cold_prior(prefix,33,site['rva'],ref,cold=True)
     if not ok:raise ValueError('cold root '+str(obs))
     root=obs['active']['root']
     if tasks:
+        count=4 if repeatable else 2
         begins=[x for x in lines if x.startswith(b'STYLEOS S863L BEGIN ')]
         ends=[x for x in lines if x.startswith(b'STYLEOS S863L DONE ')]
         req=[x for x in lines if x.startswith(b'STYLEOS S863B REQUEST ')]
-        if len(begins)!=2 or len(ends)!=2 or len(req)!=3:raise ValueError('cold distinct launch count')
+        if len(begins)!=count or len(ends)!=count or len(req)!=count+int(not repeatable):raise ValueError('cold distinct launch count')
         for i,x in enumerate(req):
-            want=f'STYLEOS S863B REQUEST root=0x{root:016x} completed=0x{i:016x} dispatches=0x{10*i:016x} accepted=0x{int(i<2):016x}'.encode()
+            want=f'STYLEOS S863B REQUEST root=0x{root:016x} completed=0x{i:016x} dispatches=0x{10*i:016x} accepted=0x{int(i<count):016x}'.encode()
             if x!=want:raise ValueError('cold request identity or refusal')
-        if not lines.index(b'STYLEOS DESKTOP READY')<lines.index(req[0])<lines.index(begins[0])<lines.index(ends[0])<lines.index(req[1])<lines.index(begins[1])<lines.index(ends[1])<lines.index(req[2]):raise ValueError('cold request order')
+        prev=lines.index(b'STYLEOS DESKTOP READY')
+        for i in range(count):
+            if not prev<lines.index(req[i])<lines.index(begins[i])<lines.index(ends[i]):raise ValueError('cold request order')
+            prev=lines.index(ends[i])
+        if not repeatable and not prev<lines.index(req[-1]):raise ValueError('cold refusal order')
         frame=sessions=None;workload=[]
         for i,(begin,end) in enumerate(zip(begins,ends)):
             m=re.fullmatch(rb'STYLEOS S863L BEGIN root=0x([0-9a-f]{16}) dispatches=0x([0-9a-f]{16}) frame=0x([0-9a-f]{16}) sessions=0x([0-9a-f]{16})',begin)
@@ -58,24 +63,25 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks):
         all_workload=[x for x in lines if x.startswith((b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862'))]
         if workload!=all_workload:raise ValueError('task ran outside admitted launches')
         from test_desktop_v0 import Frame
-        frames=[Frame(folder/(name+'.ppm')) for name in ('note','after-first-launch','after-tasks')]
+        names=['note','after-first-launch','after-tasks']+([f'after-launch-{i}' for i in range(3,count+1)] if repeatable else [])
+        frames=[Frame(folder/(name+'.ppm')) for name in names]
         if any((x.w,x.h,x.pixels)!=(frames[0].w,frames[0].h,frames[0].pixels) for x in frames[1:]):raise ValueError('QMP screen changed across launch')
-        if [x for x in lines if x.startswith(b'STYLEOS S863 EXIT ')][0].split()[-2:]!=[b'dispatches=0x0000000000000014',b'used=0x0000000000000000']:raise ValueError('exit after refusal')
-        ok,taskobs=task_verify(prefix+b'\n'.join(workload)+b'\n',33,site,ref,clean_fnv=frame,cold=True)
+        if [x for x in lines if x.startswith(b'STYLEOS S863 EXIT ')][0].split()[-2:]!=[f'dispatches=0x{10*count:016x}'.encode(),b'used=0x0000000000000000']:raise ValueError('exit after refusal')
+        ok,taskobs=task_verify(prefix+b'\n'.join(workload)+b'\n',33,site,ref,clean_fnv=frame,cold=True,round_count=count)
         if not ok:raise ValueError('cold task hardware '+str(taskobs))
         events=trace_check(data.decode('ascii'),taskobs)
-        if len(events)!=25:raise ValueError('cold task CPU count')
+        if len(events)!=1+12*count:raise ValueError('cold task CPU count')
         slices=[x for x in lines if x.startswith(b'STYLEOS S863P SLICE ')]
-        if len(slices)!=22 or any(x.startswith((b'STYLEOS S863P WAIT',b'STYLEOS S863P RESUME')) for x in lines):raise ValueError('cold task poll count')
+        if len(slices)!=11*count or any(x.startswith((b'STYLEOS S863P WAIT',b'STYLEOS S863P RESUME')) for x in lines):raise ValueError('cold task poll count')
         before=0
         for i,line in enumerate(slices,1):
             m=re.fullmatch(rb'STYLEOS S863P SLICE '+b' '.join(x+b'=0x([0-9a-f]{16})' for x in (b'n',b'before',b'after',b'used',b'processes',b'windows',b'done')),line)
             if not m:raise ValueError('cold task slice')
             seq,old,new,used,procs,wins,done=map(lambda x:int(x,16),m.groups())
-            cleanup=i in (11,22)
+            cleanup=i%11==0
             if (seq,old,new,used,done)!=(i,before,before+int(not cleanup),0 if cleanup else 6,int(cleanup)) or (cleanup and (procs or wins)):raise ValueError('cold task poll binding')
             before=new
-        if before!=20:raise ValueError('cold task final dispatches')
+        if before!=10*count:raise ValueError('cold task final dispatches')
     else:
         events=cold_trace(data.decode('ascii'),obs)
     cold_rows=[x for x in lines if x.startswith(b'STYLEOS S863B COLD ')]

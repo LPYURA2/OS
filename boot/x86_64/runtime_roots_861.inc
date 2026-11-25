@@ -17,6 +17,10 @@ static struct rt858_live capture861(void){
 static bool boundary861(const struct dpr_service *d,const struct s842_cache *cache){
  struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&(
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+#ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
+ (d->dispatcher.dispatches&&d->dispatcher.dispatches%10==0&&
+  d->dispatcher.dispatches<=10*S863_LAUNCH_LIMIT&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
+#endif
  ((d->dispatcher.dispatches==
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
  12
@@ -89,7 +93,7 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  static struct s844_lease old[2],l[2];
  static unsigned round;static bool prepared;
  unsigned used;
- if(round>=2)fail("863-pump-completed");
+ if(round>=S863_LAUNCH_LIMIT)fail("863-pump-completed");
 #else
  struct s844_lease old[2]={0};
  for(unsigned round=0;round<2;round++){

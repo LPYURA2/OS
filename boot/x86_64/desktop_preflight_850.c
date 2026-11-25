@@ -436,7 +436,12 @@ static void shell_boundary863(void){
    * Use only the already admitted pointer retained before the shell began. */
   unsigned dispatches=shell_d863->dispatcher.dispatches;
   if(!live_arena863||live_arena863->base!=pump_arena_base863||
-     !s844_count(live_arena863,&used)||dispatches>20||
+     !s844_count(live_arena863,&used)||
+#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+     dispatches<10*task_batches863||dispatches>10*(task_batches863+1)||
+#else
+     dispatches>20||
+#endif
      live_arena863->next!=S863_INITIAL_ARENA_NEXT+2*((dispatches+9)/10)||
      (used!=0&&used!=6))fail("863-pump-arena");
   if(!used){
@@ -457,7 +462,7 @@ static void shell_boundary863(void){
 __attribute__((noinline)) void s863_live_run(void){
  shell_boundary863();
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- if(live_phase863==1||task_batches863>=2)fail("863-task-phase");
+ if(live_phase863==1||task_batches863>=S863_LAUNCH_LIMIT)fail("863-task-phase");
 #else
  if(live_phase863)fail("863-live-phase");
 #endif
@@ -483,7 +488,7 @@ __attribute__((noinline)) void s863_live_run(void){
 bool s863_request_tasks(void){
  s863_shell_guard();
  shell_boundary863();
- bool accept=live_phase863!=1&&!task_requested863&&task_batches863<2;
+ bool accept=live_phase863!=1&&!task_requested863&&task_batches863<S863_LAUNCH_LIMIT;
  if(accept)task_requested863=true;
  arch_puts("STYLEOS S863B REQUEST");field("root",shell_root863);field("completed",task_batches863);
  field("dispatches",shell_d863->dispatcher.dispatches);field("accepted",accept);arch_putc('\n');
@@ -506,7 +511,7 @@ __attribute__((noinline)) void s863_shell_pump(void){
  uint64_t frame=live_hash863((const volatile unsigned char *)live_surface863->base,bytes);
  unsigned before=shell_d863->dispatcher.dispatches;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- if(pump_calls863>=22)fail("863-pump-admission");
+ if(pump_calls863>=11*(task_batches863+1))fail("863-pump-admission");
 #else
  if(pump_calls863>=22||frame!=pump_frame863||draft!=pump_sessions863)fail("863-pump-admission");
 #endif
@@ -568,7 +573,11 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
 #endif
  if(batch==1&&!ev->mouse&&ev->key==0x58&&!ev->modifiers){
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+#ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
+  if(!task_batches863||task_requested863||live_phase863!=2)fail("863-task-incomplete");
+#else
   if(task_batches863!=2||task_requested863)fail("863-task-incomplete");
+#endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
   if(live_phase863!=2)fail("863-live-incomplete");

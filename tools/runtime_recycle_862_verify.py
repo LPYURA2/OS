@@ -20,16 +20,19 @@ def recycle_site(efi,map_file):
         site[name+'_rva']=rva
     return site
 
-def verify(raw,rc,site,reference,*,clean_fnv=None,cold=False):
+def verify(raw,rc,site,reference,*,clean_fnv=None,cold=False,round_count=2):
     try:
+        if round_count<2 or (not cold and round_count!=2):raise ValueError('S862R round profile')
         if not site.get('s849_guest_bind_leases_rva') or not site.get('stale862_rva'):raise ValueError('S862R linked policy')
         lines=raw.splitlines()
         if any(b' FAIL ' in x for x in lines):raise ValueError('S862R guest failure')
         def indices(tag):return [i for i,x in enumerate(lines) if x.startswith(tag)]
         rows=indices(b'STYLEOS S862R ');begins=indices(b'STYLEOS S862R BEGIN ');ends=indices(b'STYLEOS S862R DONE ')
         fx=indices(b'STYLEOS S862R FX ');reuse=indices(b'STYLEOS S862R REUSE ');stale=indices(b'STYLEOS S862R STALE ')
-        if tuple(map(len,(rows,begins,ends,fx,reuse,stale)))!=(8,2,2,2,1,1):raise ValueError('S862R record count')
-        if not begins[0]<fx[0]<ends[0]<begins[1]<reuse[0]<fx[1]<stale[0]<ends[1] or ends[0]+1!=begins[1] or ends[1]!=len(lines)-1:raise ValueError('S862R phase order')
+        if tuple(map(len,(rows,begins,ends,fx,reuse,stale)))!=(5*round_count-2,round_count,round_count,round_count,round_count-1,round_count-1):raise ValueError('S862R record count')
+        if not begins[0]<fx[0]<ends[0] or ends[-1]!=len(lines)-1:raise ValueError('S862R phase order')
+        for i in range(1,round_count):
+            if not ends[i-1]+1==begins[i]<reuse[i-1]<fx[i]<stale[i-1]<ends[i]:raise ValueError('S862R phase order')
         if any(x.startswith((b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862B ',b'STYLEOS S862S ',b'STYLEOS S862L ')) for x in lines[:begins[0]]):raise ValueError('S862R event before round')
         def row(i,tag,keys):
             m=re.fullmatch(b'STYLEOS S862R '+tag+b' '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in keys),lines[i])
@@ -40,7 +43,7 @@ def verify(raw,rc,site,reference,*,clean_fnv=None,cold=False):
             if len(found)!=1:raise ValueError('S862R phase '+str(tag))
             return found[0]
         prefix=lines[:begins[0]];rounds=[]
-        for epoch in range(2):
+        for epoch in range(round_count):
             # Shared, genuine boot prefix plus the unmodified records of this round.
             # Each original line is retained; only the other round is excluded.
             part=prefix+lines[begins[epoch]+1:ends[epoch]]
@@ -50,17 +53,21 @@ def verify(raw,rc,site,reference,*,clean_fnv=None,cold=False):
             begin=row(begins[epoch],b'BEGIN',('round','safe','dispatches','next'))
             end=row(ends[epoch],b'DONE',('round','safe','dispatches','next','next-pid','next-window','used'))
             f=row(fx[epoch],b'FX',('safe','gen-a','gen-b','refused'))
-            if tuple(begin.values())!=(epoch,safe,10*epoch,gen) or tuple(end.values())!=(epoch,safe,10*(epoch+1),gen+2,3+2*epoch,3+2*epoch,0) or tuple(f.values())!=(safe,gen,gen+1,2*epoch):raise ValueError('S862R counter/FP binding')
+            if tuple(begin.values())!=(epoch,safe,10*epoch,gen) or tuple(end.values())!=(epoch,safe,10*(epoch+1),gen+2,3+2*epoch,3+2*epoch,0) or tuple(f.values())!=(safe,gen,gen+1,2*int(epoch>0)):raise ValueError('S862R counter/FP binding')
             if not within(epoch,b'STYLEOS S849 READY ')<fx[epoch]<within(epoch,b'STYLEOS S848 READY ') or within(epoch,b'STYLEOS S861 POLICY ')+1!=ends[epoch]:raise ValueError('S862R round boundary')
             rounds.append(obs)
-        a,b=(o['join_roots'] for o in rounds)
-        if any(a[k]!=b[k] for k in ('safe','a','b','pa-a','pa-b')):raise ValueError('S862R no physical/root reuse')
-        r=row(reuse[0],b'REUSE',('pa-a','pa-b','old-a','old-b','new-a','new-b','stale-leases','stale-root'))
-        if tuple(r.values())!=(a['pa-a'],a['pa-b'],a['gen-a'],a['gen-b'],b['gen-a'],b['gen-b'],2,1) or not reuse[0]<within(1,b'STYLEOS S861 ROOTS '):raise ValueError('S862R lease proof')
-        t=row(stale[0],b'STALE',('slot','root','old-pid','new-pid','old-handle','new-handle','old-dispatch','new-dispatch','refused'))
-        if tuple(t.values())!=(0,a['a'],1,3,a['gen-a'],b['gen-a'],1,11,3) or not within(1,b'STYLEOS S862L READY ')<stale[0]<within(1,b'STYLEOS S862B ENTER step=0x0000000000000000 '):raise ValueError('S862R stale ticket proof')
-        if rounds[0]['join_clean']['fnv']!=rounds[1]['join_clean']['fnv']:raise ValueError('S862R frame continuity')
-        return True,dict(rounds=rounds,reused_pages=r,stale_ticket=t)
+        receipts=[];tickets=[]
+        for i in range(1,round_count):
+            a,b=(rounds[j]['join_roots'] for j in (i-1,i))
+            if any(a[k]!=b[k] for k in ('safe','a','b','pa-a','pa-b')):raise ValueError('S862R no physical/root reuse')
+            r=row(reuse[i-1],b'REUSE',('pa-a','pa-b','old-a','old-b','new-a','new-b','stale-leases','stale-root'))
+            if tuple(r.values())!=(a['pa-a'],a['pa-b'],a['gen-a'],a['gen-b'],b['gen-a'],b['gen-b'],2,1) or not reuse[i-1]<within(i,b'STYLEOS S861 ROOTS '):raise ValueError('S862R lease proof')
+            t=row(stale[i-1],b'STALE',('slot','root','old-pid','new-pid','old-handle','new-handle','old-dispatch','new-dispatch','refused'))
+            if tuple(t.values())!=(0,a['a'],2*i-1,2*i+1,a['gen-a'],b['gen-a'],10*(i-1)+1,10*i+1,3) or not within(i,b'STYLEOS S862L READY ')<stale[i-1]<within(i,b'STYLEOS S862B ENTER step=0x0000000000000000 '):raise ValueError('S862R stale ticket proof')
+            if rounds[i-1]['join_clean']['fnv']!=rounds[i]['join_clean']['fnv']:raise ValueError('S862R frame continuity')
+            receipts.append(r);tickets.append(t)
+        if round_count==2:return True,dict(rounds=rounds,reused_pages=receipts[0],stale_ticket=tickets[0])
+        return True,dict(rounds=rounds,reused_pages=receipts,stale_ticket=tickets)
     except (ValueError,TypeError,KeyError,IndexError,StopIteration) as exc:return False,str(exc)
 
 def trace_check(text,obs):
@@ -69,8 +76,12 @@ def trace_check(text,obs):
         block=text[m.start():h[i+1].start() if i+1<len(h) else len(text)];cr=re.findall(r'\bCR3=([0-9a-fA-F]+)\b',block)
         if len(cr)!=1:raise ValueError('S862R CPU CR3')
         if int(cr[0],16) in roots:start=i;break
-    if start is None or len(h)-start!=25:raise ValueError('S862R total events')
-    split=h[start+13].start()
-    first=sparse_trace(text[:split],rounds[0]);second=sparse_trace(text[split:],rounds[1],initial_bp=False)
-    if len(first)!=13 or len(second)!=12 or first[-1][0]+1!=second[0][0]:raise ValueError('S862R CPU continuity')
-    return first+second
+    if start is None or len(h)-start!=1+12*len(rounds):raise ValueError('S862R total events')
+    records=[]
+    for i,round in enumerate(rounds):
+        lo=0 if not i else h[start+1+12*i].start()
+        hi=h[start+1+12*(i+1)].start() if i+1<len(rounds) else len(text)
+        part=sparse_trace(text[lo:hi],round,initial_bp=not i)
+        if len(part)!=(13 if not i else 12) or (i and records[-1][0]+1!=part[0][0]):raise ValueError('S862R CPU continuity')
+        records.extend(part)
+    return records

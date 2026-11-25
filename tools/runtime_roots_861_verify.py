@@ -5,7 +5,7 @@ from irq_trace_accept_859 import HEADER
 POLICY=b'STYLEOS S861 POLICY cpl0-only=yes shared-desktop=yes inherited-return=no cpl3=no timer=no production-cr3=deny'
 def verify(raw,rc,site,reference,*,generation_base=4,clean_fnv=None,cold=False):
     try:
-        if generation_base not in ((1,3) if cold else (4,6)):raise ValueError('861 generation profile')
+        if (not cold and generation_base not in (4,6)) or (cold and (generation_base<1 or generation_base%2!=1 or generation_base>2*(0xffffffff//11-1)-1)):raise ValueError('861 generation profile')
         ok,obs=prior(raw,rc,site['rva'],reference,cold=cold)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[x for x in lines if x.startswith(b'STYLEOS S861 ')]

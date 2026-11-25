@@ -30,7 +30,7 @@ def timer_site(efi,map_file):
 
 def verify(raw,rc,site,reference,*,budgets=(3,5),sparse=False,epoch=0,clean_fnv=None,cold=False):
     try:
-        if epoch not in (0,1) or (epoch and not sparse):raise ValueError('S861T epoch')
+        if epoch<0 or (not cold and epoch not in (0,1)) or (cold and epoch>=0xffffffff//11-1) or (epoch and not sparse):raise ValueError('S861T epoch')
         offset=2*epoch;dispatch_base=10*epoch
         ok,obs=roots_verify(raw,rc,site,reference,generation_base=(1 if cold else 4)+offset,clean_fnv=clean_fnv,cold=cold)
         if not ok:raise ValueError(obs)
