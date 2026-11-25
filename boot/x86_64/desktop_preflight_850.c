@@ -402,7 +402,13 @@ bool s863_disk_read(uint32_t lba,uint8_t out[512]){
 bool s863_disk_write(uint32_t lba,const uint8_t in[512]){
  if(!in||lba<1||lba>72||!disk_ready863())return false;
  /* Every successful write already includes hardware flush and readback. */
- if(!storage_commit_863(&disk863.s.store,lba,in))return false;
+ if(!storage_commit_863(&disk863.s.store,lba,in)){
+  arch_puts("STYLEOS S863S REFUSAL");field("root",shell_root863);field("lba",lba);
+  field("store",disk863.s.store.fault);field("ata",disk863.s.pio.ata.fault);
+  field("phase",disk863.s.pio.ata.phase);field("polls",disk863.s.pio.ata.status_polls);
+  field("status",disk863.s.pio.ata.last_status);field("ops",disk863.s.live.ops);
+  field("pending-flush",disk863.s.pio.ata.pending_flush);arch_putc('\n');return false;
+ }
  arch_puts("STYLEOS S863S COMMIT");field("root",shell_root863);field("lba",lba);arch_putc('\n');
  return true;
 }

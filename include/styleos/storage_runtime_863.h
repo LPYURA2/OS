@@ -19,12 +19,17 @@ struct storage_ops_863 {
     bool (*write)(void *,uint32_t,const uint8_t [S863_SECTOR_BYTES]);
     bool (*flush)(void *);
 };
+enum storage863_fault {
+    STORAGE863_NONE, STORAGE863_GUARD, STORAGE863_READ,
+    STORAGE863_WRITE, STORAGE863_FLUSH, STORAGE863_COMPARE
+};
 struct storage_runtime_863 {
     const struct storage_ops_863 *ops;
     void *ctx;
     uint64_t root,epoch,device;
     uint32_t first,count;
     bool writable,bound,busy,quarantined;
+    enum storage863_fault fault;
 };
 bool storage_bind_863(struct storage_runtime_863 *,const struct storage_ops_863 *,
     void *,uint64_t,uint64_t,uint64_t,uint32_t,uint32_t,bool);

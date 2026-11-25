@@ -7,11 +7,26 @@ struct ata_runtime_ops_863 {
     struct ata857_ops read_ops;
     bool (*write_data)(void *,uint16_t);
 };
+/* First fault is sticky until a fresh unbound context. No retry or reset. */
+enum ata863_fault {
+    ATA863_NONE, ATA863_IDENTIFY, ATA863_FLUSH_UNSUPPORTED,
+    ATA863_STATUS_IO, ATA863_STATUS_INVALID, ATA863_STATUS_ERROR,
+    ATA863_STATUS_TIMEOUT, ATA863_REGISTER_IO, ATA863_DATA_IO,
+    ATA863_READ_TRANSFER
+};
+enum ata863_phase {
+    ATA863_IDLE, ATA863_BIND, ATA863_READ, ATA863_WRITE_SETUP,
+    ATA863_WRITE_DATA, ATA863_WRITE_COMPLETE, ATA863_FLUSH
+};
 struct ata_runtime_863 {
     struct ata857_state reader;
     const struct ata_runtime_ops_863 *ops;
     void *ctx;
     bool bound,busy,quarantined,flush_supported,pending_flush;
+    enum ata863_fault fault;
+    enum ata863_phase phase;
+    unsigned status_polls;
+    uint8_t last_status;
 };
 bool ata_runtime_bind_863(struct ata_runtime_863 *,const struct ata_runtime_ops_863 *,void *);
 bool ata_runtime_read_863(void *,uint32_t,uint8_t [512]);
