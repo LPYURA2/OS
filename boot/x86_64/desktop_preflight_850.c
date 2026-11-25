@@ -65,16 +65,23 @@ static uint16_t cmd(unsigned dev,unsigned fn){out32(0xcf8,cfgaddr(dev,fn,4));ret
 static void cmdwrite(unsigned dev,unsigned fn,uint16_t v){out32(0xcf8,cfgaddr(dev,fn,4));out16(0xcfc,v);}
 #if defined(STYLEOS_TEST_STORAGE_ATA_READ_857) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
 #include <styleos/ata_diag_857.h>
-struct ata857_live {uint64_t root;unsigned ops;};
+struct ata857_live {uint64_t root;unsigned ops;uint32_t bar4;};
 static bool ata857_live_check(struct ata857_live *x){
  uint16_t cs;__asm__ volatile("mov %%cs,%0":"=r"(cs));
  if(!x||!x->root||read_cr3()!=x->root||(flags()&0x200)||(cs&3)||x->ops>=200000u)return false;
  ++x->ops;
+ const uint32_t bar=x->bar4?x->bar4:UINT32_C(0x60e1);
+ if(bar!=UINT32_C(0x60e1)
+#if defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) && defined(STYLEOS_TEST_FOUR_GUEST_864)
+    &&bar!=UINT32_C(0x6061)
+#endif
+    )return false;
  uint32_t old=in32(0xcf8);
- bool ok=cfg(5,0,0)==0x70108086u&&cfg(5,0,4)==0x02800003u&&cfg(5,0,8)==0x01018000u&&cfg(5,0,12)==0&&cfg(5,0,0x40)==0&&cfg(5,0,0x20)==0x60e1u;
+ bool ok=cfg(5,0,0)==0x70108086u&&cfg(5,0,4)==0x02800003u&&cfg(5,0,8)==0x01018000u&&cfg(5,0,12)==0&&cfg(5,0,0x40)==0&&cfg(5,0,0x20)==bar;
  for(unsigned i=0;i<4;i++)if(cfg(5,0,0x10+4*i)!=0)ok=false;
  out32(0xcf8,old);if(!ok||in32(0xcf8)!=old||read_cr3()!=x->root||(flags()&0x200))return false;
- const uint16_t ports[4]={0x60e0,0x60e2,0x60e8,0x60ea};
+ const uint16_t base=(uint16_t)(bar&~3u);
+ const uint16_t ports[4]={base,(uint16_t)(base+2),(uint16_t)(base+8),(uint16_t)(base+10)};
  for(unsigned i=0;i<4;i++){uint8_t v;__asm__ volatile("inb %1,%0":"=a"(v):"Nd"(ports[i]):"memory");if(v)return false;}
  return true;
 }
@@ -429,12 +436,17 @@ static _Alignas(4096) union {
 } disk863;
 _Static_assert(sizeof disk863==4096,"disk service page");
 static bool disk_preflight863;
-static struct bm857_snapshot disk_snapshot863(void){
+static struct bm857_snapshot disk_snapshot863(uint32_t pinned){
  uint32_t old=in32(0xcf8);
  struct bm857_snapshot v={.root=read_cr3(),.id=cfg(5,0,0),.class_revision=cfg(5,0,8),.command_status=cfg(5,0,4),.bar4=cfg(5,0,0x20)};
  out32(0xcf8,old);
- if(in32(0xcf8)!=old||v.id!=0x70108086u||v.class_revision!=0x01018000u||v.bar4!=0x60e1u)fail("863-shell-storage-pci");
- const uint16_t ports[]={0x60e0,0x60e2,0x60e8,0x60ea};
+ if(in32(0xcf8)!=old||v.id!=0x70108086u||v.class_revision!=0x01018000u||(v.bar4!=0x60e1u
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+    &&v.bar4!=0x6061u
+#endif
+    )||(pinned&&v.bar4!=pinned))fail("863-shell-storage-pci");
+ const uint16_t base=(uint16_t)(v.bar4&~3u);
+ const uint16_t ports[]={base,(uint16_t)(base+2),(uint16_t)(base+8),(uint16_t)(base+10)};
  for(unsigned i=0;i<4;i++)__asm__ volatile("inb %1,%0":"=a"(v.bm[i]):"Nd"(ports[i]):"memory");
  return v;
 }
@@ -456,14 +468,16 @@ static void disk_admit863(void){
   ack=true;break;
  }
  if(!ack||!shell_fixture863()||!same_cache(&shell_cache863))fail("863-shell-storage-host");
- struct bm857_snapshot before=disk_snapshot863();
+ struct bm857_snapshot before=disk_snapshot863(0);
  uint16_t word=0;
- if(!bm857_plan(&before,shell_root863,&word))fail("863-shell-storage-dma");
+ if(!bm857_plan_at(&before,shell_root863,before.bar4,&word))fail("863-shell-storage-dma");
  uint32_t old=in32(0xcf8);
  cmdwrite(5,0,word);out32(0xcf8,old);
- struct bm857_snapshot after=disk_snapshot863();
- if(!bm857_confirm(&after,shell_root863))fail("863-shell-storage-master");
+ struct bm857_snapshot after=disk_snapshot863(before.bar4);
+ if(!bm857_confirm_at(&after,shell_root863,before.bar4))fail("863-shell-storage-master");
  disk863.s.live.root=shell_root863;
+ disk863.s.live.bar4=before.bar4;
+ arch_puts("STYLEOS S863S BAR4");field("root",shell_root863);field("bar4",before.bar4);arch_putc('\n');
  disk863.s.pio.live=&disk863.s.live;
  uint8_t super[512];
  if(!ata_runtime_bind_863(&disk863.s.pio.ata,&pio_ops863,&disk863.s.pio)||
@@ -1046,7 +1060,7 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  /* Explicit Q35/TCG disposable fixture experiment. No generic ATA grant.
   * Host checks topology/attachment/ports before sending input; guest rechecks
   * PCI and BMIDE before each operation. Timing=0 is accepted ONLY here. */
- struct ata857_live io857={target,0};struct ata857_state ata857={0};uint16_t words857[ATA857_WORDS];
+ struct ata857_live io857={.root=target};struct ata857_state ata857={0};uint16_t words857[ATA857_WORDS];
  if(!ata857_identify(&ata857,&ata857_io,&io857,words857))fail("857-ata-identify");
  arch_puts("STYLEOS S857 ATA-IDENTIFY");field("root",target);arch_puts(" bytes=");ata857_hex(words857);arch_putc('\n');
  const uint32_t lbas857[]={0,1,2048,4095};

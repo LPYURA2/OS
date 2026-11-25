@@ -268,7 +268,7 @@ def main():
                 if 'QMP' not in d.receive():raise RuntimeError('QMP greeting')
                 d.call('qmp_capabilities');snapshot('prelaunch',True);d.call('cont')
                 wait(proc,serial,b'STYLEOS S863S WAIT');d.call('stop')
-                gate=snapshot('gate',True);verify_ready(gate);verify_bar(gate['pci'],gate['mtree']);d.call('cont')
+                gate=snapshot('gate',True);verify_ready(gate);verify_bar(gate['pci'],gate['mtree'],0x6060 if args.iso else 0x60e0);d.call('cont')
                 d.key('b');wait(proc,serial,b'STYLEOS S863 READY ');d.wait_uart('DATA MOUNT');d.screen('initial');d.x,d.y=640,600
                 if write:
                     d.key('f5');d.key('ctrl-n');d.key('a')
@@ -292,7 +292,7 @@ def main():
                             d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',i);d.screen(f'after-launch-{i}')
                     d.key('f9');wait(proc,serial,b'STYLEOS S863B REQUEST ',5 if args.four else 3)
                 d.call('stop');final=snapshot('final')
-                verify_ready(final);verify_bar(final['pci'],final['mtree'])
+                verify_ready(final);verify_bar(final['pci'],final['mtree'],0x6060 if args.iso else 0x60e0)
                 stats=next(r['stats'] for r in final['stats'] if r.get('qdev') in (DEVICE,'/machine/peripheral/'+DEVICE))
                 if stats['wr_operations']!=(2 if write else 0) or stats['wr_bytes']!=(1024 if write else 0) or (write and stats['flush_operations']<2) or (not write and stats['flush_operations']):raise ValueError('frontend mutation count')
                 if any(stats.get(key)!=0 for key in ('unmap_operations','unmap_bytes','failed_rd_operations','invalid_rd_operations','failed_wr_operations','invalid_wr_operations','failed_flush_operations','invalid_flush_operations')):raise ValueError('frontend errors')
@@ -345,6 +345,8 @@ def main():
         if docs!=[wanted]:raise ValueError('actual draft content')
         original=b'STYLEOS DESKTOP DOCUMENT SAVE' if write else b'STYLEOS DESKTOP DOCUMENT OPEN'
         if lines.count(original)!=1 or lines.index(original)+1!=lines.index(wanted):raise ValueError('document evidence order')
+        bars=[x for x in lines if x.startswith(b'STYLEOS S863S BAR4 ')]
+        if bars!=[f'STYLEOS S863S BAR4 root=0x{root:016x} bar4=0x{(0x6061 if args.iso else 0x60e1):016x}'.encode()]:raise ValueError('guest BAR4 pin mismatch')
         admits=[x for x in lines if x.startswith(b'STYLEOS S863S ADMIT ')]
         if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
         if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')

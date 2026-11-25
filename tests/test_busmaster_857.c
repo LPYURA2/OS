@@ -29,5 +29,15 @@ int main(void) {
         assert(!bm857_plan(&s,root,&word)&&word==0xabcd);s.command_status=0x02800003;assert(!bm857_confirm(&s,root));negative+=2;
     }
     uint16_t word=0xabcd;assert(!bm857_plan(NULL,root,&word)&&word==0xabcd);assert(!bm857_plan(&base,root,NULL));assert(!bm857_confirm(NULL,root));assert(!bm857_plan(&base,0,&word));negative+=4;
+    /* Optical path must use the independently observed, pinned BAR; old
+     * terminal contract must still reject it. */
+    struct bm857_snapshot optical=base;optical.bar4=0x6061;
+    word=0xabcd;assert(!bm857_plan(&optical,root,&word)&&word==0xabcd);
+    assert(bm857_plan_at(&optical,root,0x6061,&word)&&word==3);
+    optical.command_status=0x02800003;assert(bm857_confirm_at(&optical,root,0x6061));
+    assert(!bm857_confirm_at(&optical,root,0x60e1)&&!bm857_confirm(&optical,root));
+    for(unsigned b=0;b<4;b++){optical.bm[b]=1;assert(!bm857_confirm_at(&optical,root,0x6061));optical.bm[b]=0;}
+    optical.bar4=0x60c1;assert(!bm857_confirm_at(&optical,root,0x60c1));
+    positive+=2;negative+=8;
     printf("BM857 plan/readback: %u positive, %u refusals PASS\n",positive,negative);
 }
