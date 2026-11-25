@@ -513,7 +513,7 @@ static void shell_boundary863(void){
 #ifdef STYLEOS_TEST_DESKTOP_COLD_863
  unsigned dispatches=0,next=1,generation=1;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- if(live_phase863==2){dispatches=10*task_batches863;next=1+2*task_batches863;generation=1+2*task_batches863;}
+ if(live_phase863==2){dispatches=S863_DISPATCHES_PER_BATCH*task_batches863;next=1+2*task_batches863;generation=1+2*task_batches863;}
 #endif
 #else
  unsigned dispatches=20,next=5,generation=8;
@@ -529,14 +529,14 @@ static void shell_boundary863(void){
   if(!live_arena863||live_arena863->base!=pump_arena_base863||
      !s844_count(live_arena863,&used)||
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
-     dispatches<10*task_batches863||dispatches>10*(task_batches863+1)||
+     dispatches<S863_DISPATCHES_PER_BATCH*task_batches863||dispatches>S863_DISPATCHES_PER_BATCH*(task_batches863+1)||
 #else
      dispatches>20||
 #endif
-     live_arena863->next!=S863_INITIAL_ARENA_NEXT+2*((dispatches+9)/10)||
+     live_arena863->next!=S863_INITIAL_ARENA_NEXT+2*((dispatches+S863_DISPATCHES_PER_BATCH-1)/S863_DISPATCHES_PER_BATCH)||
      (used!=0&&used!=6))fail("863-pump-arena");
   if(!used){
-   if(dispatches%10||s845_arena()!=live_arena863||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail("863-pump-empty");
+   if(dispatches%S863_DISPATCHES_PER_BATCH||s845_arena()!=live_arena863||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail("863-pump-empty");
   }else if(!dispatches||s845_arena())fail("863-pump-occupied");
   return;
  }
@@ -602,14 +602,14 @@ __attribute__((noinline)) void s863_shell_pump(void){
  uint64_t frame=live_hash863((const volatile unsigned char *)live_surface863->base,bytes);
  unsigned before=shell_d863->dispatcher.dispatches;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- if(pump_calls863>=11*(task_batches863+1))fail("863-pump-admission");
+ if(pump_calls863>=S863_POLLS_PER_BATCH*(task_batches863+1))fail("863-pump-admission");
 #else
  if(pump_calls863>=22||frame!=pump_frame863||draft!=pump_sessions863)fail("863-pump-admission");
 #endif
  bool done=guest861(live_p863,&shell_cache863,live_guard863,live_arena863,live_surface863,frame);
  unsigned after=shell_d863->dispatcher.dispatches,used;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- const unsigned end_dispatch=10*(task_batches863+1);
+ const unsigned end_dispatch=S863_DISPATCHES_PER_BATCH*(task_batches863+1);
 #else
  const unsigned end_dispatch=20;
 #endif
@@ -626,7 +626,7 @@ __attribute__((noinline)) void s863_shell_pump(void){
  shell_boundary863();
  if(!done)return;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- if(pump_calls863!=11*(task_batches863+1))fail("863-pump-final");
+ if(pump_calls863!=S863_POLLS_PER_BATCH*(task_batches863+1))fail("863-pump-final");
  ++task_batches863;
 #else
  if(pump_calls863!=22||pump_gate863!=3)fail("863-pump-final");

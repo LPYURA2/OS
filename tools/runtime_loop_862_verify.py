@@ -4,8 +4,13 @@ from runtime_bank_862_verify import verify as prior, bank_site, trace_check as p
 from fault_site import _unpack,_range
 BUDGETS=(5,3)
 
-def loop_site(efi,map_file):
-    site=bank_site(efi,map_file);s=map_file.read_text()
+def loop_site(efi,map_file,*,mixed=False):
+    if mixed:
+        from runtime_mixed_863_verify import loop_site as mixed_site
+        site=mixed_site(efi,map_file)
+    else:
+        site=bank_site(efi,map_file)
+    s=map_file.read_text()
     rows=re.findall(r'^\s*([0-9a-fA-F]{4}):([0-9a-fA-F]{8})\s+s862_loop_budget\s+([0-9a-fA-F]{16})\s+boot_x86_64_user_preemption_848\.o\s*$',s,re.M)
     if len(rows)!=1:raise ValueError('S862L budget symbol')
     seg,rel,va=(int(v,16) for v in rows[0]);rva=va-site['preferred_base']

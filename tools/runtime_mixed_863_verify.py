@@ -33,9 +33,11 @@ def row(line,prefix,keys):
     m=re.fullmatch(prefix+b' '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in keys),line)
     if not m:raise ValueError('mixed row '+str(prefix))
     return dict(zip(keys,(int(v,16) for v in m.groups())))
-def verify(raw,rc,site,ref):
+def verify(raw,rc,site,ref,*,epoch=0,clean_fnv=None,cold=False):
     try:
-        ok,o=roots_verify(raw,rc,site,ref)
+        ok,o=roots_verify(raw,rc,site,ref,generation_base=(1 if cold else 4)+2*epoch,clean_fnv=clean_fnv,cold=cold)
+        offset=12*epoch
+        identity=2*epoch
         if not ok:raise ValueError(o)
         lines=raw.splitlines()
         def rows(p):return [x for x in lines if x.startswith(p)]
@@ -63,7 +65,7 @@ def verify(raw,rc,site,ref):
             label='ab'[i];child=root[label];tag=0x8480000000000000|(i<<32);term=kind=='end'
             ft=row(frames[step],b'STYLEOS S861T FRAME',('step','flags'));flags=ft['flags']
             if ft['step']!=step or flags&0x202!=0x202 or flags&~0xad7:raise ValueError('mixed flags')
-            eq(row(enter[step],b'STYLEOS S862B ENTER',('step','id','pid','dispatch','safe','root','pc','sp','flags')),(step,i,i+1,step+1,safe,child,saved[i][0],saved[i][1],saved[i][2]|0x200),'entry')
+            eq(row(enter[step],b'STYLEOS S862B ENTER',('step','id','pid','dispatch','safe','root','pc','sp','flags')),(step,i,i+1+identity,step+1+offset,safe,child,saved[i][0],saved[i][1],saved[i][2]|0x200),'entry')
             seen[i]+=1
             eq(row(caps[step],b'STYLEOS S849 CAPTURE',('id','root','n','xmm14','xmm15','mxcsr','st0','exp','kernel-restored','terminal')),(i,child,seen[i],tag|13,tag|14,0x3f80 if i else 0x1f80,0 if i else 0x8000000000000000,0 if i else 0x3fff,1,int(term)),'FP')
             vec=128 if kind=='call' or term and i else 14 if term else 0x50
@@ -85,9 +87,9 @@ def verify(raw,rc,site,ref):
                 eq(row(traps[step],b'STYLEOS S848 END',('id','root','rip','vector','error','cr2','state','ticks')),(i,child,rip,vec,err,IST if err else 0,4 if i else 3,sum(ticks)),'terminal')
             state=(4 if i else 5) if term else 1
             saved[i]=(0,0,0) if term else (rip,0x11001000,flags&~0x200)
-            eq(row(commit[step],b'STYLEOS S862B COMMIT',('step','id','pid','state','pc','sp','flags','zero')),(step,i,i+1,state,*saved[i],int(term)),'commit')
-            eq(row(boundary[step],b'STYLEOS S861T BOUNDARY',('step','safe','gdt','idt','pid')),(step,safe,a['gdt'],a['idt'],i+1),'boundary')
-            eq(row(ev[step],b'STYLEOS S860 EVENT',KEYS),(step,i,i+1,root['gen-'+label],step+1,safe,child,ticks[i],state,12288,0 if term else i+1,0 if term else int(not i)),'registry')
+            eq(row(commit[step],b'STYLEOS S862B COMMIT',('step','id','pid','state','pc','sp','flags','zero')),(step,i,i+1+identity,state,*saved[i],int(term)),'commit')
+            eq(row(boundary[step],b'STYLEOS S861T BOUNDARY',('step','safe','gdt','idt','pid')),(step,safe,a['gdt'],a['idt'],i+1+identity),'boundary')
+            eq(row(ev[step],b'STYLEOS S860 EVENT',KEYS),(step,i,i+1+identity,root['gen-'+label],step+1+offset,safe,child,ticks[i],state,12288,0 if term else i+1+identity,0 if term else int(not i)),'registry')
             back=row(backs[step],b'STYLEOS S848 BACK',('step','id','safe','state','a','b','stack-same'))
             if back['ab'[1-i]]!=prog[1-i] or back[label]<prog[i] or not term and back[label]!=prog[i]:raise ValueError('mixed isolation')
             prog[i]=back[label]
@@ -97,7 +99,7 @@ def verify(raw,rc,site,ref):
             events.append(dict(id=i,kind=kind,vector=vec,error=err,rip=rip,flags=flags,root=child))
         eq(row(exact(b'STYLEOS S848 TOTAL '),b'STYLEOS S848 TOTAL',('ticks','a','b','config-restored','timer-stopped')),(8,5,3,1,1),'timer cleanup')
         eq(row(exact(b'STYLEOS S861T SCRUB '),b'STYLEOS S861T SCRUB',('safe','used','tables-zero','leases-zero')),(safe,0,1,1),'scrub')
-        eq(row(exact(b'STYLEOS S860 CLEAN '),b'STYLEOS S860 CLEAN',('safe','dispatches','processes','windows')),(safe,12,0,0),'clean')
+        eq(row(exact(b'STYLEOS S860 CLEAN '),b'STYLEOS S860 CLEAN',('safe','dispatches','processes','windows')),(safe,12+offset,0,0),'clean')
         eq(row(exact(b'STYLEOS S862B CLEAN '),b'STYLEOS S862B CLEAN',('safe','bank-zero','pending-zero')),(safe,1,1),'bank cleanup')
         eq(row(exact(b'STYLEOS S862L READY '),b'STYLEOS S862L READY',('a','b','watchdog')),(5,3,32),'loop plan')
         eq(row(exact(b'STYLEOS S862L EMPTY '),b'STYLEOS S862L EMPTY',('dispatches','safe','windows')),(12,safe,0),'loop empty')
@@ -105,16 +107,17 @@ def verify(raw,rc,site,ref):
         if exact(b'STYLEOS S849 CLEAN ')!=b'STYLEOS S849 CLEAN slots-zero=yes kernel-copy-zero=yes' or ticks!=[5,3] or seen!=[7,5] or windows:raise ValueError('mixed final')
         o.update(mixed_events=events,timer_ready=ready);return True,o
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)
-def trace_check(text,o):
+def trace_check(text,o,*,initial_bp=True):
     h=list(HEADER.finditer(text));root=o['join_roots'];start=None
     for i,m in enumerate(h):
         block=text[m.start():h[i+1].start() if i+1<len(h) else len(text)]
         if any(int(x,16) in (root['safe'],root['a'],root['b']) for x in re.findall(r'\bCR3=([0-9a-fA-F]+)\b',block)):
             start=i;break
-    if start is None or len(h)-start!=15:raise ValueError('mixed CPU count')
-    out=roots_trace(text[:h[start+3].start()],o)
+    prefix=3 if initial_bp else 2
+    if start is None or len(h)-start!=prefix+12:raise ValueError('mixed CPU count')
+    out=roots_trace(text[:h[start+prefix].start()],o,initial_bp=initial_bp)
     for j,e in enumerate(o['mixed_events']):
-        k=start+3+j;m=h[k];block=text[m.start():h[k+1].start() if k+1<len(h) else len(text)]
+        k=start+prefix+j;m=h[k];block=text[m.start():h[k+1].start() if k+1<len(h) else len(text)]
         def val(p):
             v=re.findall(p,block,re.M)
             if len(v)!=1:raise ValueError('mixed CPU field '+p)

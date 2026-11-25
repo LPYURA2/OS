@@ -2,10 +2,16 @@
 #define STYLEOS_DESKTOP_INTERACTIVE_863_H
 #include <styleos/desktop_v0.h>
 /* Q35/TCG only; no general device admission. */
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+#define S863_DISPATCHES_PER_BATCH 12u
+#else
+#define S863_DISPATCHES_PER_BATCH 10u
+#endif
+#define S863_POLLS_PER_BATCH (S863_DISPATCHES_PER_BATCH+1u)
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
-/* Keep all 10 dispatch/11 poll/2 identity increments below UINT32_MAX.
+/* Keep all dispatch/poll/identity increments below UINT32_MAX.
  * Refuse rather than wrap. This is not a per-boot workload quota. */
-#define S863_LAUNCH_LIMIT (UINT32_MAX/11u-1u)
+#define S863_LAUNCH_LIMIT (UINT32_MAX/S863_POLLS_PER_BATCH-1u)
 #else
 #define S863_LAUNCH_LIMIT 2u
 #endif

@@ -170,7 +170,7 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  * registry/context admission is delayed; no new mapping is asserted here. */
 static void sparse_admit862(unsigned id,const struct s846_root child[2],uint64_t safe){
  if(root848()!=safe||(flags848()&0x200)||runtime860->dispatcher.current!=-1||pr_snapshot(pr_global(),0,0,true)!=id||ws_snapshot(ws_global(),0,0)!=id)fail848("862-sparse-before");
- if(id){const struct pr_entry *a=pr_find(pr_global(),pid860[0]);if(!a||a->state!=PR_READY||a->cpu_ticks!=1||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+1)fail848("862-sparse-A");}
+ if(id){const struct pr_entry *a=pr_find(pr_global(),pid860[0]);if(!a||a->state!=PR_READY||a->cpu_ticks!=(EXTRA_DISPATCH848?0u:1u)||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+1)fail848("862-sparse-A");}
  if(rt862_bank_admit(&bank862,runtime860,safe,id,handle860[id],child[id].built.root,id?"S860 B":"S860 A",&pid860[id])!=PS_OK||pr_account(pr_global(),pid860[id],handle860[id],0,3*P)!=PR_OK||ws_open_app(ws_global(),pr_global(),pid860[id],id?"S860 B":"S860 A",(struct ws_bounds){0,0,400,300},&win860[id])!=WS_OK)fail848("862-sparse-admit");
  if(!id&&ws_set_minimized(ws_global(),pid860[id],win860[id],true)!=WS_OK)fail848("862-sparse-window");
  for(unsigned j=0;j<15;j++)bank862.slots[id].context.gpr[j]=pattern848(id,j);
@@ -217,12 +217,16 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  dispatch_base848=runtime860->dispatcher.dispatches;
  if(
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
-    dispatch_base848%10||dispatch_base848/10>=S863_LAUNCH_LIMIT||
+    dispatch_base848%S863_DISPATCHES_PER_BATCH||dispatch_base848/S863_DISPATCHES_PER_BATCH>=S863_LAUNCH_LIMIT||
 #else
     (dispatch_base848!=0&&dispatch_base848!=10)||
 #endif
     armed848||receipt860||frame860||cr2862||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail848("862-recycle-start");
- ticks848=0;for(unsigned i=0;i<2;i++){local848[i]=0;progress848[i]=0;}
+ ticks848=0;for(unsigned i=0;i<2;i++){local848[i]=0;progress848[i]=0;
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+ mixed_calls848[i]=0;mixed_pc848[i]=0;
+#endif
+ }
 #endif
 #endif
  __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3":"=m"(g0),"=m"(i0),"=r"(tr),"=r"(cs));

@@ -124,7 +124,7 @@ def main():
     build=out/'build'
     with (out/'compile.log').open('w') as f:
         subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--desktop-owned-root-preview' if preview else '--test-desktop-autonomous-863','--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
-    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=recycle_site(efi.read_bytes(),mp)
+    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=recycle_site(efi.read_bytes(),mp,mixed=preview)
     for forbidden in ('s863_disk_write','s863_disk_read','storage_commit_863','ata_runtime_write_863','disk_admit863'):
         if forbidden in mp.read_text():raise ValueError('storage backend linked '+forbidden)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
@@ -191,9 +191,9 @@ def main():
     if lines.count(policy)!=1:raise ValueError('policy')
     cold=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))
     prefix=b'\n'.join(lines[:cold])+b'\n'
-    root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview)
+    root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview,mixed=preview)
     pointer=verify_pointer_clock(lines,root) if preview else None
     smp_refusal=refuse_smp_preview(cmd,vars,out,iso,iso_before) if preview else None
     (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,smp_refusal=smp_refusal,pointer_clock=pointer,host_exit=rc),indent=2))
-    print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, 49 CPU events, four independent launch cycles, no storage writes')
+    print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, {0} CPU events, four independent launch cycles, no storage writes'.format(len(events)))
 if __name__=='__main__':main()

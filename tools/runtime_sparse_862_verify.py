@@ -3,8 +3,8 @@ import re
 from runtime_loop_862_verify import verify as prior, loop_site, trace_check
 from fault_site import _unpack,_range
 
-def sparse_site(efi,map_file):
-    site=loop_site(efi,map_file);s=map_file.read_text()
+def sparse_site(efi,map_file,*,mixed=False):
+    site=loop_site(efi,map_file,mixed=mixed);s=map_file.read_text()
     pe,=_unpack('<I',efi,60,'PE');_,count,_,_,_,opt,_=_unpack('<HHIIIHH',efi,pe+4,'COFF')
     for name,obj in [('sparse_admit862',r'boot_x86_64_user_preemption_848\.o')]+[(f'rt862_bank_{x}',r'kernel_runtime_bank_862\.o') for x in ('open','admit','release')]:
         rows=re.findall(r'^\s*([0-9a-fA-F]{4}):([0-9a-fA-F]{8})\s+'+name+r'\s+([0-9a-fA-F]{16})\s+'+obj+r'\s*$',s,re.M)
@@ -16,10 +16,15 @@ def sparse_site(efi,map_file):
         _range(efi,ro+rel,1,'S862S entry byte');site[name+'_rva']=rva
     return site
 
-def verify(raw,rc,site,reference,*,epoch=0,clean_fnv=None,cold=False):
+def verify(raw,rc,site,reference,*,epoch=0,clean_fnv=None,cold=False,mixed=False):
     try:
         if not all(site.get(x+'_rva') for x in ('sparse_admit862','rt862_bank_open','rt862_bank_admit','rt862_bank_release')):raise ValueError('S862S linked policy')
-        ok,obs=prior(raw,rc,site,reference,sparse=True,epoch=epoch,clean_fnv=clean_fnv,cold=cold)
+        if mixed:
+            from runtime_mixed_863_verify import verify as mixed_verify
+            if site.get('loop_budgets')!=[5,3] or not site.get('loop_budget_rva'):raise ValueError('mixed budget binding')
+            ok,obs=mixed_verify(raw,rc,site,reference,epoch=epoch,clean_fnv=clean_fnv,cold=cold)
+        else:
+            ok,obs=prior(raw,rc,site,reference,sparse=True,epoch=epoch,clean_fnv=clean_fnv,cold=cold)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S862S ')]
         def pos(prefix):
@@ -36,7 +41,7 @@ def verify(raw,rc,site,reference,*,epoch=0,clean_fnv=None,cold=False):
             identity=(i,i+1+2*epoch,r['gen-'+'ab'[i]],r['ab'[i]],safe)
             a=row(rows[i],b'ADMIT',('id','pid','handle','root','safe','dispatches','processes','windows'))
             z=row(rows[2+i],b'RELEASE',('id','pid','handle','root','safe','processes'))
-            if tuple(a.values())!=(*identity,i+10*epoch,i+1,i+1) or tuple(z.values())!=(*identity,1-i):raise ValueError('S862S binding/count')
+            if tuple(a.values())!=(*identity,i+(12 if mixed else 10)*epoch,i+1,i+1) or tuple(z.values())!=(*identity,1-i):raise ValueError('S862S binding/count')
             admissions.append(a);releases.append(z)
         if not rows[0]<pos(b'STYLEOS S861T READY ')<pos(b'STYLEOS S862B ENTER step=0x0000000000000000 '):raise ValueError('S862S A admission order')
         if not pos(b'STYLEOS S848 BACK step=0x0000000000000000 ')<rows[1]<pos(b'STYLEOS S860 READY ')<pos(b'STYLEOS S862B ENTER step=0x0000000000000001 '):raise ValueError('S862S B admission order')

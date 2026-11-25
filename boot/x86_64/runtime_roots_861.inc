@@ -1,6 +1,9 @@
 /* S861 diagnostic only: included after the S851 hardware helpers. No CPL3
  * dispatch or new grants. All objects are image-owned, single CPU, IF=0. */
 #include <styleos/runtime_roots_861.h>
+#ifndef S863_DISPATCHES_PER_BATCH
+#define S863_DISPATCHES_PER_BATCH 10u
+#endif
 static _Alignas(4096) uint64_t child_tables861[2][PG_TABLE_PAGES][512];
 static struct s846_root children861[2];
 static struct s850_gop_plan frozen861;
@@ -18,8 +21,8 @@ static bool boundary861(const struct dpr_service *d,const struct s842_cache *cac
  struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&(
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
- (d->dispatcher.dispatches&&d->dispatcher.dispatches%10==0&&
-  d->dispatcher.dispatches<=10*S863_LAUNCH_LIMIT&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
+ (d->dispatcher.dispatches&&d->dispatcher.dispatches%S863_DISPATCHES_PER_BATCH==0&&
+  d->dispatcher.dispatches<=S863_DISPATCHES_PER_BATCH*S863_LAUNCH_LIMIT&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
 #endif
  ((d->dispatcher.dispatches==
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
@@ -102,7 +105,7 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  if(!prepared){
 #endif
- if(d->dispatcher.dispatches!=10*round)fail("862-recycle-dispatch-start");
+ if(d->dispatcher.dispatches!=S863_DISPATCHES_PER_BATCH*round)fail("862-recycle-dispatch-start");
  arch_puts("STYLEOS S862R BEGIN");field("round",round);field("safe",safe);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);arch_putc('\n');
 #else
  const uint64_t expected_generation=4;
@@ -185,7 +188,7 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  arch_puts("STYLEOS S861 CLEAN");field("safe",safe);field("used",used);field("next",arena->next);field("tables-zero",1);field("leases-zero",1);field("fnv",after);arch_putc('\n');
  arch_puts("STYLEOS S861 POLICY cpl0-only=yes shared-desktop=yes inherited-return=no cpl3=no timer=no production-cr3=deny\n");
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
- if(arena->next!=expected_generation+2||d->dispatcher.dispatches!=10*(round+1)||pr_global()->next_pid!=3+2*round||ws_global()->next_id!=3+2*round)fail("862-recycle-final");
+ if(arena->next!=expected_generation+2||d->dispatcher.dispatches!=S863_DISPATCHES_PER_BATCH*(round+1)||pr_global()->next_pid!=3+2*round||ws_global()->next_id!=3+2*round)fail("862-recycle-final");
  arch_puts("STYLEOS S862R DONE");field("round",round);field("safe",safe);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);field("next-pid",pr_global()->next_pid);field("next-window",ws_global()->next_id);field("used",used);arch_putc('\n');
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  prepared=false;
