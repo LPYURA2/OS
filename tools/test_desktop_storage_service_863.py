@@ -137,7 +137,7 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
     return root,events
 
 
-def verify_four_storage(lines,raw,data,site,ref,folder,write):
+def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False):
     """Same four-process trace as live ISO, with an actual save between polls."""
     from runtime_four_864_verify import verify,trace_check,N,order
     from runtime_mixed_863_verify import row
@@ -154,7 +154,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write):
     frames=[Frame(folder/(x+'.ppm')) for x in names]
     hashes=[frame_hash(x) for x in frames];final=hashes[1]
     if any(x.pixels!=frames[1].pixels for x in frames[2:]) or (frames[0].pixels==frames[1].pixels)==write:raise ValueError('four storage frame continuity')
-    ok,obs=verify(raw,33,site,ref,cold=True,clean_fnv=final,storage=True)
+    ok,obs=verify(raw,33,site,ref,cold=True,clean_fnv=final,storage=True,provisioned=provisioned)
     if not ok:raise ValueError(obs)
     root=obs['active']['root'];events=trace_check(data.decode('ascii'),obs)
     cold=rows(b'STYLEOS S863B COLD');ready=rows(b'STYLEOS S863 READY')
@@ -350,7 +350,7 @@ def main():
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
         if args.four:
-            root,events=verify_four_storage(lines,raw,data,site,ref,folder,write)
+            root,events=verify_four_storage(lines,raw,data,site,ref,folder,write,provisioned=args.provisioned)
         elif cold:
             root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks,mixed=mixed,interleaved=mixed and write)
         else:
@@ -381,7 +381,8 @@ def main():
         bars=[x for x in lines if x.startswith(b'STYLEOS S863S BAR4 ')]
         if bars!=[f'STYLEOS S863S BAR4 root=0x{root:016x} bar4=0x{(0x6061 if args.iso else 0x60e1):016x}'.encode()]:raise ValueError('guest BAR4 pin mismatch')
         admits=[x for x in lines if x.startswith(b'STYLEOS S863S ADMIT ')]
-        if len(admits)!=1 or not lines.index(dma[0])<lines.index(dma[1])<lines.index(bars[0])<lines.index(admits[0]):raise ValueError('DMA admission order')
+        if len(admits)!=1 or not gate<lines.index(dma[0])<lines.index(dma[1])<lines.index(bars[0])<lines.index(admits[0]):raise ValueError('DMA admission order')
+        if args.provisioned and not lines.index(bars[0])<lines.index(b'STYLEOS S863S PROVISIONED-IDENTITY')<lines.index(admits[0]):raise ValueError('identity must precede write admission')
         if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
         if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')
         return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h,'interleaved_save':mixed and write}
