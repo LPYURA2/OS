@@ -35,7 +35,7 @@ def verify(raw,rc,site,reference,*,clean_fnv=None,cold=False,round_count=2,mixed
         if not begins[0]<fx[0]<ends[0] or ends[-1]!=len(lines)-1:raise ValueError('S862R phase order')
         for i in range(1,round_count):
             if not ends[i-1]+1==begins[i]<reuse[i-1]<fx[i]<stale[i-1]<ends[i]:raise ValueError('S862R phase order')
-        if any(x.startswith((b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862B ',b'STYLEOS S862S ',b'STYLEOS S862L ')) for x in lines[:begins[0]]):raise ValueError('S862R event before round')
+        if any(x.startswith((b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862B ',b'STYLEOS S862S ',b'STYLEOS S862L ',b'STYLEOS S863M ')) for x in lines[:begins[0]]):raise ValueError('S862R event before round')
         def row(i,tag,keys):
             m=re.fullmatch(b'STYLEOS S862R '+tag+b' '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in keys),lines[i])
             if not m:raise ValueError('S862R schema '+str(tag))

@@ -54,6 +54,7 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
             prev=lines.index(ends[i])
         if not repeatable and not prev<lines.index(req[-1]):raise ValueError('cold refusal order')
         frame=sessions=None;workload=[]
+        workload_tags=(b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862',b'STYLEOS S863M ')
         for i,(begin,end) in enumerate(zip(begins,ends)):
             m=re.fullmatch(rb'STYLEOS S863L BEGIN root=0x([0-9a-f]{16}) dispatches=0x([0-9a-f]{16}) frame=0x([0-9a-f]{16}) sessions=0x([0-9a-f]{16})',begin)
             if not m:raise ValueError('cold task begin')
@@ -61,9 +62,10 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
             if rr!=root or dispatch!=n*i or end!=f'STYLEOS S863L DONE root=0x{root:016x} dispatches=0x{n*(i+1):016x} frame=0x{fr:016x} sessions=0x{se:016x}'.encode():raise ValueError('cold task final state')
             if i and (fr,se)!=(frame,sessions):raise ValueError('cold shell state changed between launches')
             frame,sessions=fr,se
-            workload.extend(x for x in lines[lines.index(begin)+1:lines.index(end)] if x.startswith((b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862',b'STYLEOS S863M ')))
-        all_workload=[x for x in lines if x.startswith((b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862'))]
+            workload.extend(x for x in lines[lines.index(begin)+1:lines.index(end)] if x.startswith(workload_tags))
+        all_workload=[x for x in lines if x.startswith(workload_tags)]
         if workload!=all_workload:raise ValueError('task ran outside admitted launches')
+        if not mixed and any(x.startswith(b'STYLEOS S863M ') for x in workload):raise ValueError('unexpected mixed workload in legacy profile')
         from test_desktop_v0 import Frame
         names=['note','after-first-launch','after-tasks']+([f'after-launch-{i}' for i in range(3,count+1)] if repeatable else [])
         frames=[Frame(folder/(name+'.ppm')) for name in names]
