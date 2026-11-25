@@ -1,0 +1,28 @@
+name: StyleOS 863 owned-root shell clock consumer
+on:
+  push:
+    branches: [feature/styleos-desktop-runtime-863]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  clock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install real guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 ovmf dosfstools mtools
+      - name: Actual shell boots with two RTC configurations
+        run: |
+          python3 tools/test_desktop_clock_service_863.py --output build/s863-clock/first
+          python3 tools/test_desktop_clock_service_863.py --output build/s863-clock/second --late
+          python3 tools/test_desktop_clock_pair_863.py build/s863-clock/first build/s863-clock/second
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-863-clock-service
+          path: build/s863-clock/
+          if-no-files-found: warn

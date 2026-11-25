@@ -22,7 +22,7 @@ void s844_guest_run(uint64_t);
 #include <styleos/desktop_v0.h>
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
 #include <styleos/desktop_interactive_863.h>
-#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
 #include <styleos/rtc_runtime_863.h>
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
@@ -197,7 +197,7 @@ static bool shell_fixture863(void){
 void s863_shell_guard(void){
  if(!shell_root863||read_cr3()!=shell_root863||(flags()&0x200)||dpr_global_state()!=shell_d863)fail("863-shell-root");
 }
-#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
 /* Only this opt-in Q35/TCG diagnostic owns CMOS. The runner fixes one vCPU;
  * APs are not started. No other CMOS backend is linked. As in S854 we
  * establish a NEW masked-NMI index shadow, never infer inherited port 70.
@@ -211,7 +211,9 @@ static _Alignas(4096) union {
 _Static_assert(sizeof rtc_page863==4096,"RTC page extent");
 #define rtc_runtime863 (rtc_page863.state)
 static bool rtc_preflight863,rtc_admitted863;
+#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
 static unsigned rtc_samples863;
+#endif
 static bool rtc_observe863(void *ctx,struct rtc_runtime_observation_863 *o)
 {
  uint16_t cs;__asm__ volatile("mov %%cs,%0":"=r"(cs));
@@ -251,6 +253,7 @@ static void rtc_admit863(void)
  rtc_admitted863=true;
  if(!rtc_runtime_bind_863(&rtc_runtime863,&rtc_ops863,&rtc_runtime863,shell_root863,1,initial))fail("863-rtc-bind");
 }
+#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
 static void rtc_sample863(void)
 {
  struct rtc_time_854 t={0};bool ok=false;
@@ -269,6 +272,36 @@ static void rtc_sample863(void)
  field("dispatches",shell_d863->dispatcher.dispatches);field("hour",t.hour);
  field("minute",t.min);field("second",t.sec);field("shadow",rtc_runtime863.owner.shadow);arch_putc('\n');
 }
+#endif
+#ifdef STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863
+/* Only admitted Q35 fixture. Leave caller outputs unchanged on refusal. */
+bool s863_shell_clock(unsigned *hour,unsigned *minute){
+ static bool displayed;
+ static unsigned last_hour,last_min;
+ if(!hour||!minute||hour==minute||!rtc_admitted863)return false;
+ s863_shell_guard();
+ if(!same_cache(&shell_cache863)||rtc_runtime863.quarantined)return false;
+ struct rtc_time_854 t={0};bool ok=false;
+ unsigned attempts=displayed?1:4096;
+ for(unsigned i=0;i<attempts;i++){
+  if(rtc_runtime_read_863(&rtc_runtime863,&t)){ok=true;break;}
+  if(rtc_runtime863.quarantined)break;
+  __asm__ volatile("pause":::"memory");
+ }
+ if(!ok||rtc_runtime863.owner.held||rtc_runtime863.owner.shadow!=0x8d||
+    rtc_runtime863.quarantined||rtc_runtime863.owner.quarantined||
+    t.hour>23||t.min>59||!same_cache(&shell_cache863))return false;
+ s863_shell_guard();
+ *hour=t.hour;*minute=t.min;
+ if(!displayed||last_hour!=t.hour||last_min!=t.min){
+  arch_puts("STYLEOS S863C CLOCK");field("root",shell_root863);
+  field("dispatches",shell_d863->dispatcher.dispatches);field("hour",t.hour);
+  field("minute",t.min);field("shadow",rtc_runtime863.owner.shadow);arch_putc('\n');
+  displayed=true;last_hour=t.hour;last_min=t.min;
+ }
+ return true;
+}
+#endif
 #endif
 static void shell_boundary863(void){
  s863_shell_guard();unsigned used;
@@ -475,11 +508,15 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #endif
 #endif
  shell_boundary863();
-#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
  rtc_admit863();
 #endif
  arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
+#ifdef STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863
+ arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
+#else
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
+#endif
  desktop_v0_run(s);
 #endif
 #endif
@@ -756,7 +793,7 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
   struct pg_lookup x;
   if(arch_paging_attest_image_writable(p,desc[i],4096)!=PG_OK||pg_lookup(&composed.plan,desc[i],&x)!=PG_OK||x.pa!=desc[i]||x.flags!=PG_WRITE)fail("descriptor-closure");
  }
-#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
  /* The old walker is legal ONLY here, with the inherited CR3 active.
   * The detached plan has already passed the guarded-tree audit. */
  if(rtc_preflight863||
