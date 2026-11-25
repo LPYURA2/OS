@@ -37,6 +37,54 @@ def verify_preview_media(iso,efi,out):
     return dict(boot_lba=lba,esp_sha256=sha(image),tree_efi_sha256=sha(tree_efi.read_bytes()),
                 boot_efi_sha256=sha(boot_efi.read_bytes()))
 
+def refuse_smp_preview(cmd,vars,out,iso,expected_hash):
+    """Use the same ISO, fresh firmware variables and actual two-vCPU QEMU."""
+    folder=out/'refuse-smp';folder.mkdir()
+    serial=folder/'serial.log';trace=folder/'cpu-trace.log'
+    varfile=folder/'OVMF_VARS.fd';shutil.copyfile(vars,varfile)
+    args=list(cmd)
+    args[args.index('-smp')+1]='2,sockets=1,cores=2,threads=1'
+    args[args.index('-serial')+1]=f'file:{serial}'
+    args[args.index('-D')+1]=str(trace)
+    for i,arg in enumerate(args):
+        if arg.startswith('if=pflash,format=raw,file='):
+            args[i]=f'if=pflash,format=raw,file={varfile}'
+    (folder/'command.json').write_text(json.dumps(args,indent=2))
+    with (folder/'qemu.log').open('wb') as err:
+        proc=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=err)
+        d=Desktop(proc,serial,folder)
+        try:
+            if 'QMP' not in d.receive():raise RuntimeError('SMP QMP greeting')
+            d.call('qmp_capabilities')
+            cpus=d.call('query-cpus-fast')
+            if len(cpus)!=2 or {cpu['cpu-index'] for cpu in cpus}!={0,1}:
+                raise ValueError('negative fixture not two actual vCPUs')
+            wait(proc,serial,b'STYLEOS S850 FAIL 863-platform-cpu')
+            d.call('stop')
+            status=d.call('query-status')
+            stats=d.call('query-blockstats',**{'query-nodes':False})
+            if status.get('status')!='paused' or proc.poll() is not None:
+                raise ValueError('negative guest did not remain in fail-stop')
+            if not stats or any(x['stats']['wr_operations'] or x['stats']['wr_bytes'] for x in stats):
+                raise ValueError('negative fixture wrote to media')
+            raw=serial.read_bytes();lines=raw.splitlines()
+            if [x for x in lines if b' FAIL ' in x]!=[b'STYLEOS S850 FAIL 863-platform-cpu']:
+                raise ValueError('negative fixture wrong refusal')
+            if any(x.startswith((b'STYLEOS S850 ROOT ',b'STYLEOS S863 ',b'STYLEOS S863S ',b'STYLEOS S863L ',b'STYLEOS DESKTOP READY')) for x in lines):
+                raise ValueError('negative fixture crossed desktop root admission')
+            d.call('quit')
+            if proc.wait(timeout=30)!=0:raise ValueError('negative host exit')
+        finally:
+            d.ready.close()
+            if proc.poll() is None:proc.kill();proc.wait()
+            proc.stdin.close();proc.stdout.close()
+    if sha(iso.read_bytes())!=expected_hash:raise ValueError('negative ISO changed')
+    result=dict(vcpus=cpus,host_status=status,block_stats=stats,
+                refusal='863-platform-cpu',uart_sha256=sha(raw),
+                iso_sha256=expected_hash)
+    (folder/'results.json').write_text(json.dumps(result,indent=2))
+    return result
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--preview',action='store_true');args=p.parse_args();preview=args.preview;out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build'
@@ -110,6 +158,7 @@ def main():
     cold=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))
     prefix=b'\n'.join(lines[:cold])+b'\n'
     root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview)
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,host_exit=rc),indent=2))
+    smp_refusal=refuse_smp_preview(cmd,vars,out,iso,iso_before) if preview else None
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,smp_refusal=smp_refusal,host_exit=rc),indent=2))
     print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, 49 CPU events, four independent launch cycles, no storage writes')
 if __name__=='__main__':main()

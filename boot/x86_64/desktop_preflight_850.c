@@ -126,7 +126,13 @@ static const struct storage_ops_863 store_ops863={pio_observe863,pio_read863,pio
 #endif
 #endif
 static void field(const char *k,uint64_t v){arch_putc(' ');arch_puts(k);arch_putc('=');paging_hex(v);}
-static _Noreturn void fail(const char *s){arch_puts("STYLEOS S850 FAIL ");arch_puts(s);arch_putc('\n');out32(0xf4,0x11);arch_halt();}
+static _Noreturn void fail(const char *s){
+ arch_puts("STYLEOS S850 FAIL ");arch_puts(s);arch_putc('\n');
+#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+ out32(0xf4,0x11);
+#endif
+ arch_halt();
+}
 /* Same narrow reversible S795 probe, restricted further to the standard
  * QEMU VGA fixture. No probe on an unknown device or driver-owned BAR.
  * Restore the command, BAR, and CF8 on every path following a write. */
@@ -206,6 +212,16 @@ static uint64_t pump_frame863,pump_sessions863;
 static uint64_t live_hash863(const volatile unsigned char *p,size_t n){
  uint64_t h=UINT64_C(14695981039346656037);
  for(size_t i=0;i<n;i++){h^=p[i];h*=UINT64_C(1099511628211);}return h;
+}
+#endif
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+/* This is a CPUID-visible fixture limit, not a general SMP topology proof.
+ * Never infer physical CPU count or authorize AP startup from this check. */
+static bool preview_single_cpu863(void){
+ uint32_t a,b,c,d;
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
+ unsigned logical=(b>>16)&255u;
+ return logical==1||(!(d&(1u<<28))&&logical==0);
 }
 #endif
 static bool shell_fixture863(void){
@@ -682,6 +698,9 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  /* Existing shell only after two actual lifecycle rounds on this same root.
   * Storage/clock/reset are explicitly denied. No new task ABI or DMA grant. */
  if(!shell_fixture863()||!identity((uintptr_t)desktop_v0_run,PG_EXEC)||!identity((uintptr_t)desk_input_init,PG_EXEC)||!identity((uintptr_t)desk_input_next,PG_EXEC))fail("863-shell-admission");
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+ if(!preview_single_cpu863())fail("863-shell-cpu");
+#endif
  shell_root863=target;shell_d863=dpr_global_state();shell_cache863=*cache;
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
  live_p863=p;live_guard863=guard;live_arena863=allocator858;live_surface863=s;
@@ -971,6 +990,9 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
  if(!p||!p->evidence||!guard||read_cr3()!=p->old_root||(flags()&0x200)||arch_paging_attest_image_writable(p,(uintptr_t)tables,sizeof tables)!=PG_OK)fail("context-storage");
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
  if(!shell_fixture863())fail("863-platform");
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+ if(!preview_single_cpu863())fail("863-platform-cpu");
+#endif
 #endif
  const struct desktop_surface *surface=desktop_platform_surface();
  if(!desktop_surface_valid(surface))fail("surface-invalid");
