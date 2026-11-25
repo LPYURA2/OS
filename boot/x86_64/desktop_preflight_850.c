@@ -197,6 +197,7 @@ static unsigned pump_calls863;
 static uint64_t pump_arena_base863;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
 static bool task_requested863;
+static unsigned task_batches863;
 #else
 static unsigned pump_gate863;
 static uint64_t pump_frame863,pump_sessions863;
@@ -415,7 +416,7 @@ static void shell_boundary863(void){
 #ifdef STYLEOS_TEST_DESKTOP_COLD_863
  unsigned dispatches=0,next=1,generation=1;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- if(live_phase863==2){dispatches=20;next=5;generation=5;}
+ if(live_phase863==2){dispatches=10*task_batches863;next=1+2*task_batches863;generation=1+2*task_batches863;}
 #endif
 #else
  unsigned dispatches=20,next=5,generation=8;
@@ -449,7 +450,12 @@ static void shell_boundary863(void){
  * Reuse the bounded S862 trial, not an independent scheduler or new grant. */
 __attribute__((noinline)) void s863_live_run(void){
  shell_boundary863();
- if(live_phase863||!live_p863||!live_guard863||!live_arena863||!live_surface863||live_arena863!=s845_arena()||live_surface863->stride!=live_surface863->width||live_surface863->format!=DESKTOP_BGR_BYTES)fail("863-live-admission");
+#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+ if(live_phase863==1||task_batches863>=2)fail("863-task-phase");
+#else
+ if(live_phase863)fail("863-live-phase");
+#endif
+ if(!live_p863||!live_guard863||!live_arena863||!live_surface863||live_arena863!=s845_arena()||live_surface863->stride!=live_surface863->width||live_surface863->format!=DESKTOP_BGR_BYTES)fail("863-live-admission");
  const struct desk_sessions *sessions=desk_sessions_global();
 #ifndef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
  if(!sessions->notes.dirty||!sessions->notes.length||!desk_sessions_pid(sessions,DESK_SESSION_NOTES))fail("863-live-draft");
@@ -470,9 +476,12 @@ __attribute__((noinline)) void s863_live_run(void){
  * Only the fixed built-in native fixture is currently authorized. */
 bool s863_request_tasks(void){
  s863_shell_guard();
- if(live_phase863||task_requested863)return false;
- shell_boundary863();task_requested863=true;
- return true;
+ shell_boundary863();
+ bool accept=live_phase863!=1&&!task_requested863&&task_batches863<2;
+ if(accept)task_requested863=true;
+ arch_puts("STYLEOS S863B REQUEST");field("root",shell_root863);field("completed",task_batches863);
+ field("dispatches",shell_d863->dispatcher.dispatches);field("accepted",accept);arch_putc('\n');
+ return accept;
 }
 #endif
 /* Called once per actual shell poll after input/render. One hardware dispatch
@@ -497,7 +506,12 @@ __attribute__((noinline)) void s863_shell_pump(void){
 #endif
  bool done=guest861(live_p863,&shell_cache863,live_guard863,live_arena863,live_surface863,frame);
  unsigned after=shell_d863->dispatcher.dispatches,used;
- if(after<before||after-before>1||!s844_count(live_arena863,&used)||(done!=(after==20&&used==0))||(!done&&after==before&&used!=0))fail("863-pump-result");
+#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+ const unsigned end_dispatch=10*(task_batches863+1);
+#else
+ const unsigned end_dispatch=20;
+#endif
+ if(after<before||after-before>1||!s844_count(live_arena863,&used)||(done!=(after==end_dispatch&&used==0))||(!done&&after==before&&used!=0))fail("863-pump-result");
  arch_puts("STYLEOS S863P SLICE");field("n",++pump_calls863);field("before",before);field("after",after);field("used",used);field("processes",pr_snapshot(pr_global(),0,0,true));field("windows",ws_snapshot(ws_global(),0,0));field("done",done);arch_putc('\n');
 #ifndef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
  if(pump_calls863==1){pump_gate863=1;arch_puts("STYLEOS S863P WAIT\n");}
@@ -510,7 +524,8 @@ __attribute__((noinline)) void s863_shell_pump(void){
  shell_boundary863();
  if(!done)return;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
- if(pump_calls863!=22)fail("863-pump-final");
+ if(pump_calls863!=11*(task_batches863+1))fail("863-pump-final");
+ ++task_batches863;
 #else
  if(pump_calls863!=22||pump_gate863!=3)fail("863-pump-final");
 #endif
@@ -546,6 +561,9 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
  if(batch==1&&!ev->mouse&&ev->key==0x43&&!ev->modifiers)s863_live_run();
 #endif
  if(batch==1&&!ev->mouse&&ev->key==0x58&&!ev->modifiers){
+#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+  if(task_batches863!=2||task_requested863)fail("863-task-incomplete");
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
   if(live_phase863!=2)fail("863-live-incomplete");
 #endif

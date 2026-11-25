@@ -184,7 +184,12 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  if(arena->next!=expected_generation+2||d->dispatcher.dispatches!=10*(round+1)||pr_global()->next_pid!=3+2*round||ws_global()->next_id!=3+2*round)fail("862-recycle-final");
  arch_puts("STYLEOS S862R DONE");field("round",round);field("safe",safe);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);field("next-pid",pr_global()->next_pid);field("next-window",ws_global()->next_id);field("used",used);arch_putc('\n');
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
- prepared=false;return ++round==2;
+ prepared=false;
+#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+ ++round;return true;
+#else
+ return ++round==2;
+#endif
 #else
  }
 #endif
