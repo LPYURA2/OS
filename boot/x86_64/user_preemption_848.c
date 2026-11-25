@@ -283,7 +283,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
  dispatch_base848=runtime860->dispatcher.dispatches;
  if(dispatch_base848%26||
-#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#if defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_INTEGRATED_RUNTIME_864)
     dispatch_base848/26>=S863_LAUNCH_LIMIT||
 #else
     dispatch_base848>=104||
