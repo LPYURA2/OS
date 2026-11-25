@@ -1,6 +1,23 @@
 /* Terminal, single CPU, integer-only CPL3 experiment under audited S846 roots. */
 #include <styleos/process_entry_847.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+/* The integrated profile uses only the hardware-preemptive entry adapter.
+ * No cooperative fallback or synthetic cooperative program is permitted.
+ * Keep fail-stop on unexpected origin; do not invent a trap result. */
+#if !defined(STYLEOS_TEST_USER_PREEMPT_848) || !defined(STYLEOS_TEST_RUNTIME_BANK_862)
+#error integrated runtime requires authenticated preemptive bank
+#endif
+bool s848_active(void);
+unsigned s848_dispatch_raw(struct s847_raw *,uint64_t,uint64_t);
+unsigned s847_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root)
+{
+ if(s848_active())return s848_dispatch_raw(f,cr2,root);
+ __asm__ volatile("cli":::"memory");
+ arch_puts("STYLEOS RUNTIME FAIL unexpected inactive trap\n");
+ arch_halt();
+}
+#else
 #define P UINT64_C(4096)
 #ifdef STYLEOS_TEST_RUNTIME_USER_861
 #include <styleos/runtime_entry_858.h>
@@ -208,3 +225,5 @@ void s863_coop_reap(uint64_t root,const struct s844_lease leases[2])
  if(rt861_dispatcher(&boundary)!=joined847||pr_snapshot(pr_global(),0,0,true))fail847("863-coop-reap-final");
 }
 #endif
+
+#endif /* integrated preemptive bridge / historical cooperative fixture */

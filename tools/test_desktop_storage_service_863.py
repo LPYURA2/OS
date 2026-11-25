@@ -245,6 +245,15 @@ def main():
         with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',*build_args,'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
     efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=None if args.four else bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
+    if args.integrated:
+        # The integrated hardware-preemptive path has no cooperative fallback.
+        # Bind actual linked entry symbols, not the source profile name alone.
+        symbols={token for line in mp.read_text().splitlines() for token in line.split()}
+        forbidden={'s847_trial','s863_coop_reap','s847_0_start','s847_0_end','s847_0_fault','s847_0_ok','s847_0_deny','s847_0_yield','s847_1_start','s847_1_end','s847_1_exit','s847_1_ok','s847_1_deny','s847_1_yield'}
+        required={'s847_enter','s847_dispatch_raw','s848_dispatch_raw','s848_irq_entry','s847_pf_entry','s847_call_entry'}
+        if symbols & forbidden or not required <= symbols:
+            raise ValueError('integrated preemptive entry provenance')
+        (out/'entry-separation.json').write_text(json.dumps({'required':sorted(required),'absent':sorted(forbidden)},indent=2)+'\n')
     if args.owned_shell:
         # The shell-only image must not require a linked child workload site.
         # Bind the real boot BP and demand absence of the child INT3 label.

@@ -175,7 +175,7 @@ s848_irq_entry:
     iretq
 .Lbad847:
     cli
-#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#if !defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) && !defined(STYLEOS_PROVISIONED_STORAGE_864)
     movl $0x26,%eax
     outl %eax,$0xf4
 #endif
@@ -194,6 +194,7 @@ s847_kernel_ss: .word 0
 .globl s847_bad_entry
 s847_bad_entry:
     jmp .Lbad847
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
 .macro prefix847 tag
     movabs $0x12000000,%rbx
     movq $8,%rcx
@@ -245,6 +246,7 @@ s847_1_exit:
 .Luser_bad1:
     ud2
 s847_1_end:
+#endif /* historical cooperative payloads */
 
 #ifdef STYLEOS_TEST_USER_PREEMPT_848
 /* No voluntary yield or GPR changes in either busy loop. */
