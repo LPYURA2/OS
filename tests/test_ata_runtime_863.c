@@ -7,7 +7,8 @@ struct fixture {
     uint16_t identify[256],media[256],durable[256];
     unsigned calls,fail_at,command,index,commands,write_words,flushes;
     uint8_t regs[9];
-    bool timeout,completion_timeout;
+    bool timeout,completion_timeout,flush_timeout;
+    unsigned completion_busy,flush_busy;
 };
 static bool call(struct fixture*f)
 {
@@ -17,7 +18,17 @@ static bool call(struct fixture*f)
 static bool status(void *p,uint8_t *v)
 {
     struct fixture*f=p;if(!call(f))return false;
-    *v=(f->timeout||(f->completion_timeout&&f->command==0x30&&f->index==256))?128:(uint8_t)(64|((f->command==0xec||f->command==0x20||f->command==0x30)&&f->index<256?8:0));
+    if(f->timeout){*v=128;return true;}
+    if(f->command==0x30&&f->index==256){
+        if(f->completion_timeout){*v=0xd0;return true;}
+        if(f->completion_busy){--f->completion_busy;*v=0xd0;return true;}
+    }
+    if(f->command==0xe7){
+        if(f->flush_timeout){*v=0xc0;return true;}
+        if(f->flush_busy){--f->flush_busy;*v=0xc0;return true;}
+        memcpy(f->durable,f->media,sizeof f->media);
+    }
+    *v=(uint8_t)(64|((f->command==0xec||f->command==0x20||f->command==0x30)&&f->index<256?8:0));
     return true;
 }
 static bool reg(void *p,unsigned r,uint8_t v)
@@ -26,7 +37,7 @@ static bool reg(void *p,unsigned r,uint8_t v)
     assert(ata857_allowed(r,v)||(r==7&&(v==0x30||v==0xe7)));
     f->regs[r]=v;
     if(r==7){f->command=v;f->index=0;f->commands++;
-        if(v==0xe7){f->flushes++;memcpy(f->durable,f->media,sizeof f->media);}
+        if(v==0xe7)f->flushes++;
     }
     return true;
 }
@@ -77,7 +88,28 @@ int main(void)
     a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));f.timeout=true;
     assert(!ata_runtime_write_863(&a,0,in)&&a.quarantined&&!f.write_words&&a.fault==ATA863_STATUS_TIMEOUT&&a.phase==ATA863_WRITE_SETUP&&a.status_polls==ATA857_POLLS&&a.last_status==128);refused++;
     a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));f.completion_timeout=true;
-    assert(!ata_runtime_write_863(&a,0,in)&&a.quarantined&&f.write_words==256&&a.fault==ATA863_STATUS_TIMEOUT&&a.phase==ATA863_WRITE_COMPLETE&&a.status_polls==ATA857_POLLS&&a.last_status==128&&!a.pending_flush);refused++;
+    assert(!ata_runtime_write_863(&a,0,in)&&a.quarantined&&f.write_words==256&&a.fault==ATA863_STATUS_TIMEOUT&&a.phase==ATA863_WRITE_COMPLETE&&a.status_polls==ATA863_COMPLETION_POLLS&&a.last_status==0xd0&&!a.pending_flush);refused++;
     unsigned stopped=f.calls;assert(!ata_runtime_flush_863(&a)&&!ata_runtime_read_863(&a,0,out)&&f.calls==stopped&&a.phase==ATA863_WRITE_COMPLETE);refused+=2;
+    /* Reproduce the observed BUSY statuses for longer than the old budget.
+     * Exactly one write command and one flush; no replay or fake readback. */
+    a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));
+    f.completion_busy=2*ATA857_POLLS;f.flush_busy=2*ATA857_POLLS;
+    assert(ata_runtime_write_863(&a,20,in)&&a.pending_flush&&f.commands==2&&f.write_words==256&&!f.completion_busy);positive++;
+    assert(ata_runtime_flush_863(&a)&&!a.pending_flush&&f.commands==3&&f.flushes==1&&!f.flush_busy);positive++;
+    assert(ata_runtime_read_863(&a,20,out)&&f.commands==4&&!memcmp(in,out,512)&&!memcmp(f.media,f.durable,sizeof f.media));positive++;
+    /* The last allowed sample succeeds; one additional BUSY sample refuses. */
+    a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));
+    f.completion_busy=ATA863_COMPLETION_POLLS+3;
+    assert(ata_runtime_write_863(&a,20,in)&&f.commands==2&&!f.completion_busy);positive++;
+    f.flush_busy=ATA863_COMPLETION_POLLS+3;
+    assert(ata_runtime_flush_863(&a)&&f.commands==3&&!f.flush_busy);positive++;
+    a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));
+    f.completion_busy=ATA863_COMPLETION_POLLS+4;
+    assert(!ata_runtime_write_863(&a,20,in)&&a.quarantined&&f.commands==2&&a.status_polls==ATA863_COMPLETION_POLLS);refused++;
+    a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));
+    assert(ata_runtime_write_863(&a,20,in));f.flush_timeout=true;
+    assert(!ata_runtime_flush_863(&a)&&a.quarantined&&a.pending_flush&&a.phase==ATA863_FLUSH&&a.fault==ATA863_STATUS_TIMEOUT&&a.last_status==0xc0&&a.status_polls==ATA863_COMPLETION_POLLS&&f.commands==3&&f.flushes==1);refused++;
+    stopped=f.calls;
+    assert(!ata_runtime_flush_863(&a)&&!ata_runtime_write_863(&a,20,in)&&!ata_runtime_read_863(&a,20,out)&&stopped==f.calls);refused+=3;
     printf("S863 PIO write transport: %u positive, %u refusals PASS (host model only)\n",positive,refused);
 }

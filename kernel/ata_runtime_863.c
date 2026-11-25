@@ -19,10 +19,10 @@ static bool sample(struct ata_runtime_863 *a,uint8_t *s)
     if(!*s||*s==255)return fault(a,ATA863_STATUS_INVALID);
     return true;
 }
-static bool wait_status(struct ata_runtime_863 *a,bool data)
+static bool wait_status(struct ata_runtime_863 *a,bool data,unsigned budget)
 {
     a->status_polls=0;
-    for(unsigned i=0;i<ATA857_POLLS;i++){
+    for(unsigned i=0;i<budget;i++){
         ++a->status_polls;
         uint8_t s;
         if(!sample(a,&s))return false;
@@ -79,15 +79,15 @@ bool ata_runtime_write_863(void *ctx,uint32_t lba,const uint8_t in[512])
     struct ata_runtime_863 *a=ctx;
     if(!a||!in||lba>=ATA857_SECTORS||a->pending_flush||!enter(a))return false;
     a->phase=ATA863_WRITE_SETUP;
-    if(!wait_status(a,false)||!reg(a,8,2)||!reg(a,6,0xe0)||!delay(a)||
-       !wait_status(a,false)||!reg(a,1,0)||!reg(a,2,1)||!reg(a,3,(uint8_t)lba)||
+    if(!wait_status(a,false,ATA857_POLLS)||!reg(a,8,2)||!reg(a,6,0xe0)||!delay(a)||
+       !wait_status(a,false,ATA857_POLLS)||!reg(a,1,0)||!reg(a,2,1)||!reg(a,3,(uint8_t)lba)||
        !reg(a,4,(uint8_t)(lba>>8))||!reg(a,5,0)||!reg(a,7,0x30)||
-       !delay(a)||!wait_status(a,true))return finish(a,false);
+       !delay(a)||!wait_status(a,true,ATA857_POLLS))return finish(a,false);
     a->phase=ATA863_WRITE_DATA;
     for(unsigned i=0;i<ATA857_WORDS;i++)
         if(!a->ops->write_data(a->ctx,(uint16_t)(in[2*i]|((uint16_t)in[2*i+1]<<8))))return finish(a,fault(a,ATA863_DATA_IO));
     a->phase=ATA863_WRITE_COMPLETE;
-    if(!delay(a)||!wait_status(a,false))return finish(a,false);
+    if(!delay(a)||!wait_status(a,false,ATA863_COMPLETION_POLLS))return finish(a,false);
     a->pending_flush=true;return finish(a,true);
 }
 bool ata_runtime_flush_863(void *ctx)
@@ -95,7 +95,7 @@ bool ata_runtime_flush_863(void *ctx)
     struct ata_runtime_863 *a=ctx;
     if(!a||!a->pending_flush||!enter(a))return false;
     a->phase=ATA863_FLUSH;
-    if(!wait_status(a,false)||!reg(a,6,0xe0)||!delay(a)||!wait_status(a,false)||
-       !reg(a,7,0xe7)||!delay(a)||!wait_status(a,false))return finish(a,false);
+    if(!wait_status(a,false,ATA857_POLLS)||!reg(a,6,0xe0)||!delay(a)||!wait_status(a,false,ATA857_POLLS)||
+       !reg(a,7,0xe7)||!delay(a)||!wait_status(a,false,ATA863_COMPLETION_POLLS))return finish(a,false);
     a->pending_flush=false;return finish(a,true);
 }

@@ -7,6 +7,11 @@ struct ata_runtime_ops_863 {
     struct ata857_ops read_ops;
     bool (*write_data)(void *,uint16_t);
 };
+/* Completion of the already issued WRITE/FLUSH may wait for host I/O.
+ * Only those two completion waits receive this larger finite poll budget.
+ * The platform's existing cumulative guard remains authoritative.
+ * This is a fixture-specific poll ceiling, not a wall-clock ATA timeout. */
+#define ATA863_COMPLETION_POLLS (8u * ATA857_POLLS)
 /* First fault is sticky until a fresh unbound context. No retry or reset. */
 enum ata863_fault {
     ATA863_NONE, ATA863_IDENTIFY, ATA863_FLUSH_UNSUPPORTED,
