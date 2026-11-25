@@ -63,3 +63,24 @@ jobs:
           name: styleos-864-wide-host
           path: build/s864-wide/
           if-no-files-found: warn
+
+  four-root-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Four detached address spaces with original builder and physical arena
+        run: |
+          set -euo pipefail
+          mkdir -p build/s864-roots
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -DSTYLEOS_TEST_WIDE_ROOTS_864 -Iinclude kernel/{user_root_846,paging,apic_root_842,cache_policy_800,physical_arena_844}.c tests/test_user_roots_wide_864.c -o "build/s864-roots/$cc"
+            "build/s864-roots/$cc" | tee "build/s864-roots/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-864-four-roots-host
+          path: build/s864-roots/
