@@ -9,6 +9,7 @@
 #include <styleos/desktop_text_app.h>
 #include <styleos/native_desktop_bridge.h>
 #ifdef STYLEOS_DESKTOP_V0
+#include <styleos/desktop_process_runtime.h>
 #include <styleos/runtime_entry_858.h>
 static void desktop_kernel_boundary864(void){
  if(!rt864_services_boundary(dpr_arch_safe_root())){

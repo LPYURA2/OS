@@ -80,8 +80,10 @@ __asm__(
  ".global irq807_unexpected\n"
  "irq807_unexpected:\n"
  "cli\n"
+#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
  "movl $0x22,%eax\n"
- "outl %eax,$0xf4\n" /* unexpected interrupt -> failure exit 69 */
+ "outl %eax,$0xf4\n" /* terminal diagnostic only */
+#endif
  "3: hlt\n"
  "jmp 3b\n"
 );
