@@ -31,6 +31,10 @@ static void actual_fx(void){
   write32(&a[i],24,0x1f80|(i<<13));write32(&a[i],28,reported);
   for(unsigned j=160;j<416;j++)a[i].bytes[j]=(uint8_t)(i*61+j);
   C(s849_image_valid(&a[i],mask));
+  struct s849_image altered=a[i];
+  altered.bytes[511]^=0xff;C(s849_arch_equal(&a[i],&altered,mask));
+  altered.bytes[160]^=1;C(!s849_arch_equal(&a[i],&altered,mask));
+  altered=a[i];altered.bytes[32]^=1;C(!s849_arch_equal(&a[i],&altered,mask));
  }
  for(unsigned round=0;round<64;round++)for(unsigned i=0;i<4;i++){
   unsigned j=(i+1)%4;
@@ -38,6 +42,7 @@ static void actual_fx(void){
   const struct s849_image *actual[]={&oa,&ob,&again};
   const struct s849_image *expected[]={&a[i],&a[j],&a[i]};
   for(unsigned k=0;k<3;k++){
+   C(s849_arch_equal(actual[k],expected[k],mask));
    C(!memcmp(actual[k]->bytes,expected[k]->bytes,5));
    C(!memcmp(actual[k]->bytes+32,expected[k]->bytes+32,10));
    C(read32(actual[k],24)==read32(expected[k],24));

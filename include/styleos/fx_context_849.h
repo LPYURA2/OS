@@ -20,6 +20,8 @@ _Static_assert(sizeof(struct s849_image)==512,"FXSAVE extent");
 _Static_assert(_Alignof(struct s849_image)==16,"FXSAVE alignment");
 bool s849_admit(const struct s849_caps *,uint32_t *);
 bool s849_image_valid(const struct s849_image *,uint32_t);
+/* Compare defined architectural state, not reserved bytes or inactive x87 payloads. */
+bool s849_arch_equal(const struct s849_image *,const struct s849_image *,uint32_t);
 #ifdef STYLEOS_TEST_WIDE_FX_864
 /* Trusted caller binds each entry to a distinct, already audited root and
  * its current physical lease generation. No actual CPU mode transition. */

@@ -21,6 +21,17 @@ bool s849_image_valid(const struct s849_image *i,uint32_t mask){
  uint32_t reported=get32(i->bytes+28);if(effective_mask(reported)!=mask)return false;
  return !(get32(i->bytes+24)&~mask);
 }
+bool s849_arch_equal(const struct s849_image *a,const struct s849_image *b,uint32_t mask){
+ if(!s849_image_valid(a,mask)||!s849_image_valid(b,mask))return false;
+ const uint8_t *x=a->bytes,*y=b->bytes;
+ for(unsigned i=0;i<5;i++)if(x[i]!=y[i])return false;
+ if(get32(x+24)!=get32(y+24)||get32(x+28)!=get32(y+28))return false;
+ unsigned top=(x[3]>>3)&7u;
+ for(unsigned i=0;i<8;i++)if(x[4]&(1u<<((top+i)&7u)))
+  for(unsigned j=0;j<10;j++)if(x[32+16*i+j]!=y[32+16*i+j])return false;
+ for(unsigned i=160;i<416;i++)if(x[i]!=y[i])return false;
+ return true;
+}
 static void clean_image(struct s849_image *i,uint32_t mask){zero(i,sizeof *i);i->bytes[0]=0x7f;i->bytes[1]=3;put32(i->bytes+24,0x1f80);put32(i->bytes+28,mask);}
 static bool bank_ok(const struct s849_bank *b){
  if(!region(b,sizeof *b,_Alignof(struct s849_bank))||!b->admitted||!mask_ok(b->mxcsr_mask)||b->active< -1||b->active>=(int)S849_SLOT_COUNT)return false;

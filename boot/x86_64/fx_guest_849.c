@@ -99,38 +99,40 @@ bool s849_guest_dispatch(unsigned id,uint64_t root){
 }
 bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
  if(!safe849||id>=S846_ROOT_COUNT||cr3_849()!=root||(flags849()&0x200)||s849_live!=2||!s849_suspend(&bank,id,root,FX_GEN(id),&s849_user_capture))return false;
- /* Fixtures set XMM14/15 once, before recording integer progress. All
-  * other XMM lanes stay zero. Verify each actual trap capture. */
- uint64_t x14=UINT64_C(0x8480000000000000)|((uint64_t)id<<32)|13;
- uint64_t x15=UINT64_C(0x8480000000000000)|((uint64_t)id<<32)|14;
- const uint8_t *p=s849_user_capture.bytes;
- /* User fixture uses one x87 value and distinct MXCSR, without resetting
-  * them at each dispatch. Compare only architectural fields. */
- uint64_t st0=u64(p+32);uint32_t exp=(uint32_t)p[40]|((uint32_t)p[41]<<8);
- uint32_t mx=id?0x3f80:0x1f80;
- if(p[0]!=0x7f||p[1]!=3||p[2]||p[3]!=0x38||p[4]!=0x80||st0!=(id?0:UINT64_C(0x8000000000000000))||exp!=(id?0:0x3fff))return false;
+ /* The kernel FP restore is an architectural check independent of the
+  * user program. Validate the actual captured state through the bank above. */
  __asm__ volatile("fxsave64 %0":"=m"(kernel_check)::"memory");
- const uint8_t *k=s849_kernel_image.bytes,*q=kernel_check.bytes;
- /* FIP/FDP/FOP and empty x87 payloads are not assumed portable.
-  * Compare defined control/status/tag, active logical ST slots, MXCSR, XMM. */
- for(unsigned j=0;j<5;j++)if(k[j]!=q[j])return false;
- if(u32(k+24)!=u32(q+24)||u32(k+28)!=u32(q+28))return false;
- unsigned top=(k[3]>>3)&7u;
- for(unsigned j=0;j<8;j++)if(k[4]&(1u<<((top+j)&7u)))for(unsigned n=0;n<10;n++)if(k[32+16*j+n]!=q[32+16*j+n])return false;
- for(unsigned j=160;j<416;j++)if(k[j]!=q[j])return false;
+ if(!s849_arch_equal(&s849_kernel_image,&kernel_check,bank.mxcsr_mask))return false;
  scrub(&kernel_check,sizeof kernel_check);
- if(!allzero(p+160,14*16)||u64(p+160+14*16)!=x14||u64(p+160+15*16)!=x15||u64(p+160+14*16+8)||u64(p+160+15*16+8)||u32(p+24)!=mx)return false;
+ const uint8_t *p=s849_user_capture.bytes;
+ uint64_t x14=u64(p+160+14*16),x15=u64(p+160+15*16),st0=u64(p+32);
+ uint32_t exp=(uint32_t)p[40]|((uint32_t)p[41]<<8);
+ bool control=p[0]==0x7f&&p[1]==3&&!p[2]&&p[3]==0x38&&p[4]==0x80;
+ bool other=allzero(p+160,14*16)&&!u64(p+160+14*16+8)&&!u64(p+160+15*16+8);
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ /* Report observed fixture properties, but the kernel's FP save/restore
+  * must not depend on these user-controlled register values. The
+  * external guest verifier still requires the precise test pattern. */
+ arch_puts("STYLEOS S849 OBSERVED");field("id",id);field("root",root);field("n",seen[id]+1);field("control",control);field("other-zero",other);arch_putc('\n');
+#else
+ uint64_t tag=UINT64_C(0x8480000000000000)|((uint64_t)id<<32);
+ if(!control||!other||x14!=(tag|13)||x15!=(tag|14)||
+    st0!=(id?0:UINT64_C(0x8000000000000000))||exp!=(id?0:0x3fff)||
+    u32(p+24)!=(id?0x3f80u:0x1f80u))return false;
+#endif
  ++seen[id];arch_puts("STYLEOS S849 CAPTURE");field("id",id);field("root",root);field("n",seen[id]);field("xmm14",x14);field("xmm15",x15);field("mxcsr",u32(p+24));field("st0",st0);field("exp",exp);field("kernel-restored",1);field("terminal",terminal);arch_putc('\n');
  scrub(&s849_user_capture,sizeof s849_user_capture);scrub(&s849_user_restore,sizeof s849_user_restore);s849_live=0;
  /* Retirement happens later under the safe root. */
  return true;
 }
 bool s849_guest_finish(uint64_t safe){
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if defined(STYLEOS_TEST_FOUR_GUEST_864) && !defined(STYLEOS_INTEGRATED_RUNTIME_864)
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(seen[i]!=s862_loop_budget[i]+2)return false;
 #endif
  if(safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live
-#ifdef STYLEOS_TEST_RUNTIME_LOOP_862
+#if defined(STYLEOS_INTEGRATED_RUNTIME_864)
+ /* Retire the actual bound slots; capture counts are external test criteria. */
+#elif defined(STYLEOS_TEST_RUNTIME_LOOP_862)
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
  ||seen[0]!=s862_loop_budget[0]+2||seen[1]!=s862_loop_budget[1]+2
 #else

@@ -67,6 +67,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
         returns=group(b'STYLEOS S863M RESUME',('id','pc','rax','ticks'),4)
         ranges=group(b'STYLEOS S864 RANGE',('id','root','address','bytes'),2)
         for i,r in enumerate(ranges,2):eq(r,(i,tasks[i]['root'],0x12000000 if i==2 else IST,8),'range request')
+        fx_observed=group(b'STYLEOS S849 OBSERVED',('id','root','n','control','other-zero'),N if integrated else 0)
         cancel_rows=rows(b'STYLEOS S865 TIMER-CANCEL')
         if len(cancel_rows)!=(8 if integrated else 0):raise ValueError('timer cancellation count')
         cancel_index=0
@@ -77,6 +78,10 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
             def check(line,prefix,keys,want,why):eq(row(line,prefix,keys),want,why)
             check(en,tags[0],('step','id','pid','dispatch','safe','root','pc','sp','flags'),(step,i,i+1+base,step+1+offset,safe,child,saved[i][0],saved[i][1],saved[i][2]|0x200),'entry')
             seen[i]+=1
+            if integrated:
+                eq(fx_observed[step],(i,child,seen[i],1,1),'actual FP control and remaining lanes')
+                line=rows(b'STYLEOS S849 OBSERVED')[step]
+                if not lines.index(en)<lines.index(line)<lines.index(fp):raise ValueError('FP observation order')
             check(fp,tags[1],('id','root','n','xmm14','xmm15','mxcsr','st0','exp','kernel-restored','terminal'),(i,child,seen[i],tag|13,tag|14,0x3f80 if i else 0x1f80,0 if i else 0x8000000000000000,0 if i else 0x3fff,1,int(end)),'FP')
             ff=row(frame,tags[2],('step','flags'));flags=ff['flags']
             if ff['step']!=step or flags&0x202!=0x202 or flags&~0xad7:raise ValueError('flags')
