@@ -264,6 +264,13 @@ jobs:
             "$cc" -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_busmaster_857.c -o "build/s864-four-optical-bar/$cc"
             "build/s864-four-optical-bar/$cc"
           done
+      - name: Storage request budget and sticky refusal regression
+        run: |
+          mkdir -p build/s864-storage-budget-host
+          for cc in gcc clang; do
+            "$cc" -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude kernel/storage_runtime_863.c tests/test_storage_runtime_863.c -o "build/s864-storage-budget-host/$cc"
+            "build/s864-storage-budget-host/$cc"
+          done
       - name: Real optical boot, four native contexts, guarded save and cold reopen
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --output build/s864-four-optical-storage
       - uses: actions/upload-artifact@v4

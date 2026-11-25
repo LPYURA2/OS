@@ -31,6 +31,15 @@ struct storage_runtime_863 {
     bool writable,bound,busy,quarantined;
     enum storage863_fault fault;
 };
+/* Renew the finite architecture callback budget ONLY at an external,
+ * quiescent request boundary. Never renew inside read/write/flush/observe.
+ * A fault, active request or unsettled transport cannot be reset here. */
+static inline bool storage_budget_begin_864(const struct storage_runtime_863 *s,
+    bool transport_idle,unsigned *budget_used)
+{
+    if(!s||!budget_used||!transport_idle||!s->bound||s->busy||s->quarantined||s->fault)return false;
+    *budget_used=0;return true;
+}
 bool storage_bind_863(struct storage_runtime_863 *,const struct storage_ops_863 *,
     void *,uint64_t,uint64_t,uint64_t,uint32_t,uint32_t,bool);
 bool storage_read_863(struct storage_runtime_863 *,uint32_t,uint8_t [S863_SECTOR_BYTES]);

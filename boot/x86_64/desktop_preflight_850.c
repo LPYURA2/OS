@@ -507,6 +507,14 @@ static void disk_admit863(void){
 static bool disk_ready863(void){
  if(!disk863.s.ready||disk863.s.store.quarantined||disk863.s.pio.ata.quarantined)return false;
  s863_shell_guard();
+ /* This adapter is called only from the synchronous kernel shell. Keep
+  * the 200000-check limit across each complete request (including a
+  * commit's write, flush and readback), not across an entire boot. */
+ const struct ata_runtime_863 *a=&disk863.s.pio.ata;
+ if(!storage_budget_begin_864(&disk863.s.store,
+      a->bound&&!a->busy&&!a->quarantined&&!a->pending_flush&&!a->fault&&
+      a->reader.identified&&!a->reader.busy&&!a->reader.quarantined,
+      &disk863.s.live.ops))return false;
  if(!same_cache(&shell_cache863)||!ata857_live_check(&disk863.s.live)){
   disk863.s.store.quarantined=true;disk863.s.pio.ata.quarantined=true;return false;
  }

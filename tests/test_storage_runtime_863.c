@@ -86,5 +86,20 @@ int main(void)
     s=(struct storage_runtime_863){0};f=fixture(&s);
     assert(!storage_bind_863(&s,&ops,&f,0x1000,1,42,4095,2,true));
     assert(!storage_bind_863(&s,&ops,&f,0x1000,1,42,0,0,true));bad+=2;
+    /* The finite callback budget is renewable only between operations.
+     * Simulate many completed requests and guard against reentrant reset. */
+    s=(struct storage_runtime_863){0};f=fixture(&s);assert(bind(&f,true));
+    unsigned used=200000;
+    assert(storage_budget_begin_864(&s,true,&used)&&used==0);good++;
+    for(unsigned i=0;i<1024;i++){
+        used=200000;assert(storage_budget_begin_864(&s,true,&used)&&!used);
+        assert(storage_read_863(&s,0,out));good++;
+    }
+    used=123;assert(!storage_budget_begin_864(&s,false,&used)&&used==123);bad++;
+    s.busy=true;assert(!storage_budget_begin_864(&s,true,&used)&&used==123);s.busy=false;bad++;
+    s.quarantined=true;assert(!storage_budget_begin_864(&s,true,&used)&&used==123);s.quarantined=false;bad++;
+    s.fault=STORAGE863_GUARD;assert(!storage_budget_begin_864(&s,true,&used)&&used==123);s.fault=STORAGE863_NONE;bad++;
+    s.bound=false;assert(!storage_budget_begin_864(&s,true,&used)&&used==123);bad++;
+    assert(!storage_budget_begin_864(0,true,&used)&&!storage_budget_begin_864(&s,true,0));bad+=2;
     printf("S863 storage runtime: %u positive, %u refusals PASS (host model only)\n",good,bad);
 }
