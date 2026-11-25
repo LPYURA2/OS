@@ -1,6 +1,6 @@
 """S863 cooperative bank proof: raw UART plus independently recorded CPU events."""
 import re
-from runtime_user_861_verify import user_site,trace_check
+from runtime_user_861_verify import user_site,trace_check,HEADER
 from runtime_roots_861_verify import verify as roots_verify
 def verify(raw,rc,site,ref):
     try:

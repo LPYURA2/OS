@@ -45,7 +45,7 @@ def main(p):
             except ValueError:pass
             else:raise AssertionError('accepted UART mutation')
         u+=1
-    for h in re.finditer(rb'^STYLEOS S861U (?:READY|FRAME|EVENT|CLEAN) [^\r\n]+',raw,re.M):
+    for h in re.finditer(rb'^STYLEOS (?:S861U (?:READY|CLEAN)|S863C (?:TRAP|COMMIT)) [^\r\n]+',raw,re.M):
         for field in re.finditer(rb'=0x([0-9a-f]{16})',h[0]):
             a,z=(h.start()+i for i in field.span(1));old=raw[a:z]
             for i in range(64):reject_uart(raw[:a]+f'{int(old,16)^(1<<i):016x}'.encode()+raw[z:])
