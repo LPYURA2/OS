@@ -206,9 +206,11 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write):
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
+    if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
+    if args.iso and args.build_from:p.error('ISO proof requires a fresh linked build')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base);original=base.read_bytes();base.chmod(0o444)
@@ -230,10 +232,21 @@ def main():
     if args.four:
         from runtime_mixed_863_verify import loop_site
         site=loop_site(efi.read_bytes(),mp,four=True)
+    media=None;iso=None;iso_sha=None
+    if args.iso:
+        from test_desktop_autonomous_863 import verify_preview_media
+        iso=out/'StyleOS-owned-root-storage-test.iso'
+        subprocess.run([sys.executable,str(ROOT/'tools/make_desktop_iso.py'),'--efi',str(efi),'--output',str(iso)],check=True)
+        iso_sha=sha(iso.read_bytes());media=verify_preview_media(iso,efi,out)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
     def run(name,write):
         folder=out/name;folder.mkdir();serial=folder/'serial.log';shutil.copyfile(vars,folder/'OVMF_VARS.fd')
         cmd=[q,'-machine','q35','-accel','tcg,thread=single','-smp','1','-rtc','base=2026-11-25T12:34:00,clock=vm','-m','128M','-display','none','-vga','std','-serial',f'file:{serial}','-monitor','none','-qmp','stdio','-net','none','-no-reboot','-S','-device','isa-debug-exit,iobase=0xf4,iosize=0x04','-drive',f'if=pflash,format=raw,readonly=on,file={code}','-drive',f'if=pflash,format=raw,file={folder/"OVMF_VARS.fd"}','-drive',f'if=none,id=styleos,format=raw,readonly=on,file={boot}','-device','virtio-blk-pci,drive=styleos,bootindex=1','-device','piix3-ide,id=styleos-ide,bus=pcie.0,addr=0x5']
+        if args.iso:
+            # Optical medium is the only bootable image; no raw virtio boot fallback.
+            for item in (f'if=none,id=styleos,format=raw,readonly=on,file={boot}','virtio-blk-pci,drive=styleos,bootindex=1'):
+                i=cmd.index(item);del cmd[i-1:i+1]
+            cmd+=['-boot','order=d,strict=on','-cdrom',str(iso)]
         for node in ({'driver':'file','filename':str(base),'node-name':FILE,'read-only':True},{'driver':'raw','file':FILE,'node-name':RAW,'read-only':True},{'driver':'file','filename':str(top),'node-name':TOPFILE,'read-only':False},{'driver':'qcow2','file':TOPFILE,'backing':RAW,'node-name':TOP,'read-only':False}):cmd+=['-blockdev',json.dumps(node)]
         cmd+=['-device',f'ide-hd,id={DEVICE},bus={CONTROLLER}.1,unit=0,drive={TOP}']
         trace=folder/'cpu-trace.log';cmd+=['-d','int,guest_errors','-D',str(trace)]
@@ -247,6 +260,10 @@ def main():
                         o[key]=d.call(method,**kw)
                     (folder/(tag+'.json')).write_text(json.dumps(o,indent=2))
                     if pre:scope_fixture(o,base,top);verify_legacy_io(o['mtree'])
+                    if args.iso:
+                        optical=[b for b in o['blocks'] if (b.get('inserted') or {}).get('file')==str(iso)]
+                        if len(optical)!=1 or optical[0].get('removable') is not True or optical[0]['inserted'].get('ro') is not True:raise ValueError('missing unique read-only optical boot attachment')
+                        if any((b.get('inserted') or {}).get('file')==str(boot) for b in o['blocks']):raise ValueError('unexpected raw boot fallback')
                     return o
                 if 'QMP' not in d.receive():raise RuntimeError('QMP greeting')
                 d.call('qmp_capabilities');snapshot('prelaunch',True);d.call('cont')
@@ -339,8 +356,8 @@ def main():
     expected[19*512:20*512]=(header+struct.pack('<I',h)).ljust(512,b'\0');expected[20*512:21*512]=payload.ljust(512,b'\0')
     def check(tag):
         path=out/(tag+'.raw');image('convert','-f','qcow2','-O','raw',str(top),str(path))
-        if path.read_bytes()!=expected or base.read_bytes()!=original or sha(boot.read_bytes())!=boot_sha:raise ValueError('exact disk contents')
+        if path.read_bytes()!=expected or base.read_bytes()!=original or sha(boot.read_bytes())!=boot_sha or (args.iso and sha(iso.read_bytes())!=iso_sha):raise ValueError('exact disk contents')
     check('after-write');second=run('second',False);check('after-reboot')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()
