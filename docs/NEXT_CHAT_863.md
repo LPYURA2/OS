@@ -83,3 +83,7 @@ The previous PIO guest run 45675881471 at f112c7b1 succeeded on BOTH real QEMU b
 
 
 RTC repair CI 45675400426 at 097273ba: all steps SUCCESS, including real RTC guest and independent CPU/UART/frames replay. New cooperative candidate still unverified. Replay import HEADER corrected; mutation coverage now includes every new S863C TRAP/COMMIT row. Preserve full CI.
+
+
+## Cooperative context host stress
+Local verified-baseline compilation with exact new cooperative adapter and declarations: GCC and Clang ASan+UBSan each 787 positive / 1281 refusal checks PASS, 130 synthetic dispatches per run. Tests preserve both contexts byte-for-byte, reject stale/foreign tickets, invalid trap vector/flags/IST and replay without mutating registry/bank/windows, retain minimized windows, isolate A fault and B normal exit, reap both. No physical I/O or CPU trace claimed. Added mandatory existing bootstrap CI step; exact guest CI 45676723108 still queued when inspected. No changes to ordinary kernel in this commit. Next verify and fix real cooperative guest, then integrate remaining ordinary runtime. Main/accepted refs unchanged.
