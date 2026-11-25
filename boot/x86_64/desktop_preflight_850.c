@@ -145,7 +145,7 @@ static const struct desktop_surface *live_surface863;
 static unsigned live_phase863;
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
 static unsigned pump_calls863,pump_gate863;
-static uint64_t pump_frame863,pump_sessions863;
+static uint64_t pump_frame863,pump_sessions863,pump_arena_base863;
 #endif
 static uint64_t live_hash863(const volatile unsigned char *p,size_t n){
  uint64_t h=UINT64_C(14695981039346656037);
@@ -171,7 +171,17 @@ static void shell_boundary863(void){
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  if(live_phase863==1){
   struct rt858_live v=capture861();
-  if(rt861_dispatcher(&v)!=shell_d863||!same_cache(&shell_cache863)||nwc_port_count(nwc_global())||!s844_count(s845_arena(),&used)||(used!=0&&used!=6)||shell_d863->dispatcher.dispatches>20)fail("863-pump-boundary");
+  if(rt861_dispatcher(&v)!=shell_d863||!same_cache(&shell_cache863)||nwc_port_count(nwc_global()))fail("863-pump-boundary");
+  /* s845_arena is an empty-arena handoff, not an active-arena query.
+   * Use only the already admitted pointer retained before the shell began. */
+  unsigned dispatches=shell_d863->dispatcher.dispatches;
+  if(!live_arena863||live_arena863->base!=pump_arena_base863||
+     !s844_count(live_arena863,&used)||dispatches>20||
+     live_arena863->next!=4+2*((dispatches+9)/10)||
+     (used!=0&&used!=6))fail("863-pump-arena");
+  if(!used){
+   if(dispatches%10||s845_arena()!=live_arena863||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail("863-pump-empty");
+  }else if(!dispatches||s845_arena())fail("863-pump-occupied");
   return;
  }
 #else
@@ -343,6 +353,9 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  shell_root863=target;shell_d863=dpr_global_state();shell_cache863=*cache;
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
  live_p863=p;live_guard863=guard;live_arena863=allocator858;live_surface863=s;
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+ pump_arena_base863=arena858.start;
+#endif
 #endif
  shell_boundary863();
  arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
