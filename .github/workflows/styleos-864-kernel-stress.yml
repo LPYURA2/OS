@@ -170,3 +170,21 @@ jobs:
           name: styleos-864-four-live-desktop
           path: build/s864-four-live/
           if-no-files-found: warn
+
+  four-live-storage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools
+      - name: Eight independent four-process save and reboot pairs
+        run: python3 tools/test_desktop_storage_stability_863.py --mixed --four --output build/s864-four-storage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-864-four-storage
+          path: build/s864-four-storage/
+          if-no-files-found: warn

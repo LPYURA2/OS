@@ -136,8 +136,78 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
     if rd!=[wanted]:raise ValueError('cold ready')
     return root,events
 
+
+def verify_four_storage(lines,raw,data,site,ref,folder,write):
+    """Same four-process trace as live ISO, with an actual save between polls."""
+    from runtime_four_864_verify import verify,trace_check,N,order
+    from runtime_mixed_863_verify import row
+    from test_desktop_v0 import Frame
+    from test_desktop_interactive_863 import fnv_text
+    def rows(tag):return [x for x in lines if x.startswith(tag+b' ')]
+    def expect(line,tag,keys,want):
+        if tuple(row(line,tag,keys).values())!=tuple(want):raise ValueError('four storage '+str(tag))
+    def frame_hash(frame):
+        if (frame.w,frame.h)!=(1280,800):raise ValueError('four storage display mode')
+        pixels=frame.pixels;buf=bytearray(frame.w*frame.h*4);buf[0::4]=pixels[2::3];buf[1::4]=pixels[1::3];buf[2::4]=pixels[0::3]
+        return fnv_text(buf)
+    names=['note','after-first-launch','after-tasks','after-launch-3','after-launch-4']
+    frames=[Frame(folder/(x+'.ppm')) for x in names]
+    hashes=[frame_hash(x) for x in frames];final=hashes[1]
+    if any(x.pixels!=frames[1].pixels for x in frames[2:]) or (frames[0].pixels==frames[1].pixels)==write:raise ValueError('four storage frame continuity')
+    ok,obs=verify(raw,33,site,ref,cold=True,clean_fnv=final,storage=True)
+    if not ok:raise ValueError(obs)
+    root=obs['active']['root'];events=trace_check(data.decode('ascii'),obs)
+    cold=rows(b'STYLEOS S863B COLD');ready=rows(b'STYLEOS S863 READY')
+    if len(cold)!=1 or len(ready)!=1:raise ValueError('four cold boot')
+    expect(cold[0],b'STYLEOS S863B COLD',('root','dispatches','arena-next','processes','windows'),(root,0,1,0,0))
+    expect(ready[0],b'STYLEOS S863 READY',('root','dispatches','next-pid','next-window','input','x','y','writes'),(root,0,1,1,3,640,600,1024000))
+    clocks=rows(b'STYLEOS S863C CLOCK')
+    if len(clocks)!=1:raise ValueError('four cold clock')
+    expect(clocks[0],b'STYLEOS S863C CLOCK',('root','dispatches','hour','minute','shadow'),(root,0,12,34,0x8d))
+    req=rows(b'STYLEOS S863B REQUEST');beg=rows(b'STYLEOS S863L BEGIN');end=rows(b'STYLEOS S863L DONE')
+    rb=rows(b'STYLEOS S864 BATCH-BEGIN');re=rows(b'STYLEOS S864 BATCH-END');slices=rows(b'STYLEOS S863P SLICE')
+    if len(req)!=5 or any(len(x)!=4 for x in (beg,end,rb,re)) or len(slices)!=108:raise ValueError('four storage poll count')
+    tags=(b'STYLEOS S864 ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S861T ',b'STYLEOS S862',b'STYLEOS S863M ')
+    workload=[];before=0;session=None;prev=lines.index(ready[0])
+    if not lines.index(cold[0])<lines.index(clocks[0])<lines.index(b'STYLEOS DESKTOP READY')<prev:raise ValueError('four cold ordering')
+    for i in range(4):
+        expect(req[i],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted'),(root,i,N*i,1))
+        begin=row(beg[i],b'STYLEOS S863L BEGIN',('root','dispatches','frame','sessions'))
+        done=row(end[i],b'STYLEOS S863L DONE',('root','dispatches','frame','sessions'))
+        if tuple(begin.values())!=(root,N*i,hashes[0] if i==0 else final,begin['sessions']) or tuple(done.values())!=(root,N*(i+1),final,done['sessions']):raise ValueError('four storage frame receipts')
+        if not (write and i==0) and begin['sessions']!=done['sessions']:raise ValueError('four session changed outside save')
+        if session is not None and begin['sessions']!=session:raise ValueError('four session continuity')
+        session=done['sessions']
+        ids=[lines.index(x) for x in (req[i],beg[i],rb[i],slices[i*27],re[i],slices[i*27+26],end[i])]
+        if prev>=ids[0] or ids!=sorted(ids):raise ValueError('four storage launch order')
+        prev=ids[-1];workload.extend(x for x in lines[ids[1]+1:ids[-1]] if x.startswith(tags))
+        windows=4
+        for j,(_,kind) in enumerate(list(order())+[(0,'cleanup')]):
+            cleanup=kind=='cleanup'
+            if kind=='end':windows-=1
+            n=i*27+j+1
+            want=(n,before,before+int(not cleanup),0 if cleanup else 12,0 if cleanup else 4,0 if cleanup else windows,int(cleanup))
+            expect(slices[n-1],b'STYLEOS S863P SLICE',('n','before','after','used','processes','windows','done'),want)
+            before=want[2]
+    expect(req[-1],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted'),(root,4,104,0))
+    exits=rows(b'STYLEOS S863 EXIT')
+    if len(exits)!=1 or not prev<lines.index(req[-1])<lines.index(exits[0]) or exits[0].split()[-2:]!=[b'dispatches=0x0000000000000068',b'used=0x0000000000000000']:raise ValueError('four storage exit')
+    if before!=104 or workload!=[x for x in lines if x.startswith(tags)]:raise ValueError('four storage workload scope')
+    io=[rows(b'STYLEOS S864 '+x) for x in (b'HOLD',b'SAVED',b'RESUME')]
+    if write:
+        if any(len(x)!=1 for x in io):raise ValueError('four storage interleave count')
+        hold,saved,resume=(x[0] for x in io)
+        expect(hold,b'STYLEOS S864 HOLD',('root','dispatches','used','pid'),(root,1,12,1))
+        expect(saved,b'STYLEOS S864 SAVED',('root','dispatches','used'),(root,1,12))
+        expect(resume,b'STYLEOS S864 RESUME',('root','dispatches'),(root,1))
+        commits=rows(b'STYLEOS S863S COMMIT');docs=rows(b'STYLEOS S863S SAVED')
+        if len(commits)!=2 or len(docs)!=1 or not lines.index(slices[0])<lines.index(hold)<lines.index(commits[0])<lines.index(commits[1])<lines.index(docs[0])<lines.index(saved)<lines.index(resume)<lines.index(slices[1]):raise ValueError('four storage commit order')
+    elif any(io):raise ValueError('unexpected reopen mutation')
+    return root,events
+
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
@@ -154,9 +224,12 @@ def main():
         build=args.build_from.resolve(strict=True)
         (out/'compile.log').write_text('Reusing exact cold image: '+str(build)+'\n')
     else:
-        with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
+        with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),*(['--four-live-864'] if args.four else []),'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
-    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
+    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=None if args.four else bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
+    if args.four:
+        from runtime_mixed_863_verify import loop_site
+        site=loop_site(efi.read_bytes(),mp,four=True)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
     def run(name,write):
         folder=out/name;folder.mkdir();serial=folder/'serial.log';shutil.copyfile(vars,folder/'OVMF_VARS.fd')
@@ -197,7 +270,10 @@ def main():
                     d.screen('after-first-launch')
                     d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',2)
                     d.screen('after-tasks')
-                    d.key('f9');wait(proc,serial,b'STYLEOS S863B REQUEST ',3)
+                    if args.four:
+                        for i in (3,4):
+                            d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',i);d.screen(f'after-launch-{i}')
+                    d.key('f9');wait(proc,serial,b'STYLEOS S863B REQUEST ',5 if args.four else 3)
                 d.call('stop');final=snapshot('final')
                 verify_ready(final);verify_bar(final['pci'],final['mtree'])
                 stats=next(r['stats'] for r in final['stats'] if r.get('qdev') in (DEVICE,'/machine/peripheral/'+DEVICE))
@@ -235,7 +311,9 @@ def main():
         gate=lines.index(b'STYLEOS S863S WAIT')
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
-        if cold:
+        if args.four:
+            root,events=verify_four_storage(lines,raw,data,site,ref,folder,write)
+        elif cold:
             root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks,mixed=mixed,interleaved=mixed and write)
         else:
             ok,obs=prior(prefix,33,site,ref)
@@ -263,6 +341,6 @@ def main():
         path=out/(tag+'.raw');image('convert','-f','qcow2','-O','raw',str(top),str(path))
         if path.read_bytes()!=expected or base.read_bytes()!=original or sha(boot.read_bytes())!=boot_sha:raise ValueError('exact disk contents')
     check('after-write');second=run('second',False);check('after-reboot')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,ordinary_desktop_verified=False,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()

@@ -495,8 +495,12 @@ void s863_storage_document(bool saved,unsigned slot,const char *data,size_t byte
   unsigned used=0;
   if(!saved||slot!=1||bytes!=1||data[0]!='a'||live_phase863!=1||task_batches863||
      shell_d863->dispatcher.dispatches!=1||shell_d863->dispatcher.current!=-1||
-     !s844_count(live_arena863,&used)||used!=6||
+     !s844_count(live_arena863,&used)||used!=3*S863_TASKS_PER_BATCH||
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+     pr_snapshot(pr_global(),0,0,true)!=4||ws_snapshot(ws_global(),0,0)!=4||
+#else
      pr_snapshot(pr_global(),0,0,true)!=1||ws_snapshot(ws_global(),0,0)!=1||
+#endif
      disk863.s.pio.ata.pending_flush||disk863.s.store.busy)fail("864-storage-boundary");
   io_gate864=2;
   arch_puts("STYLEOS S864 SAVED");field("root",shell_root863);field("dispatches",1);field("used",used);arch_putc('\n');
@@ -648,9 +652,13 @@ __attribute__((noinline)) void s863_shell_pump(void){
 #ifdef S864_INTERLEAVE
  if(pump_calls863==1&&sessions->notes.dirty){
   const struct pr_entry *waiting=pr_find(pr_global(),1);
-  if(io_gate864||done||after!=1||used!=6||!waiting||waiting->state!=PR_READY||
+  if(io_gate864||done||after!=1||used!=3*S863_TASKS_PER_BATCH||!waiting||waiting->state!=PR_READY||
      waiting->cpu_ticks||shell_d863->dispatcher.current!=-1||
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+     pr_snapshot(pr_global(),0,0,true)!=4||ws_snapshot(ws_global(),0,0)!=4)
+#else
      pr_snapshot(pr_global(),0,0,true)!=1||ws_snapshot(ws_global(),0,0)!=1)
+#endif
    fail("864-storage-hold");
   io_gate864=1;
   arch_puts("STYLEOS S864 HOLD");field("root",shell_root863);field("dispatches",after);field("used",used);field("pid",waiting->pid);arch_putc('\n');
@@ -706,7 +714,7 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
   if(!task_batches863||task_requested863||live_phase863!=2)fail("863-task-incomplete");
 #else
-  if(task_batches863!=2||task_requested863)fail("863-task-incomplete");
+  if(task_batches863!=S863_LAUNCH_LIMIT||task_requested863)fail("863-task-incomplete");
 #endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863

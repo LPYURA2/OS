@@ -117,10 +117,10 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
         for i,x in enumerate(releases):eq(x,(i,base+i+1,gen0+base+i,roots[i]['child'],safe,3-i),'release')
         return True,dict(four_roots=roots,four_switches=switches,four_events=events,timer_ready=ready)
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)
-def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None):
+def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False):
     try:
         lines=raw.splitlines()
-        prefix=raw if not cold else b'\n'.join(lines[:next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))])+b'\n'
+        prefix=raw if not cold else b'\n'.join(lines[:next(i for i,x in enumerate(lines) if (x==b'STYLEOS S863S WAIT' if storage else x.startswith(b'STYLEOS S863B COLD ')))])+b'\n'
         gen0=1 if cold else 4
         ok,o=prior(prefix,rc,site['rva'],ref,cold=cold)
         if not ok:raise ValueError(o)
