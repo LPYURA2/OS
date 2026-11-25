@@ -94,7 +94,7 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  struct s844_lease old[2]={0};
  for(unsigned round=0;round<2;round++){
 #endif
- const uint64_t expected_generation=4+2*round;
+ const uint64_t expected_generation=S863_INITIAL_ARENA_NEXT+2*round;
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  if(!prepared){
 #endif

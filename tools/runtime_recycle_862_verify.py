@@ -20,7 +20,7 @@ def recycle_site(efi,map_file):
         site[name+'_rva']=rva
     return site
 
-def verify(raw,rc,site,reference,*,clean_fnv=None):
+def verify(raw,rc,site,reference,*,clean_fnv=None,cold=False):
     try:
         if not site.get('s849_guest_bind_leases_rva') or not site.get('stale862_rva'):raise ValueError('S862R linked policy')
         lines=raw.splitlines()
@@ -44,9 +44,9 @@ def verify(raw,rc,site,reference,*,clean_fnv=None):
             # Shared, genuine boot prefix plus the unmodified records of this round.
             # Each original line is retained; only the other round is excluded.
             part=prefix+lines[begins[epoch]+1:ends[epoch]]
-            ok,obs=sparse_verify(b'\n'.join(part)+b'\n',rc,site,reference,epoch=epoch,clean_fnv=clean_fnv)
+            ok,obs=sparse_verify(b'\n'.join(part)+b'\n',rc,site,reference,epoch=epoch,clean_fnv=clean_fnv,cold=cold)
             if not ok:raise ValueError('round '+str(epoch)+': '+str(obs))
-            root=obs['join_roots'];safe=root['safe'];gen=4+2*epoch
+            root=obs['join_roots'];safe=root['safe'];gen=(1 if cold else 4)+2*epoch
             begin=row(begins[epoch],b'BEGIN',('round','safe','dispatches','next'))
             end=row(ends[epoch],b'DONE',('round','safe','dispatches','next','next-pid','next-window','used'))
             f=row(fx[epoch],b'FX',('safe','gen-a','gen-b','refused'))
@@ -56,9 +56,9 @@ def verify(raw,rc,site,reference,*,clean_fnv=None):
         a,b=(o['join_roots'] for o in rounds)
         if any(a[k]!=b[k] for k in ('safe','a','b','pa-a','pa-b')):raise ValueError('S862R no physical/root reuse')
         r=row(reuse[0],b'REUSE',('pa-a','pa-b','old-a','old-b','new-a','new-b','stale-leases','stale-root'))
-        if tuple(r.values())!=(a['pa-a'],a['pa-b'],4,5,6,7,2,1) or not reuse[0]<within(1,b'STYLEOS S861 ROOTS '):raise ValueError('S862R lease proof')
+        if tuple(r.values())!=(a['pa-a'],a['pa-b'],a['gen-a'],a['gen-b'],b['gen-a'],b['gen-b'],2,1) or not reuse[0]<within(1,b'STYLEOS S861 ROOTS '):raise ValueError('S862R lease proof')
         t=row(stale[0],b'STALE',('slot','root','old-pid','new-pid','old-handle','new-handle','old-dispatch','new-dispatch','refused'))
-        if tuple(t.values())!=(0,a['a'],1,3,4,6,1,11,3) or not within(1,b'STYLEOS S862L READY ')<stale[0]<within(1,b'STYLEOS S862B ENTER step=0x0000000000000000 '):raise ValueError('S862R stale ticket proof')
+        if tuple(t.values())!=(0,a['a'],1,3,a['gen-a'],b['gen-a'],1,11,3) or not within(1,b'STYLEOS S862L READY ')<stale[0]<within(1,b'STYLEOS S862B ENTER step=0x0000000000000000 '):raise ValueError('S862R stale ticket proof')
         if rounds[0]['join_clean']['fnv']!=rounds[1]['join_clean']['fnv']:raise ValueError('S862R frame continuity')
         return True,dict(rounds=rounds,reused_pages=r,stale_ticket=t)
     except (ValueError,TypeError,KeyError,IndexError,StopIteration) as exc:return False,str(exc)

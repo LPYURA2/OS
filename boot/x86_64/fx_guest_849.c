@@ -38,7 +38,13 @@ bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
 /* The caller has audited the same two leases and their roots before this
  * operation. No generation can be reused without a fresh empty FP bank. */
 bool s849_guest_bind_leases(const struct s844_lease leases[2],bool reused){
- if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||bank.active!=-1||s849_live||!leases||leases[0].generation!=(reused?6u:4u)||leases[1].generation!=leases[0].generation+1)return false;
+ if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||bank.active!=-1||s849_live||!leases||leases[0].generation!=
+#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+ (reused?3u:1u)
+#else
+ (reused?6u:4u)
+#endif
+ ||leases[1].generation!=leases[0].generation+1)return false;
  for(unsigned i=0;i<2;i++){
   if(bank.slot[i].generation!=1||!bank.slot[i].live||seen[i])return false;
   bank.slot[i].generation=leases[i].generation;

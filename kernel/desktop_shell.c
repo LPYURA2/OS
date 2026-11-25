@@ -405,6 +405,9 @@ static bool keyboard(unsigned key, unsigned mods)
 {
     last_file_click.at = 0;
     current_file_click.id = -1;
+#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+    if (key == 0x43 && !mods) { (void)s863_request_tasks(); return false; }
+#endif
     if (key == 0x44) { restart_shell(); return true; } /* F10, preserve app state and PIDs */
     if (key == 0x42) { open_window(TASKS); return true; } /* F8 processes */
     if (key == 0x3f) { open_window(NOTE_WINDOW); return true; } /* F5 Notes */
