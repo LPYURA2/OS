@@ -97,7 +97,7 @@ jobs:
           set -euo pipefail
           mkdir -p build/s864-fx
           for cc in gcc clang; do
-            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -DSTYLEOS_TEST_WIDE_FX_864 -Iinclude kernel/fx_context_849.c tests/test_fx_wide_864.c -o "build/s864-fx/$cc"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -DSTYLEOS_TEST_WIDE_FX_864 -Iinclude kernel/fx_context_849.c tests/test_fx_wide_864.c arch/x86_64/fx_context_849_host.S -o "build/s864-fx/$cc"
             "build/s864-fx/$cc" | tee "build/s864-fx/$cc.log"
           done
       - uses: actions/upload-artifact@v4
