@@ -105,6 +105,9 @@ static bool same_plan(const struct pg_plan *a,const struct pg_plan *b){
 bool s846_audit(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,const struct s846_root *r){
  struct pg_plan p;
  if(!r||!r->ready||r->built.error!=PG_OK||!r->built.used||r->built.used>PG_TABLE_PAGES||r->built.root!=r->plan.tables_pa||!plan(safe,c,a,l,id,g,r->plan.tables,r->plan.tables_pa,&p)||!same_plan(&p,&r->plan))return false;
+#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+ if(!match(r->lease,l[id]))return false;
+#endif
  uint32_t seen=0;uint64_t leaves=0,n=0;for(size_t i=0;i<p.count;i++)n+=p.maps[i].bytes/P;
  return walk(&p,safe,r->built.used,0,4,0,&seen,&leaves)&&seen==(r->built.used==32?UINT32_MAX:(UINT32_C(1)<<r->built.used)-1)&&leaves==n;
 }
@@ -116,6 +119,9 @@ bool s846_build(const struct s842_root *safe,const struct s842_cache *c,const st
  for(unsigned i=0;i<3;i++){uint64_t *e=leaf(&r.plan,r.built.used,user_va[i],true);if(!e)return false;*e|=4;}
  uint64_t dev[2]={safe->lapic,safe->ioapic};
  for(unsigned i=0;i<2;i++){uint64_t *e=leaf(&r.plan,r.built.used,dev[i],false);if(!e)return false;*e|=cache_bits(safe->uc_index);}
+#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+ r.lease=l[id];
+#endif
  r.ready=true;if(!s846_audit(safe,c,a,l,id,g,&r))return false;
  *out=r;return true;
 }

@@ -18,7 +18,11 @@ struct s846_guard { uint64_t pa[3]; };
  * be live, distinct, and owned by their respective process. Caller has
  * admitted the scratch table storage and serialized against allocation.
  * This module never activates a root or executes user instructions. */
-struct s846_root { struct pg_plan plan; struct pg_result built; bool ready; };
+struct s846_root { struct pg_plan plan; struct pg_result built; bool ready;
+#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+ struct s844_lease lease;
+#endif
+};
 bool s846_build(const struct s842_root *,const struct s842_cache *,
  const struct s844_arena *,const struct s844_lease [S846_ROOT_COUNT],unsigned id,const struct s846_guard *,
  uint64_t (*tables)[512],uint64_t tables_pa,struct s846_root *);

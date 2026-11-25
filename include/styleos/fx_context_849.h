@@ -10,12 +10,24 @@
 struct s849_image { _Alignas(16) uint8_t bytes[S849_BYTES]; };
 struct s849_caps { uint32_t leaf1_ecx,leaf1_edx,mxcsr_mask; uint64_t cr0,cr4; };
 struct s849_slot { struct s849_image image; uint64_t root,generation; bool live; };
-struct s849_bank { struct s849_slot slot[2]; uint32_t mxcsr_mask; int active; bool admitted; };
+#ifdef STYLEOS_TEST_WIDE_FX_864
+#define S849_SLOT_COUNT 4u
+#else
+#define S849_SLOT_COUNT 2u
+#endif
+struct s849_bank { struct s849_slot slot[S849_SLOT_COUNT]; uint32_t mxcsr_mask; int active; bool admitted; };
 _Static_assert(sizeof(struct s849_image)==512,"FXSAVE extent");
 _Static_assert(_Alignof(struct s849_image)==16,"FXSAVE alignment");
 bool s849_admit(const struct s849_caps *,uint32_t *);
 bool s849_image_valid(const struct s849_image *,uint32_t);
+#ifdef STYLEOS_TEST_WIDE_FX_864
+/* Trusted caller binds each entry to a distinct, already audited root and
+ * its current physical lease generation. No actual CPU mode transition. */
+bool s849_init_set(struct s849_bank *,const struct s849_caps *,
+ const uint64_t roots[S849_SLOT_COUNT],const uint64_t generations[S849_SLOT_COUNT]);
+#else
 bool s849_init(struct s849_bank *,const struct s849_caps *,uint64_t,uint64_t);
+#endif
 /* Dispatch/suspend metadata only. Caller must serialize and perform actual
  * restore/save before changing execution domain, without using FP in kernel. */
 bool s849_dispatch(struct s849_bank *,unsigned,uint64_t,uint64_t,struct s849_image *);

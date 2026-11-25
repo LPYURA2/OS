@@ -46,9 +46,8 @@ int main(void){
  struct s844_lease old=l[2];C(s844_release(&arena,old.owner,old));C(!s846_audit_set(&safe,&c,&arena,l,&g,roots));
  C(s844_acquire(&arena,S846_OWNER_A+2,3,&l[2])&&l[2].pa==old.pa&&l[2].generation!=old.generation);
  C(!s844_release(&arena,old.owner,old));
- /* Replacing a lease requires re-establishing its root. Existing root
-  * descriptors have no generation field; never pass an old root as proof
-  * of fresh allocation. The future hardware adapter must bind generation. */
+ /* Same physical address, new generation: old root must stay invalid. */
+ C(!s846_audit_set(&safe,&c,&arena,l,&g,roots));
  memset(&roots[2],0,sizeof roots[2]);
  C(s846_build(&safe,&c,&arena,l,2,&g,tables[2],0x200000+3*PG_TABLE_BYTES,&roots[2]));
  C(s846_audit_set(&safe,&c,&arena,l,&g,roots));

@@ -84,3 +84,24 @@ jobs:
         with:
           name: styleos-864-four-roots-host
           path: build/s864-roots/
+
+  four-fx-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Four distinct FP contexts with generation-bound admission
+        run: |
+          set -euo pipefail
+          mkdir -p build/s864-fx
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -DSTYLEOS_TEST_WIDE_FX_864 -Iinclude kernel/fx_context_849.c tests/test_fx_wide_864.c -o "build/s864-fx/$cc"
+            "build/s864-fx/$cc" | tee "build/s864-fx/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-864-four-fx-host
+          path: build/s864-fx/

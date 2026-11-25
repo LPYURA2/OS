@@ -23,11 +23,35 @@ bool s849_image_valid(const struct s849_image *i,uint32_t mask){
 }
 static void clean_image(struct s849_image *i,uint32_t mask){zero(i,sizeof *i);i->bytes[0]=0x7f;i->bytes[1]=3;put32(i->bytes+24,0x1f80);put32(i->bytes+28,mask);}
 static bool bank_ok(const struct s849_bank *b){
- if(!region(b,sizeof *b,_Alignof(struct s849_bank))||!b->admitted||!mask_ok(b->mxcsr_mask)||b->active< -1||b->active>1)return false;
- for(unsigned i=0;i<2;i++)if(b->slot[i].live&&(!root_ok(b->slot[i].root)||!b->slot[i].generation||!s849_image_valid(&b->slot[i].image,b->mxcsr_mask)))return false;
- if(b->slot[0].live&&b->slot[1].live&&b->slot[0].root==b->slot[1].root)return false;
+ if(!region(b,sizeof *b,_Alignof(struct s849_bank))||!b->admitted||!mask_ok(b->mxcsr_mask)||b->active< -1||b->active>=(int)S849_SLOT_COUNT)return false;
+ for(unsigned i=0;i<S849_SLOT_COUNT;i++)if(b->slot[i].live&&(!root_ok(b->slot[i].root)||!b->slot[i].generation||!s849_image_valid(&b->slot[i].image,b->mxcsr_mask)))return false;
+ for(unsigned i=0;i<S849_SLOT_COUNT;i++)for(unsigned j=0;j<i;j++)
+  if(b->slot[i].live&&b->slot[j].live&&b->slot[i].root==b->slot[j].root)return false;
  return b->active<0||b->slot[b->active].live;
 }
+#ifdef STYLEOS_TEST_WIDE_FX_864
+bool s849_init_set(struct s849_bank *b,const struct s849_caps *c,
+ const uint64_t roots[S849_SLOT_COUNT],const uint64_t generations[S849_SLOT_COUNT]){
+ uint32_t mask;
+ const size_t n=S849_SLOT_COUNT*sizeof(uint64_t);
+ if(!region(b,sizeof *b,_Alignof(struct s849_bank))||!region(c,sizeof *c,_Alignof(struct s849_caps))||
+    !region(roots,n,_Alignof(uint64_t))||!region(generations,n,_Alignof(uint64_t))||
+    !separate(b,sizeof *b,c,sizeof *c)||!separate(b,sizeof *b,roots,n)||
+    !separate(b,sizeof *b,generations,n)||!separate(roots,n,generations,n)||
+    !separate(c,sizeof *c,roots,n)||!separate(c,sizeof *c,generations,n)||
+    b->admitted||!s849_admit(c,&mask))return false;
+ for(unsigned i=0;i<S849_SLOT_COUNT;i++){
+  if(!root_ok(roots[i])||!generations[i])return false;
+  for(unsigned j=0;j<i;j++)if(roots[i]==roots[j]||generations[i]==generations[j])return false;
+ }
+ zero(b,sizeof *b);b->active=-1;b->mxcsr_mask=mask;
+ for(unsigned i=0;i<S849_SLOT_COUNT;i++){
+  clean_image(&b->slot[i].image,mask);b->slot[i].root=roots[i];
+  b->slot[i].generation=generations[i];b->slot[i].live=true;
+ }
+ b->admitted=true;return true;
+}
+#else
 bool s849_init(struct s849_bank *b,const struct s849_caps *c,uint64_t a,uint64_t z){
  uint32_t mask;if(!region(b,sizeof *b,_Alignof(struct s849_bank))||!region(c,sizeof *c,_Alignof(struct s849_caps))||!separate(b,sizeof *b,c,sizeof *c)||!root_ok(a)||!root_ok(z)||a==z||!s849_admit(c,&mask))return false;
  /* Caller owns a fresh, inactive object. Refuse reinitialization of live bank. */
@@ -35,7 +59,8 @@ bool s849_init(struct s849_bank *b,const struct s849_caps *c,uint64_t a,uint64_t
  zero(b,sizeof *b);b->active=-1;b->mxcsr_mask=mask;b->slot[0].root=a;b->slot[1].root=z;
  for(unsigned i=0;i<2;i++){clean_image(&b->slot[i].image,mask);b->slot[i].generation=1;b->slot[i].live=true;}b->admitted=true;return true;
 }
-static bool match(const struct s849_bank *b,unsigned id,uint64_t root,uint64_t gen){return bank_ok(b)&&id<2&&b->slot[id].live&&b->slot[id].root==root&&b->slot[id].generation==gen;}
+#endif
+static bool match(const struct s849_bank *b,unsigned id,uint64_t root,uint64_t gen){return bank_ok(b)&&id<S849_SLOT_COUNT&&b->slot[id].live&&b->slot[id].root==root&&b->slot[id].generation==gen;}
 bool s849_dispatch(struct s849_bank *b,unsigned id,uint64_t root,uint64_t gen,struct s849_image *out){
  if(!match(b,id,root,gen)||b->active!=-1||!region(out,sizeof *out,_Alignof(struct s849_image))||!separate(b,sizeof *b,out,sizeof *out))return false;
  *out=b->slot[id].image;b->active=(int)id;return true;
