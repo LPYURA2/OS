@@ -17,6 +17,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
       - name: Real cooperative CPL3, existing dispatcher, protected roots and original Desktop frame
         run: python3 tools/test_runtime_user_861_guest.py --output build/s861-user
+      - name: Replay actual CPL3 evidence and reject mutated bindings
+        run: python3 tools/test_runtime_user_861_replay.py build/s861-user
       - name: Preserve original guest evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
