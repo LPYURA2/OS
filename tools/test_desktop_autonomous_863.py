@@ -24,6 +24,11 @@ def verify_preview_media(iso,efi,out):
     subprocess.run(['xorriso','-osirrox','on','-indev',str(iso),
                     '-extract','/EFI_BOOT.IMG',str(esp),
                     '-extract','/EFI/BOOT/BOOTX64.EFI',str(tree_efi)],check=True)
+    font_notice=folder/'DESKTOP-FONT.TXT'
+    subprocess.run(['xorriso','-osirrox','on','-indev',str(iso),
+                    '-extract','/LICENSES/DESKTOP-FONT.TXT',str(font_notice)],check=True)
+    original_notice=Path(__file__).resolve().parents[1]/'docs/licenses/desktop-font.txt'
+    if font_notice.read_bytes()!=original_notice.read_bytes():raise ValueError('embedded font license differs')
     image=esp.read_bytes()
     if len(image)!=16*1024*1024:raise ValueError('unexpected EFI partition size')
     with iso.open('rb') as stream:
@@ -34,7 +39,7 @@ def verify_preview_media(iso,efi,out):
     expected=efi.read_bytes()
     if tree_efi.read_bytes()!=expected or boot_efi.read_bytes()!=expected:
         raise ValueError('packaged EFI differs from linked executable')
-    return dict(boot_lba=lba,esp_sha256=sha(image),tree_efi_sha256=sha(tree_efi.read_bytes()),
+    return dict(font_notice_sha256=sha(font_notice.read_bytes()),boot_lba=lba,esp_sha256=sha(image),tree_efi_sha256=sha(tree_efi.read_bytes()),
                 boot_efi_sha256=sha(boot_efi.read_bytes()))
 
 def verify_pointer_clock(lines,root):

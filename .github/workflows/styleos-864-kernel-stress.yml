@@ -105,3 +105,24 @@ jobs:
         with:
           name: styleos-864-four-fx-host
           path: build/s864-fx/
+
+  four-joint-roots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Joint Desktop and four user roots with GOP isolation
+        run: |
+          set -euo pipefail
+          mkdir -p build/s864-joint
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -DSTYLEOS_TEST_WIDE_ROOTS_864 -Iinclude kernel/{runtime_roots_861,user_root_846,desktop_root_850,desktop_gop_850,desktop_display,pci_aperture_795,cache_policy_800,cache_pagewalk_801,apic_root_842,paging,physical_arena_844}.c tests/test_runtime_roots_wide_864.c -o "build/s864-joint/$cc"
+            "build/s864-joint/$cc" | tee "build/s864-joint/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-864-joint-roots-host
+          path: build/s864-joint/

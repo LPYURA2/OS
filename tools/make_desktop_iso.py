@@ -44,6 +44,10 @@ def create_iso(efi, output):
         boot_dir = tree / 'EFI' / 'BOOT'
         boot_dir.mkdir(parents=True)
         shutil.copyfile(efi, boot_dir / 'BOOTX64.EFI')
+        # Include the exact license of the embedded DejaVu-derived bitmap font.
+        licenses = tree / 'LICENSES'
+        licenses.mkdir()
+        shutil.copyfile(Path(__file__).resolve().parents[1] / 'docs/licenses/desktop-font.txt', licenses / 'DESKTOP-FONT.TXT')
         candidate = staging / 'StyleOS.iso'
         subprocess.run(['xorriso', '-as', 'mkisofs', '-V', 'STYLEOS_DESKTOP',
                         '--modification-date=' + ISO_STAMP, '--set_all_file_dates', ISO_STAMP,
