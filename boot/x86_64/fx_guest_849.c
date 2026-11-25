@@ -39,6 +39,14 @@ bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
   roots[i]=child[i].built.root;generations[i]=leases[i].generation;
  }
  if(!s849_init_set(&bank,&c,roots,generations))return false;
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++){
+  seen[i]=0;
+  if(generations[i]>=8){
+   struct s849_image rejected={0};
+   if(s849_dispatch(&bank,i,roots[i],generations[i]-4,&rejected)||!allzero(&rejected,sizeof rejected)||bank.active!=-1)return false;
+   arch_puts("STYLEOS S864 FX-STALE");field("id",i);field("gen",generations[i]-4);arch_putc('\n');
+  }
+ }
  if(
 #else
  if(!s849_init(&bank,&c,child[0].built.root,child[1].built.root)||

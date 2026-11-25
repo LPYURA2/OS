@@ -26,7 +26,7 @@ static bool boundary861(const struct dpr_service *d,const struct s842_cache *cac
 #endif
  ((d->dispatcher.dispatches==
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
- 26
+ 26 || d->dispatcher.dispatches==52 || d->dispatcher.dispatches==78 || d->dispatcher.dispatches==104
 #elif defined(STYLEOS_TEST_RUNTIME_MIXED_863)
  12
 #else
@@ -89,8 +89,12 @@ extern void s863_coop_reap(uint64_t,const struct s844_lease [2]);
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
 static void guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena,const struct desktop_surface *s,uint64_t before){
  const uint64_t safe=composed.built.root;const struct dpr_service *d=dpr_global_state();
- struct s844_lease l[4];unsigned used;
- if(!base861||!arena||!boundary861(d,cache)||!s844_count(arena,&used)||used||arena->next!=4||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-admit");
+ struct s844_lease l[4],old[4]={0};unsigned used;
+ for(unsigned round=0;round<4;round++){
+ const uint64_t gen=4+4*round;
+ if(d->dispatcher.dispatches!=26*round||pr_global()->next_pid!=1+4*round||ws_global()->next_id!=1+4*round)fail("864-batch-start");
+ arch_puts("STYLEOS S864 BATCH-BEGIN");field("round",round);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);arch_putc('\n');
+ if(!base861||!arena||!boundary861(d,cache)||!s844_count(arena,&used)||used||arena->next!=gen||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-admit");
  for(unsigned i=0;i<4;i++){
   if(!s844_acquire(arena,S846_OWNER_A+i,3,&l[i])||!iszero861(l[i].pa,3*4096))fail("864-lease");
   *(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)=UINT64_C(0x86110000)+i;
@@ -101,6 +105,17 @@ static void guest861(struct pg_experiment *p,const struct s842_cache *cache,cons
  }
  struct user_audit861 a={cache,p->evidence,guard,arena,l};
  if(!user_audit861(&a))fail("864-joint-audit");
+ if(round){
+  if(rt864_roots_audit_frozen(base861,cache,&frozen861,p->evidence,arena,old,guard,&composed,children861))fail("864-stale-root");
+  for(unsigned i=0;i<4;i++){
+   if(old[i].pa!=l[i].pa||old[i].generation+4!=l[i].generation||
+      s844_release(arena,old[i].owner,old[i])||!s844_count(arena,&used)||used!=12||
+      *(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)!=UINT64_C(0x86110000)+i)fail("864-stale-lease");
+   arch_puts("STYLEOS S864 REUSE");field("id",i);field("pa",l[i].pa);field("old",old[i].generation);field("new",l[i].generation);arch_putc('\n');
+  }
+  if(!user_audit861(&a))fail("864-reuse-audit");
+ }
+ for(unsigned i=0;i<4;i++)old[i]=l[i];
  for(unsigned i=0;i<4;i++){
   uint64_t r[5];roundtrip861(i,children861[i].built.root,safe,r);
   for(unsigned j=0;j<4;j++)if(*(volatile uint64_t *)(uintptr_t)(l[j].pa+4096)!=((UINT64_C(0x86110000)+j)^(j<=i?UINT64_C(0x86100000):0)))fail("864-cross-isolation");
@@ -117,8 +132,11 @@ static void guest861(struct pg_experiment *p,const struct s842_cache *cache,cons
  s860_reap(safe);
  uint64_t after=UINT64_C(14695981039346656037);const volatile uint32_t *fb=(const void *)(uintptr_t)s->base;
  for(size_t i=0;i<(size_t)s->width*s->height;i++){uint32_t pixel=fb[i];for(unsigned j=0;j<4;j++){after^=(pixel>>(8*j))&255u;after*=UINT64_C(1099511628211);}}
- if(after!=before||!boundary861(d,cache)||arena->next!=8||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-final");
+ if(after!=before||!boundary861(d,cache)||arena->next!=gen+4||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-final");
  arch_puts("STYLEOS S864 CLEAN");field("safe",safe);field("used",used);field("next",arena->next);field("tables-zero",1);field("leases-zero",1);field("fnv",after);arch_putc('\n');
+ if(pr_global()->next_pid!=5+4*round||ws_global()->next_id!=5+4*round)fail("864-identities");
+ arch_puts("STYLEOS S864 BATCH-END");field("round",round);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);arch_putc('\n');
+ }
 }
 #else
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
