@@ -5,6 +5,10 @@
 #define BIT(n) (UINT64_C(1)<<(n))
 static unsigned phase;
 static uint64_t active_root;
+#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
+#include <styleos/runtime_tick_860.h>
+static struct rt858_expected started_contract;
+#endif
 static bool page(uint64_t v){return v && !(v&4095u) && v<BIT(47);}
 bool rt858_validate(const struct rt858_expected *e,const struct rt858_live *v){
  return e&&v&&page(e->root)&&page(e->old_root)&&e->root!=e->old_root&&
@@ -31,6 +35,42 @@ bool rt858_start(const struct rt858_expected *e,const struct rt858_live *v){
  phase=1; /* sticky refusal on any partial startup */
  if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||dpr_global_state())return false;
  if(dpr_global_start(e->root)!=DPR_OK||usr_global_start()!=USR_OK||nwc_global_start()!=NWC_OK||!empty(e->root))return false;
- active_root=e->root;phase=2;return true;
+ active_root=e->root;
+#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
+ started_contract=*e;
+#endif
+ phase=2;return true;
 }
 bool rt858_ready(uint64_t root){return phase==2&&root==active_root&&empty(root);}
+
+#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
+/* Trusted supervisor snapshot, NOT a CPU attestation. Call only between
+ * dispatches with the original safe descriptors and stack restored. */
+struct dpr_service *rt861_dispatcher(const struct rt858_live *live){
+ if(phase!=2||active_root!=started_contract.root||!rt858_validate(&started_contract,live))return 0;
+ struct dpr_service *d=dpr_tick_global_860();
+ const struct usr_runtime *u=usr_global();const struct nwc_service *n=nwc_global();
+ if(!d||d!=dpr_global_state()||!u||!u->ready||!n||!n->ready||
+    d->dispatcher.safe_root!=active_root||d->dispatcher.registry!=pr_global()||d->windows!=ws_global()||
+    u->processes!=pr_global()||u->windows!=ws_global()||n->registry!=pr_global()||n->windows!=ws_global()||n->sessions!=u||
+    d->dispatcher.current!=-1||d->dispatcher.next>=PS_MAX_SLOTS)return 0;
+ const struct ps_dispatcher *ps=&d->dispatcher;
+ /* Narrow two-native-context contract; no kernel-task admission here. */
+ for(unsigned i=0;i<PS_MAX_SLOTS;i++){
+  const struct ps_slot *s=&ps->slots[i];
+  if(!s->pid){if(s->handle||s->user_root)return 0;continue;}
+  const struct pr_entry *p=pr_find(ps->registry,s->pid);
+  if(!p||p->type!=PR_NATIVE_USER||!s->handle||!page(s->user_root)||s->user_root==active_root||
+     p->scheduler_handle!=s->handle||p->page_root!=s->user_root||
+     (p->state!=PR_READY&&p->state!=PR_EXITED&&p->state!=PR_FAULTED))return 0;
+  for(unsigned j=0;j<i;j++)if(ps->slots[j].pid&&(ps->slots[j].pid==s->pid||ps->slots[j].handle==s->handle||ps->slots[j].user_root==s->user_root))return 0;
+ }
+ for(unsigned i=0;i<PR_MAX_PROCESSES;i++){
+  const struct pr_entry *p=&ps->registry->processes[i];if(p->state==PR_UNUSED)continue;
+  unsigned matches=0;for(unsigned j=0;j<PS_MAX_SLOTS;j++)if(ps->slots[j].pid==p->pid&&p->pid)matches++;
+  if(matches!=1||p->type!=PR_NATIVE_USER||p->state==PR_RUNNING||p->state==PR_WAITING)return 0;
+  for(unsigned j=0;j<i;j++)if(ps->registry->processes[j].state!=PR_UNUSED&&ps->registry->processes[j].pid==p->pid)return 0;
+ }
+ return d;
+}
+#endif

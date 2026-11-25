@@ -1,0 +1,26 @@
+name: StyleOS 861 shared runtime host contracts
+on:
+  push:
+    branches: [feature/styleos-runtime-join-861]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Shared singleton, detached roots and combined lifecycle (host only)
+        run: |
+          set -euo pipefail
+          mkdir -p build/s861
+          bash tools/test_runtime_join_861.sh | tee build/s861/host.log
+      - name: Preserve host evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-861-host-contracts
+          path: build/s861/
