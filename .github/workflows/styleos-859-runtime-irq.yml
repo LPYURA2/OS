@@ -1,7 +1,7 @@
 name: StyleOS 859 IRQ0 on owned runtime root
 on:
   push:
-    branches: [feature/styleos-runtime-irq-859, test/styleos-irq-pointer-859, feature/styleos-runtime-tick-860]
+    branches: [feature/styleos-runtime-irq-859, test/styleos-irq-pointer-859, feature/styleos-runtime-tick-860, feature/styleos-runtime-join-861]
   workflow_dispatch:
 jobs:
   probe:
