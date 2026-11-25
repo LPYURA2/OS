@@ -27,6 +27,7 @@ def main():
             r=json.loads((case/'results.json').read_text())
             if r['status']!='PASS' or not r['cold_owned_root'] or r['cold_task_fixture']!=mixed or r.get('mixed_task_fixture',False)!=mixed or any(r[k]!=v for k,v in expected.items()):raise ValueError('same linked image required')
             if r['first']['writes']!=2 or r['second']['writes']!=0:raise ValueError('write counts')
+            if r['first'].get('interleaved_save')!=mixed or r['second'].get('interleaved_save')!=False:raise ValueError('interleaved save binding')
             if len(r['first']['cpu_events'])!=(29 if mixed else 1) or len(r['second']['cpu_events'])!=(29 if mixed else 1):raise ValueError('cold CPU proof')
             if sha(case/'legacy.raw')!=r['base_sha256'] or sha(case/'after-write.raw')!=r['media_sha256'] or sha(case/'after-reboot.raw')!=r['media_sha256']:raise ValueError('media hash')
             if {k:sha(v) for k,v in paths.items()}!=expected:raise ValueError('shared image changed after case')

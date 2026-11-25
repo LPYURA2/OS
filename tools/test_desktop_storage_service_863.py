@@ -33,7 +33,8 @@ def cold_trace(trace,obs):
     if len(events)!=1 or events[0][1]!=expected:raise ValueError('cold actual CPU binding')
     return events
 
-def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_preview=False,mixed=False,round_count=None):
+def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_preview=False,mixed=False,round_count=None,interleaved=False):
+    if interleaved and not (tasks and mixed and not repeatable and not live_preview):raise ValueError('unsupported interleave profile')
     ok,obs=cold_prior(prefix,33,site['rva'],ref,cold=True)
     if not ok:raise ValueError('cold root '+str(obs))
     root=obs['active']['root']
@@ -60,7 +61,14 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
             m=re.fullmatch(rb'STYLEOS S863L BEGIN root=0x([0-9a-f]{16}) dispatches=0x([0-9a-f]{16}) frame=0x([0-9a-f]{16}) sessions=0x([0-9a-f]{16})',begin)
             if not m:raise ValueError('cold task begin')
             rr,dispatch,fr,se=map(lambda x:int(x,16),m.groups())
-            if rr!=root or dispatch!=n*i or end!=f'STYLEOS S863L DONE root=0x{root:016x} dispatches=0x{n*(i+1):016x} frame=0x{fr:016x} sessions=0x{se:016x}'.encode():raise ValueError('cold task final state')
+            if rr!=root or dispatch!=n*i:raise ValueError('cold task initial state')
+            if interleaved and i==0:
+                initial_frame=fr
+                m=re.fullmatch(rb'STYLEOS S863L DONE root=0x([0-9a-f]{16}) dispatches=0x([0-9a-f]{16}) frame=0x([0-9a-f]{16}) sessions=0x([0-9a-f]{16})',end)
+                if not m:raise ValueError('interleaved task final state')
+                er,ed,fr,se=(int(x,16) for x in m.groups())
+                if (er,ed)!=(root,n) or fr==initial_frame:raise ValueError('interleaved render')
+            elif end!=f'STYLEOS S863L DONE root=0x{root:016x} dispatches=0x{n*(i+1):016x} frame=0x{fr:016x} sessions=0x{se:016x}'.encode():raise ValueError('cold task final state')
             if i and (fr,se)!=(frame,sessions):raise ValueError('cold shell state changed between launches')
             frame,sessions=fr,se
             workload.extend(x for x in lines[lines.index(begin)+1:lines.index(end)] if x.startswith(workload_tags))
@@ -70,7 +78,16 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
         from test_desktop_v0 import Frame
         names=['note','after-first-launch','after-tasks']+([f'after-launch-{i}' for i in range(3,count+1)] if repeatable else [])
         frames=[Frame(folder/(name+'.ppm')) for name in names]
-        if any((x.w,x.h,x.pixels)!=(frames[0].w,frames[0].h,frames[0].pixels) for x in frames[1:]):raise ValueError('QMP screen changed across launch')
+        unchanged=frames[1:] if interleaved else frames
+        if any((x.w,x.h,x.pixels)!=(unchanged[0].w,unchanged[0].h,unchanged[0].pixels) for x in unchanged[1:]):raise ValueError('QMP screen changed across launch')
+        if interleaved:
+            from test_desktop_interactive_863 import fnv_text
+            def receipt(image):
+                if (image.w,image.h)!=(1280,800):raise ValueError('interleave display mode')
+                pixels=image.pixels;raw=bytearray(image.w*image.h*4)
+                raw[0::4]=pixels[2::3];raw[1::4]=pixels[1::3];raw[2::4]=pixels[0::3]
+                return fnv_text(raw)
+            if receipt(frames[0])!=initial_frame or receipt(frames[1])!=frame:raise ValueError('actual interleaved framebuffer receipt')
         if live_preview:
             # Independently bind QMP RGB pixels to the guest's BGR0 frame receipt.
             from test_desktop_interactive_863 import fnv_text
@@ -99,6 +116,14 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
             if (seq,old,new,used,done)!=(i,before,before+int(not cleanup),0 if cleanup else 6,int(cleanup)) or (cleanup and (procs or wins)):raise ValueError('cold task poll binding')
             before=new
         if before!=n*count:raise ValueError('cold task final dispatches')
+        io=[x for x in lines if x.startswith(b'STYLEOS S864 ')]
+        if interleaved:
+            want=[f'STYLEOS S864 {tag} root=0x{root:016x} dispatches=0x0000000000000001{tail}'.encode() for tag,tail in [('HOLD',' used=0x0000000000000006 pid=0x0000000000000001'),('SAVED',' used=0x0000000000000006'),('RESUME','')]]
+            if io!=want:raise ValueError('interleaved receipts')
+            commits=[x for x in lines if x.startswith(b'STYLEOS S863S COMMIT ')]
+            saves=[x for x in lines if x.startswith(b'STYLEOS S863S SAVED ')]
+            if len(commits)!=2 or len(saves)!=1 or not lines.index(begins[0])<lines.index(slices[0])<lines.index(io[0])<lines.index(commits[0])<lines.index(commits[1])<lines.index(saves[0])<lines.index(io[1])<lines.index(io[2])<lines.index(slices[1])<lines.index(ends[0]):raise ValueError('interleaved commit order')
+        elif io:raise ValueError('unexpected interleaved workload')
     else:
         events=cold_trace(data.decode('ascii'),obs)
     cold_rows=[x for x in lines if x.startswith(b'STYLEOS S863B COLD ')]
@@ -156,13 +181,19 @@ def main():
                 gate=snapshot('gate',True);verify_ready(gate);verify_bar(gate['pci'],gate['mtree']);d.call('cont')
                 d.key('b');wait(proc,serial,b'STYLEOS S863 READY ');d.wait_uart('DATA MOUNT');d.screen('initial');d.x,d.y=640,600
                 if write:
-                    d.key('f5');d.key('ctrl-n');d.key('a');d.key('ctrl-s');d.wait_uart('DOCUMENT SAVE')
+                    d.key('f5');d.key('ctrl-n');d.key('a')
+                    if not mixed:d.key('ctrl-s');d.wait_uart('DOCUMENT SAVE')
                 else:
                     # Legacy root rows: Documents, Projects, seeded slot 0, saved slot 1.
                     d.key('f2');d.click(688*1280//1536+115,746*128//804+42+12+3*45+12);d.wait_uart('DOCUMENT OPEN')
                 d.screen('note')
                 if tasks:
-                    d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',1)
+                    d.key('f9')
+                    if mixed and write:
+                        wait(proc,serial,b'STYLEOS S864 HOLD ')
+                        d.key('ctrl-s');d.wait_uart('DOCUMENT SAVE')
+                        wait(proc,serial,b'STYLEOS S864 RESUME ')
+                    wait(proc,serial,b'STYLEOS S863L DONE ',1)
                     d.screen('after-first-launch')
                     d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',2)
                     d.screen('after-tasks')
@@ -205,7 +236,7 @@ def main():
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
         if cold:
-            root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks,mixed=mixed)
+            root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks,mixed=mixed,interleaved=mixed and write)
         else:
             ok,obs=prior(prefix,33,site,ref)
             if not ok:raise ValueError('prior lifecycle '+str(obs))
@@ -222,7 +253,7 @@ def main():
         admits=[x for x in lines if x.startswith(b'STYLEOS S863S ADMIT ')]
         if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
         if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')
-        return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h}
+        return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h,'interleaved_save':mixed and write}
     first=run('first',True)
     expected=bytearray(original);payload=b'a'
     header=struct.pack('<8sIIBB2x',b'STYLED01',1,1,0,1);h=2166136261

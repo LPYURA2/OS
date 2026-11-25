@@ -218,6 +218,11 @@ static uint64_t pump_arena_base863;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
 static bool task_requested863;
 static unsigned task_batches863;
+#if defined(STYLEOS_TEST_RUNTIME_MIXED_863) && defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
+/* Only the explicit S864 mixed cold-storage fixture. No new disk authority. */
+#define S864_INTERLEAVE 1
+static unsigned io_gate864;
+#endif
 #else
 static unsigned pump_gate863;
 static uint64_t pump_frame863,pump_sessions863;
@@ -485,6 +490,18 @@ void s863_storage_document(bool saved,unsigned slot,const char *data,size_t byte
  for(size_t i=0;i<bytes;i++){hash^=(uint8_t)data[i];hash*=UINT64_C(1099511628211);}
  arch_puts(saved?"STYLEOS S863S SAVED":"STYLEOS S863S OPENED");
  field("root",shell_root863);field("slot",slot);field("bytes",bytes);field("hash",hash);arch_putc('\n');
+#ifdef S864_INTERLEAVE
+ if(io_gate864==1){
+  unsigned used=0;
+  if(!saved||slot!=1||bytes!=1||data[0]!='a'||live_phase863!=1||task_batches863||
+     shell_d863->dispatcher.dispatches!=1||shell_d863->dispatcher.current!=-1||
+     !s844_count(live_arena863,&used)||used!=6||
+     pr_snapshot(pr_global(),0,0,true)!=1||ws_snapshot(ws_global(),0,0)!=1||
+     disk863.s.pio.ata.pending_flush||disk863.s.store.busy)fail("864-storage-boundary");
+  io_gate864=2;
+  arch_puts("STYLEOS S864 SAVED");field("root",shell_root863);field("dispatches",1);field("used",used);arch_putc('\n');
+ }
+#endif
 }
 uint32_t s863_disk_probe(void){return disk_ready863()?4096:0;}
 bool s863_disk_read(uint32_t lba,uint8_t out[512]){
@@ -592,6 +609,16 @@ __attribute__((noinline)) void s863_shell_pump(void){
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
  if(task_requested863){task_requested863=false;s863_live_run();}
  if(live_phase863!=1)return;
+#ifdef S864_INTERLEAVE
+ if(io_gate864==1)return;
+ if(io_gate864==2){
+  shell_boundary863();
+  if(shell_d863->dispatcher.dispatches!=1||shell_d863->dispatcher.current!=-1||
+     desk_sessions_global()->notes.dirty)fail("864-storage-resume");
+  io_gate864=3;
+  arch_puts("STYLEOS S864 RESUME");field("root",shell_root863);field("dispatches",1);arch_putc('\n');
+ }
+#endif
 #else
  if(live_phase863!=1||pump_gate863==1||pump_gate863==2)return;
 #endif
@@ -617,6 +644,17 @@ __attribute__((noinline)) void s863_shell_pump(void){
  arch_puts("STYLEOS S863P SLICE");field("n",++pump_calls863);field("before",before);field("after",after);field("used",used);field("processes",pr_snapshot(pr_global(),0,0,true));field("windows",ws_snapshot(ws_global(),0,0));field("done",done);arch_putc('\n');
 #ifndef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
  if(pump_calls863==1){pump_gate863=1;arch_puts("STYLEOS S863P WAIT\n");}
+#endif
+#ifdef S864_INTERLEAVE
+ if(pump_calls863==1&&sessions->notes.dirty){
+  const struct pr_entry *waiting=pr_find(pr_global(),1);
+  if(io_gate864||done||after!=1||used!=6||!waiting||waiting->state!=PR_READY||
+     waiting->cpu_ticks||shell_d863->dispatcher.current!=-1||
+     pr_snapshot(pr_global(),0,0,true)!=1||ws_snapshot(ws_global(),0,0)!=1)
+   fail("864-storage-hold");
+  io_gate864=1;
+  arch_puts("STYLEOS S864 HOLD");field("root",shell_root863);field("dispatches",after);field("used",used);field("pid",waiting->pid);arch_putc('\n');
+ }
 #endif
 #else
  guest861(live_p863,&shell_cache863,live_guard863,live_arena863,live_surface863,frame);
