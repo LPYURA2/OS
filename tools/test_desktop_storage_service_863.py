@@ -250,7 +250,13 @@ def main():
         # Bind the real boot BP and demand absence of the child INT3 label.
         map_text=mp.read_text()
         site=bp_site(efi.read_bytes(),map_text)
-        if any('s861_bp_return' in line.split() for line in map_text.splitlines()):raise ValueError('child workload entry still linked in owned shell')
+        forbidden={'s861_bp_return','s863_live_run','s863_request_tasks','s863_shell_pump'}
+        present=forbidden.intersection(token for line in map_text.splitlines() for token in line.split())
+        if present:raise ValueError('shell fixture entry still linked: '+','.join(sorted(present)))
+        compiler=json.loads((build/'x86_64/owned-shell-compiler.json').read_text())
+        if '-DSTYLEOS_OWNED_SHELL_865=1' not in compiler['flags'] or not compiler['sources'] or set(compiler['sources'])!=set(compiler['source_sha256']):raise ValueError('owned shell compiler manifest')
+        for rel,digest in compiler['source_sha256'].items():
+            if sha((ROOT/rel).read_bytes())!=digest:raise ValueError('owned shell source mismatch '+rel)
     elif args.four:
         from runtime_mixed_863_verify import loop_site
         site=loop_site(efi.read_bytes(),mp,four=True)

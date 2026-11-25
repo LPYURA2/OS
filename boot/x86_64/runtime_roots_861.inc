@@ -5,7 +5,9 @@
 #define S863_DISPATCHES_PER_BATCH 10u
 #endif
 static _Alignas(4096) uint64_t child_tables861[S846_ROOT_COUNT][PG_TABLE_PAGES][512];
+#ifndef STYLEOS_OWNED_SHELL_865
 static struct s846_root children861[S846_ROOT_COUNT];
+#endif
 static struct s850_gop_plan frozen861;
 static const struct s842_root *base861;
 static bool preflight861(struct pg_experiment *p,const struct s842_root *base,const struct s850_gop_request *req){
@@ -42,6 +44,7 @@ static bool boundary861(const struct dpr_service *d,const struct s842_cache *cac
 #endif
  rt858_ready(v.root));
 }
+#ifndef STYLEOS_OWNED_SHELL_865
 static void zero861(void *p,size_t n){volatile unsigned char *b=p;for(size_t i=0;i<n;i++)b[i]=0;}
 static bool iszero861(uint64_t p,size_t n){const volatile unsigned char *b=(const void *)(uintptr_t)p;for(size_t i=0;i<n;i++)if(b[i])return false;return true;}
 static __attribute__((noinline)) void roundtrip861(unsigned i,uint64_t root,uint64_t safe,uint64_t *out){
@@ -289,3 +292,5 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
 }
 
 #endif /* four guest */
+
+#endif /* exclude diagnostic child execution helpers in owned shell */

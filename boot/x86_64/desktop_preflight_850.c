@@ -218,7 +218,7 @@ static const struct dpr_service *shell_d863;
 static struct s842_cache shell_cache863;
 static uint64_t shell_root863;
 static unsigned shell_events863;
-#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+#if defined(STYLEOS_TEST_DESKTOP_LIVE_863) && !defined(STYLEOS_OWNED_SHELL_865)
 static struct pg_experiment *live_p863;
 static const struct s846_guard *live_guard863;
 static struct s844_arena *live_arena863;
@@ -583,13 +583,13 @@ static void shell_boundary863(void){
  s863_shell_guard();unsigned used;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_863
  unsigned dispatches=0,next=1,generation=1;
-#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+#if defined(STYLEOS_TEST_DESKTOP_COLD_TASKS_863) && !defined(STYLEOS_OWNED_SHELL_865)
  if(live_phase863==2){dispatches=S863_DISPATCHES_PER_BATCH*task_batches863;next=1+S863_TASKS_PER_BATCH*task_batches863;generation=1+S863_TASKS_PER_BATCH*task_batches863;}
 #endif
 #else
  unsigned dispatches=20,next=5,generation=8;
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+#if defined(STYLEOS_TEST_DESKTOP_LIVE_863) && !defined(STYLEOS_OWNED_SHELL_865)
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  if(live_phase863==1){
   struct rt858_live v=capture861();
@@ -624,7 +624,7 @@ static void shell_boundary863(void){
 #endif
  if(!boundary861(shell_d863,&shell_cache863)||shell_d863->dispatcher.dispatches!=dispatches||pr_global()->next_pid!=next||ws_global()->next_id!=next||nwc_port_count(nwc_global())||!s844_count(s845_arena(),&used)||used||s845_arena()->next!=generation)fail("863-shell-boundary");
 }
-#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+#if defined(STYLEOS_TEST_DESKTOP_LIVE_863) && !defined(STYLEOS_OWNED_SHELL_865)
 /* Called only from the completed input/render boundary of the running shell.
  * Reuse the bounded S862 trial, not an independent scheduler or new grant. */
 __attribute__((noinline)) void s863_live_run(void){
@@ -656,10 +656,6 @@ __attribute__((noinline)) void s863_live_run(void){
 bool s863_request_tasks(void){
  s863_shell_guard();
  shell_boundary863();
-#ifdef STYLEOS_OWNED_SHELL_865
- /* Defense in depth: no trusted package admission exists in this profile. */
- return false;
-#endif
  bool accept=live_phase863!=1&&!task_requested863&&task_batches863<S863_LAUNCH_LIMIT;
  #if defined(STYLEOS_TEST_FOUR_GUEST_864) && (defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_INTEGRATED_RUNTIME_864))
  /* Reserve sufficient registry serial space before admitting an entire
@@ -675,10 +671,6 @@ bool s863_request_tasks(void){
 /* Called once per actual shell poll after input/render. One hardware dispatch
  * or one terminal cleanup; no preserved execution stack and no nested shell. */
 __attribute__((noinline)) void s863_shell_pump(void){
-#ifdef STYLEOS_OWNED_SHELL_865
- if(task_requested863||live_phase863||task_batches863)fail("865-unexpected-fixture-request");
- return;
-#endif
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
  if(task_requested863){task_requested863=false;s863_live_run();}
  if(live_phase863!=1)return;
@@ -892,7 +884,7 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(!preview_single_cpu863())fail("863-shell-cpu");
 #endif
  shell_root863=target;shell_d863=dpr_global_state();shell_cache863=*cache;
-#ifdef STYLEOS_TEST_DESKTOP_LIVE_863
+#if defined(STYLEOS_TEST_DESKTOP_LIVE_863) && !defined(STYLEOS_OWNED_SHELL_865)
  live_p863=p;live_guard863=guard;live_arena863=allocator858;live_surface863=s;
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  pump_arena_base863=arena858.start;

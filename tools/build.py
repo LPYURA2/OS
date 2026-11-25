@@ -765,6 +765,12 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         sources += ['kernel/system_update.c', 'kernel/desktop_import.c', 'boot/x86_64/desktop_update.c',
                     'third_party/monocypher/monocypher.c',
                     'third_party/monocypher/monocypher-ed25519.c']
+    if owned_shell_865:
+        # Actual compiler arguments and translation-unit bytes, not inferred profile names.
+        (folder / 'owned-shell-compiler.json').write_text(json.dumps({
+            'flags': flags, 'sources': sources,
+            'source_sha256': {rel: hashlib.sha256((ROOT / rel).read_bytes()).hexdigest() for rel in sources}
+        },indent=2)+'\n')
     for rel in sources:
         source = ROOT / rel
         obj = folder / (rel.replace('/', '_').rsplit('.', 1)[0] + '.o')
