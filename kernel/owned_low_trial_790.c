@@ -98,7 +98,12 @@ static bool cache_unchanged842(const struct s842_cache *s){
 static uint64_t efer(void) { uint32_t lo,hi;__asm__ volatile("rdmsr":"=a"(lo),"=d"(hi):"c"(0xc0000080u));return ((uint64_t)hi<<32u)|lo; }
 static void field(const char *s,uint64_t v) { arch_puts(s);paging_hex(v); }
 __attribute__((noreturn)) static void stop_vm(unsigned status) {
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+    (void)status;
+    __asm__ volatile("cli":::"memory");
+#else
     __asm__ volatile("cli;outl %0,%1"::"a"(status),"Nd"((uint16_t)0xf4):"memory");
+#endif
     arch_halt();
 }
 __attribute__((noreturn)) static void fail(const char *why) {
@@ -303,7 +308,21 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
 #ifdef STYLEOS_TEST_APIC_ROOT_842
     const struct boot_info *boot842=(const struct boot_info *)(uintptr_t)e->live.handoff.start;
     struct acpi806_topology topo842={0};
+#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+    /* The captured MADT is the same validated firmware snapshot consumed
+     * by the APIC-root builder. Explain unsupported topology before it
+     * can reach that builder; never relax its single-LAPIC contract. */
+    if(!acpi806_copy_capture(&topo842))fail("s842-acpi-capture");
+    if(topo842.enabled_lapics!=1){
+        arch_puts("STYLEOS S790 CPU-SCOPE");
+        field(" enabled=",topo842.enabled_lapics);
+        arch_putc('\n');
+        fail("863-platform-cpu");
+    }
+    if(!snap842(&cache842)||
+#else
     if(!acpi806_copy_capture(&topo842)||!snap842(&cache842)||
+#endif
        !s842_build_pe_efi(&low_request,e,boot842,&cache842,&topo842,msr842(0x1b),&apic842)||
        !s842_audit(&apic842,&cache842)||!cache_unchanged842(&cache842))fail("s842-apic-root-admission");
 #endif

@@ -59,7 +59,7 @@ def refuse_smp_preview(cmd,vars,out,iso,expected_hash):
             cpus=d.call('query-cpus-fast')
             if len(cpus)!=2 or {cpu['cpu-index'] for cpu in cpus}!={0,1}:
                 raise ValueError('negative fixture not two actual vCPUs')
-            wait(proc,serial,b'STYLEOS S850 FAIL 863-platform-cpu')
+            wait(proc,serial,b'STYLEOS S790 FAIL 863-platform-cpu')
             d.call('stop')
             status=d.call('query-status')
             stats=d.call('query-blockstats',**{'query-nodes':False})
@@ -68,8 +68,12 @@ def refuse_smp_preview(cmd,vars,out,iso,expected_hash):
             if not stats or any(x['stats']['wr_operations'] or x['stats']['wr_bytes'] for x in stats):
                 raise ValueError('negative fixture wrote to media')
             raw=serial.read_bytes();lines=raw.splitlines()
-            if [x for x in lines if b' FAIL ' in x]!=[b'STYLEOS S850 FAIL 863-platform-cpu']:
+            refusal=b'STYLEOS S790 FAIL 863-platform-cpu'
+            scope=b'STYLEOS S790 CPU-SCOPE enabled=0x0000000000000002'
+            if [x for x in lines if b' FAIL ' in x]!=[refusal]:
                 raise ValueError('negative fixture wrong refusal')
+            if [x for x in lines if x.startswith(b'STYLEOS S790 CPU-SCOPE ')]!=[scope] or lines[-2:]!=[scope,refusal]:
+                raise ValueError('negative fixture wrong actual MADT CPU count or refusal order')
             if any(x.startswith((b'STYLEOS S850 ROOT ',b'STYLEOS S863 ',b'STYLEOS S863S ',b'STYLEOS S863L ',b'STYLEOS DESKTOP READY')) for x in lines):
                 raise ValueError('negative fixture crossed desktop root admission')
             d.call('quit')
