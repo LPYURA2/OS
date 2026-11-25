@@ -146,9 +146,14 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
 #ifdef STYLEOS_TEST_RUNTIME_USER_861
  struct rt858_live v=capture861();struct dpr_service *joined=rt861_dispatcher(&v);
  if(!joined||joined!=d)fail("861-user-reap-boundary");
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+ const unsigned expected_dispatches=8; /* Bank has reaped both terminal slots. */
+#else
  for(unsigned i=0;i<2;i++)if(dpr_release(joined,i,l[i].generation)!=PS_OK)fail("861-user-reap");
- if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||joined->dispatcher.dispatches!=4)fail("861-user-clean");
- arch_puts("STYLEOS S861U CLEAN");field("safe",safe);field("dispatches",4);field("processes",0);field("windows",0);arch_putc('\n');
+ const unsigned expected_dispatches=4;
+#endif
+ if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||joined->dispatcher.dispatches!=expected_dispatches)fail("861-user-clean");
+ arch_puts("STYLEOS S861U CLEAN");field("safe",safe);field("dispatches",expected_dispatches);field("processes",0);field("windows",0);arch_putc('\n');
  arch_puts("STYLEOS S861U POLICY cooperative-cpl3=yes existing-dispatcher=yes timer=no fp=no production-cr3=deny\n");
 #endif
  if(!s844_count(arena,&used)||used||!boundary861(d,cache)||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("861-final");

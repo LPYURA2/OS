@@ -17,7 +17,15 @@ static struct rt858_live live847(void){
 struct d847 {uint16_t limit;uint64_t base;}__attribute__((packed));
 struct gate847 {uint16_t low,cs;uint8_t ist,type;uint16_t mid;uint32_t hi,zero;}__attribute__((packed));
 static _Alignas(16) struct gate847 idt847[256];
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+#include <styleos/runtime_bank_862.h>
+static struct rt862_bank coop863;
+static struct s847_raw receipt863;
+static uint64_t frame863,cr2863;
+static bool pending863;
+#else
 static struct s847_control ctl847;
+#endif
 static unsigned events847;
 static uint64_t pcs847[2][4];
 extern void s847_bad_entry(void);
@@ -40,6 +48,19 @@ unsigned s847_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #ifdef STYLEOS_TEST_USER_PREEMPT_848
  if(s848_active())return s848_dispatch_raw(f,cr2,root);
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+ unsigned n=events847,id=n%2,stage=n/2;
+ if(n>=8||pending863||!joined847||joined847->dispatcher.current!=(int)id||
+    root!=cr3_847()||root!=coop863.slots[id].root||f->rip!=pcs847[id][stage]||
+    f->cs!=coop863.cs||f->ss!=coop863.ss||(f->rflags&~UINT64_C(0x8d7))||!(f->rflags&2))fail847("863-coop-trap");
+ bool fault=stage==3&&!id;
+ uint64_t call=stage<2?3:stage==2?1:2;
+ if(fault?(f->vector!=14||f->error!=5||cr2!=S846_IST):(f->vector!=128||f->error||f->gpr[0]!=call))fail847("863-coop-origin");
+ if(stage>=2&&(f->gpr[11]!=0x847000u+id||f->gpr[5]!=S846_DATA))fail847("863-coop-registers");
+ receipt863=*f;frame863=(uintptr_t)f;cr2863=fault?cr2:0;pending863=true;
+ arch_puts("STYLEOS S863C TRAP");fld("n",n);fld("id",id);fld("stage",stage);fld("root",root);fld("vector",f->vector);fld("error",f->error);fld("cr2",cr2863);fld("rip",f->rip);fld("rsp",f->rsp);fld("cs",f->cs);fld("ss",f->ss);fld("frame",frame863);fld("call",fault?0:call);fld("flags",f->rflags);arch_putc('\n');
+ ++events847;return 0; /* Always restore safe CR3/stack before any result. */
+#else
  static const unsigned ids[8]={0,0,0,1,1,1,0,1};
  static const unsigned stages[8]={0,1,2,0,1,2,3,3};
  unsigned n=events847;if(n>=8||ctl847.current!=(int)ids[n])fail847("event-order");
@@ -57,6 +78,7 @@ unsigned s847_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  if(!s847_apply_raw(&ctl847,f,(uintptr_t)f,cr2,root,&d)||d.action!=action||d.result!=expect)fail847("trap-decision");
  arch_puts("STYLEOS S847 TRAP");fld("n",n);fld("id",id);fld("stage",stage);fld("root",root);fld("vector",f->vector);fld("error",f->error);fld("cr2",f->vector==14?cr2:0);fld("rip",f->rip);fld("rsp",f->rsp);fld("cs",f->cs);fld("ss",f->ss);fld("frame",(uintptr_t)f);fld("call",f->vector==14?0:call);fld("action",d.action);fld("result",d.result);arch_putc('\n');
  events847++;return d.action==S847_RETURN?1u:0u;
+#endif
 }
 void s847_trial(const struct s846_root child[2],const struct s844_lease leases[2],uint64_t root
 #ifdef STYLEOS_TEST_RUNTIME_USER_861
@@ -84,7 +106,12 @@ void s847_trial(const struct s846_root child[2],const struct s844_lease leases[2
   for(size_t j=0;j<hi-lo;j++)if(dest[j]!=starts[i][j])fail847("code-copy");
  }
  struct s847_selectors sel;
- if(!s847_gdt_append((void *)(uintptr_t)oldg.base,P,oldg.limit,tr,cs,&sel)||!s847_init(&ctl847,root,child[0].built.root,child[1].built.root,sel.cs,sel.ss))fail847("gdt");
+ if(!s847_gdt_append((void *)(uintptr_t)oldg.base,P,oldg.limit,tr,cs,&sel))fail847("gdt");
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+ if(!rt862_bank_init(&coop863,joined847,root,sel.cs,sel.ss))fail847("863-coop-bank");
+#else
+ if(!s847_init(&ctl847,root,child[0].built.root,child[1].built.root,sel.cs,sel.ss))fail847("gdt");
+#endif
  for(unsigned i=0;i<256;i++)gate847(i,s847_bad_entry,cs,3,0x8e);
  gate847(128,s847_call_entry,cs,1,0xee);gate847(14,s847_pf_entry,cs,2,0x8e);
  struct d847 g={sel.limit,oldg.base},d={sizeof idt847-1,(uintptr_t)idt847};
@@ -95,6 +122,42 @@ void s847_trial(const struct s846_root child[2],const struct s844_lease leases[2
  __asm__ volatile("lidt %0;lgdt %1"::"m"(oldi),"m"(oldg):"memory");
 #endif
  arch_puts("STYLEOS S847 READY");fld("safe",root);fld("cs",sel.cs);fld("ss",sel.ss);fld("tr",tr);fld("limit",sel.limit);for(unsigned i=0;i<2;i++)for(unsigned j=0;j<4;j++){const char *keys[2][4]={{"a-ok","a-deny","a-yield","a-fault"},{"b-ok","b-deny","b-yield","b-exit"}};fld(keys[i][j],pcs847[i][j]);}arch_putc('\n');
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+ for(unsigned step=0;step<8;step++){
+  struct rt858_live boundary=live847();unsigned id;uint32_t pid;
+  if(rt861_dispatcher(&boundary)!=joined847||!audit(opaque)||pending863||
+     dpr_dispatch(joined847,&id,&pid)!=PS_OK||id!=step%2||pid!=pid847[id])fail847("863-coop-select");
+  struct rt862_selection ticket={.slot=id,.dispatch=joined847->dispatcher.dispatches,.pid=pid,
+    .handle=leases[id].generation,.child_root=child[id].built.root,.safe_root=root};
+  struct up_context c;
+  if(!rt863_coop_enter(&coop863,joined847,&ticket,root,&c)||
+    c.pc!=(step<2?S846_CODE:pcs847[id][step/2-1])||(c.status&0x200))fail847("863-coop-enter");
+  uint64_t before_sp,after_sp;
+  __asm__ volatile("lgdt %0;lidt %1"::"m"(g),"m"(d):"memory");
+  __asm__ volatile("mov %%rsp,%0":"=r"(before_sp));s847_enter(&c,child[id].built.root,root);__asm__ volatile("mov %%rsp,%0":"=r"(after_sp));
+  __asm__ volatile("lidt %0;lgdt %1"::"m"(oldi),"m"(oldg):"memory");
+  struct rt858_live returned=live847();
+  if(!pending863||events847!=step+1||before_sp!=after_sp||returned.root!=root||
+     returned.gdt!=initial.gdt||returned.idt!=initial.idt||returned.gdt_limit!=initial.gdt_limit||
+     returned.idt_limit!=initial.idt_limit||returned.tr!=initial.tr||returned.cs!=initial.cs||
+     (returned.rflags&0x200)||!audit(opaque)||rt861_dispatcher(&returned)!=joined847)fail847("863-coop-safe");
+  if(rt863_coop_commit(&coop863,joined847,&ticket,root,returned.rflags,&receipt863,frame863,cr2863)!=PS_OK)fail847("863-coop-commit");
+  unsigned stage=step/2;const struct pr_entry *pe=pr_find(pr_global(),pid);
+  const struct up_context *stored=&coop863.slots[id].context;
+  uint64_t value=read847(leases[id].pa+P),foreign=read847(leases[1-id].pa+P);
+  uint64_t expected=stage<2?0x846d1000u+id:step==7?0x847101u:0x847000u+id;
+  uint64_t other=step<5?0x846d1000u+1-id:0x847000u+1-id;
+  if(!pe||pe->cpu_ticks||pe->resident_bytes!=3*P||
+     pe->state!=(stage<3?PR_READY:id?PR_EXITED:PR_FAULTED)||joined847->dispatcher.current!=-1||
+     ((ws_find(ws_global(),win847[id])!=0)!=(stage<3))||value!=expected||foreign!=other||
+     (stage<3&&(stored->pc!=receipt863.rip||stored->gpr[0]!=(stage==1?3u:0u)))||
+     ws_snapshot(ws_global(),0,0)!=(stage<3?2u:7u-step))fail847("863-coop-state");
+  arch_puts("STYLEOS S863C COMMIT");fld("n",step);fld("id",id);fld("pid",pid);fld("dispatch",ticket.dispatch);fld("safe",root);fld("pc",stored->pc);fld("rax",stored->gpr[0]);fld("state",pe->state);fld("windows",ws_snapshot(ws_global(),0,0));fld("value",value);fld("foreign",foreign);fld("stack-same",1);arch_putc('\n');
+  pending863=false;frame863=cr2863=0;volatile unsigned char*q=(void*)&receipt863;for(size_t i=0;i<sizeof receipt863;i++)q[i]=0;
+ }
+ if(events847!=8||pending863)fail847("863-coop-count");
+ for(unsigned i=0;i<2;i++)if(rt862_bank_release(&coop863,joined847,root,i,pid847[i],leases[i].generation,child[i].built.root)!=PS_OK)fail847("863-coop-reap");
+#else
  for(unsigned step=0;step<4;step++){
   unsigned id;struct up_context c;uint64_t before_sp,after_sp;
 #ifdef STYLEOS_TEST_RUNTIME_USER_861
@@ -118,6 +181,7 @@ void s847_trial(const struct s846_root child[2],const struct s844_lease leases[2
   arch_puts("STYLEOS S847 BACK");fld("step",step);fld("id",id);fld("root",root);fld("state",ctl847.slot[id].state);fld("value",value);fld("foreign",foreign);fld("stack-same",1);arch_putc('\n');
  }
  unsigned id;struct up_context c;if(events847!=8||s847_dispatch(&ctl847,root,&id,&c))fail847("terminal");
+#endif
  __asm__ volatile("lidt %0;lgdt %1"::"m"(oldi),"m"(oldg):"memory");
  volatile unsigned char *tail=(void *)(uintptr_t)(oldg.base+oldg.limit+1u);for(unsigned i=0;i<16;i++)tail[i]=0;
  __asm__ volatile("sgdt %0":"=m"(now));if(now.base!=oldg.base||now.limit!=oldg.limit)fail847("restore-gdt");

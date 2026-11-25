@@ -130,3 +130,34 @@ enum ps_status rt863_bank_syscall(struct rt862_bank *b,struct dpr_service *d,
  b->slots[t->slot].context=saved;return PS_OK;
 }
 #endif
+
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+#include <styleos/user_copy_772.h>
+/* Separate IF=0 integer-only fixture. No fabricated interrupt bit and no
+ * relaxation of the existing timer-profile gates. */
+bool rt863_coop_enter(const struct rt862_bank *b,const struct dpr_service *d,
+ const struct rt862_selection *t,uint64_t live,struct up_context *out){
+ if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),out,sizeof *out,_Alignof(struct up_context))||!ticket(b,d,t,live))return false;
+ *out=b->slots[t->slot].context;return true;
+}
+enum ps_status rt863_coop_commit(struct rt862_bank *b,struct dpr_service *d,
+ const struct rt862_selection *t,uint64_t live,uint64_t flags,
+ const struct s847_raw *f,uint64_t va,uint64_t cr2){
+ if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),f,sizeof *f,_Alignof(struct s847_raw))||
+    !ticket(b,d,t,live)||(flags&~UINT64_C(0x8d7))||!(flags&2)||f->rsp<=S846_STACK)return PS_EVIDENCE;
+ struct up_context saved;struct up_event event;
+ if(!s847_decode(f,va,cr2,t->child_root,b->cs,b->ss,&saved,&event)||!context(b,&saved))return PS_EVIDENCE;
+ enum ps_event kind=PS_YIELD;
+ if(event.kind==UP_FAULT)kind=PS_FAULT;
+ else if(cr2)return PS_EVIDENCE;
+ else if(f->gpr[0]==S847_CALL_EXIT)kind=PS_EXIT;
+ else if(f->gpr[0]==S847_CALL_YIELD)saved.gpr[0]=0;
+ else if(f->gpr[0]==S847_CALL_RANGE){size_t off=0;saved.gpr[0]=uc772_plan(event.active_root,t->child_root,S846_DATA,f->gpr[1],f->gpr[2],&off);}
+ else saved.gpr[0]=UC772_BAD;
+ enum ps_status status=dpr_observe(d,t->slot,t->handle,t->child_root,live,kind);
+ if(status!=PS_OK)return status;
+ if(kind==PS_YIELD)b->slots[t->slot].context=saved;
+ else{volatile unsigned char *q=(void *)&b->slots[t->slot].context;for(size_t i=0;i<sizeof saved;i++)q[i]=0;}
+ return PS_OK;
+}
+#endif

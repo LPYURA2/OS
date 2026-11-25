@@ -27,4 +27,10 @@ enum ps_status rt862_bank_release(struct rt862_bank *,struct dpr_service *,uint6
 enum ps_status rt863_bank_syscall(struct rt862_bank *,struct dpr_service *,
  const struct rt862_selection *,uint64_t,uint64_t,const struct s847_raw *,uint64_t,uint64_t);
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+bool rt863_coop_enter(const struct rt862_bank *,const struct dpr_service *,
+ const struct rt862_selection *,uint64_t,struct up_context *);
+enum ps_status rt863_coop_commit(struct rt862_bank *,struct dpr_service *,
+ const struct rt862_selection *,uint64_t,uint64_t,const struct s847_raw *,uint64_t,uint64_t);
+#endif
 #endif

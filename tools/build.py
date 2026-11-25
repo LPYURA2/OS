@@ -36,7 +36,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
           test_ownership_plan=False, test_ownership_plan_invalid=False,
           test_tasks=False, test_user_processes=False, test_storage=False,
           test_disk_app=False, test_desktop_display=False, desktop_v0=False,
-          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False, test_physical_arena_844=False, test_task_stacks_845=False, test_user_roots_846=False, test_process_trial_847=False, test_user_preempt_848=False, test_fx_context_849=False, test_desktop_preflight_850=False, test_desktop_switch_851=False, test_desktop_frame_852=False, test_desktop_input_853=False, test_desktop_rtc_854=False, test_desktop_time_855=False, test_storage_topology_856=False, test_storage_bmdma_857=False, test_storage_busmaster_857=False, test_storage_ata_read_857=False, test_runtime_entry_858=False, test_runtime_arena_858=False, test_runtime_irq_859=False, test_runtime_tick_860=False, test_runtime_roots_861=False, test_runtime_user_861=False, test_runtime_timer_861=False, test_runtime_select_862=False, test_runtime_bank_862=False, test_runtime_loop_862=False, test_runtime_sparse_862=False, test_runtime_recycle_862=False, test_desktop_interactive_863=False, test_desktop_live_863=False, test_desktop_pump_863=False, test_desktop_rtc_runtime_863=False, test_storage_pio_runtime_863=False):
+          test_paging_roundtrip=False, test_frame_grants=False, test_tss_ltr=False, test_ist_hw=False, test_guard_pf=False, test_double_fault=False, test_root_slots=False, test_owned_low=False, test_wx_fault=False, test_wx_exec=False, test_hw_probe_793=False, test_pci_probe_794=False, test_pci_aperture_795=False, test_pci_topology_796=False, test_pci_range_799=False, test_cache_800=False, test_cache_801=False, test_cache_803=False, test_cache_804=False, test_irq_apic_805=False, test_acpi_madt_806=False, test_irq_delivery_807=False, test_dmar_808=False, test_vtd_809=False, test_iommu_810=False, test_acpi_namespace_816=False, test_acpi_osl_818=False, test_acpica_bridge_819=False, test_acpica_core_821=False, test_acpica_aml_822=False, test_acpica_firmware_823=False, acpica_core_lib=None, acpica_core_include=None, test_acpi_hostbridge_815=False, test_pci_rootbridge_814=False, test_pci_mcfg_813=False, test_pci_requester_812=False, test_pci_requester_811=False, test_native_tea=False, test_native_tea_disk=False, test_native_tea_session=False, test_user_syscall=False, test_user_syscall_deny=False, test_user_ipc=False, test_user_ipc_deny=False, update_build=None, update_public_key=None, test_update_fail=False, test_acpi_resources_824=False, test_ecam_826=False, test_ecam_quarantine_827=False, test_iommu_evidence_828=False, test_irq_sources_830=False, test_post_ebs_834=False, test_iommu_quarantine_835=False, test_guest_plan_837=False, test_guest_observation_840=False, test_alias_census_841=False, test_apic_root_842=False, test_timer_scheduler_843=False, test_physical_arena_844=False, test_task_stacks_845=False, test_user_roots_846=False, test_process_trial_847=False, test_user_preempt_848=False, test_fx_context_849=False, test_desktop_preflight_850=False, test_desktop_switch_851=False, test_desktop_frame_852=False, test_desktop_input_853=False, test_desktop_rtc_854=False, test_desktop_time_855=False, test_storage_topology_856=False, test_storage_bmdma_857=False, test_storage_busmaster_857=False, test_storage_ata_read_857=False, test_runtime_entry_858=False, test_runtime_arena_858=False, test_runtime_irq_859=False, test_runtime_tick_860=False, test_runtime_roots_861=False, test_runtime_user_861=False, test_runtime_timer_861=False, test_runtime_select_862=False, test_runtime_bank_862=False, test_runtime_loop_862=False, test_runtime_sparse_862=False, test_runtime_recycle_862=False, test_desktop_interactive_863=False, test_desktop_live_863=False, test_desktop_pump_863=False, test_desktop_rtc_runtime_863=False, test_storage_pio_runtime_863=False, test_runtime_coop_863=False):
     if test_desktop_rtc_runtime_863:
         test_desktop_pump_863 = True
     if test_desktop_pump_863:
@@ -63,6 +63,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         if test_runtime_user_861:
             raise ValueError("861 cooperative and timer fixtures must be separate")
         test_runtime_roots_861 = True
+    if test_runtime_coop_863:
+        test_runtime_user_861 = True
     if test_runtime_user_861:
         test_runtime_roots_861 = True
     if test_runtime_roots_861:
@@ -411,9 +413,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/desktop_gop_850.c','kernel/desktop_root_850.c','kernel/pci_probe_794.c','kernel/pci_aperture_795.c','kernel/cache_pagewalk_801.c','boot/x86_64/desktop_preflight_850.c']
     if test_runtime_roots_861:
         common += ['kernel/user_root_846.c','kernel/runtime_roots_861.c']
-    if test_runtime_bank_862:
+    if test_runtime_bank_862 or test_runtime_coop_863:
         common += ["kernel/runtime_bank_862.c"]
-    if test_runtime_timer_861:
+    if test_runtime_timer_861 or test_runtime_coop_863:
         common += ["kernel/runtime_tick_860.c"]
     if test_runtime_tick_860:
         common += ['kernel/process_scheduler.c','kernel/desktop_process_runtime.c','kernel/window_service.c','kernel/process_api.c','kernel/process_inspector.c','kernel/process_view.c','kernel/runtime_tick_860.c']
@@ -633,6 +635,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append("-DSTYLEOS_TEST_RUNTIME_SELECT_862=1")
     if test_runtime_timer_861:
         flags += ["-DSTYLEOS_TEST_RUNTIME_TIMER_861=1","-DSTYLEOS_TEST_USER_PREEMPT_848=1","-DSTYLEOS_TEST_FX_CONTEXT_849=1"]
+    if test_runtime_coop_863:
+        flags.append('-DSTYLEOS_TEST_RUNTIME_COOP_863=1')
     if test_runtime_user_861:
         flags.append('-DSTYLEOS_TEST_RUNTIME_USER_861=1')
     if test_runtime_roots_861:
@@ -933,6 +937,7 @@ def main():
     negative.add_argument('--test-runtime-bank-862', action='store_true', help='862 registry-only context bank')
     negative.add_argument('--test-runtime-select-862', action='store_true', help='862 selected context with one dispatch authority')
     negative.add_argument('--test-runtime-timer-861', action='store_true', help='861 shared Desktop runtime with real LAPIC and FP')
+    negative.add_argument('--test-runtime-coop-863', action='store_true', help='863 cooperative real INT80 scheduling boundaries')
     negative.add_argument('--test-runtime-user-861', action='store_true',help='861 cooperative CPL3 on Desktop runtime')
     negative.add_argument('--test-runtime-roots-861', action='store_true',help='861 real Desktop/child-root supervisor roundtrips')
     negative.add_argument('--test-runtime-tick-860', action='store_true',help='860 existing dispatcher with actual S849 CPL3 timer events')
@@ -1023,6 +1028,8 @@ def main():
         if args.test_runtime_user_861:
             parser.error("861 cooperative and timer fixtures must be separate")
         args.test_runtime_roots_861 = True
+    if args.test_runtime_coop_863:
+        args.test_runtime_user_861 = True
     if args.test_runtime_user_861:
         args.test_runtime_roots_861 = True
     if args.test_runtime_roots_861:
@@ -1247,6 +1254,7 @@ def main():
                'runtime-bank-862' if args.test_runtime_bank_862 else
                'runtime-select-862' if args.test_runtime_select_862 else
                'runtime-timer-861' if args.test_runtime_timer_861 else
+               'runtime-coop-863' if args.test_runtime_coop_863 else
                'runtime-user-861' if args.test_runtime_user_861 else
                'runtime-roots-861' if args.test_runtime_roots_861 else
                'runtime-irq-859' if args.test_runtime_irq_859 else
@@ -1333,6 +1341,7 @@ def main():
                              **({'test_storage_ata_read_857': True} if args.test_storage_ata_read_857 else {}),
                              **({'test_runtime_tick_860': True} if args.test_runtime_tick_860 else {}),
                              **({'test_runtime_roots_861': True} if args.test_runtime_roots_861 else {}),
+                             **({'test_runtime_coop_863': True} if args.test_runtime_coop_863 else {}),
                              **({'test_runtime_user_861': True} if args.test_runtime_user_861 else {}),
                              **({'test_runtime_timer_861': True} if args.test_runtime_timer_861 else {}),
                              **({'test_runtime_select_862': True} if args.test_runtime_select_862 else {}),
@@ -1430,6 +1439,7 @@ def main():
                              **({'test_storage_ata_read_857': True} if args.test_storage_ata_read_857 else {}),
                              **({'test_runtime_tick_860': True} if args.test_runtime_tick_860 else {}),
                              **({'test_runtime_roots_861': True} if args.test_runtime_roots_861 else {}),
+                             **({'test_runtime_coop_863': True} if args.test_runtime_coop_863 else {}),
                              **({'test_runtime_user_861': True} if args.test_runtime_user_861 else {}),
                              **({'test_runtime_timer_861': True} if args.test_runtime_timer_861 else {}),
                              **({'test_runtime_select_862': True} if args.test_runtime_select_862 else {}),
