@@ -146,9 +146,26 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ /* Validate actual non-IRQ frame before retiring our timer. The
+  * classifier's armed argument describes the post-retirement contract.
+  * Never discard a pending or in-service IRQ to manufacture a syscall. */
  enum rt865_frame_kind kind=rt865_classify_frame(f,(uintptr_t)f,f->vector==14?cr2:0,
-    root,bank862.safe,bank862.cs,bank862.ss,armed848);
+    root,bank862.safe,bank862.cs,bank862.ss,f->vector==V&&armed848);
  if(kind==RT865_INVALID)fail848("865-frame-contract");
+ if(kind!=RT865_TICK){
+  if(!armed848||rd848(0x320)!=V||rd848(0x380)!=COUNT||
+     pending848(0x100)||pending848(0x200))fail848("865-timer-cancel-origin");
+  uint32_t remaining=rd848(0x390);
+  if(!remaining||remaining>COUNT)fail848("865-timer-cancel-expired");
+  wr848(0x320,BIT|V);wr848(0x380,0);
+  uint32_t after=rd848(0x390),initial=rd848(0x380),lvt=rd848(0x320);
+  uint32_t isr=pending848(0x100),irr=pending848(0x200);
+  if(after||initial||lvt!=(BIT|V)||isr||irr)fail848("865-timer-cancel-pending");
+  armed848=false;
+  arch_puts("STYLEOS S865 TIMER-CANCEL");fld848("id",(unsigned)id);fld848("root",root);
+  fld848("vector",f->vector);fld848("remaining",remaining);fld848("initial",initial);
+  fld848("current",after);fld848("lvt",lvt);fld848("isr",isr);fld848("irr",irr);arch_putc('\n');
+ }
  bool returning=kind==RT865_SYSCALL;
  /* Stress workload assertions stay separate from frame classification. */
  if(returning&&f->gpr[0]!=first_call848((unsigned)id))fail848("865-fixture-call");
@@ -580,7 +597,14 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   const bool call_slice=false;
 #endif
   if(terminal)put848(leases[id].pa+P+8,1);
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+  /* Same timer policy for every dispatch, not a prediction of the payload's
+   * next event. Non-IRQ entry retires the timer with actual readback. */
+  if(rd848(0x320)!=(BIT|V)||rd848(0x390)||pending848(0x100)||pending848(0x200))fail848("865-timer-arm");
+  armed848=true;wr848(0x320,V);wr848(0x380,COUNT);
+#else
   else if(!call_slice){armed848=true;wr848(0x320,V);wr848(0x380,COUNT);}
+#endif
   __asm__ volatile("mov %%rsp,%0":"=r"(sp0));s847_enter(&ctx,child[id].built.root,safe);__asm__ volatile("mov %%rsp,%0":"=r"(sp1));
   uint64_t a=word848(leases[id].pa+P);
   for(unsigned j=0;j<S846_ROOT_COUNT;j++)if(j!=id&&word848(leases[j].pa+P)!=progress848[j])fail848("safe-other-progress");

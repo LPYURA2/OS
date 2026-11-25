@@ -14,7 +14,7 @@ def order():
         n[i]+=1
         if kind=='end':live[i]=False
         yield i,kind
-def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
+def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False):
     try:
         base=4*epoch;offset=N*epoch
         lines=list(lines)
@@ -67,6 +67,9 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
         returns=group(b'STYLEOS S863M RESUME',('id','pc','rax','ticks'),4)
         ranges=group(b'STYLEOS S864 RANGE',('id','root','address','bytes'),2)
         for i,r in enumerate(ranges,2):eq(r,(i,tasks[i]['root'],0x12000000 if i==2 else IST,8),'range request')
+        cancel_rows=rows(b'STYLEOS S865 TIMER-CANCEL')
+        if len(cancel_rows)!=(8 if integrated else 0):raise ValueError('timer cancellation count')
+        cancel_index=0
         ticks=[0]*4;seen=[0]*4;prog=[0]*4;saved=[(CODE,SP,2)]*4;events=[];windows=4;recv_index=close_index=0
         for step,(i,kind) in enumerate(order()):
             en,fp,frame,commit,boundary,event,progress,back=(s[step] for s in streams)
@@ -79,6 +82,12 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
             if ff['step']!=step or flags&0x202!=0x202 or flags&~0xad7:raise ValueError('flags')
             vec=128 if kind=='call' else (14,128,6,13)[i] if end else 0x50
             err=5 if vec==14 else 0
+            if integrated and kind!='tick':
+                line=cancel_rows[cancel_index];cancel_index+=1
+                c=row(line,b'STYLEOS S865 TIMER-CANCEL',('id','root','vector','remaining','initial','current','lvt','isr','irr'))
+                if not 0<c['remaining']<=5000000:raise ValueError('timer cancellation before expiry')
+                eq(c,(i,child,vec,c['remaining'],0,0,0x10050,0,0),'timer retirement')
+                if not lines.index(en)<lines.index(line)<lines.index(fp):raise ValueError('timer retirement order')
             if kind=='call':
                 rip=t['yield']
                 check(traps[step],b'STYLEOS S863M CALL',('id','root','rip','rsp','flags','frame','rax','timer','isr','irr'),(i,child,rip,SP,flags,IST+4096-16-176,3 if i>=2 else 1,0,0,0),'returning syscall')
@@ -159,7 +168,7 @@ def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count
             if not a<z or (i and a<=ends[i-1]):raise ValueError('batch order')
             for k,tag,dispatch,gen in ((a,b'STYLEOS S864 BATCH-BEGIN',N*i,gen0+4*i),(z,b'STYLEOS S864 BATCH-END',N*(i+1),gen0+4*(i+1))):
                 if tuple(row(lines[k],tag,('round','dispatches','next')).values())!=(i,dispatch,gen):raise ValueError('batch identity')
-            ok,b=verify_batch(lines[:begins[0]]+lines[a+1:z],site,ref,o,i,gen0=gen0,clean_fnv=clean_fnv)
+            ok,b=verify_batch(lines[:begins[0]]+lines[a+1:z],site,ref,o,i,gen0=gen0,clean_fnv=clean_fnv,integrated=integrated)
             if not ok:raise ValueError(b)
             if i and [x['child'] for x in b['four_roots']]!=[x['child'] for x in batches[0]['four_roots']]:raise ValueError('root reuse')
             batches.append(b)
