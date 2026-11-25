@@ -1,3 +1,7 @@
+## Stage 859 — final regression fixture correction (candidate)
+
+Five focused CI SUCCESS, actual IRQ/EOI and CPU trace independently verified. Final full CI blocked at old S842 host test: deterministic fixture correction only; full regression must pass before acceptance. See [handoff](NEXT_CHAT_859.md). Kernel code unchanged, KFA gates open.
+
 ## Stage 859 — final IRQ candidate after first successful actual guest
 
 Targeted IRQ0/ISR/EOI/restore PASS on d93724eea24afb75894bf787b0184ad172f478bd. Final exact-SHA acceptance requires full and focused regression plus CPU trace proof; see [handoff](NEXT_CHAT_859.md). No production IRQ or scheduling grant. KFA gates open.

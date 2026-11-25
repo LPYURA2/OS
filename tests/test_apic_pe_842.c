@@ -45,10 +45,33 @@ static void u64(unsigned char *b,unsigned off,uint64_t val){
 static void descriptor(unsigned char *b,unsigned type,uint64_t pa,uint64_t pages,uint64_t attr){
  memset(b,0,48);u32(b,0,type);u64(b,8,pa);u64(b,24,pages);u64(b,32,attr);
 }
+/* The loaded PE has four rights runs. An adjacent external RW/NX stack
+ * legitimately merges with the last run; a separated stack must not.
+ * Check the exact extents/rights in both layouts, not an ASLR-dependent count. */
+static bool exact_plan(const struct s842_root *r,bool adjacent){
+ const uint64_t base=(uintptr_t)image,stack=(uintptr_t)stackbuf;
+ const struct pg_mapping expected[]={
+  {base,base,P,0},{base+P,base+P,2u*P,PG_EXEC},
+  {base+3u*P,base+3u*P,P,0},
+  {base+4u*P,base+4u*P,(36u+(adjacent?2u:0u))*P,PG_WRITE},
+  {stack,stack,2u*P,PG_WRITE},
+  {0xfee00000,0xfee00000,P,PG_WRITE},{0xfec00000,0xfec00000,P,PG_WRITE}};
+ if(stack!=base+(N+(adjacent?0u:1u))*P||r->plan.count!=(adjacent?6u:7u))return false;
+ for(size_t i=0,j=0;i<7;i++){
+  if(adjacent&&i==4)continue;
+  const struct pg_mapping *a=&r->plan.maps[j++],*b=&expected[i];
+  if(a->va!=b->va||a->pa!=b->pa||a->bytes!=b->bytes||a->flags!=b->flags)return false;
+ }
+ return true;
+}
 int main(void){
- image=mmap(NULL,N*P,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_32BIT,-1,0);
- stackbuf=mmap(NULL,2u*P,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_32BIT,-1,0);
- assert(image!=MAP_FAILED&&stackbuf!=MAP_FAILED);pe();
+ /* One reservation makes adjacency and the later one-page gap deterministic.
+  * Keep the gap inaccessible in the host too; only named spans are admitted. */
+ image=mmap(NULL,(N+3u)*P,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_32BIT,-1,0);
+ assert(image!=MAP_FAILED);
+ assert(mprotect(image,N*P,PROT_READ|PROT_WRITE)==0);
+ stackbuf=image+N*P;
+ assert(mprotect(stackbuf,2u*P,PROT_READ|PROT_WRITE)==0);pe();
  struct s790_low_request p=request();
  struct boot_memory_map m={.ram={p.image,p.boot_stack},.reserved={p.image,p.boot_stack},.nr_ram=2,.nr_reserved=2};
  struct s842_cache c={.pat=0x0007040600070406,.cap=1,.def=0x806,.count=1,.bits=48,.pairs={{0x80000000,0xffff80000800}}};
@@ -56,7 +79,15 @@ int main(void){
  struct s842_root r;uint64_t msr=0xfee00900;unsigned n=0;
  #define CHECK(x) do{assert(x);n++;}while(0)
  CHECK(s842_build_pe(&p,&m,&c,&t,msr,&r));CHECK(s842_audit(&r,&c));
- CHECK(r.plan.count==7);CHECK(r.lapic==t.lapic_physical&&r.ioapic==t.ioapic[0].physical);
+ CHECK(exact_plan(&r,true));
+ /* Move the stack across a genuine unmapped page within the reservation. */
+ assert(mprotect(stackbuf,2u*P,PROT_NONE)==0);stackbuf+=P;
+ assert(mprotect(stackbuf,2u*P,PROT_READ|PROT_WRITE)==0);
+ p=request();m=(struct boot_memory_map){.ram={p.image,p.boot_stack},.reserved={p.image,p.boot_stack},.nr_ram=2,.nr_reserved=2};
+ CHECK(s842_build_pe(&p,&m,&c,&t,msr,&r));CHECK(s842_audit(&r,&c));
+ CHECK(exact_plan(&r,false));
+ struct pg_lookup gap={0};CHECK(pg_lookup(&r.plan,p.image.end,&gap)!=PG_OK);
+ CHECK(r.lapic==t.lapic_physical&&r.ioapic==t.ioapic[0].physical);
  CHECK(!s842_build_pe(&p,&m,&c,&t,msr|0x400,&r)&&!r.ready);
  CHECK(!s842_build_pe(&p,&m,&c,&t,msr^0x1000,&r));
  CHECK(!s842_build_pe(&p,&m,&c,&t,msr&~0x800,&r));
@@ -91,5 +122,6 @@ int main(void){
  descriptor(raw+96,2,0xfee00000,1,15);CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));
  descriptor(raw+96,11,0xfee00000,1,1);CHECK(s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));
  descriptor(raw+96,2,q.image.start,1,15);CHECK(!s842_build_pe_efi(&q,&ev,boot,&c,&t,msr,&r));
- printf("S842 PE/APIC composition: %u PASS (host fixture only)\n",n);return 0;
+ assert(munmap(image,(N+3u)*P)==0);
+ printf("S842 PE/APIC composition: %u PASS (adjacent and separated host fixtures only)\n",n);return 0;
 }
