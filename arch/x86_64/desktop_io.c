@@ -14,7 +14,7 @@ static inline uint8_t in8(uint16_t port)
     __asm__ volatile ("inb %1,%0" : "=a"(v) : "Nd"(port));
     return v;
 }
-#ifndef STYLEOS_TEST_DESKTOP_INPUT_853
+#if !defined(STYLEOS_TEST_DESKTOP_INPUT_853) && !defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
 static inline void out16(uint16_t port, uint16_t value)
 {
     __asm__ volatile ("outw %0,%1" :: "a"(value), "Nd"(port));
@@ -133,7 +133,7 @@ bool desk_input_next(struct desk_event *event)
     return false;
 }
 
-#ifndef STYLEOS_TEST_DESKTOP_INPUT_853
+#if !defined(STYLEOS_TEST_DESKTOP_INPUT_853) && !defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
 void desk_reboot(void) { (void)ps_write(KSTAT, 0xfe); }
 
 static uint8_t rtc(unsigned n) { out8(0x70, (uint8_t)n); return in8(0x71); }

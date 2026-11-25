@@ -1,0 +1,38 @@
+name: StyleOS 863 integrated owned-root interactive Desktop
+on:
+  push:
+    branches: [feature/styleos-desktop-runtime-863]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  interactive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install build and real guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 ovmf dosfstools mtools
+      - name: Explicit deny adapters on GCC and Clang
+        run: |
+          set -euo pipefail
+          mkdir -p build/s863-interactive-host
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -DSTYLEOS_TEST_DESKTOP_INTERACTIVE_863=1 -Iinclude tests/test_desktop_interactive_863.c kernel/desktop_interactive_io_863.c -o "build/s863-interactive-host/$cc"
+            "build/s863-interactive-host/$cc" | tee "build/s863-interactive-host/$cc.log"
+          done
+      - name: Actual two CPL3 lifecycle rounds then interactive shell on same CR3
+        run: python3 tools/test_desktop_interactive_863.py --output build/s863-interactive
+      - name: Independently replay real CPU, UART and QMP frames
+        run: python3 tools/test_desktop_interactive_863_replay.py build/s863-interactive
+      - name: Preserve raw evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-863-interactive
+          path: |
+            build/s863-interactive/
+            build/s863-interactive-host/*.log
+          if-no-files-found: warn

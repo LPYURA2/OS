@@ -8,6 +8,9 @@
 #include <styleos/desktop_sessions.h>
 #include <styleos/desktop_text_app.h>
 #include <styleos/native_desktop_bridge.h>
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#include <styleos/desktop_interactive_863.h>
+#endif
 
 enum { FILES, NOTES, TASKS, ABOUT, NOTE_WINDOW, WINDOWS };
 enum { LIGHT = 0xf3f0e9, MUTED = 0xaeb8c7, GOLD = 0xe6ad63, FOLDER = 0xe7be80,
@@ -54,6 +57,18 @@ static struct desk_editor_draft *current_draft(void)
     return active() == NOTE_WINDOW ? &desk_sessions_global()->notes :
                                      &desk_sessions_global()->editor;
 }
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+static size_t note_length863(void){return desk_sessions_global()->notes.length;}
+static uint64_t note_hash863(void){
+    const struct desk_editor_draft *n=&desk_sessions_global()->notes;
+    if(n->length>sizeof n->content)arch_halt();
+    uint64_t hash=UINT64_C(14695981039346656037);
+    for(size_t i=0;i<n->length;i++){hash^=(unsigned char)n->content[i];hash*=UINT64_C(1099511628211);}
+    return hash;
+}
+static bool note_dirty863(void){return desk_sessions_global()->notes.dirty;}
+static unsigned note_session863(void){return desk_sessions_pid(desk_sessions_global(),DESK_SESSION_NOTES);}
+#endif
 #define document (current_draft()->document)
 #define doc_folder (current_draft()->doc_folder)
 #define content (current_draft()->content)
@@ -1032,6 +1047,9 @@ size_t desk_cursor_853(const struct desk_event *event)
 
 _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 {
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+    s863_shell_guard();
+#endif
     width = (int)surface->width;
     height = (int)surface->height;
     if (width < 800 || height < 600) {
@@ -1064,17 +1082,31 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     size_t painted = desk_present(&(struct desk_damage){.all = true}, draw);
     if ((input_flags & 3) == 3 && painted) desk_update_mark_ready();
 #else
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+    size_t initial_writes863=desk_present(&(struct desk_damage){.all = true}, draw);
+#else
     (void)desk_present(&(struct desk_damage){.all = true}, draw);
 #endif
+#endif
     arch_puts("STYLEOS DESKTOP READY\n");
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+    s863_shell_observe(0,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),initial_writes863,input_flags,0);
+#endif
     unsigned tick = 0;
     bool cursor_proven = false;
     for (;;) {
         struct desk_event e;
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+        s863_shell_guard();
+        struct desk_event observed863={0};size_t writes863=0;unsigned batch863=0;
+#endif
         struct visual old, next;
         bool captured = false, editor = false, clock = false;
         for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i) {
             if (!captured) { take_visual(&old); captured = true; }
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+            observed863=e;batch863++;
+#endif
             if (e.mouse) editor |= mouse(&e) &&
                           (active() == NOTES || active() == NOTE_WINDOW);
             else editor |= keyboard(e.key, e.modifiers) &&
@@ -1105,11 +1137,17 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                 cursor_only = false;
             }
             size_t writes = desk_present(&damage, draw);
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+            writes863=writes;
+#endif
             if (!cursor_proven && cursor_only && writes && writes <= 2u * CURSOR_W * CURSOR_H) {
                 arch_puts("STYLEOS DESKTOP CURSOR DAMAGE PASS\n");
                 cursor_proven = true;
             }
         }
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+        if(captured)s863_shell_observe(&observed863,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),writes863,input_flags,batch863);
+#endif
         for (unsigned i = 0; i < 64; ++i) __asm__ volatile("pause");
     }
 }

@@ -20,6 +20,9 @@ void s844_guest_run(uint64_t);
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_FRAME_852
 #include <styleos/desktop_v0.h>
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#include <styleos/desktop_interactive_863.h>
+#endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_RTC_854
 #include <styleos/rtc_x86_854.h>
@@ -126,6 +129,39 @@ static uint64_t bytes64(const unsigned char *p){uint64_t v=0;for(unsigned i=0;i<
 #ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
 #include "runtime_roots_861.inc"
 #endif
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+static const struct dpr_service *shell_d863;
+static struct s842_cache shell_cache863;
+static uint64_t shell_root863;
+static unsigned shell_events863;
+static bool shell_fixture863(void){
+ uint32_t a,b,c,d;
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
+ if(!(c&(1u<<31)))return false;
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(0x40000000),"2"(0));
+ if(b!=0x54474354u||c!=0x43544743u||d!=0x47435447u)return false;
+ uint32_t old=in32(0xcf8),lpc=cfg(31,0,0),cls=cfg(31,0,8);out32(0xcf8,old);
+ return in32(0xcf8)==old&&lpc==0x29188086u&&(cls>>16)==0x0601;
+}
+void s863_shell_guard(void){
+ if(!shell_root863||read_cr3()!=shell_root863||(flags()&0x200)||dpr_global_state()!=shell_d863)fail("863-shell-root");
+}
+static void shell_boundary863(void){
+ s863_shell_guard();unsigned used;
+ if(!boundary861(shell_d863,&shell_cache863)||shell_d863->dispatcher.dispatches!=20||pr_global()->next_pid!=5||ws_global()->next_id!=5||nwc_port_count(nwc_global())||!s844_count(s845_arena(),&used)||used||s845_arena()->next!=8)fail("863-shell-boundary");
+}
+void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsigned active,bool ru,unsigned restarts,size_t text,uint64_t text_hash,bool text_dirty,unsigned note_session,size_t writes,unsigned inputs,unsigned batch){
+ shell_boundary863();
+ if(inputs!=3||batch>32||(!ev)!=(!batch))fail("863-shell-input");
+ if(!ev){arch_puts("STYLEOS S863 READY");field("root",shell_root863);field("dispatches",shell_d863->dispatcher.dispatches);field("next-pid",pr_global()->next_pid);field("next-window",ws_global()->next_id);field("input",inputs);field("x",x);field("y",y);field("writes",writes);arch_putc('\n');return;}
+ if(shell_events863==UINT32_MAX)fail("863-shell-counter");
+ arch_puts("STYLEOS S863 EVENT");field("root",shell_root863);field("n",++shell_events863);field("batch",batch);field("mouse",ev->mouse);field("key",ev->key);field("dx",(uint64_t)(int64_t)ev->dx);field("dy",(uint64_t)(int64_t)ev->dy);field("buttons",ev->buttons);field("modifiers",ev->modifiers);field("x",x);field("y",y);field("active",active);field("ru",ru);field("restarts",restarts);field("text",text);field("text-hash",text_hash);field("text-dirty",text_dirty);field("note-session",note_session);field("writes",writes);arch_putc('\n');
+ if(batch==1&&!ev->mouse&&ev->key==0x58&&!ev->modifiers){
+  arch_puts("STYLEOS S863 EXIT");field("root",shell_root863);field("events",shell_events863);field("dispatches",shell_d863->dispatcher.dispatches);field("used",0);arch_putc('\n');
+  out32(0xf4,0x10);arch_halt();
+ }
+}
+#endif
 static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,const struct desktop_surface *s,uint64_t gdt,uint64_t idt,uint64_t tss,uint64_t rsp0,uint16_t limit,uint16_t selector){
  uint16_t cs,tr;uint64_t rsp,cr0;__asm__ volatile("mov %%cs,%0;str %1;mov %%rsp,%2;mov %%cr0,%3":"=r"(cs),"=r"(tr),"=r"(rsp),"=r"(cr0));
  uint64_t cr4=reg4(),target=composed.built.root,bridge_pa=(uintptr_t)bridge;
@@ -205,6 +241,15 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  arch_puts("STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny\n");
 #ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
  guest861(p,cache,guard,allocator858,s,hash);
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+ /* Existing shell only after two actual lifecycle rounds on this same root.
+  * Storage/clock/reset are explicitly denied. No new task ABI or DMA grant. */
+ if(!shell_fixture863()||!identity((uintptr_t)desktop_v0_run,PG_EXEC)||!identity((uintptr_t)desk_input_init,PG_EXEC)||!identity((uintptr_t)desk_input_next,PG_EXEC))fail("863-shell-admission");
+ shell_root863=target;shell_d863=dpr_global_state();shell_cache863=*cache;shell_boundary863();
+ arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",20);arch_putc('\n');
+ arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
+ desktop_v0_run(s);
+#endif
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_IRQ_859
  if(read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("859-map-context");
@@ -420,7 +465,13 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
 ,uint16_t gdt_limit,uint16_t tss_selector
 #endif
 ){
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+ if(flags()&0x200)fail("863-platform-context");
+#endif
  if(!p||!p->evidence||!guard||read_cr3()!=p->old_root||(flags()&0x200)||arch_paging_attest_image_writable(p,(uintptr_t)tables,sizeof tables)!=PG_OK)fail("context-storage");
+#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+ if(!shell_fixture863())fail("863-platform");
+#endif
  const struct desktop_surface *surface=desktop_platform_surface();
  if(!desktop_surface_valid(surface))fail("surface-invalid");
  if(!desktop_surface_excludes_boot_memory(surface,p->evidence))fail("surface-overlap");
