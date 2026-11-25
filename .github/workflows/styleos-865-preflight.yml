@@ -1,0 +1,46 @@
+name: StyleOS 865 preflight frozen integrated candidate
+on:
+  push:
+    branches: [feature/styleos-kernel-acceptance-preflight-865]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reproducibility-and-real-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fbbfb478da5967fee18e1828178a12e64e687bd3
+          persist-credentials: false
+      - name: Install real guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Freeze source and tools
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "fbbfb478da5967fee18e1828178a12e64e687bd3"
+          test -z "$(git status --porcelain)"
+          mkdir -p build/s865-preflight
+          git rev-parse HEAD > build/s865-preflight/source-sha.txt
+          git archive --format=tar HEAD | sha256sum > build/s865-preflight/source-tar.sha256
+          (clang --version; lld-link --version; python3 --version; qemu-system-x86_64 --version; dpkg-query -W clang lld qemu-system-x86 ovmf dosfstools mtools xorriso) > build/s865-preflight/tools.txt
+      - name: Real integrated ISO guest and exact media verification
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --output build/s865-preflight/guest
+      - name: Independent second build and byte comparison
+        run: |
+          set -euo pipefail
+          python3 tools/build.py --arch x86_64 --desktop-integrated-864 --output build/s865-preflight/rebuild > build/s865-preflight/rebuild.log 2>&1
+          for name in BOOTX64.EFI styleos.img StyleOS-integrated-864.iso; do
+            a="build/s865-preflight/guest/build/x86_64/$name"
+            b="build/s865-preflight/rebuild/x86_64/$name"
+            sha256sum "$a" "$b" | tee -a build/s865-preflight/binary-sha256.txt
+            cmp "$a" "$b"
+          done
+          echo 'Frozen diagnostic candidate reproducibility PASS; not KFA-01 or final acceptance' | tee build/s865-preflight/reproducibility.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-865-preflight
+          path: build/s865-preflight/
+          if-no-files-found: error
