@@ -336,3 +336,26 @@ jobs:
           name: styleos-865-owned-shell
           path: build/s865-owned-shell/
           if-no-files-found: warn
+
+
+  entry-classification-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Workload-independent raw frame classification (host only)
+        run: |
+          set -euo pipefail
+          mkdir -p build/s865-entry-classification
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_ENTRY_CLASSIFIER_865 -DSTYLEOS_TEST_FOUR_GUEST_864 -Iinclude kernel/process_entry_847.c tests/test_entry_classification_865.c -o "build/s865-entry-classification/$cc"
+            "build/s865-entry-classification/$cc" | tee "build/s865-entry-classification/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-865-entry-classification
+          path: build/s865-entry-classification/
+          if-no-files-found: error

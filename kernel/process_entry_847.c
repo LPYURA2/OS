@@ -35,6 +35,28 @@ bool s847_decode(const struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root
  *out=c;*ev=e;return true;
 }
 
+#if defined(STYLEOS_INTEGRATED_RUNTIME_864) || defined(STYLEOS_TEST_RUNTIME_ENTRY_CLASSIFIER_865)
+enum rt865_frame_kind rt865_classify_frame(const struct s847_raw *f,uint64_t va,
+ uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed)
+{
+ if(!region(f,sizeof *f,_Alignof(struct s847_raw))||
+    !child||child>=LOW||(child&(P-1))||!safe||safe>=LOW||(safe&(P-1))||child==safe||
+    (cs&7)!=3||(ss&7)!=3||cs<11||ss<11||cs==ss||
+    f->cs!=cs||f->ss!=ss||(f->rflags&0x202)!=0x202||(f->rflags&~UINT64_C(0xad7))||
+    f->rip<S846_CODE||f->rip>=S846_CODE+P||f->rsp<=S846_STACK||f->rsp>S846_STACK+P||
+    (f->vector!=14&&cr2))return RT865_INVALID;
+ if(f->vector==0x50)
+    return armed&&!f->error&&va==S846_IST+P-16-sizeof *f?RT865_TICK:RT865_INVALID;
+ /* The existing restricted adapter masks the timer for call/fault slices.
+  * Asynchronous syscall-while-timer-armed requires separate IRQ retirement. */
+ if(armed)return RT865_INVALID;
+ struct s847_raw n=*f;n.rflags&=~UINT64_C(0x200);
+ struct up_context c;struct up_event e;
+ if(!s847_decode(&n,va,cr2,child,cs,ss,&c,&e))return RT865_INVALID;
+ return e.kind==UP_FAULT||f->gpr[0]==S847_CALL_EXIT?RT865_TERMINAL:RT865_SYSCALL;
+}
+#endif
+
 bool s847_apply_raw(struct s847_control *ctl,struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root,struct s847_decision *out){
  if(!region(ctl,sizeof *ctl,_Alignof(struct s847_control))||!region(f,sizeof *f,_Alignof(struct s847_raw))||!region(out,sizeof *out,_Alignof(struct s847_decision))||!separate(ctl,sizeof *ctl,f,sizeof *f)||!separate(ctl,sizeof *ctl,out,sizeof *out)||!separate(f,sizeof *f,out,sizeof *out)||ctl->cs>UINT16_MAX||ctl->ss>UINT16_MAX)return false;
  struct up_context c;struct up_event e;struct s847_decision d;

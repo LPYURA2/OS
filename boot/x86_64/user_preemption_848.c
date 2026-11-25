@@ -145,7 +145,16 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #endif
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ enum rt865_frame_kind kind=rt865_classify_frame(f,(uintptr_t)f,f->vector==14?cr2:0,
+    root,bank862.safe,bank862.cs,bank862.ss,armed848);
+ if(kind==RT865_INVALID)fail848("865-frame-contract");
+ bool returning=kind==RT865_SYSCALL;
+ /* Stress workload assertions stay separate from frame classification. */
+ if(returning&&f->gpr[0]!=first_call848((unsigned)id))fail848("865-fixture-call");
+#else
  bool returning=f->vector==128&&f->gpr[0]==first_call848((unsigned)id);
+#endif
  if(!s849_guest_suspend((unsigned)id,root,f->vector!=V&&!returning))fail848("fx-suspend");
 #else
  if(!s849_guest_suspend((unsigned)id,root,f->vector!=V))fail848("fx-suspend");
