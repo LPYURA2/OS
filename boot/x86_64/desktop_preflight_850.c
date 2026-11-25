@@ -571,6 +571,7 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
 #endif
  if(batch==1&&!ev->mouse&&ev->key==0x43&&!ev->modifiers)s863_live_run();
 #endif
+#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
  if(batch==1&&!ev->mouse&&ev->key==0x58&&!ev->modifiers){
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
@@ -589,6 +590,7 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
   arch_puts("STYLEOS S863 EXIT");field("root",shell_root863);field("events",shell_events863);field("dispatches",shell_d863->dispatcher.dispatches);field("used",0);arch_putc('\n');
   out32(0xf4,0x10);arch_halt();
  }
+#endif
 }
 #endif
 static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,const struct desktop_surface *s,uint64_t gdt,uint64_t idt,uint64_t tss,uint64_t rsp0,uint16_t limit,uint16_t selector){

@@ -33,7 +33,7 @@ def cold_trace(trace,obs):
     if len(events)!=1 or events[0][1]!=expected:raise ValueError('cold actual CPU binding')
     return events
 
-def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False):
+def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_preview=False):
     ok,obs=cold_prior(prefix,33,site['rva'],ref,cold=True)
     if not ok:raise ValueError('cold root '+str(obs))
     root=obs['active']['root']
@@ -66,7 +66,10 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False):
         names=['note','after-first-launch','after-tasks']+([f'after-launch-{i}' for i in range(3,count+1)] if repeatable else [])
         frames=[Frame(folder/(name+'.ppm')) for name in names]
         if any((x.w,x.h,x.pixels)!=(frames[0].w,frames[0].h,frames[0].pixels) for x in frames[1:]):raise ValueError('QMP screen changed across launch')
-        if [x for x in lines if x.startswith(b'STYLEOS S863 EXIT ')][0].split()[-2:]!=[f'dispatches=0x{10*count:016x}'.encode(),b'used=0x0000000000000000']:raise ValueError('exit after refusal')
+        exits=[x for x in lines if x.startswith(b'STYLEOS S863 EXIT ')]
+        if live_preview:
+            if exits:raise ValueError('preview unexpectedly executed test exit')
+        elif len(exits)!=1 or exits[0].split()[-2:]!=[f'dispatches=0x{10*count:016x}'.encode(),b'used=0x0000000000000000']:raise ValueError('exit after refusal')
         ok,taskobs=task_verify(prefix+b'\n'.join(workload)+b'\n',33,site,ref,clean_fnv=frame,cold=True,round_count=count)
         if not ok:raise ValueError('cold task hardware '+str(taskobs))
         events=trace_check(data.decode('ascii'),taskobs)

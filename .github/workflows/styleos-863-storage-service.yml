@@ -24,9 +24,15 @@ jobs:
       - name: Cold shell requests actual native tasks after ready, then returns to shell
         if: ${{ !cancelled() && steps.tools.conclusion == 'success' }}
         run: python3 tools/test_desktop_storage_service_863.py --tasks --output build/s863-storage-tasks
-      - name: Autonomous cold boot with storage denied and two task launches
+      - name: Autonomous cold boot with storage denied and four task launches
         if: ${{ !cancelled() && steps.tools.conclusion == 'success' }}
         run: python3 tools/test_desktop_autonomous_863.py --output build/s863-autonomous
+      - name: Install ISO packaging tool
+        if: ${{ !cancelled() && steps.tools.conclusion == 'success' }}
+        run: sudo apt-get install -y xorriso
+      - name: Actual ISO preview boot and live input after F12 without debug exit device
+        if: ${{ !cancelled() && steps.tools.conclusion == 'success' }}
+        run: python3 tools/test_desktop_autonomous_863.py --preview --output build/s863-owned-root-preview
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -36,6 +42,7 @@ jobs:
             build/s863-storage-cold/
             build/s863-storage-tasks/
             build/s863-autonomous/
+            build/s863-owned-root-preview/
           if-no-files-found: warn
 
   stability:
