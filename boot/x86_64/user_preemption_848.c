@@ -7,7 +7,7 @@
 #include <styleos/user_session_runtime.h>
 static uint32_t ipc_session864;
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
+#if defined(STYLEOS_TEST_DESKTOP_AUTONOMOUS_863) || defined(STYLEOS_INTEGRATED_RUNTIME_864)
 #include <styleos/desktop_interactive_863.h>
 #endif
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
