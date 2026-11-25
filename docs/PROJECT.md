@@ -1,3 +1,7 @@
+## Stage 858 — runtime entry on owned root (candidate)
+
+Accepted S857 a0db88a21a62cdb85cb0c5df1152799269975476, all three exact-SHA CI SUCCESS, verified full archive and focused raw evidence. See [handoff](NEXT_CHAT_858.md) and [architecture](architecture/RUNTIME_ENTRY_858.md). Runtime service bootstrap under audited CR3 is a separate terminal profile; not production root or application admission. KFA gates remain open.
+
 ## Stage 857 — same-boot storage fixture candidate
 
 Accepted S856 24b424d581b86dd1b500cd57755ac835b8b9903a, CI 45490977416 SUCCESS: 219 PASS, 5 SKIPPED, 0 FAIL; independent raw replay passed. See [handoff](NEXT_CHAT_857.md). Diagnostic ATA read PASS in fixed QEMU fixture; no general ATA admission or UI changes. Final exact-SHA full and focused regressions required.

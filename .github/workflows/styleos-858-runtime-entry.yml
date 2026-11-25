@@ -1,0 +1,37 @@
+name: StyleOS 858 runtime services under owned root
+on:
+  push:
+    branches: [feature/styleos-runtime-entry-858]
+  workflow_dispatch:
+jobs:
+  runtime-entry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU and OVMF build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Runtime bootstrap host model using actual services
+        run: |
+          set -euo pipefail
+          mkdir -p build/s858-tests
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -Iinclude tests/test_runtime_entry_858.c kernel/runtime_entry_858.c kernel/desktop_process_runtime.c kernel/process_scheduler.c kernel/process_runtime.c kernel/window_service.c kernel/user_session_runtime.c kernel/native_window_channel.c -o "build/s858-tests/$cc"
+            "build/s858-tests/$cc" | tee "build/s858-tests/$cc.log"
+            "build/s858-tests/$cc" dirty | tee "build/s858-tests/$cc-dirty.log"
+          done
+      - name: Start actual runtime services and render first frame under owned CR3
+        run: |
+          python3 tools/test_runtime_entry_858_guest.py --output build/s858-runtime
+          python3 tools/test_runtime_entry_858_verify.py build/s858-runtime
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-858-runtime-entry
+          path: |
+            build/s858-runtime/
+            build/s858-tests/*.log
+          if-no-files-found: warn

@@ -3,6 +3,12 @@
 #include <styleos/desktop_root_850.h>
 #include <styleos/arch.h>
 #include <styleos/ist_guard_plan_785.h>
+#ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
+#include <styleos/runtime_entry_858.h>
+#include <styleos/desktop_process_runtime.h>
+#include <styleos/user_session_runtime.h>
+#include <styleos/native_window_channel.h>
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_FRAME_852
 #include <styleos/desktop_v0.h>
 #endif
@@ -139,6 +145,16 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
   arch_puts("STYLEOS S851 PIXEL");field("id",i);field("root",target);field("address",(uintptr_t)pixel);field("old",old);field("write",want);field("read",got);field("restored",restored);arch_putc('\n');
  }
  arch_puts("STYLEOS S851 POLICY terminal=yes own-root=yes hardware-ist=yes framebuffer-restored=yes firmware-return=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
+ /* Initial service bootstrap only, after hardware proof. No legacy device
+  * initialization, tasks, IRQ enabling or production-root authorization. */
+ struct rt858_expected expected858={p->old_root,target,gdt,idt,p->evidence->live.stack.start,p->evidence->live.stack.end,limit,selector,cs};
+ struct rt858_live live858={0};
+ __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3;mov %%rsp,%4;mov %%cr0,%5":"=m"(live_g),"=m"(live_d),"=r"(live858.tr),"=r"(live858.cs),"=r"(live858.rsp),"=r"(live858.cr0)::"memory");
+ live858.root=read_cr3();live858.gdt=live_g.base;live858.idt=live_d.base;live858.gdt_limit=live_g.limit;live858.idt_limit=live_d.limit;live858.cr4=reg4();live858.efer=read_msr(0xc0000080);live858.rflags=flags();
+ if(!identity((uintptr_t)rt858_start,PG_EXEC)||!same_cache(cache)||!rt858_start(&expected858,&live858)||!rt858_ready(target)||read_cr3()!=target||(flags()&0x200))fail("858-runtime-entry");
+ arch_puts("STYLEOS S858 RUNTIME");field("root",read_cr3());field("old",p->old_root);field("gdt",live858.gdt);field("idt",live858.idt);field("tr",live858.tr);field("cs",live858.cs);field("rsp",live858.rsp);field("cr0",live858.cr0);field("cr4",live858.cr4);field("efer",live858.efer);field("flags",live858.rflags);field("gdt-limit",live858.gdt_limit);field("idt-limit",live858.idt_limit);field("safe-root",dpr_global_state()->dispatcher.safe_root);field("processes",pr_snapshot(pr_global(),0,0,true));field("windows",ws_snapshot(ws_global(),0,0));field("session-next",usr_global()->next_session);field("selected",usr_global()->selected_session);field("ports",nwc_port_count(nwc_global()));arch_putc('\n');
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_FRAME_852
  /* Bound the diagnostic workload to the admitted standard VGA mode. */
  if(s->width!=1280||s->height!=800||s->stride!=1280||s->format!=DESKTOP_BGR_BYTES||
@@ -156,6 +172,10 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("852-frame-readback");
  arch_puts("STYLEOS S852 FRAME");field("root",target);field("width",s->width);field("height",s->height);field("writes",writes);field("fnv",hash);field("first",fb[0]);field("last",fb[writes-1]);arch_putc('\n');
  arch_puts("STYLEOS S852 POLICY first-frame=yes input=no storage=no app-admission=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
+ if(!rt858_ready(read_cr3())||(flags()&0x200)||!same_cache(cache))fail("858-runtime-frame");
+ arch_puts("STYLEOS S858 POLICY runtime-services=yes empty-registry=yes frame=yes irq=no app-admission=no storage=no production-cr3=deny\n");
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_INPUT_853
  /* This is a fixed Q35/TCG terminal fixture, not general ACPI resource admission. */
  uint32_t cp_a,cp_b,cp_c,cp_d;
