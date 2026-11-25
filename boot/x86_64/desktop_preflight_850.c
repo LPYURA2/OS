@@ -230,7 +230,7 @@ static uint64_t pump_arena_base863;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
 static bool task_requested863;
 static unsigned task_batches863;
-#if defined(STYLEOS_TEST_RUNTIME_MIXED_863) && defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
+#if defined(STYLEOS_TEST_RUNTIME_MIXED_863) && defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) && !defined(STYLEOS_INTEGRATED_RUNTIME_864)
 /* Only the explicit S864 mixed cold-storage fixture. No new disk authority. */
 #define S864_INTERLEAVE 1
 static unsigned io_gate864;
@@ -657,7 +657,7 @@ bool s863_request_tasks(void){
  s863_shell_guard();
  shell_boundary863();
  bool accept=live_phase863!=1&&!task_requested863&&task_batches863<S863_LAUNCH_LIMIT;
-#if defined(STYLEOS_TEST_FOUR_GUEST_864) && defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW)
+ #if defined(STYLEOS_TEST_FOUR_GUEST_864) && (defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_INTEGRATED_RUNTIME_864))
  /* Reserve sufficient registry serial space before admitting an entire
   * four-context batch. Never begin a workload that can exhaust it mid-flight. */
  accept=accept&&pr_global()->change_serial<=UINT32_MAX-128u;

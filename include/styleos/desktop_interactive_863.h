@@ -13,7 +13,7 @@
 #define S863_TASKS_PER_BATCH 2u
 #endif
 #define S863_POLLS_PER_BATCH (S863_DISPATCHES_PER_BATCH+1u)
-#if defined(STYLEOS_TEST_FOUR_GUEST_864) && defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW)
+#if defined(STYLEOS_TEST_FOUR_GUEST_864) && (defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_INTEGRATED_RUNTIME_864))
 /* Leave headroom for all per-batch 32-bit counters (including registry
  * transitions), rather than limiting the live service to four launches. */
 #define S863_LAUNCH_LIMIT (UINT32_MAX/128u-1u)

@@ -298,3 +298,22 @@ jobs:
           name: styleos-864-four-provisioned-storage
           path: build/s864-four-provisioned-storage/
           if-no-files-found: warn
+
+
+  integrated-desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install optical guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Integrated ISO, ordinary save and eight uninterrupted native workload rounds on both boots
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --output build/s864-integrated-desktop
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-864-integrated-desktop
+          path: build/s864-integrated-desktop/
+          if-no-files-found: warn

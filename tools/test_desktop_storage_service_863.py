@@ -137,7 +137,7 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
     return root,events
 
 
-def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False,rc=33):
+def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False,rc=33,integrated=False):
     """Same four-process trace as live ISO, with an actual save between polls."""
     from runtime_four_864_verify import verify,trace_check,N,order
     from runtime_mixed_863_verify import row
@@ -150,11 +150,12 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
         if (frame.w,frame.h)!=(1280,800):raise ValueError('four storage display mode')
         pixels=frame.pixels;buf=bytearray(frame.w*frame.h*4);buf[0::4]=pixels[2::3];buf[1::4]=pixels[1::3];buf[2::4]=pixels[0::3]
         return fnv_text(buf)
-    names=['note','after-first-launch','after-tasks','after-launch-3','after-launch-4']
+    rounds=8 if integrated else 4
+    names=['note','after-first-launch','after-tasks']+[f'after-launch-{i}' for i in range(3,rounds+1)]
     frames=[Frame(folder/(x+'.ppm')) for x in names]
     hashes=[frame_hash(x) for x in frames];final=hashes[1]
-    if any(x.pixels!=frames[1].pixels for x in frames[2:]) or (frames[0].pixels==frames[1].pixels)==write:raise ValueError('four storage frame continuity')
-    ok,obs=verify(raw,rc,site,ref,cold=True,clean_fnv=final,storage=True,provisioned=provisioned,host_quit=provisioned)
+    if any(x.pixels!=frames[1].pixels for x in frames[2:]) or (frames[0].pixels==frames[1].pixels)==(write and not integrated):raise ValueError('four storage frame continuity')
+    ok,obs=verify(raw,rc,site,ref,cold=True,clean_fnv=final,storage=True,provisioned=provisioned,host_quit=provisioned,round_count=rounds,integrated=integrated)
     if not ok:raise ValueError(obs)
     root=obs['active']['root'];events=trace_check(data.decode('ascii'),obs)
     cold=rows(b'STYLEOS S863B COLD');ready=rows(b'STYLEOS S863 READY')
@@ -166,16 +167,16 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     expect(clocks[0],b'STYLEOS S863C CLOCK',('root','dispatches','hour','minute','shadow'),(root,0,12,34,0x8d))
     req=rows(b'STYLEOS S863B REQUEST');beg=rows(b'STYLEOS S863L BEGIN');end=rows(b'STYLEOS S863L DONE')
     rb=rows(b'STYLEOS S864 BATCH-BEGIN');re=rows(b'STYLEOS S864 BATCH-END');slices=rows(b'STYLEOS S863P SLICE')
-    if len(req)!=5 or any(len(x)!=4 for x in (beg,end,rb,re)) or len(slices)!=108:raise ValueError('four storage poll count')
+    if len(req)!=rounds+(0 if integrated else 1) or any(len(x)!=rounds for x in (beg,end,rb,re)) or len(slices)!=27*rounds:raise ValueError('four storage poll count')
     tags=(b'STYLEOS S864 ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S861T ',b'STYLEOS S862',b'STYLEOS S863M ')
     workload=[];before=0;session=None;prev=lines.index(ready[0])
     if not lines.index(cold[0])<lines.index(clocks[0])<lines.index(b'STYLEOS DESKTOP READY')<prev:raise ValueError('four cold ordering')
-    for i in range(4):
+    for i in range(rounds):
         expect(req[i],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted'),(root,i,N*i,1))
         begin=row(beg[i],b'STYLEOS S863L BEGIN',('root','dispatches','frame','sessions'))
         done=row(end[i],b'STYLEOS S863L DONE',('root','dispatches','frame','sessions'))
         if tuple(begin.values())!=(root,N*i,hashes[0] if i==0 else final,begin['sessions']) or tuple(done.values())!=(root,N*(i+1),final,done['sessions']):raise ValueError('four storage frame receipts')
-        if not (write and i==0) and begin['sessions']!=done['sessions']:raise ValueError('four session changed outside save')
+        if not (write and i==0 and not integrated) and begin['sessions']!=done['sessions']:raise ValueError('four session changed outside save')
         if session is not None and begin['sessions']!=session:raise ValueError('four session continuity')
         session=done['sessions']
         ids=[lines.index(x) for x in (req[i],beg[i],rb[i],slices[i*27],re[i],slices[i*27+26],end[i])]
@@ -189,15 +190,19 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
             want=(n,before,before+int(not cleanup),0 if cleanup else 12,0 if cleanup else 4,0 if cleanup else windows,int(cleanup))
             expect(slices[n-1],b'STYLEOS S863P SLICE',('n','before','after','used','processes','windows','done'),want)
             before=want[2]
-    expect(req[-1],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted'),(root,4,104,0))
+    if not integrated:expect(req[-1],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted'),(root,4,104,0))
     exits=rows(b'STYLEOS S863 EXIT')
     if provisioned:
         input_events=rows(b'STYLEOS S863 EVENT')
-        if exits or len(input_events)<2 or b' key=0x0000000000000058 ' not in input_events[-2] or b' key=0x0000000000000040 ' not in input_events[-1] or b' writes=0x0000000000000000' in input_events[-1] or not prev<lines.index(req[-1])<lines.index(input_events[-2])<lines.index(input_events[-1]):raise ValueError('live post-workload input proof')
+        if exits or len(input_events)<2 or b' key=0x0000000000000058 ' not in input_events[-2] or b' key=0x0000000000000040 ' not in input_events[-1] or b' writes=0x0000000000000000' in input_events[-1] or not max(prev,lines.index(req[-1]))<lines.index(input_events[-2])<lines.index(input_events[-1]):raise ValueError('live post-workload input proof')
     elif len(exits)!=1 or not prev<lines.index(req[-1])<lines.index(exits[0]) or exits[0].split()[-2:]!=[b'dispatches=0x0000000000000068',b'used=0x0000000000000000']:raise ValueError('four storage exit')
-    if before!=104 or workload!=[x for x in lines if x.startswith(tags)]:raise ValueError('four storage workload scope')
+    if before!=N*rounds or workload!=[x for x in lines if x.startswith(tags)]:raise ValueError('four storage workload scope')
     io=[rows(b'STYLEOS S864 '+x) for x in (b'HOLD',b'SAVED',b'RESUME')]
-    if write:
+    if integrated:
+        if any(io):raise ValueError('test hold reached integrated runtime')
+        commits=rows(b'STYLEOS S863S COMMIT');docs=rows(b'STYLEOS S863S SAVED')
+        if write and (len(commits)!=2 or len(docs)!=1 or not lines.index(ready[0])<lines.index(commits[0])<lines.index(commits[1])<lines.index(docs[0])<lines.index(req[0])):raise ValueError('ordinary pre-workload save order')
+    elif write:
         if any(len(x)!=1 for x in io):raise ValueError('four storage interleave count')
         hold,saved,resume=(x[0] for x in io)
         expect(hold,b'STYLEOS S864 HOLD',('root','dispatches','used','pid'),(root,1,12,1))
@@ -209,12 +214,13 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
     if args.iso and args.build_from:p.error('ISO proof requires a fresh linked build')
     if args.provisioned and not args.iso:p.error('--provisioned requires --iso')
+    if args.integrated and not args.provisioned:p.error('--integrated requires --provisioned')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base)
@@ -234,7 +240,8 @@ def main():
         build=args.build_from.resolve(strict=True)
         (out/'compile.log').write_text('Reusing exact cold image: '+str(build)+'\n')
     else:
-        with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),*(['--four-live-864'] if args.four else []),*(['--provisioned-storage-864'] if args.provisioned else []),'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
+        build_args=['--desktop-integrated-864'] if args.integrated else ['--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),*(['--four-live-864'] if args.four else []),*(['--provisioned-storage-864'] if args.provisioned else [])]
+        with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',*build_args,'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
     efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=None if args.four else bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
     if args.four:
@@ -243,8 +250,8 @@ def main():
     media=None;iso=None;iso_sha=None
     if args.iso:
         from test_desktop_autonomous_863 import verify_preview_media
-        iso=out/'StyleOS-owned-root-storage-test.iso'
-        subprocess.run([sys.executable,str(ROOT/'tools/make_desktop_iso.py'),'--efi',str(efi),'--output',str(iso)],check=True)
+        iso=build/'x86_64/StyleOS-integrated-864.iso' if args.integrated else out/'StyleOS-owned-root-storage-test.iso'
+        if not args.integrated:subprocess.run([sys.executable,str(ROOT/'tools/make_desktop_iso.py'),'--efi',str(efi),'--output',str(iso)],check=True)
         iso_sha=sha(iso.read_bytes());media=verify_preview_media(iso,efi,out)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
     def run(name,write,foreign=False):
@@ -297,14 +304,14 @@ def main():
                 d.wait_uart('DATA MOUNT');d.screen('initial');d.x,d.y=640,600
                 if write:
                     d.key('f5');d.key('ctrl-n');d.key('a')
-                    if not mixed:d.key('ctrl-s');d.wait_uart('DOCUMENT SAVE')
+                    if not mixed or args.integrated:d.key('ctrl-s');d.wait_uart('DOCUMENT SAVE')
                 else:
                     # Legacy root rows: Documents, Projects, seeded slot 0, saved slot 1.
                     d.key('f2');d.click(688*1280//1536+115,746*128//804+42+12+3*45+12);d.wait_uart('DOCUMENT OPEN')
                 d.screen('note')
                 if tasks:
                     d.key('f9')
-                    if mixed and write:
+                    if mixed and write and not args.integrated:
                         wait(proc,serial,b'STYLEOS S864 HOLD ')
                         d.key('ctrl-s');d.wait_uart('DOCUMENT SAVE')
                         wait(proc,serial,b'STYLEOS S864 RESUME ')
@@ -313,9 +320,9 @@ def main():
                     d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',2)
                     d.screen('after-tasks')
                     if args.four:
-                        for i in (3,4):
+                        for i in range(3,9 if args.integrated else 5):
                             d.key('f9');wait(proc,serial,b'STYLEOS S863L DONE ',i);d.screen(f'after-launch-{i}')
-                    d.key('f9');wait(proc,serial,b'STYLEOS S863B REQUEST ',5 if args.four else 3)
+                    if not args.integrated:d.key('f9');wait(proc,serial,b'STYLEOS S863B REQUEST ',5 if args.four else 3)
                 d.call('stop');final=snapshot('final')
                 verify_ready(final);verify_bar(final['pci'],final['mtree'],0x6060 if args.iso else 0x60e0)
                 stats=next(r['stats'] for r in final['stats'] if r.get('qdev') in (DEVICE,'/machine/peripheral/'+DEVICE))
@@ -370,7 +377,7 @@ def main():
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
         if args.four:
-            root,events=verify_four_storage(lines,raw,data,site,ref,folder,write,provisioned=args.provisioned,rc=rc)
+            root,events=verify_four_storage(lines,raw,data,site,ref,folder,write,provisioned=args.provisioned,rc=rc,integrated=args.integrated)
         elif cold:
             root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks,mixed=mixed,interleaved=mixed and write)
         else:
@@ -405,7 +412,7 @@ def main():
         if args.provisioned and not lines.index(bars[0])<lines.index(b'STYLEOS S863S PROVISIONED-IDENTITY')<lines.index(admits[0]):raise ValueError('identity must precede write admission')
         if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
         if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')
-        return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h,'interleaved_save':mixed and write,'host_exit':rc,'live_after_f12':args.provisioned}
+        return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h,'interleaved_save':mixed and write and not args.integrated,'host_exit':rc,'live_after_f12':args.provisioned}
     first=run('first',True)
     expected=bytearray(original);payload=b'a'
     header=struct.pack('<8sIIBB2x',b'STYLED01',1,1,0,1);h=2166136261
@@ -417,6 +424,6 @@ def main():
     check('after-write');second=run('second',False);check('after-reboot')
     foreign=run('foreign-identity',False,True) if args.provisioned else None
     if args.provisioned:check('after-foreign-refusal')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,integrated_runtime=args.integrated,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()

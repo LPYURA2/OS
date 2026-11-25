@@ -127,9 +127,10 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
         for i,x in enumerate(releases):eq(x,(i,base+i+1,gen0+base+i,roots[i]['child'],safe,3-i),'release')
         return True,dict(four_roots=roots,four_switches=switches,four_events=events,timer_ready=ready)
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)
-def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count=4,provisioned=False,host_quit=False):
+def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count=4,provisioned=False,host_quit=False,integrated=False):
     try:
-        if round_count!=4 and (not cold or storage or round_count!=8):raise ValueError('unsupported four workload')
+        if integrated and not (cold and storage and provisioned and host_quit and round_count==8):raise ValueError('integrated eight-round storage profile required')
+        if round_count!=4 and (not cold or (storage and not integrated) or round_count!=8):raise ValueError('unsupported four workload')
         lines=raw.splitlines()
         if host_quit and not provisioned:raise ValueError('host quit limited to live provisioned storage')
         if provisioned and not (cold and storage):raise ValueError('provisioned requires cold storage')
