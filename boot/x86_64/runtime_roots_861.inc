@@ -24,7 +24,11 @@ static bool boundary861(const struct dpr_service *d,const struct s842_cache *cac
  )&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_USER_861
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+ (d->dispatcher.dispatches==8&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
+#else
  (d->dispatcher.dispatches==4&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
+#endif
 #endif
  rt858_ready(v.root));
 }
