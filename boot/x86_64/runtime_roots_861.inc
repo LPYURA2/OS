@@ -59,6 +59,9 @@ const struct s846_root [2],const struct s844_lease [2],uint64_t,uint64_t,bool (*
 extern void s860_reap(uint64_t);
 #else
 extern void s847_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t,bool (*)(void *),void *);
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+extern void s863_coop_reap(uint64_t,const struct s844_lease [2]);
+#endif
 #endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
@@ -147,7 +150,9 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  struct rt858_live v=capture861();struct dpr_service *joined=rt861_dispatcher(&v);
  if(!joined||joined!=d)fail("861-user-reap-boundary");
 #ifdef STYLEOS_TEST_RUNTIME_COOP_863
- const unsigned expected_dispatches=8; /* Bank has reaped both terminal slots. */
+ if(!s844_count(arena,&used)||used)fail("863-coop-scrub");
+ s863_coop_reap(safe,l);
+ const unsigned expected_dispatches=8;
 #else
  for(unsigned i=0;i<2;i++)if(dpr_release(joined,i,l[i].generation)!=PS_OK)fail("861-user-reap");
  const unsigned expected_dispatches=4;

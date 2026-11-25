@@ -140,8 +140,8 @@ void s847_trial(const struct s846_root child[2],const struct s844_lease leases[2
   if(!pending863||events847!=step+1||before_sp!=after_sp||returned.root!=root||
      returned.gdt!=initial.gdt||returned.idt!=initial.idt||returned.gdt_limit!=initial.gdt_limit||
      returned.idt_limit!=initial.idt_limit||returned.tr!=initial.tr||returned.cs!=initial.cs||
-     (returned.rflags&0x200)||!audit(opaque)||rt861_dispatcher(&returned)!=joined847)fail847("863-coop-safe");
-  if(rt863_coop_commit(&coop863,joined847,&ticket,root,returned.rflags,&receipt863,frame863,cr2863)!=PS_OK)fail847("863-coop-commit");
+     (returned.rflags&0x200)||!audit(opaque)||joined847->dispatcher.current!=(int)id)fail847("863-coop-safe");
+  if(rt863_coop_commit(&coop863,joined847,&ticket,root,returned.rflags,&receipt863,frame863,cr2863)!=PS_OK||rt861_dispatcher(&returned)!=joined847)fail847("863-coop-commit");
   unsigned stage=step/2;const struct pr_entry *pe=pr_find(pr_global(),pid);
   const struct up_context *stored=&coop863.slots[id].context;
   uint64_t value=read847(leases[id].pa+P),foreign=read847(leases[1-id].pa+P);
@@ -156,7 +156,7 @@ void s847_trial(const struct s846_root child[2],const struct s844_lease leases[2
   pending863=false;frame863=cr2863=0;volatile unsigned char*q=(void*)&receipt863;for(size_t i=0;i<sizeof receipt863;i++)q[i]=0;
  }
  if(events847!=8||pending863)fail847("863-coop-count");
- for(unsigned i=0;i<2;i++)if(rt862_bank_release(&coop863,joined847,root,i,pid847[i],leases[i].generation,child[i].built.root)!=PS_OK)fail847("863-coop-reap");
+ /* Retire registry identities only after parent has scrubbed and released the physical leases. */
 #else
  for(unsigned step=0;step<4;step++){
   unsigned id;struct up_context c;uint64_t before_sp,after_sp;
@@ -188,3 +188,19 @@ void s847_trial(const struct s846_root child[2],const struct s844_lease leases[2
  __asm__ volatile("sidt %0":"=m"(now));if(now.base!=oldi.base||now.limit!=oldi.limit)fail847("restore-idt");
  arch_puts("STYLEOS S847 POLICY cpl3=yes user-fault-contained=yes range-only=yes if=0 production-cr3=deny\n");
 }
+
+#ifdef STYLEOS_TEST_RUNTIME_COOP_863
+/* Parent calls only after both child-table spans and both released lease
+ * spans have been independently checked zero. No live user mappings remain. */
+void s863_coop_reap(uint64_t root,const struct s844_lease leases[2])
+{
+ struct rt858_live boundary=live847();
+ if(!leases||events847!=8||pending863||boundary.root!=root||
+    rt861_dispatcher(&boundary)!=joined847||ws_snapshot(ws_global(),0,0))fail847("863-coop-reap-boundary");
+ for(unsigned i=0;i<2;i++){
+    const struct rt862_bank_slot *s=&coop863.slots[i];
+    if(rt862_bank_release(&coop863,joined847,root,i,pid847[i],leases[i].generation,s->root)!=PS_OK)fail847("863-coop-reap");
+ }
+ if(rt861_dispatcher(&boundary)!=joined847||pr_snapshot(pr_global(),0,0,true))fail847("863-coop-reap-final");
+}
+#endif
