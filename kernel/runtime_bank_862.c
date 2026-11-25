@@ -128,6 +128,42 @@ enum ps_status rt863_bank_admit_initial(struct rt862_bank *b,struct dpr_service 
  return PS_OK;
 }
 
+#if defined(STYLEOS_INTEGRATED_RUNTIME_864) || defined(STYLEOS_TEST_RUNTIME_IMAGE_ADMISSION_865)
+#ifndef STYLEOS_TEST_WIDE_ROOTS_864
+#error verified image admission requires lease-bound root metadata
+#endif
+enum ps_status rt865_bank_admit_image(struct rt862_bank *b,struct dpr_service *d,
+ uint64_t live,unsigned slot,const struct s846_root *child,const struct s844_lease *lease,
+ const struct nte_loaded *image,const char *name,const struct up_context *initial,uint32_t *pid)
+{
+ if(!layout(b,d,child,sizeof *child,_Alignof(struct s846_root),lease,sizeof *lease,_Alignof(struct s844_lease))||
+    !layout(b,d,image,sizeof *image,_Alignof(struct nte_loaded),initial,sizeof *initial,_Alignof(struct up_context))||
+    !layout(b,d,pid,sizeof *pid,_Alignof(uint32_t),0,0,1)||
+    !apart(child,sizeof *child,image,sizeof *image)||!apart(child,sizeof *child,initial,sizeof *initial)||
+    !apart(lease,sizeof *lease,image,sizeof *image)||!apart(lease,sizeof *lease,initial,sizeof *initial)||
+    !apart(pid,sizeof *pid,child,sizeof *child)||!apart(pid,sizeof *pid,lease,sizeof *lease)||
+    !apart(pid,sizeof *pid,image,sizeof *image)||!apart(pid,sizeof *pid,initial,sizeof *initial)||
+    slot>=S846_ROOT_COUNT||slot>=PS_MAX_SLOTS||!child->ready||child->built.error!=PG_OK||
+    !root(child->built.root)||child->built.root==live||child->built.root!=child->plan.tables_pa||
+    !child->built.used||child->built.used>child->plan.capacity||child->plan.capacity!=PG_TABLE_PAGES||
+    child->plan.arch!=PG_X86||child->plan.count<3||child->plan.count>PG_MAX_MAPS||
+    !root(lease->pa)||lease->pa>(UINT64_C(1)<<47)-3*PAGE||lease->pages!=3||
+    lease->owner!=S846_OWNER_A+slot||!lease->generation||
+    child->lease.pa!=lease->pa||child->lease.owner!=lease->owner||
+    child->lease.pages!=lease->pages||child->lease.generation!=lease->generation||
+    !image->code_bytes||image->code_bytes>image->memory_bytes||image->memory_bytes>PAGE||
+    image->entry<S846_CODE||image->entry-S846_CODE>=image->code_bytes||
+    initial->pc!=image->entry)return PS_EVIDENCE;
+ const uint64_t vas[3]={S846_CODE,S846_DATA,S846_STACK};
+ for(unsigned i=0;i<3;i++){
+  const struct pg_mapping *m=&child->plan.maps[child->plan.count-3+i];
+  if(m->va!=vas[i]||m->pa!=lease->pa+i*PAGE||m->bytes!=PAGE||
+     m->flags!=(i?PG_WRITE:PG_EXEC))return PS_EVIDENCE;
+ }
+ return rt863_bank_admit_initial(b,d,live,slot,lease->generation,child->built.root,name,initial,pid);
+}
+#endif
+
 /* Supervisor receipt after actual trap, safe-root restoration and FP save.
  * RANGE only validates a user interval; no user dereference. A returning
  * syscall is a scheduling boundary: save the result, transition to READY,

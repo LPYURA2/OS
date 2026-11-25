@@ -28,6 +28,17 @@ enum ps_status rt862_bank_release(struct rt862_bank *,struct dpr_service *,uint6
  * Failure preserves registry, bank and output. */
 enum ps_status rt863_bank_admit_initial(struct rt862_bank *,struct dpr_service *,
  uint64_t,unsigned,uint64_t,uint64_t,const char *,const struct up_context *,uint32_t *);
+#if defined(STYLEOS_INTEGRATED_RUNTIME_864) || defined(STYLEOS_TEST_RUNTIME_IMAGE_ADMISSION_865)
+#include <styleos/native_tea_elf.h>
+/* Trusted loader admission for the existing bounded three-page layout.
+ * The architecture MUST independently audit the actual tables, current
+ * arena lease and code provenance immediately before this call. Metadata
+ * alone is not a hardware proof or authorization of a .tea package.
+ * No write or process publication on refusal. */
+enum ps_status rt865_bank_admit_image(struct rt862_bank *,struct dpr_service *,
+ uint64_t,unsigned,const struct s846_root *,const struct s844_lease *,
+ const struct nte_loaded *,const char *,const struct up_context *,uint32_t *);
+#endif
 /* Supervisor-only, after authenticated safe-root return and FP suspension.
  * Nonterminal INT80 range/yield/unknown; no user-memory copy or I/O. */
 enum ps_status rt863_bank_syscall(struct rt862_bank *,struct dpr_service *,

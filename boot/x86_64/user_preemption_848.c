@@ -409,7 +409,14 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   handle860[i]=leases[i].generation;
   struct up_context initial={.pc=S846_CODE,.sp=S846_STACK+P,.status=2,.cs=sel.cs,.ss=sel.ss};
   for(unsigned j=0;j<15;j++)initial.gpr[j]=first_arg848(i,j);
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+  /* The fixture supplies bytes today; the same admission consumes trusted
+   * loader metadata without requiring any particular program instruction. */
+  struct nte_loaded image={.entry=S846_CODE,.code_bytes=(uint32_t)((uintptr_t)end[i]-(uintptr_t)start[i]),.memory_bytes=P};
+  if(!audit(opaque)||rt865_bank_admit_image(&bank862,runtime860,safe,i,&child[i],&leases[i],&image,"S864 process",&initial,&pid860[i])!=PS_OK||
+#else
   if(rt863_bank_admit_initial(&bank862,runtime860,safe,i,handle860[i],child[i].built.root,"S864 process",&initial,&pid860[i])!=PS_OK||
+#endif
      pr_account(pr_global(),pid860[i],handle860[i],0,3*P)!=PR_OK||
      ws_open_app(ws_global(),pr_global(),pid860[i],"S864 process",(struct ws_bounds){0,0,400,300},&win860[i])!=WS_OK)fail848("864-admit");
   if(usr_bind(users,ipc_session864,pid860[i],handle860[i])!=USR_OK||nwc_claim(channel,pid860[i],handle860[i],child[i].built.root,win860[i])!=NWC_OK||nwc_send_key(channel,win860[i],0x41u+i,0,true)!=NWC_OK||nwc_send_key(channel,win860[i],0x51u+i,0,true)!=NWC_OK)fail848("864-ipc-admit");

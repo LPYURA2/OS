@@ -359,3 +359,26 @@ jobs:
           name: styleos-865-entry-classification
           path: build/s865-entry-classification/
           if-no-files-found: error
+
+
+  image-admission-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Loader metadata admission and atomic refusal (host only)
+        run: |
+          set -euo pipefail
+          mkdir -p build/s865-image-admission
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_IMAGE_ADMISSION_865 -DSTYLEOS_TEST_WIDE_ROOTS_864 -DSTYLEOS_TEST_FOUR_GUEST_864 -DSTYLEOS_TEST_RUNTIME_TICK_860 -DSTYLEOS_TEST_RUNTIME_SYSCALL_863 -Iinclude kernel/runtime_bank_862.c tests/test_image_admission_865.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/s865-image-admission/$cc"
+            "build/s865-image-admission/$cc" | tee "build/s865-image-admission/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-865-image-admission
+          path: build/s865-image-admission/
+          if-no-files-found: error
