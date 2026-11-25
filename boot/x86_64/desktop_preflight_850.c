@@ -65,7 +65,7 @@ static uint16_t cmd(unsigned dev,unsigned fn){out32(0xcf8,cfgaddr(dev,fn,4));ret
 static void cmdwrite(unsigned dev,unsigned fn,uint16_t v){out32(0xcf8,cfgaddr(dev,fn,4));out16(0xcfc,v);}
 #if defined(STYLEOS_TEST_STORAGE_ATA_READ_857) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
 #include <styleos/ata_diag_857.h>
-struct ata857_live {uint64_t root;unsigned ops;uint32_t bar4;};
+struct ata857_live {uint64_t root;unsigned ops;uint32_t bar4,command_status;};
 static bool ata857_live_check(struct ata857_live *x){
  uint16_t cs;__asm__ volatile("mov %%cs,%0":"=r"(cs));
  if(!x||!x->root||read_cr3()!=x->root||(flags()&0x200)||(cs&3)||x->ops>=200000u)return false;
@@ -77,7 +77,9 @@ static bool ata857_live_check(struct ata857_live *x){
 #endif
     )return false;
  uint32_t old=in32(0xcf8);
- bool ok=cfg(5,0,0)==0x70108086u&&cfg(5,0,4)==0x02800003u&&cfg(5,0,8)==0x01018000u&&cfg(5,0,12)==0&&cfg(5,0,0x40)==0&&cfg(5,0,0x20)==bar;
+ const uint32_t command=x->command_status?x->command_status:UINT32_C(0x02800003);
+ if(command!=0x02800003u&&(bar!=0x6061u||command!=0x02800001u))return false;
+ bool ok=cfg(5,0,0)==0x70108086u&&cfg(5,0,4)==command&&cfg(5,0,8)==0x01018000u&&cfg(5,0,12)==0&&cfg(5,0,0x40)==0&&cfg(5,0,0x20)==bar;
  for(unsigned i=0;i<4;i++)if(cfg(5,0,0x10+4*i)!=0)ok=false;
  out32(0xcf8,old);if(!ok||in32(0xcf8)!=old||read_cr3()!=x->root||(flags()&0x200))return false;
  const uint16_t base=(uint16_t)(bar&~3u);
@@ -450,6 +452,10 @@ static struct bm857_snapshot disk_snapshot863(uint32_t pinned){
  for(unsigned i=0;i<4;i++)__asm__ volatile("inb %1,%0":"=a"(v.bm[i]):"Nd"(ports[i]):"memory");
  return v;
 }
+static void disk_dma_receipt863(const char *tag,const struct bm857_snapshot *s){
+ arch_puts("STYLEOS S863S DMA-");arch_puts(tag);field("root",s->root);field("bar4",s->bar4);field("command-status",s->command_status);
+ field("primary-command",s->bm[0]);field("primary-status",s->bm[1]);field("secondary-command",s->bm[2]);field("secondary-status",s->bm[3]);arch_putc('\n');
+}
 static void disk_admit863(void){
  uint32_t a,b,c,d;
  __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
@@ -469,14 +475,20 @@ static void disk_admit863(void){
  }
  if(!ack||!shell_fixture863()||!same_cache(&shell_cache863))fail("863-shell-storage-host");
  struct bm857_snapshot before=disk_snapshot863(0);
+ disk_dma_receipt863("BEFORE",&before);
  uint16_t word=0;
- if(!bm857_plan_at(&before,shell_root863,before.bar4,&word))fail("863-shell-storage-dma");
- uint32_t old=in32(0xcf8);
- cmdwrite(5,0,word);out32(0xcf8,old);
+ const bool optical=before.bar4==0x6061u;
+ if(!(optical?bm864_optical_plan(&before,shell_root863,&word):bm857_plan_at(&before,shell_root863,before.bar4,&word)))fail("863-shell-storage-dma");
+ if((uint16_t)before.command_status!=word){
+  uint32_t old=in32(0xcf8);cmdwrite(5,0,word);out32(0xcf8,old);
+  if(in32(0xcf8)!=old)fail("863-shell-storage-config-restore");
+ }
  struct bm857_snapshot after=disk_snapshot863(before.bar4);
- if(!bm857_confirm_at(&after,shell_root863,before.bar4))fail("863-shell-storage-master");
+ disk_dma_receipt863("AFTER",&after);
+ if(!(optical?bm864_optical_confirm(&after,shell_root863,word):bm857_confirm_at(&after,shell_root863,before.bar4)))fail("863-shell-storage-master");
  disk863.s.live.root=shell_root863;
  disk863.s.live.bar4=before.bar4;
+ disk863.s.live.command_status=after.command_status;
  arch_puts("STYLEOS S863S BAR4");field("root",shell_root863);field("bar4",before.bar4);arch_putc('\n');
  disk863.s.pio.live=&disk863.s.live;
  uint8_t super[512];

@@ -345,9 +345,21 @@ def main():
         if docs!=[wanted]:raise ValueError('actual draft content')
         original=b'STYLEOS DESKTOP DOCUMENT SAVE' if write else b'STYLEOS DESKTOP DOCUMENT OPEN'
         if lines.count(original)!=1 or lines.index(original)+1!=lines.index(wanted):raise ValueError('document evidence order')
+        dma=[x for x in lines if x.startswith(b'STYLEOS S863S DMA-')]
+        keys=(b'root',b'bar4',b'command-status',b'primary-command',b'primary-status',b'secondary-command',b'secondary-status')
+        vals=[]
+        if len(dma)!=2:raise ValueError('missing DMA readback')
+        for line,tag in zip(dma,(b'BEFORE',b'AFTER')):
+            match=re.fullmatch(b'STYLEOS S863S DMA-'+tag+b' '+b' '.join(k+b'=0x([0-9a-f]{16})' for k in keys),line)
+            if not match:raise ValueError('DMA receipt format')
+            rr,bar,cmd_status,*bm=map(lambda x:int(x,16),match.groups())
+            if rr!=root or bar!=(0x6061 if args.iso else 0x60e1) or any(bm):raise ValueError('DMA receipt context')
+            vals.append(cmd_status)
+        if vals[0] not in ((0x02800001,0x02800003,0x02800005,0x02800007) if args.iso else (0x02800007,)) or vals[1]!=(vals[0]&~4):raise ValueError('DMA command transition')
         bars=[x for x in lines if x.startswith(b'STYLEOS S863S BAR4 ')]
         if bars!=[f'STYLEOS S863S BAR4 root=0x{root:016x} bar4=0x{(0x6061 if args.iso else 0x60e1):016x}'.encode()]:raise ValueError('guest BAR4 pin mismatch')
         admits=[x for x in lines if x.startswith(b'STYLEOS S863S ADMIT ')]
+        if len(admits)!=1 or not lines.index(dma[0])<lines.index(dma[1])<lines.index(bars[0])<lines.index(admits[0]):raise ValueError('DMA admission order')
         if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
         if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')
         return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h,'interleaved_save':mixed and write}

@@ -39,5 +39,20 @@ int main(void) {
     for(unsigned b=0;b<4;b++){optical.bm[b]=1;assert(!bm857_confirm_at(&optical,root,0x6061));optical.bm[b]=0;}
     optical.bar4=0x60c1;assert(!bm857_confirm_at(&optical,root,0x60c1));
     positive+=2;negative+=8;
+    /* Exhaust the optical command field. Only IO + optional memory/master
+     * can pass, and confirmation requires master clear with unchanged IO/MEM. */
+    optical=base;optical.bar4=0x6061;
+    for(unsigned i=0;i<65536;i++){
+      optical.command_status=0x02800000u|i;word=0xabcd;
+      bool allowed=i==1||i==3||i==5||i==7;
+      assert(bm864_optical_plan(&optical,root,&word)==allowed);
+      assert(word==(allowed?(i&3u):0xabcdu));
+      assert(bm864_optical_confirm(&optical,root,1)==(i==1));
+      assert(bm864_optical_confirm(&optical,root,3)==(i==3));
+      positive+=allowed+(i==1)+(i==3);negative+=!allowed+(i!=1)+(i!=3);
+    }
+    optical.command_status=0x02800005;optical.bm[0]=1;word=0xabcd;
+    assert(!bm864_optical_plan(&optical,root,&word)&&word==0xabcd);
+    optical.bm[0]=0;optical.command_status^=0x10000;assert(!bm864_optical_plan(&optical,root,&word));negative+=2;
     printf("BM857 plan/readback: %u positive, %u refusals PASS\n",positive,negative);
 }

@@ -28,6 +28,21 @@ static inline bool bm857_confirm_at(const struct bm857_snapshot *s, uint64_t roo
 {
     return bm857_idle_at(s,root,bar) && s->command_status == UINT32_C(0x02800003);
 }
+/* Optical firmware may leave I/O enabled without memory decoding, or
+ * may already have disabled bus mastering. No other PCI command bits are
+ * allowed; never enable any decoder or master. Require idle engines and
+ * exactly the same status bits before and after. */
+static inline bool bm864_optical_plan(const struct bm857_snapshot *s,uint64_t root,uint16_t *word)
+{
+    if(!word||!bm857_idle_at(s,root,0x6061u)||
+       (s->command_status&~UINT32_C(6))!=UINT32_C(0x02800001))return false;
+    *word=(uint16_t)(s->command_status&3u);return true;
+}
+static inline bool bm864_optical_confirm(const struct bm857_snapshot *s,uint64_t root,uint16_t expected)
+{
+    return (expected==1||expected==3)&&bm857_idle_at(s,root,0x6061u)&&
+           s->command_status==(UINT32_C(0x02800000)|expected);
+}
 /* Preserve all pre-864 terminal contracts unchanged. */
 static inline bool bm857_idle(const struct bm857_snapshot *s,uint64_t root)
 { return bm857_idle_at(s,root,UINT32_C(0x60e1)); }
