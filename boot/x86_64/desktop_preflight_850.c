@@ -78,6 +78,36 @@ static bool ata857_write(void *ctx,unsigned reg,uint8_t v){
 }
 static const struct ata857_ops ata857_io={ata857_alt,ata857_write,ata857_data};
 static void ata857_hex(const uint16_t *w){static const char hex[]="0123456789abcdef";for(unsigned i=0;i<ATA857_WORDS;i++){for(unsigned b=0;b<2;b++){unsigned v=(w[i]>>(8*b))&255u;arch_putc(hex[v>>4]);arch_putc(hex[v&15]);}}}
+#ifdef STYLEOS_TEST_STORAGE_PIO_RUNTIME_863
+#include <styleos/ata_runtime_863.h>
+#include <styleos/storage_runtime_863.h>
+struct pio863 {struct ata857_live *live;struct ata_runtime_863 ata;bool writable;};
+static bool pio_reg863(void *ctx,unsigned r,uint8_t v){
+ struct pio863 *p=ctx;
+ if(!p||!p->live)return false;
+ if(ata857_allowed(r,v))return ata857_write(p->live,r,v);
+ if(!p->writable||!p->ata.busy||r!=7||(v!=0x30&&v!=0xe7)||!ata857_live_check(p->live))return false;
+ __asm__ volatile("outb %0,%1"::"a"(v),"Nd"((uint16_t)0x177):"memory");return true;
+}
+static bool pio_status863(void *ctx,uint8_t *v){struct pio863*p=ctx;return p&&ata857_alt(p->live,v);}
+static bool pio_readword863(void *ctx,uint16_t *v){struct pio863*p=ctx;return p&&ata857_data(p->live,v);}
+static bool pio_writeword863(void *ctx,uint16_t v){
+ struct pio863*p=ctx;if(!p||!p->writable||!p->ata.busy||!ata857_live_check(p->live))return false;
+ out16(0x170,v);return true;
+}
+static const struct ata_runtime_ops_863 pio_ops863={{pio_status863,pio_reg863,pio_readword863},pio_writeword863};
+static bool pio_observe863(void *ctx,struct storage_obs_863 *o){
+ struct pio863*p=ctx;
+ if(!p||!o||!p->ata.bound||p->ata.quarantined||!ata857_live_check(p->live))return false;
+ *o=(struct storage_obs_863){.root=read_cr3(),.epoch=1,.device=UINT64_C(0x701080862800),
+ .sectors=4096,.post_ebs=true,.single_cpu=true,.kernel_context=true,.exclusive_pio=true,
+ .dma_denied=true,.disposable_data=true,.flush_supported=p->ata.flush_supported};return true;
+}
+static bool pio_read863(void *ctx,uint32_t lba,uint8_t *out){struct pio863*p=ctx;return ata_runtime_read_863(&p->ata,lba,out);}
+static bool pio_write863(void *ctx,uint32_t lba,const uint8_t *in){struct pio863*p=ctx;return p->writable&&lba==2049&&ata_runtime_write_863(&p->ata,lba,in);}
+static bool pio_flush863(void *ctx){struct pio863*p=ctx;return p->writable&&ata_runtime_flush_863(&p->ata);}
+static const struct storage_ops_863 store_ops863={pio_observe863,pio_read863,pio_write863,pio_flush863};
+#endif
 #endif
 static void field(const char *k,uint64_t v){arch_putc(' ');arch_puts(k);arch_putc('=');paging_hex(v);}
 static _Noreturn void fail(const char *s){arch_puts("STYLEOS S850 FAIL ");arch_puts(s);arch_putc('\n');out32(0xf4,0x11);arch_halt();}
@@ -647,12 +677,48 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(!ata857_live_check(&io857)||!same_cache(cache))fail("857-ata-final");
  arch_puts("STYLEOS S857 ATA-REFUSE");field("root",target);field("lba",4096);field("io",0);field("unchanged",1);arch_putc('\n');
  arch_puts("STYLEOS S857 ATA-READY");field("root",target);arch_putc('\n');
- bool ack857=false;for(unsigned i=0;i<20000000u;i++){
+ bool ack857=false;
+#ifdef STYLEOS_TEST_STORAGE_PIO_RUNTIME_863
+ bool write863=false;
+#endif
+ for(unsigned i=0;i<20000000u;i++){
    struct desk_event ev857={0};if(!desk_input_next(&ev857)){__asm__ volatile("pause");continue;}
-   if(ev857.mouse||ev857.key!=0x30||ev857.modifiers)fail("857-ata-ack");ack857=true;break;
+    
+#ifdef STYLEOS_TEST_STORAGE_PIO_RUNTIME_863
+    if(ev857.mouse||(ev857.key!=0x30&&ev857.key!=0x13)||ev857.modifiers)fail("863-pio-ack");
+    write863=ev857.key==0x30;ack857=true;break;
+#else
+    if(ev857.mouse||ev857.key!=0x30||ev857.modifiers)fail("857-ata-ack");ack857=true;break;
+#endif
  }
  if(!ack857||!ata857_live_check(&io857)||!same_cache(cache))fail("857-ata-final-ack");
  arch_puts("STYLEOS S857 ATA-POLICY fixture-only=yes identify=yes read=yes data-write=no dma=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_STORAGE_PIO_RUNTIME_863
+ /* Host attests exact paused disposable fixture, then B=commit or R=read-only. */
+ struct pio863 pio={.live=&io857,.writable=write863};
+ struct storage_runtime_863 store={0};
+ uint8_t expected863[512],got863[512];uint16_t evidence863[256];
+ uint32_t a863,b863,c863,d863;
+ __asm__ volatile("cpuid":"=a"(a863),"=b"(b863),"=c"(c863),"=d"(d863):"0"(1),"2"(0));
+ if((d863&(1u<<28))&&((b863>>16)&255u)!=1)fail("863-pio-cpu");
+ for(unsigned i=0;i<512;i++)expected863[i]=(uint8_t)(i^0xa5);
+ if(!ata_runtime_bind_863(&pio.ata,&pio_ops863,&pio)||
+    !storage_bind_863(&store,&store_ops863,&pio,target,1,UINT64_C(0x701080862800),2049,1,write863))fail("863-pio-bind");
+ unsigned oldops863=io857.ops;
+ if(storage_read_863(&store,1,got863)||storage_commit_863(&store,1,expected863)||io857.ops!=oldops863)fail("863-pio-range");
+ if(write863){if(!storage_commit_863(&store,0,expected863))fail("863-pio-commit");}
+ else if(storage_commit_863(&store,0,expected863)||io857.ops!=oldops863)fail("863-pio-ro");
+ if(!storage_read_863(&store,0,got863)||!same_cache(cache)||!ata857_live_check(&io857)||pio.ata.pending_flush)fail("863-pio-readback");
+ for(unsigned i=0;i<512;i++)if(got863[i]!=expected863[i])fail("863-pio-bytes");
+ for(unsigned i=0;i<256;i++)evidence863[i]=(uint16_t)(got863[2*i]|((uint16_t)got863[2*i+1]<<8));
+ arch_puts("STYLEOS S863D DATA");field("root",target);field("write",write863);field("lba",2049);arch_puts(" bytes=");ata857_hex(evidence863);arch_putc('\n');
+ arch_puts("STYLEOS S863D READY\n");
+ bool done863=false;
+ for(unsigned i=0;i<20000000u;i++){struct desk_event ev={0};if(!desk_input_next(&ev)){__asm__ volatile("pause");continue;}
+    if(ev.mouse||ev.key!=0x2e||ev.modifiers)fail("863-pio-finish-key");done863=true;break;}
+ if(!done863||!same_cache(cache)||!ata857_live_check(&io857))fail("863-pio-finish");
+ arch_puts("STYLEOS S863D POLICY disposable=yes dma=no ordinary-cr3=deny\n");
+#endif
 #endif
 #endif
 #endif

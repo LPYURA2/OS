@@ -1,0 +1,29 @@
+name: StyleOS 863 disposable PIO commit and reboot readback
+on:
+  push:
+    branches: [feature/styleos-desktop-runtime-863]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pio:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools
+      - name: Commit one sector on isolated disposable overlay
+        run: python3 tools/test_storage_pio_runtime_863.py --output build/s863-pio-first
+      - name: Independent reboot and exact readback with no write
+        run: python3 tools/test_storage_pio_runtime_863.py --output build/s863-pio-reboot --reboot-from build/s863-pio-first
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-863-pio-reboot
+          path: |
+            build/s863-pio-first/
+            build/s863-pio-reboot/
+          if-no-files-found: warn
