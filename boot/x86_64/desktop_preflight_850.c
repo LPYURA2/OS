@@ -656,6 +656,10 @@ __attribute__((noinline)) void s863_live_run(void){
 bool s863_request_tasks(void){
  s863_shell_guard();
  shell_boundary863();
+#ifdef STYLEOS_OWNED_SHELL_865
+ /* Defense in depth: no trusted package admission exists in this profile. */
+ return false;
+#endif
  bool accept=live_phase863!=1&&!task_requested863&&task_batches863<S863_LAUNCH_LIMIT;
  #if defined(STYLEOS_TEST_FOUR_GUEST_864) && (defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_INTEGRATED_RUNTIME_864))
  /* Reserve sufficient registry serial space before admitting an entire
@@ -671,6 +675,10 @@ bool s863_request_tasks(void){
 /* Called once per actual shell poll after input/render. One hardware dispatch
  * or one terminal cleanup; no preserved execution stack and no nested shell. */
 __attribute__((noinline)) void s863_shell_pump(void){
+#ifdef STYLEOS_OWNED_SHELL_865
+ if(task_requested863||live_phase863||task_batches863)fail("865-unexpected-fixture-request");
+ return;
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
  if(task_requested863){task_requested863=false;s863_live_run();}
  if(live_phase863!=1)return;
@@ -913,6 +921,9 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #else
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
 #endif
+ #ifdef STYLEOS_OWNED_SHELL_865
+ arch_puts("STYLEOS S865 SHELL-ONLY fixture-launch=deny\n");
+ #endif
  desktop_v0_run(s);
 #endif
 #endif

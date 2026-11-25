@@ -414,7 +414,7 @@ static bool keyboard(unsigned key, unsigned mods)
 {
     last_file_click.at = 0;
     current_file_click.id = -1;
-#ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
+#if defined(STYLEOS_TEST_DESKTOP_COLD_TASKS_863) && !defined(STYLEOS_OWNED_SHELL_865)
     if (key == 0x43 && !mods) { (void)s863_request_tasks(); return false; }
 #endif
     if (key == 0x44) { restart_shell(); return true; } /* F10, preserve app state and PIDs */
@@ -1182,7 +1182,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
         if(captured)s863_shell_observe(&observed863,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),writes863,input_flags,batch863);
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
+#if defined(STYLEOS_TEST_DESKTOP_PUMP_863) && !defined(STYLEOS_OWNED_SHELL_865)
         s863_shell_pump();
 #endif
         for (unsigned i = 0; i < 64; ++i) __asm__ volatile("pause");

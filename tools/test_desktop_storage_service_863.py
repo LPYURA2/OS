@@ -214,13 +214,14 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
     if args.iso and args.build_from:p.error('ISO proof requires a fresh linked build')
     if args.provisioned and not args.iso:p.error('--provisioned requires --iso')
     if args.integrated and not args.provisioned:p.error('--integrated requires --provisioned')
+    if args.owned_shell and not (args.integrated and args.four):p.error('--owned-shell requires integrated four-profile boot contract')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base)
@@ -240,7 +241,7 @@ def main():
         build=args.build_from.resolve(strict=True)
         (out/'compile.log').write_text('Reusing exact cold image: '+str(build)+'\n')
     else:
-        build_args=['--desktop-integrated-864'] if args.integrated else ['--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),*(['--four-live-864'] if args.four else []),*(['--provisioned-storage-864'] if args.provisioned else [])]
+        build_args=['--desktop-owned-shell-865' if args.owned_shell else '--desktop-integrated-864'] if args.integrated else ['--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),*(['--four-live-864'] if args.four else []),*(['--provisioned-storage-864'] if args.provisioned else [])]
         with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',*build_args,'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
     efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=None if args.four else bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
@@ -250,7 +251,7 @@ def main():
     media=None;iso=None;iso_sha=None
     if args.iso:
         from test_desktop_autonomous_863 import verify_preview_media
-        iso=build/'x86_64/StyleOS-integrated-864.iso' if args.integrated else out/'StyleOS-owned-root-storage-test.iso'
+        iso=build/'x86_64'/('StyleOS-owned-shell-865.iso' if args.owned_shell else 'StyleOS-integrated-864.iso') if args.integrated else out/'StyleOS-owned-root-storage-test.iso'
         if not args.integrated:subprocess.run([sys.executable,str(ROOT/'tools/make_desktop_iso.py'),'--efi',str(efi),'--output',str(iso)],check=True)
         iso_sha=sha(iso.read_bytes());media=verify_preview_media(iso,efi,out)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
@@ -309,7 +310,12 @@ def main():
                     # Legacy root rows: Documents, Projects, seeded slot 0, saved slot 1.
                     d.key('f2');d.click(688*1280//1536+115,746*128//804+42+12+3*45+12);d.wait_uart('DOCUMENT OPEN')
                 d.screen('note')
-                if tasks:
+                if args.owned_shell:
+                    tag=b'STYLEOS S863 EVENT '
+                    count=sum(x.startswith(tag) for x in serial.read_bytes().splitlines())
+                    d.key('f9');wait(proc,serial,tag,count+1)
+                    d.screen('after-denied-fixture')
+                elif tasks:
                     d.key('f9')
                     if mixed and write and not args.integrated:
                         wait(proc,serial,b'STYLEOS S864 HOLD ')
@@ -376,7 +382,23 @@ def main():
         else:gate=lines.index(b'STYLEOS S863S WAIT')
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
-        if args.four:
+        if args.owned_shell:
+            from runtime_mixed_863_verify import row
+            ok,obs=cold_prior(prefix,rc,site['rva'],ref,cold=True,host_quit=True)
+            if not ok:raise ValueError('owned shell root '+str(obs))
+            root=obs['active']['root'];events=cold_trace(data.decode('ascii'),obs)
+            marker=b'STYLEOS S865 SHELL-ONLY fixture-launch=deny'
+            direct=[x for x in lines if x.startswith(b'STYLEOS OWNED BOOT ')]
+            ready=[x for x in lines if x.startswith(b'STYLEOS S863 READY ')]
+            if len(direct)!=1 or len(ready)!=1 or lines.count(marker)!=1 or not lines.index(direct[0])<gate<lines.index(marker)<lines.index(ready[0]):raise ValueError('owned shell phase')
+            r=row(ready[0],b'STYLEOS S863 READY',('root','dispatches','next-pid','next-window','input','x','y','writes'))
+            if (r['root'],r['dispatches'],r['next-pid'],r['next-window'],r['input'])!=(root,0,1,1,3):raise ValueError('owned shell initial state')
+            inputs=[x for x in lines if x.startswith(b'STYLEOS S863 EVENT ')]
+            if len(inputs)<3 or any(b' key=0x'+f'{key:016x}'.encode()+b' ' not in x for key,x in zip((0x43,0x58,0x40),inputs[-3:])):raise ValueError('owned shell F9/F12/F6 input proof')
+            if any(x.startswith((b'STYLEOS S863B REQUEST ',b'STYLEOS S863L BEGIN ',b'STYLEOS S863P SLICE ',b'STYLEOS S864 BATCH-',b'STYLEOS S848 ',b'STYLEOS S863 EXIT ')) for x in lines):raise ValueError('fixture executed in owned shell')
+            from test_desktop_v0 import Frame
+            if Frame(folder/'note.ppm').pixels!=Frame(folder/'after-denied-fixture.ppm').pixels:raise ValueError('F9 changed shell frame')
+        elif args.four:
             root,events=verify_four_storage(lines,raw,data,site,ref,folder,write,provisioned=args.provisioned,rc=rc,integrated=args.integrated)
         elif cold:
             root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks,mixed=mixed,interleaved=mixed and write)
@@ -424,6 +446,6 @@ def main():
     check('after-write');second=run('second',False);check('after-reboot')
     foreign=run('foreign-identity',False,True) if args.provisioned else None
     if args.provisioned:check('after-foreign-refusal')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,integrated_runtime=args.integrated,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,integrated_runtime=args.integrated,owned_shell=args.owned_shell,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()
