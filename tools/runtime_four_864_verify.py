@@ -67,6 +67,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
         returns=group(b'STYLEOS S863M RESUME',('id','pc','rax','ticks'),4)
         ranges=group(b'STYLEOS S864 RANGE',('id','root','address','bytes'),2)
         for i,r in enumerate(ranges,2):eq(r,(i,tasks[i]['root'],0x12000000 if i==2 else IST,8),'range request')
+        payload=group(b'STYLEOS S865 PAYLOAD',('id','root','vector','progress','signal'),N if integrated else 0)
         fx_observed=group(b'STYLEOS S849 OBSERVED',('id','root','n','control','other-zero'),N if integrated else 0)
         cancel_rows=rows(b'STYLEOS S865 TIMER-CANCEL')
         if len(cancel_rows)!=(8 if integrated else 0):raise ValueError('timer cancellation count')
@@ -87,6 +88,12 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
             if ff['step']!=step or flags&0x202!=0x202 or flags&~0xad7:raise ValueError('flags')
             vec=128 if kind=='call' else (14,128,6,13)[i] if end else 0x50
             err=5 if vec==14 else 0
+            if integrated:
+                obs=payload[step]
+                eq(obs,(i,child,vec,obs['progress'],int(end)),'observed fixture payload')
+                if (kind=='call' and obs['progress']!=0) or (kind=='tick' and obs['progress']<=prog[i]) or (end and obs['progress']<prog[i]):
+                    raise ValueError('payload progress')
+                if not lines.index(frame)<lines.index(rows(b'STYLEOS S865 PAYLOAD')[step])<lines.index(traps[step]):raise ValueError('payload observation order')
             if integrated and kind!='tick':
                 line=cancel_rows[cancel_index];cancel_index+=1
                 c=row(line,b'STYLEOS S865 TIMER-CANCEL',('id','root','vector','remaining','initial','current','lvt','isr','irr'))
@@ -101,6 +108,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
             elif kind=='tick':
                 r=row(traps[step],b'STYLEOS S848 TICK',('n','id','root','rip','rsp','flags','frame','cs','ss','progress','isr','eoi')+GPRS)
                 ticks[i]+=1;rip=r['rip']
+                if integrated and r['progress']!=payload[step]['progress']:raise ValueError('IRQ payload observation mismatch')
                 if rip not in (t['end']-10,t['end']-7,t['end']-2) or r['progress']<=prog[i]:raise ValueError('IRQ progress')
                 eq(r,(sum(ticks),i,child,rip,SP,flags,IST+4096-16-176,0x5b,0x63,r['progress'],0x10000,1,*[0x12000000 if j==5 else tag|j for j in range(15)]),'IRQ')
                 prog[i]=r['progress']
@@ -116,6 +124,7 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
             p=row(progress,tags[6],('step','id','a','b','c','d'))
             values=[p[k] for k in 'abcd']
             if (p['step'],p['id'])!=(step,i) or any(values[j]!=prog[j] for j in range(4) if j!=i) or values[i]<prog[i] or (not end and values[i]!=prog[i]):raise ValueError('cross-process progress')
+            if integrated and values[i]!=payload[step]['progress']:raise ValueError('returned payload observation mismatch')
             prog=values
             check(back,tags[7],('step','id','safe','state','a','b','stack-same'),(step,i,safe,4 if end and i==1 else 3 if end else 1,*prog[:2],1),'safe stack')
             chain=[en,fp,frame,traps[step],commit,boundary,event,progress,back]

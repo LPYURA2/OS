@@ -56,7 +56,7 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
             prev=lines.index(ends[i])
         if not repeatable and not prev<lines.index(req[-1]):raise ValueError('cold refusal order')
         frame=sessions=None;workload=[]
-        workload_tags=(b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862',b'STYLEOS S863M ',b'STYLEOS S865 TIMER-CANCEL ')
+        workload_tags=(b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862',b'STYLEOS S863M ',b'STYLEOS S865 TIMER-CANCEL ',b'STYLEOS S865 PAYLOAD ')
         for i,(begin,end) in enumerate(zip(begins,ends)):
             m=re.fullmatch(rb'STYLEOS S863L BEGIN root=0x([0-9a-f]{16}) dispatches=0x([0-9a-f]{16}) frame=0x([0-9a-f]{16}) sessions=0x([0-9a-f]{16})',begin)
             if not m:raise ValueError('cold task begin')

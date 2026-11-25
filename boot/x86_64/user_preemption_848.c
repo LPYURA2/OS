@@ -167,8 +167,7 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
   fld848("current",after);fld848("lvt",lvt);fld848("isr",isr);fld848("irr",irr);arch_putc('\n');
  }
  bool returning=kind==RT865_SYSCALL;
- /* Stress workload assertions stay separate from frame classification. */
- if(returning&&f->gpr[0]!=first_call848((unsigned)id))fail848("865-fixture-call");
+ /* Classification is an architectural decision, not a fixture prediction. */
 #else
  bool returning=f->vector==128&&f->gpr[0]==first_call848((unsigned)id);
 #endif
@@ -180,6 +179,53 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
  arch_puts("STYLEOS S861T FRAME");fld848("step",runtime860->dispatcher.dispatches-1-DISPATCH_BASE848);fld848("flags",f->rflags);arch_putc('\n');
 #endif
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ /* Authenticate the current owner against the actual scheduler and bank.
+  * The event is classified by the CPU frame, never by user program bytes. */
+ const struct ps_slot *owner=&runtime860->dispatcher.slots[id];
+ const struct rt862_bank_slot *context=&bank862.slots[id];
+ const struct pr_entry *running=pr_find(runtime860->dispatcher.registry,owner->pid);
+ if(!running||running->state!=PR_RUNNING||!owner->pid||
+    owner->pid!=context->pid||owner->handle!=context->handle||
+    owner->user_root!=root||context->root!=root||
+    running->scheduler_handle!=owner->handle||running->page_root!=root||
+    runtime860->dispatcher.safe_root!=bank862.safe)fail848("865-current-owner");
+ uint32_t isr=0;
+ if(kind==RT865_TICK){
+  isr=rd848(0x120);
+  if(!armed848||rd848(0x390)||rd848(0x320)!=V||!(isr&BIT))
+    fail848("865-irq-origin");
+  wr848(0x320,BIT|V);wr848(0xb0,0);
+  if((rd848(0x120)&BIT)||(rd848(0x220)&BIT)||rd848(0x320)!=(BIT|V))
+    fail848("eoi-mask");
+  armed848=false;
+ }else if(armed848||rd848(0x390)||rd848(0x320)!=(BIT|V)||
+          pending848(0x100)||pending848(0x200))fail848("865-nonirq-timer");
+ /* Only authenticated receipt is consumed by the scheduler on safe root.
+  * No expected instruction PC, GPR signature or per-task tick budget. */
+ pending860=*f;frame860=(uintptr_t)f;
+ cr2862=f->vector==14?cr2:0;receipt860=true;
+ /* The integrated stress driver still needs observations for its external
+  * verifier. These user words and register values grant no authority. */
+ uint64_t p=word848(S846_DATA),signal=word848(S846_DATA+8);
+ arch_puts("STYLEOS S865 PAYLOAD");fld848("id",(unsigned)id);fld848("root",root);
+ fld848("vector",f->vector);fld848("progress",p);fld848("signal",signal);arch_putc('\n');
+ if(kind==RT865_SYSCALL){
+  ++mixed_calls848[id];
+  arch_puts("STYLEOS S863M CALL");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("rsp",f->rsp);fld848("flags",f->rflags);fld848("frame",frame860);fld848("rax",f->gpr[0]);fld848("timer",rd848(0x390));fld848("isr",pending848(0x100));fld848("irr",pending848(0x200));arch_putc('\n');
+  if(id>=2){arch_puts("STYLEOS S864 RANGE");fld848("id",id);fld848("root",root);fld848("address",f->gpr[1]);fld848("bytes",f->gpr[2]);arch_putc('\n');}
+ }else if(kind==RT865_TICK){
+  progress848[id]=p;++ticks848;++local848[id];
+  arch_puts("STYLEOS S848 TICK");fld848("n",ticks848);fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("rsp",f->rsp);fld848("flags",f->rflags);fld848("frame",frame860);fld848("cs",f->cs);fld848("ss",f->ss);fld848("progress",p);fld848("isr",isr);fld848("eoi",1);
+  const char *const names[]={"rax","rbx","rcx","rdx","rsi","rdi","rbp","r8","r9","r10","r11","r12","r13","r14","r15"};
+  for(unsigned i=0;i<15;i++)fld848(names[i],f->gpr[i]);
+  arch_putc('\n');
+ }else{
+  unsigned state=f->vector==128?S847_EXITED:S847_FAULTED;
+  arch_puts("STYLEOS S848 END");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("vector",f->vector);fld848("error",f->error);fld848("cr2",cr2862);fld848("state",state);fld848("ticks",ticks848);arch_putc('\n');
+ }
+ return 0;
+#else /* historical fixture-specific raw trap validation */
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
  if(returning){
   if(armed848||mixed_calls848[id]||local848[id]||progress848[id]||word848(S846_DATA)||word848(S846_DATA+8)||
@@ -243,6 +289,7 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  unsigned terminal_state=ctl848.slot[id].state;
 #endif
  arch_puts("STYLEOS S848 END");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("vector",f->vector);fld848("error",f->error);fld848("cr2",id?0:cr2);fld848("state",terminal_state);fld848("ticks",ticks848);arch_putc('\n');return 0;
+#endif /* integrated raw event / historical fixture */
 }
 #ifdef STYLEOS_TEST_RUNTIME_SPARSE_862
 /* Both roots and FP storage are pre-audited by the parent fixture. Only
