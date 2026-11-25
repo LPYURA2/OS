@@ -55,12 +55,7 @@ const unsigned s862_loop_budget[2]={5,3};
 #endif
 struct desc848 {uint16_t limit;uint64_t base;}__attribute__((packed));
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
-static struct rt858_live live848(void){
- struct rt858_live v={0};struct desc848 g,d;
- __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3;mov %%rsp,%4;mov %%cr0,%5;mov %%cr4,%6;mov %%cr3,%7;pushfq;popq %8":"=m"(g),"=m"(d),"=r"(v.tr),"=r"(v.cs),"=r"(v.rsp),"=r"(v.cr0),"=r"(v.cr4),"=r"(v.root),"=r"(v.rflags)::"memory");
- uint32_t lo,hi;__asm__ volatile("rdmsr":"=a"(lo),"=d"(hi):"c"(0xc0000080));v.efer=((uint64_t)hi<<32)|lo;
- v.gdt=g.base;v.idt=d.base;v.gdt_limit=g.limit;v.idt_limit=d.limit;return v;
-}
+static struct rt858_live live848(void){return rt864_arch_capture();}
 #endif
 struct gate848 {uint16_t lo,cs;uint8_t ist,type;uint16_t mid;uint32_t hi,zero;}__attribute__((packed));
 static _Alignas(16) struct gate848 idt848[256];

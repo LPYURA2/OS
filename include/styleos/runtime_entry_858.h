@@ -23,6 +23,11 @@ bool rt864_services_boundary(uint64_t live_root);
 /* Shared shell safe point. NULL snapshot is restricted to an untouched
  * inherited-root runtime; owned root requires trusted CPU observation. */
 bool rt864_shell_boundary(uint64_t live_root,const struct rt858_live *);
+/* Select inherited/owned policy from the one-shot kernel boot state, not
+ * a UI flag. Architecture capture is privileged and read-only. */
+bool rt864_shell_checkpoint(const struct rt858_live *);
+struct rt858_live rt864_arch_capture(void);
+bool rt864_arch_shell_boundary(void);
 bool rt858_validate(const struct rt858_expected *,const struct rt858_live *);
 /* Exactly once, fail closed after a partial initialization. No task admission,
  * IRQ activation, allocator transfer, or device I/O. */

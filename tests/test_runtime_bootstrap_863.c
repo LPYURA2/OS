@@ -15,7 +15,7 @@ static void unchanged(const struct pr_table *p,const struct ws_service *w){OK(!m
 int main(int argc,char **argv){
  assert(argc==2);const char *mode=argv[1];struct pr_table *p=pr_global();struct ws_service *w=ws_global();
  NO(rt863_bootstrap_ready(0x2000));NO(rt864_services_boundary(0x2000));
- NO(rt864_shell_boundary(e.root,0));NO(rt864_shell_boundary(e.root,&v));
+ NO(rt864_shell_boundary(e.root,0));NO(rt864_shell_boundary(e.root,&v));NO(rt864_shell_checkpoint(&v));NO(rt864_shell_checkpoint(0));
  if(!strcmp(mode,"ordinary")||!strcmp(mode,"owned")){
   const struct pr_table p0=*p;const struct ws_service w0=*w;
   NO(rt863_bootstrap(0));for(unsigned i=0;i<12;i++)NO(rt863_bootstrap(0x2000|B(i)));for(unsigned i=47;i<64;i++)NO(rt863_bootstrap(0x2000|B(i)));
@@ -36,7 +36,12 @@ int main(int argc,char **argv){
   OK(rt863_bootstrap_ready(e.root));
   OK(rt864_services_boundary(e.root));NO(rt864_services_boundary(e.old_root));
   bool owned=!strcmp(mode,"owned");
-  OK(rt864_shell_boundary(e.root,owned?&v:0));
+  OK(rt864_shell_boundary(e.root,owned?&v:0));OK(rt864_shell_checkpoint(&v));
+  struct rt858_live checkpoint=v;checkpoint.cr0=0;NO(rt864_shell_checkpoint(&checkpoint));
+  checkpoint=v;checkpoint.cr4=0;NO(rt864_shell_checkpoint(&checkpoint));
+  checkpoint=v;checkpoint.efer=0;NO(rt864_shell_checkpoint(&checkpoint));
+  checkpoint=v;checkpoint.root|=8;if(owned)NO(rt864_shell_checkpoint(&checkpoint));else OK(rt864_shell_checkpoint(&checkpoint));
+  checkpoint=v;checkpoint.gdt^=4096;if(owned)NO(rt864_shell_checkpoint(&checkpoint));else OK(rt864_shell_checkpoint(&checkpoint));
   NO(rt864_shell_boundary(e.root,owned?0:&v));
   NO(rt864_shell_boundary(e.old_root,owned?&v:0));
   struct rt858_live wrong=v;wrong.gdt^=4096;NO(rt864_shell_boundary(e.root,&wrong));
@@ -48,7 +53,7 @@ int main(int argc,char **argv){
   for(unsigned i=0;i<PS_MAX_SLOTS;i++){
    OK(dpr_admit(runtime,i,i+1,0x10000+4096*i,0,"native",&ids[i])==PS_OK);
    OK(rt864_services_boundary(e.root));NO(rt863_bootstrap_ready(e.root));
-   if(owned)OK(rt864_shell_boundary(e.root,&v));else NO(rt864_shell_boundary(e.root,0));
+   if(owned){OK(rt864_shell_boundary(e.root,&v));OK(rt864_shell_checkpoint(&v));}else{NO(rt864_shell_boundary(e.root,0));NO(rt864_shell_checkpoint(&v));}
   }
   struct ps_dispatcher *ps=&runtime->dispatcher;
   struct ps_slot old=ps->slots[1];ps->slots[1].handle=ps->slots[0].handle;

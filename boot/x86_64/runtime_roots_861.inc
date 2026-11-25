@@ -12,11 +12,7 @@ static bool preflight861(struct pg_experiment *p,const struct s842_root *base,co
  if(base861||read_cr3()!=p->old_root||arch_paging_attest_image_writable(p,(uintptr_t)child_tables861,sizeof child_tables861)!=PG_OK||!s850_gop_prepare(req,&frozen861))return false;
  base861=base;return true;
 }
-static struct rt858_live capture861(void){
- struct rt858_live v={0};struct s851_dt g,d;
- __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3;mov %%rsp,%4;mov %%cr0,%5":"=m"(g),"=m"(d),"=r"(v.tr),"=r"(v.cs),"=r"(v.rsp),"=r"(v.cr0)::"memory");
- v.root=read_cr3();v.gdt=g.base;v.idt=d.base;v.gdt_limit=g.limit;v.idt_limit=d.limit;v.cr4=reg4();v.efer=read_msr(0xc0000080);v.rflags=flags();return v;
-}
+static struct rt858_live capture861(void){return rt864_arch_capture();}
 static bool boundary861(const struct dpr_service *d,const struct s842_cache *cache){
  struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&(
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861

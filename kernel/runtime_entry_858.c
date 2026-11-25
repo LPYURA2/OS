@@ -135,6 +135,13 @@ bool rt864_shell_boundary(uint64_t root,const struct rt858_live *live){
  return phase==2&&active_root==root&&live->root==root&&
         rt858_validate(&started_contract,live);
 }
+bool rt864_shell_checkpoint(const struct rt858_live *v){
+ if(!v||!(v->cr0&BIT(31))||!(v->cr4&BIT(5))||!(v->efer&BIT(10)))return false;
+ if(phase)return rt864_shell_boundary(v->root,v);
+ /* Preserve the inherited CR3 cache/PCID-bit convention without granting
+  * owned-root authority; a failed owned contract cannot fall back here. */
+ return rt864_shell_boundary(v->root&~UINT64_C(4095),0);
+}
 #ifdef STYLEOS_TEST_RUNTIME_JOIN_861
 /* The owned-root adapter additionally requires its original descriptor and
  * stack contract. The common software boundary does not replace that proof. */

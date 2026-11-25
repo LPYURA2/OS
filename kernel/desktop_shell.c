@@ -8,11 +8,11 @@
 #include <styleos/desktop_sessions.h>
 #include <styleos/desktop_text_app.h>
 #include <styleos/native_desktop_bridge.h>
-#ifdef STYLEOS_DESKTOP_V0
+#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
 #include <styleos/desktop_process_runtime.h>
 #include <styleos/runtime_entry_858.h>
 static void desktop_kernel_boundary864(void){
- if(!rt864_shell_boundary(dpr_arch_safe_root(),0)){
+ if(!rt864_arch_shell_boundary()){
   arch_puts("STYLEOS DESKTOP RUNTIME BOUNDARY ERROR\n");arch_halt();
  }
 }
@@ -996,7 +996,7 @@ static void initial_windows(void)
  * file-system and open app sessions are never reinitialized on F10. */
 static void restart_shell(void)
 {
-#ifdef STYLEOS_DESKTOP_V0
+#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
     desktop_kernel_boundary864();
 #endif
     struct desk_sessions *sessions = desk_sessions_global();
@@ -1021,7 +1021,7 @@ static void restart_shell(void)
     for (int i = 0; i < WINDOWS; ++i) win[i].open = opened[i];
     shell_refreshed = true;
     print_pid("STYLEOS SHELL RESTART pid=", new_pid);
-#ifdef STYLEOS_DESKTOP_V0
+#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
     desktop_kernel_boundary864();
 #endif
     arch_puts("STYLEOS DESKTOP SHELL RESTART\n");
@@ -1074,7 +1074,7 @@ size_t desk_cursor_853(const struct desk_event *event)
 
 _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 {
-#ifdef STYLEOS_DESKTOP_V0
+#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
     desktop_kernel_boundary864();
     arch_puts("STYLEOS DESKTOP RUNTIME BOUNDARY PASS\n");
 #endif
@@ -1144,7 +1144,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                            (active() == NOTES || active() == NOTE_WINDOW);
         }
         if (++tick == 20000) { tick = 0; clock = update_clock(); }
-#ifdef STYLEOS_DESKTOP_V0
+#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
         if(captured||clock)desktop_kernel_boundary864();
 #endif
         bool imported = false;
