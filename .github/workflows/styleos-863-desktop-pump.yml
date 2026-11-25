@@ -8,7 +8,7 @@ permissions:
 jobs:
   live:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,10 +19,16 @@ jobs:
         run: python3 tools/test_desktop_pump_863.py --output build/s863-pump
       - name: Independent replay of original CPU trace, UART and frames
         run: python3 tools/test_desktop_pump_863_replay.py build/s863-pump
+      - name: Actual RTC observation before, during and after native dispatch
+        run: python3 tools/test_desktop_rtc_runtime_863.py --output build/s863-rtc-runtime
+      - name: Independent replay of original RTC and CPU evidence
+        run: python3 tools/test_desktop_rtc_runtime_863_replay.py build/s863-rtc-runtime
       - name: Preserve raw evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: styleos-863-pump-shell
-          path: build/s863-pump/
+          path: |
+            build/s863-pump/
+            build/s863-rtc-runtime/
           if-no-files-found: warn

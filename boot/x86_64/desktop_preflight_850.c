@@ -22,6 +22,9 @@ void s844_guest_run(uint64_t);
 #include <styleos/desktop_v0.h>
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
 #include <styleos/desktop_interactive_863.h>
+#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+#include <styleos/rtc_runtime_863.h>
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
 #include <styleos/desktop_sessions.h>
 #endif
@@ -164,6 +167,73 @@ static bool shell_fixture863(void){
 void s863_shell_guard(void){
  if(!shell_root863||read_cr3()!=shell_root863||(flags()&0x200)||dpr_global_state()!=shell_d863)fail("863-shell-root");
 }
+#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+/* Only this opt-in Q35/TCG diagnostic owns CMOS. The runner fixes one vCPU;
+ * APs are not started. No other CMOS backend is linked. As in S854 we
+ * establish a NEW masked-NMI index shadow, never infer inherited port 70.
+ * This mask is deliberately retained until diagnostic VM exit. */
+static struct rtc_runtime_863 rtc_runtime863;
+static bool rtc_admitted863;
+static unsigned rtc_samples863;
+static bool rtc_observe863(void *ctx,struct rtc_runtime_observation_863 *o)
+{
+ uint16_t cs;__asm__ volatile("mov %%cs,%0":"=r"(cs));
+ if(ctx!=&rtc_runtime863||!o||!rtc_admitted863||!shell_root863||
+    dpr_global_state()!=shell_d863)return false;
+ *o=(struct rtc_runtime_observation_863){.root=read_cr3(),.epoch=1,
+   .rflags=flags(),.cs=cs,.q35_tcg=true,.single_cpu=true,
+   .post_ebs=true,.exclusive_cmos=true,.known_shadow=true};
+ return true;
+}
+static bool rtc_index863(void *ctx,uint8_t v)
+{
+ if(ctx!=&rtc_runtime863||!rtc_admitted863||!rtc_runtime863.owner.held)return false;
+ __asm__ volatile("outb %0,$0x70"::"a"(v):"memory");return true;
+}
+static bool rtc_data863(void *ctx,uint8_t *v)
+{
+ if(ctx!=&rtc_runtime863||!v||!rtc_admitted863||!rtc_runtime863.owner.held)return false;
+ __asm__ volatile("inb $0x71,%0":"=a"(*v)::"memory");return true;
+}
+static const struct rtc_runtime_ops_863 rtc_ops863={rtc_observe863,rtc_index863,rtc_data863};
+static void rtc_admit863(struct pg_experiment *p)
+{
+ uint32_t a,b,c,d;
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
+ if(rtc_admitted863||!shell_fixture863()||((d&(1u<<28))&&((b>>16)&255u)!=1)||
+    read_cr3()!=shell_root863||(flags()&0x200)||
+    arch_paging_attest_image_writable(p,(uintptr_t)&rtc_runtime863,sizeof rtc_runtime863)!=PG_OK||
+    !identity((uintptr_t)&rtc_runtime863,PG_WRITE)||
+    !identity((uintptr_t)&rtc_runtime863+sizeof rtc_runtime863-1,PG_WRITE)||
+    !identity((uintptr_t)rtc_runtime_bind_863,PG_EXEC)||
+    !identity((uintptr_t)rtc_runtime_read_863,PG_EXEC)||
+    !identity((uintptr_t)rtc_observe863,PG_EXEC)||
+    !identity((uintptr_t)rtc_index863,PG_EXEC)||
+    !identity((uintptr_t)rtc_data863,PG_EXEC))fail("863-rtc-admit");
+ const uint8_t initial=0x8d;
+ __asm__ volatile("outb %0,$0x70"::"a"(initial):"memory");
+ rtc_admitted863=true;
+ if(!rtc_runtime_bind_863(&rtc_runtime863,&rtc_ops863,&rtc_runtime863,shell_root863,1,initial))fail("863-rtc-bind");
+}
+static void rtc_sample863(void)
+{
+ struct rtc_time_854 t={0};bool ok=false;
+ s863_shell_guard();
+ if(!rtc_admitted863||!same_cache(&shell_cache863)||rtc_samples863>=3)fail("863-rtc-context");
+ for(unsigned i=0;i<4096;i++){
+    if(rtc_runtime_read_863(&rtc_runtime863,&t)){ok=true;break;}
+    if(rtc_runtime863.quarantined)break;
+    __asm__ volatile("pause":::"memory");
+ }
+ if(!ok||rtc_runtime863.owner.held||rtc_runtime863.owner.shadow!=0x8d||
+    rtc_runtime863.quarantined||rtc_runtime863.owner.quarantined||
+    t.hour>23||t.min>59||t.sec>59||!same_cache(&shell_cache863))fail("863-rtc-read");
+ s863_shell_guard();
+ arch_puts("STYLEOS S863R READ");field("root",shell_root863);field("n",++rtc_samples863);
+ field("dispatches",shell_d863->dispatcher.dispatches);field("hour",t.hour);
+ field("minute",t.min);field("second",t.sec);field("shadow",rtc_runtime863.owner.shadow);arch_putc('\n');
+}
+#endif
 static void shell_boundary863(void){
  s863_shell_guard();unsigned used;
  unsigned dispatches=20,next=5,generation=8;
@@ -240,7 +310,11 @@ __attribute__((noinline)) void s863_shell_pump(void){
 void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsigned active,bool ru,unsigned restarts,size_t text,uint64_t text_hash,bool text_dirty,unsigned note_session,size_t writes,unsigned inputs,unsigned batch){
  shell_boundary863();
  if(inputs!=3||batch>32||(!ev)!=(!batch))fail("863-shell-input");
- if(!ev){arch_puts("STYLEOS S863 READY");field("root",shell_root863);field("dispatches",shell_d863->dispatcher.dispatches);field("next-pid",pr_global()->next_pid);field("next-window",ws_global()->next_id);field("input",inputs);field("x",x);field("y",y);field("writes",writes);arch_putc('\n');return;}
+ if(!ev){
+#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+  rtc_sample863();
+#endif
+  arch_puts("STYLEOS S863 READY");field("root",shell_root863);field("dispatches",shell_d863->dispatcher.dispatches);field("next-pid",pr_global()->next_pid);field("next-window",ws_global()->next_id);field("input",inputs);field("x",x);field("y",y);field("writes",writes);arch_putc('\n');return;}
  if(shell_events863==UINT32_MAX)fail("863-shell-counter");
  arch_puts("STYLEOS S863 EVENT");field("root",shell_root863);field("n",++shell_events863);field("batch",batch);field("mouse",ev->mouse);field("key",ev->key);field("dx",(uint64_t)(int64_t)ev->dx);field("dy",(uint64_t)(int64_t)ev->dy);field("buttons",ev->buttons);field("modifiers",ev->modifiers);field("x",x);field("y",y);field("active",active);field("ru",ru);field("restarts",restarts);field("text",text);field("text-hash",text_hash);field("text-dirty",text_dirty);field("note-session",note_session);field("writes",writes);arch_putc('\n');
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
@@ -250,6 +324,9 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
   const struct pr_entry *waiting=pr_find(pr_global(),1);
   const struct desk_sessions *sessions=desk_sessions_global();
   if(shell_d863->dispatcher.dispatches!=1||pr_snapshot(pr_global(),0,0,true)!=1||ws_snapshot(ws_global(),0,0)!=1||!waiting||waiting->state!=PR_READY||waiting->cpu_ticks!=1||x!=(pump_gate863==1?680u:660u)||y!=600||live_hash863((const volatile unsigned char *)sessions,sizeof *sessions)!=pump_sessions863)fail("863-pump-input-state");
+ #ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+  if(pump_gate863==1)rtc_sample863();
+ #endif
   if(++pump_gate863==3)arch_puts("STYLEOS S863P RESUME\n");
   return;
  }
@@ -260,6 +337,10 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
   if(live_phase863!=2)fail("863-live-incomplete");
 #endif
+ #ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+  rtc_sample863();
+  if(rtc_samples863!=3)fail("863-rtc-count");
+ #endif
   arch_puts("STYLEOS S863 EXIT");field("root",shell_root863);field("events",shell_events863);field("dispatches",shell_d863->dispatcher.dispatches);field("used",0);arch_putc('\n');
   out32(0xf4,0x10);arch_halt();
  }
@@ -358,6 +439,9 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #endif
 #endif
  shell_boundary863();
+#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+ rtc_admit863(p);
+#endif
  arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
  desktop_v0_run(s);

@@ -42,3 +42,10 @@ Parent b8d86db1f36b54d2049f6081ea5b076ca85c040d: dedicated pump 45668553183 FAIL
 ## Runtime RTC admission component
 
 See [RTC_RUNTIME_863.md](architecture/RTC_RUNTIME_863.md). New host-tested contract candidate, CI pending; not linked into guest yet. Continue real platform binding and guest proof, no new stage until S863 complete.
+
+
+## RTC guest binding candidate
+
+# S863 RTC guest binding candidate
+Prior SHA 5fead309b03b23c2d422e3cf90899908aad114df: bootstrap CI 45673474555 SUCCESS, GCC and Clang each 60 positive / 442 refusal cases, COFF and ordinary Desktop build PASS. Other exact-SHA runs not all complete at inspection; not accepted.
+New opt-in --test-desktop-rtc-runtime-863 inherits the prior pump profile, adds only read-only RTC binding and three actual RTC samples. Same Q35/TCG one-vCPU, post-EBS, own root, explicit CMOS exclusive access and software 0x8d shadow, no inherited index inference, no CMOS data writes. CPUID logical-count guard where HTT is advertised; runner controls -smp 1 and no AP startup. NMI remains deliberately masked until diagnostic exit; this is NOT an ordinary-runtime NMI policy. RTC only called at safe shell boundaries (before READY, after first actual hardware quantum while A remains READY, final F12 after 20 dispatches). Storage, pointer timing, shell clock display, reset remain denied; no change to original pump, ordinary Desktop or UI. New runner fixes QEMU virtual clock base and verifies three monotonic samples, shadow, root, dispatch phase, linked RX symbols, old pump CPU and frame evidence and mutation refusals. Raw UART saved unmodified; validated RTC extension rows removed only for legacy exact grammar. Prior CI pump and replay still run first, new real guest and replay mandatory. Local compile/QEMU unavailable; new CI pending, no hardware PASS claim. Next safely integrate actual shell clock with noninterfering redraw and NMI ownership, timing/storage, ordinary native task and syscall path. Main/accepted refs untouched; S863 remains open.
