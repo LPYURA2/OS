@@ -274,11 +274,12 @@ def main():
                 d.call('qmp_capabilities');snapshot('prelaunch',True);d.call('cont')
                 if args.provisioned:
                     if foreign:
-                        wait(proc,serial,b'STYLEOS S850 FAIL 864-provisioned-serial' if False else b'864-provisioned-serial')
+                        wait(proc,serial,b'STYLEOS S850 FAIL 864-provisioned-serial')
+                        if proc.wait(timeout=30)!=35:raise ValueError('foreign identity wrong diagnostic exit')
                         # Diagnostic fail-stop may exit via the existing test device;
                         # either way never accept mount/admission or a media change.
                         raw=serial.read_bytes()
-                        if b'STYLEOS S863S ADMIT ' in raw or b'STYLEOS DESKTOP READY' in raw or b'STYLEOS S863S COMMIT ' in raw or b'STYLEOS S863S WAIT' in raw:raise ValueError('foreign identity crossed admission')
+                        if [x for x in raw.splitlines() if b' FAIL ' in x]!=[b'STYLEOS S850 FAIL 864-provisioned-serial'] or b'STYLEOS S863S ADMIT ' in raw or b'STYLEOS DESKTOP READY' in raw or b'STYLEOS S863S COMMIT ' in raw or b'STYLEOS S863S WAIT' in raw:raise ValueError('foreign identity crossed admission')
                         return {'refusal':'864-provisioned-serial','uart_sha256':sha(raw)}
                     wait(proc,serial,b'STYLEOS S863 READY ')
                     d.call('stop');gate=snapshot('gate',True);verify_ready(gate);verify_bar(gate['pci'],gate['mtree'],0x6060);d.call('cont')
