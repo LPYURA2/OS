@@ -34,4 +34,12 @@ enum nte_status nte_load_x64_page(const uint8_t *elf, size_t elf_bytes,
 enum nte_status nte_load_x64_image(const uint8_t *,size_t,const uint8_t[32],
  uint8_t *,size_t,struct nte_loaded *);
 
+/* Read a bounded ELF through an admitted block reader. Scratch is private
+ * kernel memory, may change on failure; destination and metadata may not.
+ * Digest and extent must come from trusted policy, NOT from the read medium.
+ * No filesystem, signature verification or device admission is implied. */
+typedef bool (*nte_sector_read)(void *,uint32_t,uint8_t[512]);
+enum nte_status nte_load_x64_reader(nte_sector_read,void *,uint32_t,uint32_t,
+ size_t,const uint8_t[32],uint8_t *,size_t,uint8_t *,size_t,struct nte_loaded *);
+
 #endif

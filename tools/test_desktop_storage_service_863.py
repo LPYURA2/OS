@@ -228,12 +228,10 @@ def main():
     if args.provisioned:
         with base.open('r+b') as stream:
             stream.seek(4095*512);stream.write(b'STYLEOS-S864-PROVISIONED-V1'.ljust(512,b'\0'))
-    original=base.read_bytes();base.chmod(0o444)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and img and code and vars):raise RuntimeError('real QEMU mandatory')
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
     def image(*a):return subprocess.check_output([img,*a],stderr=subprocess.STDOUT,timeout=30)
-    image('create','-f','qcow2','-F','raw','-b',str(base),str(top))
     if args.build_from:
         # Only the repeated cold-storage workload shares a previously built image.
         # The stress orchestrator verifies the immutable linked artifacts for every run.
@@ -268,7 +266,25 @@ def main():
             if sha((ROOT/rel).read_bytes())!=digest:raise ValueError('owned shell source mismatch '+rel)
     elif args.four:
         from runtime_mixed_863_verify import loop_site
-        site=loop_site(efi.read_bytes(),mp,four=True)
+        site=loop_site(efi.read_bytes(),mp,four=True,external=args.integrated)
+    external_receipts=[]
+    if args.integrated and not args.owned_shell:
+        payloads=site.pop('external_payloads')
+        if len(payloads)!=4:raise ValueError('external ELF count')
+        with base.open('r+b') as stream:
+            for i,code_bytes in enumerate(payloads):
+                elf=bytearray(4096+len(code_bytes))
+                elf[:7]=b'\x7fELF\x02\x01\x01'
+                struct.pack_into('<HHIQQQIHHHHHH',elf,16,2,62,1,0x10000000,64,0,0,64,56,1,0,0,0)
+                struct.pack_into('<IIQQQQQQ',elf,64,1,5,4096,0x10000000,0x10000000,len(code_bytes),4096,4096)
+                elf[4096:]=code_bytes
+                lba=3072+16*i;sectors=(len(elf)+511)//512
+                stream.seek(lba*512);stream.write(elf.ljust(8192,b'\0'))
+                (out/f'external-{i}.elf').write_bytes(elf)
+                external_receipts.append((i,lba,len(elf),sectors))
+        (out/'external-elf.json').write_text(json.dumps(external_receipts,indent=2))
+    original=base.read_bytes();base.chmod(0o444)
+    image('create','-f','qcow2','-F','raw','-b',str(base),str(top))
     media=None;iso=None;iso_sha=None
     if args.iso:
         from test_desktop_autonomous_863 import verify_preview_media
@@ -455,6 +471,18 @@ def main():
         if args.provisioned and not lines.index(bars[0])<lines.index(b'STYLEOS S863S PROVISIONED-IDENTITY')<lines.index(admits[0]):raise ValueError('identity must precede write admission')
         if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
         if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')
+        receipts=[x for x in lines if x.startswith(b'STYLEOS S865 EXTERNAL-ELF ')]
+        want=[f'STYLEOS S865 EXTERNAL-ELF id=0x{i:016x} lba=0x{lba:016x} bytes=0x{n:016x} sectors=0x{sectors:016x}'.encode() for i,lba,n,sectors in external_receipts]*8
+        if receipts!=want:raise ValueError('external executable receipt count/content')
+        if external_receipts and stats['rd_operations']<8*sum(x[3] for x in external_receipts):raise ValueError('external executable actual disk reads')
+        if external_receipts:
+            from runtime_mixed_863_verify import row
+            entries=[x for x in lines if x.startswith(b'STYLEOS S864 TASK ')]
+            if len(entries)!=32:raise ValueError('external task admission count')
+            indices=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S865 EXTERNAL-ELF ')]
+            task_indices=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S864 TASK ')]
+            for k in range(32):
+                if not indices[k]<task_indices[k] or (k>=4 and indices[k]<=task_indices[k-4]):raise ValueError('external ELF load/admission order')
         return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h,'interleaved_save':mixed and write and not args.integrated,'host_exit':rc,'live_after_f12':args.provisioned}
     first=run('first',True)
     expected=bytearray(original);payload=b'a'

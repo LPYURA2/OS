@@ -1,5 +1,9 @@
 /* CI workload provider, never a release application loader. */
 #include "workload_865.h"
+#include <styleos/arch.h>
+extern bool s863_disk_read(uint32_t,uint8_t[512]);
+static bool read865(void *opaque,uint32_t lba,uint8_t out[512]){(void)opaque;return s863_disk_read(lba,out);}
+static void field865(const char *k,uint64_t v){arch_putc(' ');arch_puts(k);arch_puts("=0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15]);}
 #if !defined(STYLEOS_INTEGRATED_RUNTIME_864) || !defined(STYLEOS_TEST_FOUR_GUEST_864)
 #error test provider requires explicit integrated four-task fixture
 #endif
@@ -15,7 +19,7 @@ static uint8_t elf865[8192];
 static void putle(unsigned off,uint64_t value,unsigned bytes){
  for(unsigned i=0;i<bytes;i++)elf865[off+i]=(uint8_t)(value>>(8*i));
 }
-static bool stage_elf(const uint8_t *code,size_t len,uint8_t *page,struct nte_loaded *loaded){
+static bool stage_elf(unsigned id,const uint8_t *code,size_t len,uint8_t *page,struct nte_loaded *loaded){
  for(size_t j=0;j<sizeof elf865;j++)elf865[j]=0;
  elf865[0]=127;elf865[1]='E';elf865[2]='L';elf865[3]='F';
  elf865[4]=2;elf865[5]=1;elf865[6]=1;
@@ -25,7 +29,12 @@ static bool stage_elf(const uint8_t *code,size_t len,uint8_t *page,struct nte_lo
  putle(88,S846_CODE,8);putle(96,len,8);putle(104,P,8);putle(112,P,8);
  for(size_t j=0;j<len;j++)elf865[P+j]=code[j];
  uint8_t hash[32];nte_sha256(elf865,P+len,hash);
- enum nte_status result=nte_load_x64_image(elf865,P+len,hash,page,P,loaded);
+ /* Expected hash comes from the linked trusted test fixture, not the disk.
+  * Erase the constructed bytes before reading the external image. */
+ for(size_t j=0;j<sizeof elf865;j++)elf865[j]=0;
+ const uint32_t lba=3072+16*id;
+ enum nte_status result=nte_load_x64_reader(read865,0,lba,4096,P+len,hash,elf865,sizeof elf865,page,P,loaded);
+ if(result==NTE_OK){arch_puts("STYLEOS S865 EXTERNAL-ELF");field865("id",id);field865("lba",lba);field865("bytes",P+len);field865("sectors",(P+len+511)/512);arch_putc('\n');}
  for(size_t j=0;j<sizeof elf865;j++)elf865[j]=0;
  return result==NTE_OK;
 }
@@ -51,7 +60,7 @@ bool s865_fixture_stage(const struct s844_lease leases[4],struct s865_fixture_im
   volatile unsigned char *dst=(void *)(uintptr_t)leases[i].pa;
   size_t len=prepared[i].image.code_bytes;
   struct nte_loaded actual={0};
-  if(!stage_elf(start[i],len,(uint8_t *)(uintptr_t)leases[i].pa,&actual)||
+  if(!stage_elf(i,start[i],len,(uint8_t *)(uintptr_t)leases[i].pa,&actual)||
      actual.entry!=prepared[i].image.entry||actual.code_bytes!=len||
      actual.memory_bytes!=P)return false;
   prepared[i].image=actual;

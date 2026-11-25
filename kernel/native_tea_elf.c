@@ -120,3 +120,21 @@ enum nte_status nte_load_x64_page(const uint8_t *elf,size_t bytes,const uint8_t 
 enum nte_status nte_load_x64_image(const uint8_t *elf,size_t bytes,const uint8_t hash[32],uint8_t *page,size_t page_bytes,struct nte_loaded *loaded){
  return load_page(elf,bytes,hash,page,page_bytes,loaded,true);
 }
+
+enum nte_status nte_load_x64_reader(nte_sector_read read,void *opaque,uint32_t lba,uint32_t sectors,
+ size_t bytes,const uint8_t hash[32],uint8_t *scratch,size_t scratch_bytes,
+ uint8_t *page,size_t page_bytes,struct nte_loaded *loaded)
+{
+ if(!read||bytes<120||bytes>8192||page_bytes!=NTE_PAGE||
+    (uintptr_t)page%NTE_PAGE||(uintptr_t)loaded%_Alignof(struct nte_loaded))return NTE_ARGUMENT;
+ const size_t blocks=(bytes+511)/512,extent=blocks*512;
+ if(lba>=sectors||blocks>sectors-lba||scratch_bytes<extent||
+    !nte_distinct(scratch,extent,hash,32)||
+    !nte_distinct(scratch,extent,page,page_bytes)||
+    !nte_distinct(scratch,extent,loaded,sizeof *loaded)||
+    !nte_distinct(page,page_bytes,hash,32)||
+    !nte_distinct(loaded,sizeof *loaded,page,page_bytes)||
+    !nte_distinct(loaded,sizeof *loaded,hash,32))return NTE_ARGUMENT;
+ for(size_t i=0;i<blocks;i++)if(!read(opaque,lba+(uint32_t)i,scratch+i*512))return NTE_BOUNDS;
+ return nte_load_x64_image(scratch,bytes,hash,page,page_bytes,loaded);
+}
