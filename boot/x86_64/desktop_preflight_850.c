@@ -201,7 +201,10 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  arch_puts("STYLEOS S858 ARENA");field("root",target);field("base",arena858.start);field("pages",S844_PAGES);field("used",used858);field("next",allocator858->next);field("zero",1);arch_putc('\n');
  arch_puts("STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny\n");
 #ifdef STYLEOS_TEST_RUNTIME_IRQ_859
- if(!identity(0xfee00000,PG_WRITE)||!identity(0xfec00000,PG_WRITE)||!identity((uintptr_t)irq859_once,PG_EXEC)||!identity(idt,PG_WRITE)||!same_cache(cache))fail("859-map");
+ if(read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("859-map-context");
+ if(!irq859_uc_page(&composed.plan,&composed.built,cache,0xfee00000))fail("859-map-lapic-uc");
+ if(!irq859_uc_page(&composed.plan,&composed.built,cache,0xfec00000))fail("859-map-ioapic-uc");
+ if(!identity((uintptr_t)irq859_once,PG_EXEC)||!identity(idt,PG_WRITE))fail("859-map-image");
  irq859_once(target,idt,cs,p->evidence->live.stack.start,p->evidence->live.stack.end);
  if(!rt858_ready(target)||!s844_count(allocator858,&used858)||used858||allocator858->next!=4||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("859-post-runtime");
  for(uint64_t a=arena858.start;a<arena858.end;a++)if(*(volatile const unsigned char *)(uintptr_t)a)fail("859-arena-zero");

@@ -1,4 +1,6 @@
-## Stage 859 — IRQ0 under owned runtime root (candidate)
+## Stage 859 — IRQ0 under owned runtime root (candidate, UC correction)
+
+First actual IRQ guest refused before IRQ setup: `859-map`. Previous regression SUCCESS. Corrected scoped UC leaf validation; real retry required.
 
 Accepted S858 886ed41c877773a6835221cc7170fd8a57252913, all five exact-SHA CI SUCCESS; full archive and final arena evidence verified. See [handoff](NEXT_CHAT_859.md). New terminal IRQ test; no task switch, production root or general IRQ grant. KFA gates open.
 
