@@ -98,7 +98,7 @@ static bool cache_unchanged842(const struct s842_cache *s){
 static uint64_t efer(void) { uint32_t lo,hi;__asm__ volatile("rdmsr":"=a"(lo),"=d"(hi):"c"(0xc0000080u));return ((uint64_t)hi<<32u)|lo; }
 static void field(const char *s,uint64_t v) { arch_puts(s);paging_hex(v); }
 __attribute__((noreturn)) static void stop_vm(unsigned status) {
-#ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#if defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_PROVISIONED_STORAGE_864)
     (void)status;
     __asm__ volatile("cli":::"memory");
 #else

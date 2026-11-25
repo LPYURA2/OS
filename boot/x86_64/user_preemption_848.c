@@ -106,7 +106,7 @@ static uint64_t word848(uint64_t p){return *(volatile uint64_t *)(uintptr_t)p;}
 static void put848(uint64_t p,uint64_t v){*(volatile uint64_t *)(uintptr_t)p=v;}
 static void fld848(const char *k,uint64_t v){arch_putc(' ');arch_puts(k);arch_putc('=');arch_puts("0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15]);}
 static _Noreturn void fail848(const char *s){__asm__ volatile("cli");arch_puts("STYLEOS S848 FAIL ");arch_puts(s);arch_putc('\n');
-#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#if !defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) && !defined(STYLEOS_PROVISIONED_STORAGE_864)
  __asm__ volatile("outl %0,%1"::"a"(0x27u),"Nd"((uint16_t)0xf4));
 #endif
  arch_halt();}
@@ -233,7 +233,7 @@ static void sparse_admit862(unsigned id,const struct s846_root child[2],uint64_t
 #endif
  if(admission!=PS_OK||pr_account(pr_global(),pid860[id],handle860[id],0,3*P)!=PR_OK||ws_open_app(ws_global(),pr_global(),pid860[id],id?"S860 B":"S860 A",(struct ws_bounds){0,0,400,300},&win860[id])!=WS_OK)fail848("862-sparse-admit");
  if(!id&&ws_set_minimized(ws_global(),pid860[id],win860[id],true)!=WS_OK)fail848("862-sparse-window");
-#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#if !defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) && !defined(STYLEOS_PROVISIONED_STORAGE_864)
  for(unsigned j=0;j<15;j++)bank862.slots[id].context.gpr[j]=pattern848(id,j);
 #endif
  arch_puts("STYLEOS S862S ADMIT");fld848("id",id);fld848("pid",pid860[id]);fld848("handle",handle860[id]);fld848("root",child[id].built.root);fld848("safe",safe);fld848("dispatches",runtime860->dispatcher.dispatches);fld848("processes",pr_snapshot(pr_global(),0,0,true));fld848("windows",ws_snapshot(ws_global(),0,0));arch_putc('\n');

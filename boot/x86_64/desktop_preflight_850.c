@@ -154,7 +154,7 @@ static const struct storage_ops_863 store_ops863={pio_observe863,pio_read863,pio
 static void field(const char *k,uint64_t v){arch_putc(' ');arch_puts(k);arch_putc('=');paging_hex(v);}
 static _Noreturn void fail(const char *s){
  arch_puts("STYLEOS S850 FAIL ");arch_puts(s);arch_putc('\n');
-#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#if !defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) && !defined(STYLEOS_PROVISIONED_STORAGE_864)
  out32(0xf4,0x11);
 #endif
  arch_halt();
@@ -769,7 +769,7 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
 #endif
  if(batch==1&&!ev->mouse&&ev->key==0x43&&!ev->modifiers)s863_live_run();
 #endif
-#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#if !defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) && !defined(STYLEOS_PROVISIONED_STORAGE_864)
  if(batch==1&&!ev->mouse&&ev->key==0x58&&!ev->modifiers){
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863

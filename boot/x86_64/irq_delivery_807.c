@@ -80,7 +80,7 @@ __asm__(
  ".global irq807_unexpected\n"
  "irq807_unexpected:\n"
  "cli\n"
-#ifndef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
+#if !defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) && !defined(STYLEOS_PROVISIONED_STORAGE_864)
  "movl $0x22,%eax\n"
  "outl %eax,$0xf4\n" /* terminal diagnostic only */
 #endif
@@ -425,7 +425,10 @@ static bool irq859_clear(uintptr_t lapic){
 static _Alignas(16) struct idt_gate807 irq859_saved[256];
 static _Noreturn void irq859_fail(const char *reason){
  __asm__ volatile("cli":::"memory");arch_puts("STYLEOS S859 FAIL ");arch_puts(reason);arch_putc('\n');
- __asm__ volatile("outl %0,%1"::"a"(0x11u),"Nd"((uint16_t)0xf4u));arch_halt();
+#if !defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) && !defined(STYLEOS_PROVISIONED_STORAGE_864)
+ __asm__ volatile("outl %0,%1"::"a"(0x11u),"Nd"((uint16_t)0xf4u));
+#endif
+ arch_halt();
 }
 static void irq859_lvt_read(uintptr_t lapic,uint32_t *values){
  for(unsigned i=0;i<IRQ859_LVT_COUNT;i++)values[i]=mmio_read(lapic,0x320+16*i);

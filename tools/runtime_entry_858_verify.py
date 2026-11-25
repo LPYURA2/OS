@@ -4,9 +4,9 @@ from desktop_frame_852_verify import verify as prior, POLICY as FRAME
 from desktop_switch_851_verify import POLICY as SWITCH
 POLICY=b'STYLEOS S858 POLICY runtime-services=yes empty-registry=yes frame=yes irq=no app-admission=no storage=no production-cr3=deny'
 KEYS=('root','old','gdt','idt','tr','cs','rsp','cr0','cr4','efer','flags','gdt-limit','idt-limit','safe-root','processes','windows','session-next','selected','ports')
-def verify(raw,rc,rva,reference):
+def verify(raw,rc,rva,reference,*,host_quit=False):
     try:
-        ok,data=prior(raw,rc,rva,reference)
+        ok,data=prior(raw,rc,rva,reference,host_quit=host_quit)
         if not ok:raise ValueError(data)
         lines=raw.splitlines();records=[x for x in lines if x.startswith(b'STYLEOS S858 ')]
         if len(records)!=2 or records[1]!=POLICY or any(b' FAIL ' in x for x in lines):raise ValueError('858 record/policy')

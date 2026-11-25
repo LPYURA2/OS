@@ -127,10 +127,11 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None):
         for i,x in enumerate(releases):eq(x,(i,base+i+1,gen0+base+i,roots[i]['child'],safe,3-i),'release')
         return True,dict(four_roots=roots,four_switches=switches,four_events=events,timer_ready=ready)
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)
-def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count=4,provisioned=False):
+def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count=4,provisioned=False,host_quit=False):
     try:
         if round_count!=4 and (not cold or storage or round_count!=8):raise ValueError('unsupported four workload')
         lines=raw.splitlines()
+        if host_quit and not provisioned:raise ValueError('host quit limited to live provisioned storage')
         if provisioned and not (cold and storage):raise ValueError('provisioned requires cold storage')
         if storage:
             marker=b'STYLEOS S863S PROVISIONED-BOOT' if provisioned else b'STYLEOS S863S WAIT'
@@ -139,7 +140,7 @@ def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count
             if provisioned and lines.count(b'STYLEOS S863S PROVISIONED-IDENTITY')!=1:raise ValueError('missing provisioned identity')
         prefix=raw if not cold else b'\n'.join(lines[:next(i for i,x in enumerate(lines) if (x==marker if storage else x.startswith(b'STYLEOS S863B COLD ')))])+b'\n'
         gen0=1 if cold else 4
-        ok,o=prior(prefix,rc,site['rva'],ref,cold=cold)
+        ok,o=prior(prefix,rc,site['rva'],ref,cold=cold,host_quit=host_quit)
         if not ok:raise ValueError(o)
         lines=raw.splitlines()
         begins=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S864 BATCH-BEGIN ')]

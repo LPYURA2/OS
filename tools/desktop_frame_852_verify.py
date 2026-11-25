@@ -3,9 +3,9 @@ import re
 from desktop_switch_851_verify import verify as prior, POLICY as SWITCH
 POLICY=b'STYLEOS S852 POLICY first-frame=yes input=no storage=no app-admission=no production-cr3=deny'
 
-def verify(raw,rc,rva,reference):
+def verify(raw,rc,rva,reference,*,host_quit=False):
     try:
-        ok,obs=prior(raw,rc,rva)
+        ok,obs=prior(raw,rc,rva,host_quit=host_quit)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();records=[x for x in lines if x.startswith(b'STYLEOS S852 ')]
         if len(records)!=2 or records[1]!=POLICY or lines.index(SWITCH)>=lines.index(records[0]) or lines.index(records[0])>=lines.index(records[1]):raise ValueError('852 record order/policy')

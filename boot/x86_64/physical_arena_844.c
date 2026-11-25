@@ -18,7 +18,13 @@ struct s844_arena *s845_arena(void){
 }
 #endif
 static void fld(const char *key,uint64_t v){arch_putc(' ');arch_puts(key);arch_putc('=');arch_puts("0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15]);}
-static _Noreturn void fail(const char *s){arch_puts("STYLEOS S844 FAIL ");arch_puts(s);arch_putc('\n');__asm__ volatile("cli;outl %0,%1"::"a"(0x24u),"Nd"((uint16_t)0xf4));arch_halt();}
+static _Noreturn void fail(const char *s){arch_puts("STYLEOS S844 FAIL ");arch_puts(s);arch_putc('\n');
+#if defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_PROVISIONED_STORAGE_864)
+ __asm__ volatile("cli":::"memory");
+#else
+ __asm__ volatile("cli;outl %0,%1"::"a"(0x24u),"Nd"((uint16_t)0xf4));
+#endif
+arch_halt();}
 typedef EFI_STATUS (EFIAPI *alloc_pages844)(uint32_t,uint32_t,UINTN,uint64_t *);
 EFI_STATUS s844_reserve(struct efi_boot_services *bs){
  if(!bs||!bs->allocate_pages||reserved844.start)return EFI_INVALID_PARAMETER;

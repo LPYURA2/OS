@@ -137,7 +137,7 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
     return root,events
 
 
-def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False):
+def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False,rc=33):
     """Same four-process trace as live ISO, with an actual save between polls."""
     from runtime_four_864_verify import verify,trace_check,N,order
     from runtime_mixed_863_verify import row
@@ -154,7 +154,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     frames=[Frame(folder/(x+'.ppm')) for x in names]
     hashes=[frame_hash(x) for x in frames];final=hashes[1]
     if any(x.pixels!=frames[1].pixels for x in frames[2:]) or (frames[0].pixels==frames[1].pixels)==write:raise ValueError('four storage frame continuity')
-    ok,obs=verify(raw,33,site,ref,cold=True,clean_fnv=final,storage=True,provisioned=provisioned)
+    ok,obs=verify(raw,rc,site,ref,cold=True,clean_fnv=final,storage=True,provisioned=provisioned,host_quit=provisioned)
     if not ok:raise ValueError(obs)
     root=obs['active']['root'];events=trace_check(data.decode('ascii'),obs)
     cold=rows(b'STYLEOS S863B COLD');ready=rows(b'STYLEOS S863 READY')
@@ -191,7 +191,10 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
             before=want[2]
     expect(req[-1],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted'),(root,4,104,0))
     exits=rows(b'STYLEOS S863 EXIT')
-    if len(exits)!=1 or not prev<lines.index(req[-1])<lines.index(exits[0]) or exits[0].split()[-2:]!=[b'dispatches=0x0000000000000068',b'used=0x0000000000000000']:raise ValueError('four storage exit')
+    if provisioned:
+        events=rows(b'STYLEOS S863 EVENT')
+        if exits or len(events)<2 or b' key=0x0000000000000058 ' not in events[-2] or b' key=0x0000000000000040 ' not in events[-1] or b' writes=0x0000000000000000' in events[-1] or not prev<lines.index(req[-1])<lines.index(events[-2])<lines.index(events[-1]):raise ValueError('live post-workload input proof')
+    elif len(exits)!=1 or not prev<lines.index(req[-1])<lines.index(exits[0]) or exits[0].split()[-2:]!=[b'dispatches=0x0000000000000068',b'used=0x0000000000000000']:raise ValueError('four storage exit')
     if before!=104 or workload!=[x for x in lines if x.startswith(tags)]:raise ValueError('four storage workload scope')
     io=[rows(b'STYLEOS S864 '+x) for x in (b'HOLD',b'SAVED',b'RESUME')]
     if write:
@@ -252,6 +255,8 @@ def main():
             for item in (f'if=none,id=styleos,format=raw,readonly=on,file={boot}','virtio-blk-pci,drive=styleos,bootindex=1'):
                 i=cmd.index(item);del cmd[i-1:i+1]
             cmd+=['-boot','order=d,strict=on','-cdrom',str(iso)]
+        if args.provisioned:
+            i=cmd.index('isa-debug-exit,iobase=0xf4,iosize=0x04');del cmd[i-1:i+1]
         for node in ({'driver':'file','filename':str(base),'node-name':FILE,'read-only':True},{'driver':'raw','file':FILE,'node-name':RAW,'read-only':True},{'driver':'file','filename':str(top),'node-name':TOPFILE,'read-only':False},{'driver':'qcow2','file':TOPFILE,'backing':RAW,'node-name':TOP,'read-only':False}):cmd+=['-blockdev',json.dumps(node)]
         cmd+=['-device',f'ide-hd,id={DEVICE},bus={CONTROLLER}.1,unit=0,drive={TOP}'+(',serial='+('FOREIGN-S864-DATA' if foreign else 'STYLEOS-S864-DATA') if args.provisioned else '')]
         trace=folder/'cpu-trace.log';cmd+=['-d','int,guest_errors','-D',str(trace)]
@@ -275,9 +280,11 @@ def main():
                 if args.provisioned:
                     if foreign:
                         wait(proc,serial,b'STYLEOS S850 FAIL 864-provisioned-serial')
-                        if proc.wait(timeout=30)!=35:raise ValueError('foreign identity wrong diagnostic exit')
-                        # Diagnostic fail-stop may exit via the existing test device;
-                        # either way never accept mount/admission or a media change.
+                        d.call('stop');denied=snapshot('denied',True)
+                        verify_ready(denied);verify_bar(denied['pci'],denied['mtree'],0x6060)
+                        if denied['status'].get('status')!='paused' or proc.poll() is not None:raise ValueError('foreign identity did not fail-stop')
+                        d.call('quit')
+                        if proc.wait(timeout=30)!=0:raise ValueError('foreign host quit')
                         raw=serial.read_bytes()
                         if [x for x in raw.splitlines() if b' FAIL ' in x]!=[b'STYLEOS S850 FAIL 864-provisioned-serial'] or b'STYLEOS S863S ADMIT ' in raw or b'STYLEOS DESKTOP READY' in raw or b'STYLEOS S863S COMMIT ' in raw or b'STYLEOS S863S WAIT' in raw:raise ValueError('foreign identity crossed admission')
                         return {'refusal':'864-provisioned-serial','uart_sha256':sha(raw)}
@@ -320,8 +327,21 @@ def main():
                 ps=next(r['stats'] for r in projection['stats'] if r.get('qdev') in (DEVICE,'/machine/peripheral/'+DEVICE))
                 for key in ('wr_operations','wr_bytes','flush_operations'):ps[key]=0
                 scope_fixture(projection,base,top);verify_legacy_io(final['mtree'])
-                d.call('cont');d.call('human-monitor-command',**{'command-line':'sendkey f12 40'})
-                if proc.wait(timeout=30)!=33:raise ValueError('real guest exit')
+                d.call('cont')
+                if args.provisioned:
+                    tag=b'STYLEOS S863 EVENT '
+                    def event_count():return sum(x.startswith(tag) for x in serial.read_bytes().splitlines())
+                    n=event_count();d.key('f12');wait(proc,serial,tag,n+1)
+                    n=event_count();d.key('f6');wait(proc,serial,tag,n+1)
+                    d.call('stop');live=snapshot('post-f12')
+                    if live['status'].get('status')!='paused' or proc.poll() is not None:raise ValueError('not live after F12')
+                    verify_ready(live);verify_bar(live['pci'],live['mtree'],0x6060)
+                    now=next(r['stats'] for r in live['stats'] if r.get('qdev') in (DEVICE,'/machine/peripheral/'+DEVICE))
+                    if any(now[k]!=stats[k] for k in ('wr_operations','wr_bytes','flush_operations','unmap_operations')):raise ValueError('unexpected post-workload mutation')
+                    d.screen('post-f12');d.call('quit')
+                else:d.call('human-monitor-command',**{'command-line':'sendkey f12 40'})
+                rc=proc.wait(timeout=30)
+                if rc!=(0 if args.provisioned else 33):raise ValueError('real guest exit')
             except Exception as original_error:
                 # Capture the still-live device state before teardown. Never retry
                 # a failed save or resume a guest that may have quarantined media.
@@ -350,7 +370,7 @@ def main():
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
         if args.four:
-            root,events=verify_four_storage(lines,raw,data,site,ref,folder,write,provisioned=args.provisioned)
+            root,events=verify_four_storage(lines,raw,data,site,ref,folder,write,provisioned=args.provisioned,rc=rc)
         elif cold:
             root,events=verify_cold(lines,prefix,data,site,ref,folder,tasks,mixed=mixed,interleaved=mixed and write)
         else:
@@ -385,7 +405,7 @@ def main():
         if args.provisioned and not lines.index(bars[0])<lines.index(b'STYLEOS S863S PROVISIONED-IDENTITY')<lines.index(admits[0]):raise ValueError('identity must precede write admission')
         if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
         if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')
-        return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h,'interleaved_save':mixed and write}
+        return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h,'interleaved_save':mixed and write,'host_exit':rc,'live_after_f12':args.provisioned}
     first=run('first',True)
     expected=bytearray(original);payload=b'a'
     header=struct.pack('<8sIIBB2x',b'STYLED01',1,1,0,1);h=2166136261

@@ -2,9 +2,9 @@
 import re
 from desktop_preflight_850_verify import verify as preflight, POLICY as PRE
 POLICY=b'STYLEOS S851 POLICY terminal=yes own-root=yes hardware-ist=yes framebuffer-restored=yes firmware-return=no production-cr3=deny'
-def verify(raw,rc,bp_rva):
+def verify(raw,rc,bp_rva,*,host_quit=False):
     try:
-        ok,data=preflight(raw,rc)
+        ok,data=preflight(raw,rc,host_quit=host_quit)
         if not ok:raise ValueError(data)
         lines=raw.splitlines();records=[x for x in lines if x.startswith(b'STYLEOS S851 ')]
         if len(records)!=6 or records[-1]!=POLICY or any(b' FAIL ' in x for x in lines):raise ValueError('record/policy/failure')

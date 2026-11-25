@@ -2,9 +2,9 @@
 import re
 POLICY=b'STYLEOS S850 POLICY bar-restored=yes detached-audited=yes descriptors-staged=yes desktop-root-active=no framebuffer-write=no production-cr3=deny'
 
-def verify(raw,rc):
+def verify(raw,rc,*,host_quit=False):
     try:
-        if rc!=33:raise ValueError('real QEMU debug-exit required')
+        if rc!=(0 if host_quit else 33):raise ValueError('unexpected QEMU exit for selected profile')
         lines=raw.splitlines()
         def record(prefix,keys):
             rows=[x for x in lines if x.startswith(prefix+b' ')]

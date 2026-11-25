@@ -18,7 +18,13 @@ static uint64_t flags(void){uint64_t v;__asm__ volatile("pushfq;popq %0":"=r"(v)
 static uint64_t cr4(void){uint64_t v;__asm__ volatile("mov %%cr4,%0":"=r"(v));return v;}
 static void switch_to(uint64_t v){__asm__ volatile("mov %0,%%cr3"::"r"(v):"memory");}
 static void fld(const char *key,uint64_t v){arch_putc(' ');arch_puts(key);arch_putc('=');arch_puts("0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15]);}
-static _Noreturn void fail(const char *s){arch_puts("STYLEOS S846 FAIL ");arch_puts(s);arch_putc('\n');__asm__ volatile("cli;outl %0,%1"::"a"(0x25u),"Nd"((uint16_t)0xf4));arch_halt();}
+static _Noreturn void fail(const char *s){arch_puts("STYLEOS S846 FAIL ");arch_puts(s);arch_putc('\n');
+#if defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_PROVISIONED_STORAGE_864)
+ __asm__ volatile("cli":::"memory");
+#else
+ __asm__ volatile("cli;outl %0,%1"::"a"(0x25u),"Nd"((uint16_t)0xf4));
+#endif
+arch_halt();}
 /* Bind only the image-owned source and destination table buffers, while
  * the previous inherited physical-attestation mechanism is still available. */
 bool s846_bind(const struct s842_root *r,const struct s842_cache *c,struct pg_experiment *p,const struct igp785_tables *t,uint64_t root,uint64_t g1,uint64_t g2,uint64_t g3){
