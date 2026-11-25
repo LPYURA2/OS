@@ -6,9 +6,9 @@
 static unsigned phase, bootstrap_phase;
 static uint64_t bootstrap_root;
 static uint64_t active_root;
+static struct rt858_expected started_contract;
 #ifdef STYLEOS_TEST_RUNTIME_JOIN_861
 #include <styleos/runtime_tick_860.h>
-static struct rt858_expected started_contract;
 #endif
 static bool page(uint64_t v){return v && !(v&4095u) && v<BIT(47);}
 bool rt858_validate(const struct rt858_expected *e,const struct rt858_live *v){
@@ -52,13 +52,11 @@ bool rt863_bootstrap_ready(uint64_t root){
  return bootstrap_phase==2&&root==bootstrap_root&&empty(root)&&pristine();
 }
 bool rt858_start(const struct rt858_expected *e,const struct rt858_live *v){
- if(phase||!rt858_validate(e,v))return false;
+ if(phase||bootstrap_phase||!rt858_validate(e,v))return false;
  phase=1; /* sticky refusal on any partial startup */
  if(!rt863_bootstrap(e->root))return false;
  active_root=e->root;
-#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
  started_contract=*e;
-#endif
  phase=2;return true;
 }
 bool rt858_ready(uint64_t root){return phase==2&&root==active_root&&rt863_bootstrap_ready(root);}
@@ -94,12 +92,20 @@ bool rt864_services_boundary(uint64_t live_root){
  }
  return true;
 }
+/* Shared shell boundary: an inherited root cannot carry native dispatch
+ * authority. An owned root must present a fresh privileged CPU snapshot.
+ * Neither path grants mappings, device access, or new hardware authority. */
+bool rt864_shell_boundary(uint64_t root,const struct rt858_live *live){
+ if(!rt864_services_boundary(root))return false;
+ if(!live)return !phase&&rt863_bootstrap_ready(root);
+ return phase==2&&active_root==root&&live->root==root&&
+        rt858_validate(&started_contract,live);
+}
 #ifdef STYLEOS_TEST_RUNTIME_JOIN_861
 /* The owned-root adapter additionally requires its original descriptor and
  * stack contract. The common software boundary does not replace that proof. */
 struct dpr_service *rt861_dispatcher(const struct rt858_live *live){
- if(phase!=2||active_root!=started_contract.root||
-    !rt858_validate(&started_contract,live)||!rt864_services_boundary(live->root))return 0;
+ if(!live||!rt864_shell_boundary(live->root,live))return 0;
  struct dpr_service *d=dpr_tick_global_860();
  return d==dpr_global_state()?d:0;
 }

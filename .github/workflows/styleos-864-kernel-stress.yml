@@ -1,7 +1,7 @@
 name: StyleOS 864 preliminary restricted kernel endurance
 on:
   push:
-    branches: [feature/styleos-kernel-stress-864]
+    branches: [feature/styleos-kernel-stress-864, feature/styleos-kernel-integration-864-final]
   workflow_dispatch:
 permissions:
   contents: read

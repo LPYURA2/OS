@@ -12,7 +12,7 @@
 #include <styleos/desktop_process_runtime.h>
 #include <styleos/runtime_entry_858.h>
 static void desktop_kernel_boundary864(void){
- if(!rt864_services_boundary(dpr_arch_safe_root())){
+ if(!rt864_shell_boundary(dpr_arch_safe_root(),0)){
   arch_puts("STYLEOS DESKTOP RUNTIME BOUNDARY ERROR\n");arch_halt();
  }
 }
@@ -1144,6 +1144,9 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                            (active() == NOTES || active() == NOTE_WINDOW);
         }
         if (++tick == 20000) { tick = 0; clock = update_clock(); }
+#ifdef STYLEOS_DESKTOP_V0
+        if(captured||clock)desktop_kernel_boundary864();
+#endif
         bool imported = false;
 #ifdef STYLEOS_DESKTOP_UPDATE
         if (desk_import_active()) imported = desk_import_poll(&filesystem);
