@@ -14,14 +14,18 @@ jobs:
         with:
           persist-credentials: false
       - name: Install real guest tools
+        id: tools
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools
       - name: Actual note save and separate-boot reopen
         run: python3 tools/test_desktop_storage_service_863.py --output build/s863-storage
       - name: Cold owned-root shell, clock and note store without pre-shell trials
+        if: ${{ !cancelled() && steps.tools.conclusion == 'success' }}
         run: python3 tools/test_desktop_storage_service_863.py --cold --output build/s863-storage-cold
       - name: Cold shell requests actual native tasks after ready, then returns to shell
+        if: ${{ !cancelled() && steps.tools.conclusion == 'success' }}
         run: python3 tools/test_desktop_storage_service_863.py --tasks --output build/s863-storage-tasks
       - name: Autonomous cold boot with storage denied and two task launches
+        if: ${{ !cancelled() && steps.tools.conclusion == 'success' }}
         run: python3 tools/test_desktop_autonomous_863.py --output build/s863-autonomous
       - uses: actions/upload-artifact@v4
         if: always()

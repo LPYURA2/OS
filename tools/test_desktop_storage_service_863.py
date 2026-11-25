@@ -148,6 +148,18 @@ def main():
                 scope_fixture(projection,base,top);verify_legacy_io(final['mtree'])
                 d.call('cont');d.call('human-monitor-command',**{'command-line':'sendkey f12 40'})
                 if proc.wait(timeout=30)!=33:raise ValueError('real guest exit')
+            except Exception as original_error:
+                # Capture the still-live device state before teardown. Never retry
+                # a failed save or resume a guest that may have quarantined media.
+                try:
+                    if proc.poll() is None:
+                        d.call('stop')
+                        snapshot('failure')
+                        d.screen('failure')
+                except Exception as capture_error:
+                    (folder/'failure-capture-error.txt').write_text(repr(capture_error)+'\n')
+                (folder/'failure.txt').write_text(repr(original_error)+'\n')
+                raise
             finally:
                 d.ready.close()
                 if proc.poll() is None:proc.kill();proc.wait()
