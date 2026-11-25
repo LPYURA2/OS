@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Real shell note store, disposable guarded PIO overlay, two distinct boots."""
-import argparse,copy,hashlib,json,shutil,struct,subprocess,sys
+import argparse,copy,hashlib,json,re,shutil,struct,subprocess,sys
 from pathlib import Path
 from make_desktop_data import provision
 from test_desktop_v0 import Desktop
 from test_desktop_interactive_863 import wait,prior,trace_check,recycle_site
 from test_desktop_frame_852_host import reference
+from desktop_switch_851_site import bp_site
+from runtime_entry_858_verify import verify as cold_prior
+from irq_trace_accept_859 import HEADER
 from test import ROOT,firmware_path
 from block_fixture_856_verify import CONTROLLER,DEVICE,RAW,FILE
 from overlay_fixture_856 import TOP,TOPFILE
@@ -13,8 +16,24 @@ from guest_fixture_857 import scope_fixture,verify_legacy_io
 from legacy_ports_857 import verify_ready
 from bmdma_857_verify import verify_bar
 def sha(b):return hashlib.sha256(b).hexdigest()
+def cold_trace(trace,obs):
+    root=obs['active']['root'];heads=list(HEADER.finditer(trace));events=[]
+    for i,m in enumerate(heads):
+        block=trace[m.start():heads[i+1].start() if i+1<len(heads) else len(trace)]
+        def one(p):
+            v=re.findall(p,block,re.M)
+            if len(v)!=1:raise ValueError('cold CPU field '+p)
+            return int(v[0],16)
+        if one(r'\bCR3=([0-9a-fA-F]+)\b')!=root and not events:continue
+        v=tuple(int(x,16) for x in m.groups()[1:])+(one(r'\bCR3=([0-9a-fA-F]+)\b'),one(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b'),one(r'^RIP=([0-9a-fA-F]+)'),one(r'\bRSP=([0-9a-fA-F]+)\b'),one(r'^GDT=\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s*$'),one(r'^IDT=\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s*$'),one(r'^TR\s*=([0-9a-fA-F]+)\b'))
+        events.append((int(m[1]),v))
+    bp=obs['bp'];rip=bp['rip']-1;active=obs['active']
+    expected=(3,0,1,0,bp['cs'],rip,rip,bp['cs']-8,bp['rsp'],root,bp['flags'],rip,bp['rsp'],active['gdt'],active['idt'],active['tr'])
+    if len(events)!=1 or events[0][1]!=expected:raise ValueError('cold actual CPU binding')
+    return events
+
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);out=p.parse_args().output.resolve();out.mkdir(parents=True,exist_ok=False)
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');args=p.parse_args();cold=args.cold;out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base);original=base.read_bytes();base.chmod(0o444)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
@@ -22,13 +41,13 @@ def main():
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
     def image(*a):return subprocess.check_output([img,*a],stderr=subprocess.STDOUT,timeout=30)
     image('create','-f','qcow2','-F','raw','-b',str(base),str(top))
-    with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-storage-service-863','--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
+    with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863','--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
-    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=recycle_site(efi.read_bytes(),mp)
+    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=bp_site(efi.read_bytes(),mp.read_text()) if cold else recycle_site(efi.read_bytes(),mp)
     ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
     def run(name,write):
         folder=out/name;folder.mkdir();serial=folder/'serial.log';shutil.copyfile(vars,folder/'OVMF_VARS.fd')
-        cmd=[q,'-machine','q35','-accel','tcg,thread=single','-smp','1','-m','128M','-display','none','-vga','std','-serial',f'file:{serial}','-monitor','none','-qmp','stdio','-net','none','-no-reboot','-S','-device','isa-debug-exit,iobase=0xf4,iosize=0x04','-drive',f'if=pflash,format=raw,readonly=on,file={code}','-drive',f'if=pflash,format=raw,file={folder/"OVMF_VARS.fd"}','-drive',f'if=none,id=styleos,format=raw,readonly=on,file={boot}','-device','virtio-blk-pci,drive=styleos,bootindex=1','-device','piix3-ide,id=styleos-ide,bus=pcie.0,addr=0x5']
+        cmd=[q,'-machine','q35','-accel','tcg,thread=single','-smp','1','-rtc','base=2026-11-25T12:34:00,clock=vm','-m','128M','-display','none','-vga','std','-serial',f'file:{serial}','-monitor','none','-qmp','stdio','-net','none','-no-reboot','-S','-device','isa-debug-exit,iobase=0xf4,iosize=0x04','-drive',f'if=pflash,format=raw,readonly=on,file={code}','-drive',f'if=pflash,format=raw,file={folder/"OVMF_VARS.fd"}','-drive',f'if=none,id=styleos,format=raw,readonly=on,file={boot}','-device','virtio-blk-pci,drive=styleos,bootindex=1','-device','piix3-ide,id=styleos-ide,bus=pcie.0,addr=0x5']
         for node in ({'driver':'file','filename':str(base),'node-name':FILE,'read-only':True},{'driver':'raw','file':FILE,'node-name':RAW,'read-only':True},{'driver':'file','filename':str(top),'node-name':TOPFILE,'read-only':False},{'driver':'qcow2','file':TOPFILE,'backing':RAW,'node-name':TOP,'read-only':False}):cmd+=['-blockdev',json.dumps(node)]
         cmd+=['-device',f'ide-hd,id={DEVICE},bus={CONTROLLER}.1,unit=0,drive={TOP}']
         trace=folder/'cpu-trace.log';cmd+=['-d','int,guest_errors','-D',str(trace)]
@@ -76,11 +95,27 @@ def main():
         if len(commits)!=(2 if write else 0):raise ValueError('commit count')
         if write and [int(x.split()[-1].split(b'=')[1],16) for x in commits]!=[20,19]:raise ValueError('payload then header')
         gate=lines.index(b'STYLEOS S863S WAIT')
-        ok,obs=prior(b'\n'.join(lines[:gate])+b'\n',33,site,ref)
-        if not ok:raise ValueError('prior lifecycle '+str(obs))
-        data=trace.read_bytes();events=trace_check(data.decode('ascii'),obs)
-        if len(events)!=25:raise ValueError('CPU event count')
-        root=obs['rounds'][1]['join_roots']['safe']
+        prefix=b'\n'.join(lines[:gate])+b'\n'
+        data=trace.read_bytes()
+        if cold:
+            ok,obs=cold_prior(prefix,33,site['rva'],ref)
+            if not ok:raise ValueError('cold root '+str(obs))
+            root=obs['active']['root']
+            events=cold_trace(data.decode('ascii'),obs)
+            cold_rows=[x for x in lines if x.startswith(b'STYLEOS S863B COLD ')]
+            if cold_rows!=[f'STYLEOS S863B COLD root=0x{root:016x} dispatches=0x0000000000000000 arena-next=0x0000000000000001 processes=0x0000000000000000 windows=0x0000000000000000'.encode()]:raise ValueError('cold registry')
+            if any(x.startswith((b'STYLEOS S844 LIVE ',b'STYLEOS S861 ROOTS ',b'STYLEOS S848 TICK ')) for x in lines):raise ValueError('pre-shell trial executed')
+            clock=f'STYLEOS S863C CLOCK root=0x{root:016x} dispatches=0x0000000000000000 hour=0x000000000000000c minute=0x0000000000000022 shadow=0x000000000000008d'.encode()
+            if [x for x in lines if x.startswith(b'STYLEOS S863C CLOCK ')]!=[clock] or not lines.index(cold_rows[0])<lines.index(clock)<lines.index(b'STYLEOS DESKTOP READY'):raise ValueError('cold clock')
+            rd=[x for x in lines if x.startswith(b'STYLEOS S863 READY ')]
+            wanted=f'STYLEOS S863 READY root=0x{root:016x} dispatches=0x0000000000000000 next-pid=0x0000000000000001 next-window=0x0000000000000001 input=0x0000000000000003 x=0x0000000000000280 y=0x0000000000000258 writes=0x00000000000fa000'.encode()
+            if rd!=[wanted]:raise ValueError('cold ready')
+        else:
+            ok,obs=prior(prefix,33,site,ref)
+            if not ok:raise ValueError('prior lifecycle '+str(obs))
+            events=trace_check(data.decode('ascii'),obs)
+            if len(events)!=25:raise ValueError('CPU event count')
+            root=obs['rounds'][1]['join_roots']['safe']
         h=((14695981039346656037^97)*1099511628211)&((1<<64)-1)
         tag=b'SAVED' if write else b'OPENED'
         wanted=b'STYLEOS S863S '+tag+f' root=0x{root:016x} slot=0x0000000000000001 bytes=0x0000000000000001 hash=0x{h:016x}'.encode()
@@ -101,6 +136,6 @@ def main():
         path=out/(tag+'.raw');image('convert','-f','qcow2','-O','raw',str(top),str(path))
         if path.read_bytes()!=expected or base.read_bytes()!=original or sha(boot.read_bytes())!=boot_sha:raise ValueError('exact disk contents')
     check('after-write');second=run('second',False);check('after-reboot')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,ordinary_desktop_verified=False,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,ordinary_desktop_verified=False,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()

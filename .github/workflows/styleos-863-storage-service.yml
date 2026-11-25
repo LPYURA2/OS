@@ -17,9 +17,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools
       - name: Actual note save and separate-boot reopen
         run: python3 tools/test_desktop_storage_service_863.py --output build/s863-storage
+      - name: Cold owned-root shell, clock and note store without pre-shell trials
+        run: python3 tools/test_desktop_storage_service_863.py --cold --output build/s863-storage-cold
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: styleos-863-shell-storage
-          path: build/s863-storage/
+          path: |
+            build/s863-storage/
+            build/s863-storage-cold/
           if-no-files-found: warn

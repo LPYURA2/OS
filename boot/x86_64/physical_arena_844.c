@@ -52,6 +52,20 @@ static bool matches(struct s844_lease v,unsigned char byte){
  for(size_t i=0;i<(size_t)v.pages*BOOT_MEMORY_PAGE;i++)if(p[i]!=byte)return false;
  return true;
 }
+#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+/* The caller already audited the entire reserved range under the live root.
+ * Cold startup initializes metadata and scrubs RAM without fake leases. */
+bool s844_runtime_start(uint64_t expected_root){
+ uint64_t root,flags;
+ __asm__ volatile("mov %%cr3,%0;pushfq;popq %1":"=r"(root),"=r"(flags));
+ if(!admitted844||!expected_root||root!=expected_root||(flags&0x200)||
+    !s844_init(&arena844,reserved844.start))return false;
+ struct s844_lease whole={.pa=reserved844.start,.pages=S844_PAGES};
+ fill(whole,0);
+ unsigned count;
+ return is_zero(whole)&&s844_count(&arena844,&count)&&count==0&&arena844.next==1;
+}
+#endif
 /* Called only after S842 full detached-root audit and guarded transition.
  * No inherited translation is used to read or write the allocated pages. */
 void s844_guest_run(uint64_t expected_root){

@@ -76,7 +76,11 @@ extern void s863_coop_reap(uint64_t,const struct s844_lease [2]);
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
 static __attribute__((noinline)) bool
 #else
+#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+static __attribute__((unused)) void
+#else
 static void
+#endif
 #endif
 guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena,const struct desktop_surface *s,uint64_t before){
  const uint64_t safe=composed.built.root;const struct dpr_service *d=dpr_global_state();

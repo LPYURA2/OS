@@ -11,6 +11,12 @@
 bool s845_extent(struct boot_range *);
 struct s844_arena *s845_arena(void);
 void s844_guest_run(uint64_t);
+#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+bool s844_runtime_start(uint64_t);
+#define S863_INITIAL_ARENA_NEXT 1u
+#else
+#define S863_INITIAL_ARENA_NEXT 4u
+#endif
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
 #include <styleos/runtime_entry_858.h>
@@ -400,7 +406,11 @@ bool s863_disk_flush(void){
 #endif
 static void shell_boundary863(void){
  s863_shell_guard();unsigned used;
+#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+ unsigned dispatches=0,next=1,generation=1;
+#else
  unsigned dispatches=20,next=5,generation=8;
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_LIVE_863
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  if(live_phase863==1){
@@ -547,7 +557,11 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  struct boot_range arena858;
  if(!s845_extent(&arena858)||arena858.end!=arena858.start+S844_BYTES||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-context");
  for(uint64_t a=arena858.start;a<arena858.end;a+=4096)if(!identity(a,PG_WRITE))fail("858-arena-map");
+#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+ if(!s844_runtime_start(target))fail("863-cold-arena");
+#else
  s844_guest_run(target);
+#endif
  if(!s845_arena()||s845_arena()->base!=arena858.start||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-live");
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
@@ -582,13 +596,13 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  arch_puts("STYLEOS S858 POLICY runtime-services=yes empty-registry=yes frame=yes irq=no app-admission=no storage=no production-cr3=deny\n");
 #ifdef STYLEOS_TEST_RUNTIME_ARENA_858
  struct s844_arena *allocator858=s845_arena();unsigned used858;
- if(!allocator858||allocator858->base!=arena858.start||allocator858->next!=4||!s844_count(allocator858,&used858)||used858||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-after");
+ if(!allocator858||allocator858->base!=arena858.start||allocator858->next!=S863_INITIAL_ARENA_NEXT||!s844_count(allocator858,&used858)||used858||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-after");
  for(uint64_t a=arena858.start;a<arena858.end;a+=4096)if(!identity(a,PG_WRITE))fail("858-arena-after-map");
  for(uint64_t a=arena858.start;a<arena858.end;a++)if(*(volatile const unsigned char *)(uintptr_t)a)fail("858-arena-after-zero");
  arch_puts("STYLEOS S858 ARENA");field("root",target);field("base",arena858.start);field("pages",S844_PAGES);field("used",used858);field("next",allocator858->next);field("zero",1);arch_putc('\n');
  arch_puts("STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny\n");
 #ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
-#ifndef STYLEOS_TEST_DESKTOP_LIVE_863
+#if !defined(STYLEOS_TEST_DESKTOP_LIVE_863) && !defined(STYLEOS_TEST_DESKTOP_COLD_863)
  guest861(p,cache,guard,allocator858,s,hash);
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
@@ -609,8 +623,14 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
  rtc_admit863();
 #endif
+#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+ arch_puts("STYLEOS S863B COLD");field("root",target);field("dispatches",shell_d863->dispatcher.dispatches);field("arena-next",allocator858->next);
+ field("processes",pr_snapshot(pr_global(),0,0,true));field("windows",ws_snapshot(ws_global(),0,0));arch_putc('\n');
+#endif
  arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+ arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=legacy-fixture clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
+#elif defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=legacy-fixture clock=no reset=no dma-grant=no production-cr3=deny\n");
 #elif defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
