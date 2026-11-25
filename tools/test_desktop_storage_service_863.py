@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Real shell note store, disposable guarded PIO overlay, two distinct boots."""
-import argparse,hashlib,json,shutil,struct,subprocess,sys
+import argparse,copy,hashlib,json,shutil,struct,subprocess,sys
 from pathlib import Path
 from make_desktop_data import provision
 from test_desktop_v0 import Desktop
-from test_desktop_interactive_863 import wait
+from test_desktop_interactive_863 import wait,prior,trace_check,recycle_site
+from test_desktop_frame_852_host import reference
 from test import ROOT,firmware_path
 from block_fixture_856_verify import CONTROLLER,DEVICE,RAW,FILE
 from overlay_fixture_856 import TOP,TOPFILE
@@ -23,11 +24,14 @@ def main():
     image('create','-f','qcow2','-F','raw','-b',str(base),str(top))
     with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64','--test-desktop-storage-service-863','--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
+    efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=recycle_site(efi.read_bytes(),mp)
+    ref=reference(out/'host-reference','gcc');assert ref==reference(out/'host-reference-san','clang',True)
     def run(name,write):
         folder=out/name;folder.mkdir();serial=folder/'serial.log';shutil.copyfile(vars,folder/'OVMF_VARS.fd')
         cmd=[q,'-machine','q35','-accel','tcg,thread=single','-smp','1','-m','128M','-display','none','-vga','std','-serial',f'file:{serial}','-monitor','none','-qmp','stdio','-net','none','-no-reboot','-S','-device','isa-debug-exit,iobase=0xf4,iosize=0x04','-drive',f'if=pflash,format=raw,readonly=on,file={code}','-drive',f'if=pflash,format=raw,file={folder/"OVMF_VARS.fd"}','-drive',f'if=none,id=styleos,format=raw,readonly=on,file={boot}','-device','virtio-blk-pci,drive=styleos,bootindex=1','-device','piix3-ide,id=styleos-ide,bus=pcie.0,addr=0x5']
         for node in ({'driver':'file','filename':str(base),'node-name':FILE,'read-only':True},{'driver':'raw','file':FILE,'node-name':RAW,'read-only':True},{'driver':'file','filename':str(top),'node-name':TOPFILE,'read-only':False},{'driver':'qcow2','file':TOPFILE,'backing':RAW,'node-name':TOP,'read-only':False}):cmd+=['-blockdev',json.dumps(node)]
         cmd+=['-device',f'ide-hd,id={DEVICE},bus={CONTROLLER}.1,unit=0,drive={TOP}']
+        trace=folder/'cpu-trace.log';cmd+=['-d','int,guest_errors','-D',str(trace)]
         (folder/'command.json').write_text(json.dumps(cmd))
         with (folder/'qemu.log').open('wb') as err:
             proc=subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=err);d=Desktop(proc,serial,folder)
@@ -53,6 +57,13 @@ def main():
                 verify_ready(final);verify_bar(final['pci'],final['mtree'])
                 stats=next(r['stats'] for r in final['stats'] if r.get('qdev') in (DEVICE,'/machine/peripheral/'+DEVICE))
                 if stats['wr_operations']!=(2 if write else 0) or stats['wr_bytes']!=(1024 if write else 0) or (write and stats['flush_operations']<2) or (not write and stats['flush_operations']):raise ValueError('frontend mutation count')
+                if any(stats.get(key)!=0 for key in ('unmap_operations','unmap_bytes','failed_rd_operations','invalid_rd_operations','failed_wr_operations','invalid_wr_operations','failed_flush_operations','invalid_flush_operations')):raise ValueError('frontend errors')
+                # Independently verify attachment graph after actual write counters
+                # have been validated; preserve original unprojected QMP snapshot.
+                projection=copy.deepcopy(final)
+                ps=next(r['stats'] for r in projection['stats'] if r.get('qdev') in (DEVICE,'/machine/peripheral/'+DEVICE))
+                for key in ('wr_operations','wr_bytes','flush_operations'):ps[key]=0
+                scope_fixture(projection,base,top);verify_legacy_io(final['mtree'])
                 d.call('cont');d.call('human-monitor-command',**{'command-line':'sendkey f12 40'})
                 if proc.wait(timeout=30)!=33:raise ValueError('real guest exit')
             finally:
@@ -64,12 +75,23 @@ def main():
         lines=raw.splitlines();commits=[x for x in lines if x.startswith(b'STYLEOS S863S COMMIT ')]
         if len(commits)!=(2 if write else 0):raise ValueError('commit count')
         if write and [int(x.split()[-1].split(b'=')[1],16) for x in commits]!=[20,19]:raise ValueError('payload then header')
-        if not write:
-            opened=lines.index(b'STYLEOS DESKTOP DOCUMENT OPEN')
-            ev=next(x for x in lines[opened+1:] if x.startswith(b'STYLEOS S863 EVENT '))
-            h=((14695981039346656037^97)*1099511628211)&((1<<64)-1)
-            if b' text=0x0000000000000001 ' not in ev or f' text-hash=0x{h:016x} '.encode() not in ev:raise ValueError('reopened note content')
-        return {'uart_sha256':sha(raw),'write':write,'writes':stats['wr_operations']}
+        gate=lines.index(b'STYLEOS S863S WAIT')
+        ok,obs=prior(b'\n'.join(lines[:gate])+b'\n',33,site,ref)
+        if not ok:raise ValueError('prior lifecycle '+str(obs))
+        data=trace.read_bytes();events=trace_check(data.decode('ascii'),obs)
+        if len(events)!=25:raise ValueError('CPU event count')
+        root=obs['rounds'][1]['join_roots']['safe']
+        h=((14695981039346656037^97)*1099511628211)&((1<<64)-1)
+        tag=b'SAVED' if write else b'OPENED'
+        wanted=b'STYLEOS S863S '+tag+f' root=0x{root:016x} slot=0x0000000000000001 bytes=0x0000000000000001 hash=0x{h:016x}'.encode()
+        docs=[x for x in lines if x.startswith((b'STYLEOS S863S SAVED',b'STYLEOS S863S OPENED'))]
+        if docs!=[wanted]:raise ValueError('actual draft content')
+        original=b'STYLEOS DESKTOP DOCUMENT SAVE' if write else b'STYLEOS DESKTOP DOCUMENT OPEN'
+        if lines.count(original)!=1 or lines.index(original)+1!=lines.index(wanted):raise ValueError('document evidence order')
+        admits=[x for x in lines if x.startswith(b'STYLEOS S863S ADMIT ')]
+        if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
+        if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')
+        return {'uart_sha256':sha(raw),'trace_sha256':sha(data),'cpu_events':events,'write':write,'writes':stats['wr_operations'],'document_hash':h}
     first=run('first',True)
     expected=bytearray(original);payload=b'a'
     header=struct.pack('<8sIIBB2x',b'STYLED01',1,1,0,1);h=2166136261

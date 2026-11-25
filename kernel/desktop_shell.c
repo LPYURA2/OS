@@ -69,6 +69,9 @@ static uint64_t note_hash863(void){
 static bool note_dirty863(void){return desk_sessions_global()->notes.dirty;}
 static unsigned note_session863(void){return desk_sessions_pid(desk_sessions_global(),DESK_SESSION_NOTES);}
 #endif
+#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+extern void s863_storage_document(bool,unsigned,const char *,size_t);
+#endif
 #define document (current_draft()->document)
 #define doc_folder (current_draft()->doc_folder)
 #define content (current_draft()->content)
@@ -255,6 +258,9 @@ static void open_document(unsigned slot)
     scroll = 0;
     notice = "Открыто с диска";
     arch_puts("STYLEOS DESKTOP DOCUMENT OPEN\n");
+#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+    s863_storage_document(false,(unsigned)document,content,length);
+#endif
 }
 
 static void save(void)
@@ -281,6 +287,9 @@ static void save(void)
     dirty = false;
     notice = "Сохранено на диске";
     arch_puts("STYLEOS DESKTOP DOCUMENT SAVE\n");
+#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+    s863_storage_document(true,(unsigned)document,content,length);
+#endif
 }
 
 static int text_top(void) { return modern_shell() ? 128 : 96; }

@@ -76,8 +76,8 @@ static bool ata857_write(void *ctx,unsigned reg,uint8_t v){
  uint16_t port=reg==8?0x376:(uint16_t)(0x170+reg);
  __asm__ volatile("outb %0,%1"::"a"(v),"Nd"(port):"memory");return true;
 }
-static const struct ata857_ops ata857_io={ata857_alt,ata857_write,ata857_data};
 #ifdef STYLEOS_TEST_STORAGE_ATA_READ_857
+static const struct ata857_ops ata857_io={ata857_alt,ata857_write,ata857_data};
 static void ata857_hex(const uint16_t *w){static const char hex[]="0123456789abcdef";for(unsigned i=0;i<ATA857_WORDS;i++){for(unsigned b=0;b<2;b++){unsigned v=(w[i]>>(8*b))&255u;arch_putc(hex[v>>4]);arch_putc(hex[v&15]);}}}
 #endif
 #if defined(STYLEOS_TEST_STORAGE_PIO_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
@@ -330,6 +330,9 @@ static struct bm857_snapshot disk_snapshot863(void){
  return v;
 }
 static void disk_admit863(void){
+ uint32_t a,b,c,d;
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
+ if((d&(1u<<28))&&((b>>16)&255u)!=1)fail("863-shell-storage-cpu");
  s863_shell_guard();
  if(!disk_preflight863||disk863.s.ready||!shell_fixture863()||!same_cache(&shell_cache863)||
     !identity((uintptr_t)&disk863,PG_WRITE)||!identity((uintptr_t)&disk863+4095,PG_WRITE)||
@@ -365,11 +368,23 @@ static void disk_admit863(void){
 }
 static bool disk_ready863(void){
  if(!disk863.s.ready||disk863.s.store.quarantined||disk863.s.pio.ata.quarantined)return false;
- s863_shell_guard();return same_cache(&shell_cache863)&&ata857_live_check(&disk863.s.live);
+ s863_shell_guard();
+ if(!same_cache(&shell_cache863)||!ata857_live_check(&disk863.s.live)){
+  disk863.s.store.quarantined=true;disk863.s.pio.ata.quarantined=true;return false;
+ }
+ return true;
+}
+void s863_storage_document(bool saved,unsigned slot,const char *data,size_t bytes){
+ s863_shell_guard();
+ if(!disk_ready863()||slot>=DESK_DOCS||!data||bytes>DESK_TEXT_LIMIT)fail("863-shell-storage-document");
+ uint64_t hash=UINT64_C(14695981039346656037);
+ for(size_t i=0;i<bytes;i++){hash^=(uint8_t)data[i];hash*=UINT64_C(1099511628211);}
+ arch_puts(saved?"STYLEOS S863S SAVED":"STYLEOS S863S OPENED");
+ field("root",shell_root863);field("slot",slot);field("bytes",bytes);field("hash",hash);arch_putc('\n');
 }
 uint32_t s863_disk_probe(void){return disk_ready863()?4096:0;}
 bool s863_disk_read(uint32_t lba,uint8_t out[512]){
- return disk_ready863()&&storage_read_863(&disk863.s.store,lba,out);
+ return out&&lba<4096&&disk_ready863()&&storage_read_863(&disk863.s.store,lba,out);
 }
 bool s863_disk_write(uint32_t lba,const uint8_t in[512]){
  if(!in||lba<1||lba>72||!disk_ready863())return false;
