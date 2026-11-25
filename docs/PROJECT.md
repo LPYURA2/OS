@@ -1,4 +1,6 @@
-## Stage 859 — IRQ0 under owned runtime root (candidate, UC correction)
+## Stage 859 — IRQ0 under owned runtime root (candidate, ExtINT correction)
+
+UC checks passed in actual guest; inherited LINT0 ExtINT (0x700) blocked before STI. Narrow mask/readback/restore correction; real retry required.
 
 First actual IRQ guest refused before IRQ setup: `859-map`. Previous regression SUCCESS. Corrected scoped UC leaf validation; real retry required.
 

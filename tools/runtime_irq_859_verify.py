@@ -3,6 +3,8 @@ import re
 from fault_site import _range,_unpack
 from runtime_arena_858_verify import verify as prior,POLICY as ARENA
 POLICY=b'STYLEOS S859 POLICY irq0=yes eoi=yes idt-restored=yes route-restored=yes pit-restored=no runtime-intact=yes arena-intact=yes scheduler-switch=no production-cr3=deny'
+LVT_KEYS=('root','version','timer','thermal','perf','lint0','lint1','error')
+LVT_TAGS=(b'LVT-BEFORE',b'LVT-MASKED',b'LVT-RESTORED')
 KEYS=('root','idt','ist','frame','cs','rip','wait-lo','wait-hi','rsp','wait-rsp','flags','hits','isr','eoi','pin','low','high','svr','tpr','drained')
 
 def wait_site(data,map_text):
@@ -34,8 +36,19 @@ def verify(raw,rc,site,reference):
         ok,obs=prior(raw,rc,site['rva'],reference)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[x for x in lines if x.startswith(b'STYLEOS S859 ')]
-        if len(rows)!=2 or rows[1]!=POLICY or not lines.index(ARENA)<lines.index(rows[0])<lines.index(POLICY):raise ValueError('IRQ record order')
-        m=re.fullmatch(b'STYLEOS S859 IRQ '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in KEYS),rows[0])
+        if len(rows)!=5 or rows[-1]!=POLICY or not lines.index(ARENA)<lines.index(rows[0])<lines.index(POLICY):raise ValueError('IRQ record order')
+        snapshots=[]
+        for row,tag in zip(rows[:3],LVT_TAGS):
+            m=re.fullmatch(b'STYLEOS S859 '+tag+b' '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in LVT_KEYS),row)
+            if not m:raise ValueError('LVT schema')
+            snapshots.append(dict(zip(LVT_KEYS,(int(x,16) for x in m.groups()))))
+        before,masked,restored=snapshots
+        if before['root']!=obs['active']['root'] or before['version']>0xffffffff or before['version']>>16&255!=5 or before['lint0'] not in (0x700,0x10700):raise ValueError('LVT fixture')
+        for k in LVT_KEYS[2:]:
+            v=before[k]
+            if v>0xffffffff or (k!='lint0' and (not v&0x10000 or v&0x1000)):raise ValueError('LVT source unmasked or pending')
+        if masked!=dict(before,lint0=0x10700) or restored!=before:raise ValueError('LVT mask/restore')
+        m=re.fullmatch(b'STYLEOS S859 IRQ '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in KEYS),rows[3])
         if not m:raise ValueError('IRQ schema')
         v=dict(zip(KEYS,(int(x,16) for x in m.groups())))
         def extent(tag):
@@ -47,5 +60,5 @@ def verify(raw,rc,site,reference):
         if (v['root'],v['idt'],v['ist'],v['frame'],v['cs'])!=(obs['active']['root'],obs['active']['idt'],0x400000003000,obs['bp']['frame'],obs['bp']['cs']):raise ValueError('root or IST binding')
         if v['rsp']!=v['wait-rsp'] or v['rsp']&7 or not st<=v['rsp']<en or v['flags']&0x202!=0x202 or v['flags']&~0xad7:raise ValueError('interrupted frame')
         if tuple(v[k] for k in ('hits','isr','eoi','pin','low','high','svr','tpr','drained'))!=(1,1,1,2,0x10000,0,0x10f,0,1):raise ValueError('delivery/restoration')
-        obs['irq']=v;return True,obs
+        obs['irq']=v;obs['lvt']=snapshots;return True,obs
     except (ValueError,KeyError,TypeError,IndexError,StopIteration) as exc:return False,str(exc)

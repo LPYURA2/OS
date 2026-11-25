@@ -22,6 +22,8 @@ jobs:
             "build/s859-tests/$cc" | tee "build/s859-tests/$cc.log"
             "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_irq_uc_859.c kernel/paging.c kernel/cache_policy_800.c -o "build/s859-tests/$cc-uc"
             "build/s859-tests/$cc-uc" | tee "build/s859-tests/$cc-uc.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_irq_lvt_859.c -o "build/s859-tests/$cc-lvt"
+            "build/s859-tests/$cc-lvt" | tee "build/s859-tests/$cc-lvt.log"
           done
       - name: Observe real IRQ0 and EOI on runtime root
         run: |

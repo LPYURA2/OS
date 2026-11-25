@@ -28,6 +28,17 @@ static inline bool irq859_uc_page(const struct pg_plan *p,const struct pg_result
  uint64_t bits=((uc&1)?8u:0u)|((uc&2)?16u:0u)|((uc&4)?128u:0u);
  return (p->tables[t][(va>>12)&511u]&~UINT64_C(0x60))==(va|(UINT64_C(1)<<63)|3u|bits);
 }
+/* Q35 six-LVT fixture only. Accept the actual inherited ExtINT on LINT0
+ * (or its already masked form), never an arbitrary unmasked source. */
+#define IRQ859_LVT_COUNT 6u
+static inline bool irq859_lvt_plan(uint32_t version,const uint32_t *before,uint32_t *masked){
+ if(!before||!masked||((version>>16)&255u)!=5u)return false;
+ for(unsigned i=0;i<IRQ859_LVT_COUNT;i++){
+  if(i==3){if(before[i]!=0x700u&&before[i]!=0x10700u)return false;}
+  else if(!(before[i]&0x10000u)||(before[i]&0x1000u))return false;
+ }
+ *masked=0x10700u;return true;
+}
 /* Terminal single-CPU test; no scheduling or reusable IRQ grant. */
 void irq859_once(uint64_t root,uint64_t idt,uint16_t cs,uint64_t stack_lo,uint64_t stack_hi);
 #endif
