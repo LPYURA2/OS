@@ -1,0 +1,26 @@
+"""Real S858 baseline + synthetic IRQ observation, or actual S859 replay."""
+import json,sys
+from pathlib import Path
+from runtime_irq_859_verify import verify,wait_site,KEYS,POLICY,ARENA
+from runtime_arena_858_verify import verify as prior
+p=Path(sys.argv[1]);raw=(p/'serial.log').read_bytes();site=json.loads((p/'site.json').read_text());ref=json.loads((p/'reference.json').read_text());scope='actual S859 capture'
+if b'STYLEOS S859 IRQ ' not in raw:
+    b=Path(sys.argv[2]);site.update(wait_site((b/'BOOTX64.EFI').read_bytes(),(b/'kernel.map').read_text()))
+    ok,obs=prior(raw,33,site['rva'],ref);assert ok,obs
+    im=int(next(l for l in raw.splitlines() if l.startswith(b'STYLEOS MEMMAP IMAGE ')).split()[-2],16);lo=im+site['wait_lo_rva'];hi=im+site['wait_hi_rva'];rsp=obs['bp']['rsp'];v=(obs['active']['root'],obs['active']['idt'],0x400000003000,obs['bp']['frame'],obs['bp']['cs'],lo+1,lo,hi,rsp,rsp,0x202,1,1,1,2,0x10000,0,0x10f,0,1)
+    row=b'STYLEOS S859 IRQ '+b' '.join(f'{k}=0x{x:016x}'.encode() for k,x in zip(KEYS,v));raw=raw.replace(ARENA,ARENA+b'\r\n'+row+b'\r\n'+POLICY);scope='actual S858 + synthetic IRQ row (NOT real IRQ)'
+else:row=next(l for l in raw.splitlines() if l.startswith(b'STYLEOS S859 IRQ '))
+ok,obs=verify(raw,33,site,ref);assert ok,obs
+n=0
+for k in KEYS:
+    token=next(x for x in row.split() if x.startswith(k.encode()+b'='));val=int(token.split(b'=')[1],16)
+    if k=='rip':values=[0,obs['irq']['wait-hi'],obs['irq']['wait-lo']-1]
+    elif k=='flags':values=[0,2,0x200,0x40202]
+    else:values=[val^(1<<i) for i in range(64)]
+    for value in values:
+        changed=row.replace(b' '+token,b' '+k.encode()+b'='+f'0x{value:016x}'.encode(),1)
+        assert not verify(raw.replace(row,changed,1),33,site,ref)[0],(k,value);n+=1
+for bad in (raw.replace(row,b''),raw.replace(row,row+b'\n'+row),raw.replace(POLICY,b''),raw.replace(POLICY,POLICY.replace(b'scheduler-switch=no',b'scheduler-switch=yes')),raw.replace(row,b'').replace(ARENA,row+b'\n'+ARENA)):
+    assert not verify(bad,33,site,ref)[0];n+=1
+for rc in (0,35,None):assert not verify(raw,rc,site,ref)[0];n+=1
+print(scope,': 1 positive /',n,'refusals PASS')

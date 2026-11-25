@@ -1,7 +1,7 @@
 name: StyleOS 857 same-boot disk fixture observation
 on:
   push:
-    branches: [feature/styleos-storage-read-857, feature/styleos-runtime-entry-858]
+    branches: [feature/styleos-storage-read-857, feature/styleos-runtime-entry-858, feature/styleos-runtime-irq-859]
   workflow_dispatch:
 jobs:
   probe:

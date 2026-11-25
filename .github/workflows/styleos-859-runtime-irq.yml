@@ -1,0 +1,36 @@
+name: StyleOS 859 IRQ0 on owned runtime root
+on:
+  push:
+    branches: [feature/styleos-runtime-irq-859]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install build tools and QEMU OVMF
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: IRQ frame validation model
+        run: |
+          set -euo pipefail
+          mkdir -p build/s859-tests
+          for cc in gcc clang; do
+            "$cc" -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_runtime_irq_859.c -o "build/s859-tests/$cc"
+            "build/s859-tests/$cc" | tee "build/s859-tests/$cc.log"
+          done
+      - name: Observe real IRQ0 and EOI on runtime root
+        run: |
+          python3 tools/test_runtime_irq_859_guest.py --output build/s859-irq
+          python3 tools/test_runtime_irq_859_verify.py build/s859-irq
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-859-runtime-irq
+          path: |
+            build/s859-irq/
+            build/s859-tests/*.log
+          if-no-files-found: warn

@@ -1,3 +1,7 @@
+## Stage 859 — IRQ0 under owned runtime root (candidate)
+
+Accepted S858 886ed41c877773a6835221cc7170fd8a57252913, all five exact-SHA CI SUCCESS; full archive and final arena evidence verified. See [handoff](NEXT_CHAT_859.md). New terminal IRQ test; no task switch, production root or general IRQ grant. KFA gates open.
+
 ## Stage 858 — final combined runtime entry and bounded arena candidate
 
 Actual owned-root runtime and S844 arena guest PASS; see [handoff](NEXT_CHAT_858.md). Final exact-SHA full and focused regressions required. No production root, IRQ or task admission. KFA gates open.

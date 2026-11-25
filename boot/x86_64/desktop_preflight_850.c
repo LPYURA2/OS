@@ -3,6 +3,9 @@
 #include <styleos/desktop_root_850.h>
 #include <styleos/arch.h>
 #include <styleos/ist_guard_plan_785.h>
+#ifdef STYLEOS_TEST_RUNTIME_IRQ_859
+#include <styleos/runtime_irq_859.h>
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_ARENA_858
 #include <styleos/physical_arena_844.h>
 bool s845_extent(struct boot_range *);
@@ -197,6 +200,13 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  for(uint64_t a=arena858.start;a<arena858.end;a++)if(*(volatile const unsigned char *)(uintptr_t)a)fail("858-arena-after-zero");
  arch_puts("STYLEOS S858 ARENA");field("root",target);field("base",arena858.start);field("pages",S844_PAGES);field("used",used858);field("next",allocator858->next);field("zero",1);arch_putc('\n');
  arch_puts("STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_RUNTIME_IRQ_859
+ if(!identity(0xfee00000,PG_WRITE)||!identity(0xfec00000,PG_WRITE)||!identity((uintptr_t)irq859_once,PG_EXEC)||!identity(idt,PG_WRITE)||!same_cache(cache))fail("859-map");
+ irq859_once(target,idt,cs,p->evidence->live.stack.start,p->evidence->live.stack.end);
+ if(!rt858_ready(target)||!s844_count(allocator858,&used858)||used858||allocator858->next!=4||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("859-post-runtime");
+ for(uint64_t a=arena858.start;a<arena858.end;a++)if(*(volatile const unsigned char *)(uintptr_t)a)fail("859-arena-zero");
+ arch_puts("STYLEOS S859 POLICY irq0=yes eoi=yes idt-restored=yes route-restored=yes pit-restored=no runtime-intact=yes arena-intact=yes scheduler-switch=no production-cr3=deny\n");
+#endif
 #endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_INPUT_853

@@ -20,6 +20,12 @@ struct s844_arena *s845_arena(void);
 #endif
 #endif
 #include <stddef.h>
+#ifdef STYLEOS_TEST_RUNTIME_IRQ_859
+#include <styleos/runtime_irq_859.h>
+static volatile uint64_t irq859_rip,irq859_cs,irq859_flags,irq859_rsp,irq859_wait_rsp;
+extern const unsigned char irq859_wait_lo[],irq859_wait_hi[];
+extern void irq859_wait(void);
+#endif
 /* ISOLATED TERMINAL QEMU ONLY. No code is linked to ordinary Desktop.
  * PIT0 -> ISA IRQ0 -> MADT ISO GSI2 -> IOAPIC -> LAPIC vector 0x50.
  * All MMIO, timer and IDT changes occur after ExitBootServices. */
@@ -38,6 +44,12 @@ __asm__(
  "movq %rax,irq842_root_seen(%rip)\n"
  "leaq 16(%rsp),%rax\n"
  "movq %rax,irq842_frame_seen(%rip)\n"
+#endif
+#ifdef STYLEOS_TEST_RUNTIME_IRQ_859
+ "movq 16(%rsp),%rax\nmovq %rax,irq859_rip(%rip)\n"
+ "movq 24(%rsp),%rax\nmovq %rax,irq859_cs(%rip)\n"
+ "movq 32(%rsp),%rax\nmovq %rax,irq859_flags(%rip)\n"
+ "movq 40(%rsp),%rax\nmovq %rax,irq859_rsp(%rip)\n"
 #endif
  "incl irq807_hits(%rip)\n"
  "movq irq807_lapic_ptr(%rip),%rax\n"
@@ -378,4 +390,64 @@ static _Noreturn void irq_run(const struct boot_info *b
 _Noreturn void irq842_terminal(const struct boot_info *b,uint64_t root,uint64_t ist){irq_run(b,root,ist);}
 #else
 _Noreturn void irq807_terminal(const struct boot_info *b){irq_run(b);}
+#endif
+
+#ifdef STYLEOS_TEST_RUNTIME_IRQ_859
+/* Only STI inside a bounded leaf loop; no C call or scheduler mutation with IF=1.
+ * The already-tested irq807_handler captures the interrupted root/IST and EOI. */
+__asm__(".text\n.global irq859_wait\nirq859_wait:\n"
+ "movq %rsp,irq859_wait_rsp(%rip)\nmovl $5000000,%ecx\n"
+ "1: sti\n.global irq859_wait_lo\nirq859_wait_lo: nop\ncli\n.global irq859_wait_hi\nirq859_wait_hi:\n"
+ "cmpl $0,irq807_hits(%rip)\njne 2f\ndecl %ecx\njnz 1b\n2: retq\n");
+static uint64_t irq859_root(void){uint64_t v;__asm__ volatile("mov %%cr3,%0":"=r"(v));return v;}
+static uint64_t irq859_rflags(void){uint64_t v;__asm__ volatile("pushfq;popq %0":"=r"(v));return v;}
+static bool irq859_clear(uintptr_t lapic){
+ for(unsigned i=0;i<8;i++)if(mmio_read(lapic,0x100+16*i)||mmio_read(lapic,0x200+16*i))return false;
+ return true;
+}
+static _Alignas(16) struct idt_gate807 irq859_saved[256];
+void irq859_once(uint64_t root,uint64_t idt_pa,uint16_t cs,uint64_t stack_lo,uint64_t stack_hi){
+ struct idtr807 dt;__asm__ volatile("sidt %0":"=m"(dt));
+ if(irq859_root()!=root||(irq859_rflags()&0x200)||dt.base!=idt_pa||dt.limit!=4095||inb(0x21)!=255||inb(0xa1)!=255)fail("859-context");
+ struct acpi806_topology t={0};
+ if(!acpi806_copy_capture(&t)||t.enabled_lapics!=1||t.ioapic_count!=1||t.lapic_physical!=0xfee00000u||t.ioapic[0].physical!=0xfec00000u)fail("859-madt");
+ uintptr_t lapic=t.lapic_physical,io=t.ioapic[0].physical;
+ if((rdmsr(0x1b)&UINT64_C(0xfffffc00))!=UINT64_C(0xfee00800))fail("859-xapic");
+ uint32_t index=mmio_read(io,0),ioid=(io_read(io,0)>>24)&15u,version=io_read(io,1),counts[ACPI806_MAX_IOAPIC]={0};
+ counts[0]=((version>>16)&255u)+1u;
+ struct irq807_plan plan={0};
+ if(ioid!=t.ioapic[0].id||counts[0]!=24||!irq807_select_pit(&t,counts,&plan)||plan.ioapic_index||plan.gsi!=2||plan.pin!=2||!irq859_clear(lapic))fail("859-route");
+ uint32_t low[24],high[24];
+ for(unsigned i=0;i<24;i++){low[i]=io_read(io,0x10+2*i);high[i]=io_read(io,0x11+2*i);if(!(low[i]&0x10000u)){arch_puts("STYLEOS S859 BLOCKED");fld("pin",i);fld("low",low[i]);arch_putc('\n');fail("859-other-irq-unmasked");}}
+ /* No other local interrupt source can run in this small terminal interval. */
+ for(unsigned off=0x320;off<=0x370;off+=0x10){uint32_t value=mmio_read(lapic,off);if(!(value&0x10000u)){arch_puts("STYLEOS S859 BLOCKED");fld("lvt",off);fld("value",value);arch_putc('\n');fail("859-lvt-unmasked");}}
+ uint32_t dest=mmio_read(lapic,0x20)>>24,tpr=mmio_read(lapic,0x80),svr=mmio_read(lapic,0xf0),reg=0x10+2*plan.pin;
+ if(dest!=0||low[2]!=0x10000u||high[2]!=0||tpr!=0||svr!=0x10fu)fail("859-initial-registers");
+ struct idt_gate807 *live=(void *)(uintptr_t)idt_pa;
+ for(unsigned i=0;i<256;i++)irq859_saved[i]=live[i];
+ const uintptr_t handler=(uintptr_t)irq807_handler;
+ live[IRQ859_VECTOR]=(struct idt_gate807){(uint16_t)handler,cs,1,0x8e,(uint16_t)(handler>>16),(uint32_t)(handler>>32),0};
+ irq807_hits=irq807_isr_seen=irq807_eoi_clear=0;irq842_root_seen=irq842_frame_seen=0;irq859_rip=irq859_cs=irq859_flags=irq859_rsp=irq859_wait_rsp=0;
+ irq807_lapic_ptr=(volatile uint8_t *)lapic;
+ mmio_write(lapic,0xf0,0x1ffu);
+ io_write(io,reg,0x10050u);io_write(io,reg+1,dest<<24);
+ /* Mode 0, single terminal-count edge. Old PIT count/mode NOT restored. */
+ outb(0x43,0x30);outb(0x40,(uint8_t)11932);outb(0x40,(uint8_t)(11932>>8));
+ io_write(io,reg,0x50u);
+ if(io_read(io,reg)!=0x50u||io_read(io,reg+1)!=0||mmio_read(lapic,0xf0)!=0x1ffu)fail("859-route-readback");
+ irq859_wait();
+ io_write(io,reg,0x10050u); /* no source delivery while restoring */
+ bool drained=irq859_clear(lapic);
+ io_write(io,reg+1,high[2]);io_write(io,reg,low[2]);mmio_write(lapic,0xf0,svr);
+ live[IRQ859_VECTOR]=irq859_saved[IRQ859_VECTOR];
+ for(unsigned i=0;i<24;i++)if(io_read(io,0x10+2*i)!=low[i]||io_read(io,0x11+2*i)!=high[i])fail("859-ioapic-restore");
+ mmio_write(io,0,index);
+ const unsigned char *a=(const void *)live,*b=(const void *)irq859_saved;
+ for(unsigned i=0;i<4096;i++)if(a[i]!=b[i])fail("859-idt-restore");
+ __asm__ volatile("sidt %0":"=m"(dt));
+ struct irq859_expected e={root,IRQ859_IST,cs,(uintptr_t)irq859_wait_lo,(uintptr_t)irq859_wait_hi,irq859_wait_rsp};
+ struct irq859_observed o={irq842_root_seen,irq842_frame_seen,irq859_cs,irq859_rip,irq859_rsp,irq859_flags,irq807_hits,irq807_isr_seen,irq807_eoi_clear};
+ if(!drained||!irq859_clear(lapic)||!irq859_frame_ok(&e,&o)||e.rsp<stack_lo||e.rsp>=stack_hi||irq859_root()!=root||irq859_rflags()&0x200||dt.base!=idt_pa||dt.limit!=4095||mmio_read(io,0)!=index||mmio_read(lapic,0x80)!=tpr||mmio_read(lapic,0xf0)!=svr||inb(0x21)!=255||inb(0xa1)!=255)fail("859-final-proof");
+ arch_puts("STYLEOS S859 IRQ");fld("root",root);fld("idt",idt_pa);fld("ist",e.ist);fld("frame",o.frame);fld("cs",o.cs);fld("rip",o.rip);fld("wait-lo",e.wait_lo);fld("wait-hi",e.wait_hi);fld("rsp",o.rsp);fld("wait-rsp",e.rsp);fld("flags",o.rflags);fld("hits",o.hits);fld("isr",o.isr);fld("eoi",o.eoi);fld("pin",plan.pin);fld("low",low[2]);fld("high",high[2]);fld("svr",svr);fld("tpr",tpr);fld("drained",1);arch_putc('\n');
+}
 #endif
