@@ -129,6 +129,18 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #endif
  arch_puts("STYLEOS S848 END");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("vector",f->vector);fld848("error",f->error);fld848("cr2",id?0:cr2);fld848("state",terminal_state);fld848("ticks",ticks848);arch_putc('\n');return 0;
 }
+#ifdef STYLEOS_TEST_RUNTIME_SPARSE_862
+/* Both roots and FP storage are pre-audited by the parent fixture. Only
+ * registry/context admission is delayed; no new mapping is asserted here. */
+static void sparse_admit862(unsigned id,const struct s846_root child[2],uint64_t safe){
+ if(root848()!=safe||(flags848()&0x200)||runtime860->dispatcher.current!=-1||pr_snapshot(pr_global(),0,0,true)!=id||ws_snapshot(ws_global(),0,0)!=id)fail848("862-sparse-before");
+ if(id){const struct pr_entry *a=pr_find(pr_global(),pid860[0]);if(!a||a->state!=PR_READY||a->cpu_ticks!=1||runtime860->dispatcher.dispatches!=1)fail848("862-sparse-A");}
+ if(rt862_bank_admit(&bank862,runtime860,safe,id,handle860[id],child[id].built.root,id?"S860 B":"S860 A",&pid860[id])!=PS_OK||pr_account(pr_global(),pid860[id],handle860[id],0,3*P)!=PR_OK||ws_open_app(ws_global(),pr_global(),pid860[id],id?"S860 B":"S860 A",(struct ws_bounds){0,0,400,300},&win860[id])!=WS_OK)fail848("862-sparse-admit");
+ if(!id&&ws_set_minimized(ws_global(),pid860[id],win860[id],true)!=WS_OK)fail848("862-sparse-window");
+ for(unsigned j=0;j<15;j++)bank862.slots[id].context.gpr[j]=pattern848(id,j);
+ arch_puts("STYLEOS S862S ADMIT");fld848("id",id);fld848("pid",pid860[id]);fld848("handle",handle860[id]);fld848("root",child[id].built.root);fld848("safe",safe);fld848("dispatches",runtime860->dispatcher.dispatches);fld848("processes",pr_snapshot(pr_global(),0,0,true));fld848("windows",ws_snapshot(ws_global(),0,0));arch_putc('\n');
+}
+#endif
 void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2],uint64_t safe,uint64_t admitted_lapic
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
  ,bool (*audit)(void *),void *opaque
@@ -181,6 +193,14 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
 #else
  __asm__ volatile("lidt %0;lgdt %1"::"m"(i0),"m"(g0):"memory");
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_SPARSE_862
+ for(unsigned i=0;i<2;i++){
+  if(!leases[i].generation||leases[i].pages!=3||leases[i].owner!=(i?S846_OWNER_B:S846_OWNER_A)||!child[i].ready)fail848("862-sparse-lease");
+  handle860[i]=leases[i].generation;
+ }
+ if(!rt862_bank_open(&bank862,runtime860,safe,sel.cs,sel.ss))fail848("862-sparse-open");
+ sparse_admit862(0,child,safe);
+#else
  for(unsigned i=0;i<2;i++){
   if(!leases[i].generation||leases[i].pages!=3||leases[i].owner!=(i?S846_OWNER_B:S846_OWNER_A)||!child[i].ready)fail848("860-lease");
   handle860[i]=leases[i].generation;
@@ -193,13 +213,19 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
 #endif
  arch_puts("STYLEOS S860 READY");fld848("safe",safe);fld848("pid-a",pid860[0]);fld848("pid-b",pid860[1]);fld848("handle-a",handle860[0]);fld848("handle-b",handle860[1]);fld848("win-a",win860[0]);fld848("win-b",win860[1]);arch_putc('\n');
 #endif
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
  arch_puts("STYLEOS S861T READY");fld848("safe",safe);fld848("idt",(uintptr_t)idt848);fld848("cs",sel.cs);fld848("ss",sel.ss);fld848("limit",sel.limit);arch_putc('\n');
 #endif
  active848=true;
  arch_puts("STYLEOS S848 READY");fld848("safe",safe);fld848("a",child[0].built.root);fld848("b",child[1].built.root);fld848("lapic",lapic848);fld848("cs",sel.cs);fld848("ss",sel.ss);fld848("a-loop-end",sites848[0][1]);fld848("b-loop-end",sites848[1][1]);fld848("a-fault",sites848[0][2]);fld848("b-exit",sites848[1][2]);fld848("count",COUNT);arch_putc('\n');
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
- unsigned completed=0,expected_windows=2;
+ unsigned completed=0;
+#ifdef STYLEOS_TEST_RUNTIME_SPARSE_862
+ unsigned expected_windows=1;
+#else
+ unsigned expected_windows=2;
+#endif
  arch_puts("STYLEOS S862L READY");fld848("a",s862_loop_budget[0]);fld848("b",s862_loop_budget[1]);fld848("watchdog",32);arch_putc('\n');
  for(unsigned step=0;;step++){
   unsigned id;struct up_context ctx;uint64_t sp0,sp1;
@@ -214,6 +240,12 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
 #endif
   unsigned chosen;uint32_t chosen_pid;
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
+#ifdef STYLEOS_TEST_RUNTIME_SPARSE_862
+  if(step==1){
+   sparse_admit862(1,child,safe);++expected_windows;
+ arch_puts("STYLEOS S860 READY");fld848("safe",safe);fld848("pid-a",pid860[0]);fld848("pid-b",pid860[1]);fld848("handle-a",handle860[0]);fld848("handle-b",handle860[1]);fld848("win-a",win860[0]);fld848("win-b",win860[1]);arch_putc('\n');
+  }
+#endif
   if(receipt860)fail848("862-loop-receipt");
   enum ps_status selected=dpr_dispatch(runtime860,&chosen,&chosen_pid);
   if(selected==PS_EMPTY){
@@ -389,11 +421,21 @@ void s860_reap(uint64_t safe){
   if(!pe||pe->state!=(i?PR_EXITED:PR_FAULTED)||slot->pid!=pid860[i]||slot->handle!=handle860[i]||slot->root!=pe->page_root)fail848("862-bank-reap-binding");
   const unsigned char *bytes=(const void *)&slot->context;for(size_t j=0;j<sizeof slot->context;j++)if(bytes[j])fail848("862-context-zero");
  }
+#ifdef STYLEOS_TEST_RUNTIME_SPARSE_862
+ for(unsigned i=0;i<2;i++){
+  uint64_t child=bank862.slots[i].root;
+  if(rt862_bank_release(&bank862,runtime860,safe,i,pid860[i],handle860[i],child)!=PS_OK)fail848("862-sparse-release");
+  if(pr_find(pr_global(),pid860[i])||bank862.slots[i].pid||runtime860->dispatcher.slots[i].pid)fail848("862-sparse-residue");
+  arch_puts("STYLEOS S862S RELEASE");fld848("id",i);fld848("pid",pid860[i]);fld848("handle",handle860[i]);fld848("root",child);fld848("safe",safe);fld848("processes",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');
+ }
+#endif
  volatile unsigned char *wipe=(void *)&bank862;for(size_t j=0;j<sizeof bank862;j++)wipe[j]=0;
  for(size_t j=0;j<sizeof bank862;j++)if(wipe[j])fail848("862-bank-zero");
  arch_puts("STYLEOS S862B CLEAN");fld848("safe",safe);fld848("bank-zero",1);fld848("pending-zero",1);arch_putc('\n');
 #endif
+#ifndef STYLEOS_TEST_RUNTIME_SPARSE_862
  for(unsigned i=0;i<2;i++)if(dpr_release(runtime860,i,handle860[i])!=PS_OK)fail848("860-reap");
+#endif
  if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||runtime860->dispatcher.current!=-1||runtime860->dispatcher.dispatches!=10)fail848("860-reap-state");
  arch_puts("STYLEOS S860 CLEAN");fld848("safe",safe);fld848("dispatches",10);fld848("processes",0);fld848("windows",0);arch_putc('\n');
  arch_puts("STYLEOS S860 POLICY actual-cpl3-ticks=yes fp=yes existing-dispatcher=yes leases-released=yes production-cr3=deny\n");

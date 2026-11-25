@@ -28,7 +28,7 @@ def timer_site(efi,map_file):
         if id=='b' and _range(efi,off-2,2,'INT80')!=b'\xcd\x80':raise ValueError('S861T INT80 bytes')
     return site
 
-def verify(raw,rc,site,reference,*,budgets=(3,5)):
+def verify(raw,rc,site,reference,*,budgets=(3,5),sparse=False):
     try:
         ok,obs=roots_verify(raw,rc,site,reference)
         if not ok:raise ValueError(obs)
@@ -45,19 +45,24 @@ def verify(raw,rc,site,reference,*,budgets=(3,5)):
         def pos(prefix):return next(i for i,x in enumerate(lines) if x.startswith(prefix))
         image=int(lines[pos(b'STYLEOS MEMMAP IMAGE ')].split()[-2],16)
         ready=row(rows[0],b'READY',('safe','idt','cs','ss','limit'))
-        admission=parse860(pr[0],b'READY',('safe','pid-a','pid-b','handle-a','handle-b','win-a','win-b'))
+        admit=[x for x in pr if x.startswith(b'STYLEOS S860 READY ')];ev=[x for x in pr if x.startswith(b'STYLEOS S860 EVENT ')]
+        if len(admit)!=1 or len(ev)!=10:raise ValueError('S861T admission/event count')
+        admission=parse860(admit[0],b'READY',('safe','pid-a','pid-b','handle-a','handle-b','win-a','win-b'))
         handles=(r['gen-a'],r['gen-b'])
-        if tuple(ready.values())!=(safe,image+site['timer_idt_rva'],0x5b,0x63,0x67) or tuple(admission.values())!=(safe,1,2,*handles,1,2) or not lines.index(pr[0])<lines.index(rows[0])<pos(b'STYLEOS S848 READY '):raise ValueError('S861T admission')
+        if tuple(ready.values())!=(safe,image+site['timer_idt_rva'],0x5b,0x63,0x67) or tuple(admission.values())!=(safe,1,2,*handles,1,2) or not lines.index(rows[0])<pos(b'STYLEOS S848 READY '):raise ValueError('S861T admission')
         events=[x for x in lines if x.startswith((b'STYLEOS S848 TICK ',b'STYLEOS S848 END '))];backs=[x for x in lines if x.startswith(b'STYLEOS S848 BACK ')]
+        if sparse:
+            if not lines.index(backs[0])<lines.index(admit[0])<lines.index(rows[3]):raise ValueError('S861T delayed admission')
+        elif not lines.index(admit[0])<lines.index(rows[0]):raise ValueError('S861T initial admission')
         ticks=[0,0];frames=[];boundaries=[];records=[];ti=0
         for step,(id,terminal) in enumerate(fixture_order(budgets)):
             if not terminal:ticks[id]+=1
             f=row(rows[1+2*step],b'FRAME',('step','flags'))
             if f['step']!=step or not f['flags']&2 or f['flags']&~0xad7 or (not terminal and f['flags']!=obs['user_preempt_ticks'][ti]['flags']):raise ValueError('S861T flags')
             if not terminal:ti+=1
-            b=row(rows[2+2*step],b'BOUNDARY',('step','safe','gdt','idt','pid'));v=parse860(pr[step+1],b'EVENT',KEYS)
+            b=row(rows[2+2*step],b'BOUNDARY',('step','safe','gdt','idt','pid'));v=parse860(ev[step],b'EVENT',KEYS)
             if tuple(b.values())!=(step,safe,a['gdt'],a['idt'],id+1) or tuple(v.values())!=(step,id,id+1,handles[id],step+1,safe,r['ab'[id]],ticks[id],(4 if id else 5) if terminal else 1,12288,0 if terminal else id+1,0 if terminal else int(id==0)):raise ValueError('S861T dispatch')
-            if not lines.index(rows[1+2*step])<lines.index(events[step])<lines.index(rows[2+2*step])<lines.index(pr[step+1])<lines.index(backs[step]):raise ValueError('S861T order')
+            if not lines.index(rows[1+2*step])<lines.index(events[step])<lines.index(rows[2+2*step])<lines.index(ev[step])<lines.index(backs[step]):raise ValueError('S861T order')
             frames.append(f);boundaries.append(b);records.append(v)
         scrub=row(rows[-1],b'SCRUB',('safe','used','tables-zero','leases-zero'));clean=parse860(pr[-2],b'CLEAN',('safe','dispatches','processes','windows'))
         if tuple(scrub.values())!=(safe,0,1,1) or tuple(clean.values())!=(safe,10,0,0) or ticks!=list(budgets) or not lines.index(backs[-1])<pos(b'STYLEOS S849 POLICY ')<lines.index(rows[-1])<lines.index(pr[-2])<lines.index(POLICY)<pos(b'STYLEOS S861 CLEAN '):raise ValueError('S861T cleanup')
