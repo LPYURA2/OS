@@ -4,8 +4,8 @@
 #ifndef S863_DISPATCHES_PER_BATCH
 #define S863_DISPATCHES_PER_BATCH 10u
 #endif
-static _Alignas(4096) uint64_t child_tables861[2][PG_TABLE_PAGES][512];
-static struct s846_root children861[2];
+static _Alignas(4096) uint64_t child_tables861[S846_ROOT_COUNT][PG_TABLE_PAGES][512];
+static struct s846_root children861[S846_ROOT_COUNT];
 static struct s850_gop_plan frozen861;
 static const struct s842_root *base861;
 static bool preflight861(struct pg_experiment *p,const struct s842_root *base,const struct s850_gop_request *req){
@@ -25,7 +25,9 @@ static bool boundary861(const struct dpr_service *d,const struct s842_cache *cac
   d->dispatcher.dispatches<=S863_DISPATCHES_PER_BATCH*S863_LAUNCH_LIMIT&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
 #endif
  ((d->dispatcher.dispatches==
-#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ 26
+#elif defined(STYLEOS_TEST_RUNTIME_MIXED_863)
  12
 #else
  10
@@ -63,7 +65,11 @@ static __attribute__((noinline)) void roundtrip861(unsigned i,uint64_t root,uint
 struct user_audit861 {const struct s842_cache *cache;const struct boot_memory_evidence *e;const struct s846_guard *guard;const struct s844_arena *arena;const struct s844_lease *leases;};
 static bool user_audit861(void *opaque){
  const struct user_audit861 *a=opaque;
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt864_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,children861);
+#else
  return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt861_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,&children861[0],&children861[1]);
+#endif
 }
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
@@ -71,7 +77,7 @@ extern bool s848_trial(
 #else
 extern void s848_trial(
 #endif
-const struct s846_root [2],const struct s844_lease [2],uint64_t,uint64_t,bool (*)(void *),void *);
+const struct s846_root [S846_ROOT_COUNT],const struct s844_lease [S846_ROOT_COUNT],uint64_t,uint64_t,bool (*)(void *),void *);
 extern void s860_reap(uint64_t);
 #else
 extern void s847_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t,bool (*)(void *),void *);
@@ -80,6 +86,41 @@ extern void s863_coop_reap(uint64_t,const struct s844_lease [2]);
 #endif
 #endif
 #endif
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+static void guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena,const struct desktop_surface *s,uint64_t before){
+ const uint64_t safe=composed.built.root;const struct dpr_service *d=dpr_global_state();
+ struct s844_lease l[4];unsigned used;
+ if(!base861||!arena||!boundary861(d,cache)||!s844_count(arena,&used)||used||arena->next!=4||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-admit");
+ for(unsigned i=0;i<4;i++){
+  if(!s844_acquire(arena,S846_OWNER_A+i,3,&l[i])||!iszero861(l[i].pa,3*4096))fail("864-lease");
+  *(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)=UINT64_C(0x86110000)+i;
+ }
+ for(unsigned i=0;i<4;i++){
+  if(!s846_build(base861,cache,arena,l,i,guard,child_tables861[i],(uintptr_t)child_tables861[i],&children861[i]))fail("864-build");
+  arch_puts("STYLEOS S864 ROOT");field("id",i);field("safe",safe);field("child",children861[i].built.root);field("pa",l[i].pa);field("gen",l[i].generation);arch_putc('\n');
+ }
+ struct user_audit861 a={cache,p->evidence,guard,arena,l};
+ if(!user_audit861(&a))fail("864-joint-audit");
+ for(unsigned i=0;i<4;i++){
+  uint64_t r[5];roundtrip861(i,children861[i].built.root,safe,r);
+  for(unsigned j=0;j<4;j++)if(*(volatile uint64_t *)(uintptr_t)(l[j].pa+4096)!=((UINT64_C(0x86110000)+j)^(j<=i?UINT64_C(0x86100000):0)))fail("864-cross-isolation");
+  if(!boundary861(d,cache)||!user_audit861(&a))fail("864-switch-audit");
+  arch_puts("STYLEOS S864 SWITCH");field("id",i);field("child",children861[i].built.root);field("safe",safe);field("rip",r[0]);field("rsp",r[1]);field("cs",r[3]);field("flags",r[4]);field("frame",s851_frame_address);arch_putc('\n');
+ }
+ s848_trial(children861,l,safe,base861->lapic,user_audit861,&a);
+ if(!user_audit861(&a))fail("864-final-audit");
+ zero861(children861,sizeof children861);zero861(child_tables861,sizeof child_tables861);
+ if(!iszero861((uintptr_t)child_tables861,sizeof child_tables861))fail("864-table-zero");
+ for(unsigned i=0;i<4;i++)if(!s844_release(arena,S846_OWNER_A+i,l[i])||!iszero861(l[i].pa,3*4096))fail("864-release");
+ struct rt858_live v=capture861();
+ if(rt861_dispatcher(&v)!=d||!s844_count(arena,&used)||used)fail("864-reap-boundary");
+ s860_reap(safe);
+ uint64_t after=UINT64_C(14695981039346656037);const volatile uint32_t *fb=(const void *)(uintptr_t)s->base;
+ for(size_t i=0;i<(size_t)s->width*s->height;i++){uint32_t pixel=fb[i];for(unsigned j=0;j<4;j++){after^=(pixel>>(8*j))&255u;after*=UINT64_C(1099511628211);}}
+ if(after!=before||!boundary861(d,cache)||arena->next!=8||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-final");
+ arch_puts("STYLEOS S864 CLEAN");field("safe",safe);field("used",used);field("next",arena->next);field("tables-zero",1);field("leases-zero",1);field("fnv",after);arch_putc('\n');
+}
+#else
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
 static __attribute__((noinline)) bool
 #else
@@ -202,3 +243,5 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
 #endif
 #endif
 }
+
+#endif /* four guest */

@@ -35,6 +35,16 @@ bool rt864_roots_audit_set(const struct s842_root *base,const struct s850_gop_re
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)set[i]=&roots[i];
  return cross(arena,desktop,set,S846_ROOT_COUNT);
 }
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+bool rt864_roots_audit_frozen(const struct s842_root *base,const struct s842_cache *cache,const struct s850_gop_plan *proof,const struct boot_memory_evidence *e,const struct s844_arena *arena,const struct s844_lease leases[S846_ROOT_COUNT],const struct s846_guard *guard,const struct s850_desktop_root *desktop,const struct s846_root roots[S846_ROOT_COUNT]){
+ if(!base||!cache||!proof||!e||!arena||!leases||!guard||!desktop||!roots||
+    !s850_desktop_audit_frozen_861(base,cache,proof,e,guard,desktop)||
+    !s846_audit_set(base,cache,arena,leases,guard,roots))return false;
+ const struct s846_root *set[S846_ROOT_COUNT];
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++)set[i]=&roots[i];
+ return cross(arena,desktop,set,S846_ROOT_COUNT);
+}
+#endif
 #else
 bool rt861_roots_audit(const struct s842_root *base,const struct s850_gop_request *req,
  const struct s844_arena *arena,const struct s844_lease leases[2],const struct s846_guard *guard,

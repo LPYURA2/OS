@@ -8,6 +8,11 @@
 bool rt864_roots_audit_set(const struct s842_root *,const struct s850_gop_request *,
  const struct s844_arena *,const struct s844_lease [S846_ROOT_COUNT],const struct s846_guard *,
  const struct s850_desktop_root *,const struct s846_root [S846_ROOT_COUNT]);
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+bool rt864_roots_audit_frozen(const struct s842_root *,const struct s842_cache *,const struct s850_gop_plan *,const struct boot_memory_evidence *,
+ const struct s844_arena *,const struct s844_lease [S846_ROOT_COUNT],const struct s846_guard *,
+ const struct s850_desktop_root *,const struct s846_root [S846_ROOT_COUNT]);
+#endif
 #else
 bool rt861_roots_audit(const struct s842_root *,const struct s850_gop_request *,
  const struct s844_arena *,const struct s844_lease [2],const struct s846_guard *,

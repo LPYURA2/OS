@@ -301,4 +301,33 @@ s848_b_exit:
 .Lmxcsr_b849: .long 0x3f80
 #endif
 s848_b_end:
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+.macro extra848 name, tag
+.globl s848_\name\()_start,s848_\name\()_yield,s848_\name\()_loop_end,s848_\name\()_exit,s848_\name\()_end
+s848_\name\()_start:
+    movq %r14,%xmm14
+    movq %r15,%xmm15
+    fldz
+    ldmxcsr .Lmxcsr\name(%rip)
+    movq $1,%rax
+    int $0x80
+s848_\name\()_yield:
+    testq %rax,%rax
+    jnz .Lbad\name
+    movabs $\tag,%rax
+1:  incq (%rdi)
+    cmpq $0,8(%rdi)
+    je 1b
+s848_\name\()_loop_end:
+    movq $2,%rax
+    int $0x80
+s848_\name\()_exit:
+.Lbad\name:
+    ud2
+.Lmxcsr\name: .long 0x3f80
+s848_\name\()_end:
+.endm
+extra848 c,0x8480000200000000
+extra848 d,0x8480000300000000
+#endif
 #endif

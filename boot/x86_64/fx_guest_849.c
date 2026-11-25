@@ -6,9 +6,9 @@ static struct s849_image kernel_check;
 volatile uint64_t s849_live;
 static struct s849_bank bank;
 static uint64_t safe849;
-static unsigned seen[2];
+static unsigned seen[S846_ROOT_COUNT];
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
-extern const unsigned s862_loop_budget[2];
+extern const unsigned s862_loop_budget[S846_ROOT_COUNT];
 #endif
 static uint64_t cr3_849(void){uint64_t x;__asm__ volatile("mov %%cr3,%0":"=r"(x));return x;}
 static uint64_t flags849(void){uint64_t x;__asm__ volatile("pushfq;popq %0":"=r"(x));return x;}
@@ -18,9 +18,13 @@ static void field(const char *k,uint64_t x){arch_putc(' ');arch_puts(k);arch_put
 static bool mapped(const struct s846_root *r,const void *v,size_t n){uint64_t x=(uintptr_t)v;for(size_t i=0;i<r->plan.count;i++){const struct pg_mapping *m=&r->plan.maps[i];if(m->va==m->pa&&m->flags==PG_WRITE&&x>=m->va&&x-m->va<m->bytes&&n<=m->bytes-(x-m->va))return true;}return false;}
 static void scrub(void *p,size_t n){volatile uint8_t *b=p;while(n--)*b++=0;}
 static bool allzero(const void *p,size_t n){const uint8_t *b=p;while(n--)if(*b++)return false;return true;}
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+bool s849_guest_init(const struct s846_root child[S846_ROOT_COUNT],const struct s844_lease leases[S846_ROOT_COUNT],uint64_t safe){
+#else
 bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
+#endif
  if(safe849||s849_live||cr3_849()!=safe||(flags849()&0x200))return false;
- for(unsigned i=0;i<2;i++)if(!mapped(&child[i],&bank,sizeof bank)||!mapped(&child[i],&s849_kernel_image,sizeof s849_kernel_image)||!mapped(&child[i],&s849_user_capture,sizeof s849_user_capture)||!mapped(&child[i],&s849_user_restore,sizeof s849_user_restore)||!mapped(&child[i],&kernel_check,sizeof kernel_check)||!mapped(&child[i],(const void *)&s849_live,sizeof s849_live))return false;
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(!mapped(&child[i],&bank,sizeof bank)||!mapped(&child[i],&s849_kernel_image,sizeof s849_kernel_image)||!mapped(&child[i],&s849_user_capture,sizeof s849_user_capture)||!mapped(&child[i],&s849_user_restore,sizeof s849_user_restore)||!mapped(&child[i],&kernel_check,sizeof kernel_check)||!mapped(&child[i],(const void *)&s849_live,sizeof s849_live))return false;
  struct s849_caps c={0};uint32_t a,b,mask;
  __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c.leaf1_ecx),"=d"(c.leaf1_edx):"a"(1),"c"(0));
  __asm__ volatile("mov %%cr0,%0;mov %%cr4,%1":"=r"(c.cr0),"=r"(c.cr4));
@@ -28,7 +32,18 @@ bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
  if(!s849_admit(&c,&mask))return false;
  __asm__ volatile("fxsave64 %0":"=m"(s849_kernel_image)::"memory");
  c.mxcsr_mask=u32(s849_kernel_image.bytes+28);
- if(!s849_init(&bank,&c,child[0].built.root,child[1].built.root)||!s849_image_valid(&s849_kernel_image,bank.mxcsr_mask)||(bank.mxcsr_mask&0x3f80)!=0x3f80)return false;
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ uint64_t roots[S846_ROOT_COUNT],generations[S846_ROOT_COUNT];
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++){
+  if(child[i].lease.generation!=leases[i].generation||child[i].lease.pa!=leases[i].pa)return false;
+  roots[i]=child[i].built.root;generations[i]=leases[i].generation;
+ }
+ if(!s849_init_set(&bank,&c,roots,generations))return false;
+ if(
+#else
+ if(!s849_init(&bank,&c,child[0].built.root,child[1].built.root)||
+#endif
+ !s849_image_valid(&s849_kernel_image,bank.mxcsr_mask)||(bank.mxcsr_mask&0x3f80)!=0x3f80)return false;
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
  seen[0]=seen[1]=0;
 #endif
@@ -60,14 +75,18 @@ bool s849_guest_bind_leases(const struct s844_lease leases[2],bool reused){
 }
 #define FX_GEN(i) bank.slot[i].generation
 #else
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#define FX_GEN(i) bank.slot[i].generation
+#else
 #define FX_GEN(i) 1
 #endif
+#endif
 bool s849_guest_dispatch(unsigned id,uint64_t root){
- if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||s849_live||id>1||!s849_dispatch(&bank,id,root,FX_GEN(id),&s849_user_restore))return false;
+ if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||s849_live||id>=S846_ROOT_COUNT||!s849_dispatch(&bank,id,root,FX_GEN(id),&s849_user_restore))return false;
  scrub(&s849_user_capture,sizeof s849_user_capture);s849_live=1;return true;
 }
 bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
- if(!safe849||id>1||cr3_849()!=root||(flags849()&0x200)||s849_live!=2||!s849_suspend(&bank,id,root,FX_GEN(id),&s849_user_capture))return false;
+ if(!safe849||id>=S846_ROOT_COUNT||cr3_849()!=root||(flags849()&0x200)||s849_live!=2||!s849_suspend(&bank,id,root,FX_GEN(id),&s849_user_capture))return false;
  /* Fixtures set XMM14/15 once, before recording integer progress. All
   * other XMM lanes stay zero. Verify each actual trap capture. */
  uint64_t x14=UINT64_C(0x8480000000000000)|((uint64_t)id<<32)|13;
@@ -95,6 +114,9 @@ bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
  return true;
 }
 bool s849_guest_finish(uint64_t safe){
+#ifdef STYLEOS_TEST_FOUR_GUEST_864
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(seen[i]!=s862_loop_budget[i]+2)return false;
+#endif
  if(safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
@@ -106,7 +128,7 @@ bool s849_guest_finish(uint64_t safe){
  ||seen[0]!=4||seen[1]!=6
 #endif
  ||bank.active!=-1)return false;
- for(unsigned i=0;i<2;i++)if(!s849_retire(&bank,i,bank.slot[i].root,FX_GEN(i))||!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(!s849_retire(&bank,i,bank.slot[i].root,FX_GEN(i))||!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
  scrub(&s849_kernel_image,sizeof s849_kernel_image);scrub(&bank,sizeof bank);safe849=0;
  if(!allzero(&s849_kernel_image,sizeof s849_kernel_image)||!allzero(&bank,sizeof bank)||!allzero(&s849_user_capture,sizeof s849_user_capture)||!allzero(&s849_user_restore,sizeof s849_user_restore)||!allzero(&kernel_check,sizeof kernel_check))return false;
  arch_puts("STYLEOS S849 CLEAN slots-zero=yes kernel-copy-zero=yes\n");return true;
