@@ -34,6 +34,12 @@ def main(p):
     for i in range(len(blocks)):
         reject(''.join(blocks[:i]+blocks[i+1:]));reject(''.join(blocks[:i]+[blocks[i]]+blocks[i:]))
         if i+1<len(blocks):reject(''.join(blocks[:i]+[blocks[i+1],blocks[i]]+blocks[i+2:]))
+        if i>=3:
+            # Challenge every bit in every user GPR of every actual CPL3 event.
+            fields=list(re.finditer(r'\b(?:RAX|RBX|RCX|RDX|RSI|RDI|RBP|R(?:[89]|1[0-5]))\s*=([0-9a-fA-F]{16})\b',blocks[i]))
+            if len(fields)!=15:raise ValueError('S863C actual GPR field count')
+            for field in fields:
+                a,z=field.span(1);bits(heads[i].start()+a,heads[i].start()+z)
         if int(heads[i][2],16)==14:
             h=re.search(r'^CR0=[^\n]*\bCR2=([0-9a-fA-F]+)',blocks[i],re.M)
             a,z=h.span(1);bits(heads[i].start()+a,heads[i].start()+z)

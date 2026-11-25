@@ -1,6 +1,6 @@
 """S863 cooperative bank proof: raw UART plus independently recorded CPU events."""
 import re
-from runtime_user_861_verify import user_site,trace_check,HEADER
+from runtime_user_861_verify import user_site,trace_check as base_trace_check,HEADER
 from runtime_roots_861_verify import verify as roots_verify
 def verify(raw,rc,site,ref):
     try:
@@ -37,3 +37,33 @@ def verify(raw,rc,site,ref):
         if [lines.index(x) for x in order]!=sorted(lines.index(x) for x in order):raise ValueError('S863C phase order')
         obs.update(process_traps=traps,user_frames=frames,user_ready=ready,coop_commits=commits,user_clean=clean);return True,obs
     except (ValueError,KeyError,IndexError,TypeError,StopIteration) as e:return False,str(e)
+
+
+# The linked fixture deliberately uses a small known set of registers.
+# Compare all 15 actual user GPRs, not only the UART receipt and trap PC.
+USER_GPRS=('RAX','RBX','RCX','RDX','RSI','RDI','RBP','R8','R9','R10','R11','R12','R13','R14','R15')
+def user_registers(block,n):
+    if not 0<=n<8:raise ValueError('S863C register event')
+    i=n%2;stage=n//2
+    values={}
+    for k in USER_GPRS:
+        matches=re.findall(r'\b'+k+r'\s*=([0-9a-fA-F]{16})\b',block)
+        if len(matches)!=1:raise ValueError('S863C register schema '+k)
+        values[k]=int(matches[0],16)
+    expected=dict.fromkeys(USER_GPRS,0)
+    expected.update(RAX=3 if stage<2 else 1 if stage==2 else 2 if i else 0,
+                    RBX=0x12000000 if stage==0 else 0x400000003000,RCX=8)
+    if stage>=2:expected.update(RDI=0x12000000,R12=0x847000+i)
+    if stage==3:expected['R13']=0x847000+i
+    if values!=expected:raise ValueError('S863C actual user registers')
+    return values
+def trace_check(text,obs):
+    records=base_trace_check(text,obs)
+    if len(records)!=11:raise ValueError('S863C real event count')
+    headers=list(HEADER.finditer(text))
+    first=next((i for i,h in enumerate(headers) if int(h[1])==records[3][0]),None)
+    if first is None or len(headers)-first!=8:raise ValueError('S863C register trace extent')
+    for n,h in enumerate(headers[first:]):
+        end=headers[first+n+1].start() if n<7 else len(text)
+        user_registers(text[h.start():end],n)
+    return records
