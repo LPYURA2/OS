@@ -63,6 +63,9 @@ void paging_experiment(const struct boot_memory_evidence *);
 /* Prepare validates platform configuration and adds only critical mappings.
  * Activate consumes a completely validated result, then reads hardware state. */
 enum pg_error arch_paging_prepare(struct pg_experiment *);
+#ifdef STYLEOS_PROVISIONED_STORAGE_864
+enum pg_error arch_paging_finish_owned_prepare_864(struct pg_experiment *);
+#endif
 enum pg_error arch_paging_activate(struct pg_experiment *);
 #ifdef STYLEOS_TEST_FRAME_GRANTS
 /* Actual inherited CR3 walk; image-owned, WB, present, writable identity only.

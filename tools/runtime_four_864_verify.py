@@ -142,6 +142,13 @@ def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count
         gen0=1 if cold else 4
         ok,o=prior(prefix,rc,site['rva'],ref,cold=cold,host_quit=host_quit)
         if not ok:raise ValueError(o)
+        if provisioned:
+            direct=[x for x in lines if x.startswith(b'STYLEOS OWNED BOOT ')]
+            before=[x for x in lines if x.startswith(b'STYLEOS PAGING X86 BEFORE ')]
+            if len(direct)!=1 or len(before)!=1 or not lines.index(before[0])<lines.index(direct[0])<lines.index(marker):raise ValueError('direct owned boot order')
+            fields=row(direct[0],b'STYLEOS OWNED BOOT',('inherited','cr0'))
+            if fields['inherited']!=o['root']['inherited'] or not fields['cr0']&(1<<16):raise ValueError('direct inherited root or WP')
+            if any(x.startswith((b'STYLEOS PAGING ROOT ',b'STYLEOS PAGING ALIAS ',b'STYLEOS PAGING X86 AFTER ',b'STYLEOS PAGING X86 RETURN ',b'STYLEOS GRANTS ',b'STYLEOS DGB PASS',b'STYLEOS DSI 782 ',b'STYLEOS TGD 783 ')) for x in lines):raise ValueError('diagnostic roundtrip reached')
         lines=raw.splitlines()
         begins=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S864 BATCH-BEGIN ')]
         ends=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S864 BATCH-END ')]

@@ -1,6 +1,9 @@
 #include "styleos/arch.h"
 #include "styleos/paging.h"
 #include "styleos/boot_pool.h"
+#ifdef STYLEOS_PROVISIONED_STORAGE_864
+#include "styleos/owned_low_trial_790.h"
+#endif
 #ifdef STYLEOS_TEST_FRAME_GRANTS
 #include "styleos/frame_grant_proof.h"
 #endif
@@ -99,6 +102,13 @@ void paging_experiment(const struct boot_memory_evidence *e)
     if (s->data_pa != storage.data.start || s->plan.tables_pa != storage.tables.start)
         paging_fail("image physical correspondence");
     s->plan.maps[1].pa = s->data_pa;
+#ifdef STYLEOS_PROVISIONED_STORAGE_864
+    /* The guarded PE builder independently attests its own storage and
+     * constructs the final root. Do not run the temporary RWX roundtrip or
+     * historical frame-grant/descriptor negative fixtures on this route. */
+    if(arch_paging_finish_owned_prepare_864(s)!=PG_OK)paging_fail("owned boot inherited proof");
+    s790_terminal_trial(s);
+#endif
     for (size_t i = 0; i < s->plan.count; ++i) {
         struct pg_mapping *m = &s->plan.maps[i];
         map_line("MAP", m->va, m->pa, m->bytes, m->flags);

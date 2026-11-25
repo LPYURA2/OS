@@ -192,8 +192,8 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     expect(req[-1],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted'),(root,4,104,0))
     exits=rows(b'STYLEOS S863 EXIT')
     if provisioned:
-        events=rows(b'STYLEOS S863 EVENT')
-        if exits or len(events)<2 or b' key=0x0000000000000058 ' not in events[-2] or b' key=0x0000000000000040 ' not in events[-1] or b' writes=0x0000000000000000' in events[-1] or not prev<lines.index(req[-1])<lines.index(events[-2])<lines.index(events[-1]):raise ValueError('live post-workload input proof')
+        input_events=rows(b'STYLEOS S863 EVENT')
+        if exits or len(input_events)<2 or b' key=0x0000000000000058 ' not in input_events[-2] or b' key=0x0000000000000040 ' not in input_events[-1] or b' writes=0x0000000000000000' in input_events[-1] or not prev<lines.index(req[-1])<lines.index(input_events[-2])<lines.index(input_events[-1]):raise ValueError('live post-workload input proof')
     elif len(exits)!=1 or not prev<lines.index(req[-1])<lines.index(exits[0]) or exits[0].split()[-2:]!=[b'dispatches=0x0000000000000068',b'used=0x0000000000000000']:raise ValueError('four storage exit')
     if before!=104 or workload!=[x for x in lines if x.startswith(tags)]:raise ValueError('four storage workload scope')
     io=[rows(b'STYLEOS S864 '+x) for x in (b'HOLD',b'SAVED',b'RESUME')]

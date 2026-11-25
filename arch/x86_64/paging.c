@@ -27,6 +27,9 @@ struct x86_state {
     uint64_t cr0, cr3, cr4, efer, pat, rflags;
     unsigned bits;
     int nx, one_gib, prepared;
+#ifdef STYLEOS_PROVISIONED_STORAGE_864
+    const struct pg_experiment *direct_owner;
+#endif
     uint64_t pa_mask;
     struct descriptor_pointer gdtr, idtr;
     uint16_t cs;
@@ -392,6 +395,33 @@ enum pg_error arch_paging_prepare(struct pg_experiment *x)
     return PG_OK;
 }
 
+#ifdef STYLEOS_PROVISIONED_STORAGE_864
+/* Consume the already validated inherited snapshot without installing the
+ * historical RWX/alias root. The final guarded PE root is built separately.
+ * No new mappings or frame grants are provided by this step. */
+enum pg_error arch_paging_finish_owned_prepare_864(struct pg_experiment *x)
+{
+    struct x86_state *s=&saved;
+    if(!x||x!=&styleos_paging_control.state||!s->prepared||s->direct_owner||
+       !x->evidence||x->old_root!=s->cr3||x->result.error||x->result.root||x->result.used||
+       read_cr3()!=s->cr3||read_cr0()!=s->cr0||read_cr4()!=s->cr4||
+       read_msr(0xc0000080u)!=s->efer||read_msr(0x277u)!=s->pat||read_flags()&BIT(9)||
+       !image_identity(s,x->evidence->live.image)||!identity_tables(s))return PG_PLATFORM;
+    struct x86_state d={0};read_descriptors(&d);
+    if(d.gdtr.base!=s->gdtr.base||d.gdtr.limit!=s->gdtr.limit||d.idtr.base!=s->idtr.base||
+       d.idtr.limit!=s->idtr.limit||d.cs!=s->cs||
+       load64((const volatile unsigned char *)(uintptr_t)(s->gdtr.base+s->cs))!=s->code_descriptor)return PG_PLATFORM;
+    /* Same WP enforcement as the historical transition, but no MOV CR3. */
+    uint64_t wp=s->cr0|BIT(16);
+    if(wp!=s->cr0)__asm__ volatile("mov %0,%%cr0"::"r"(wp):"memory");
+    if(read_cr0()!=wp||read_cr3()!=s->cr3||read_cr4()!=s->cr4||
+       read_msr(0xc0000080u)!=s->efer||read_msr(0x277u)!=s->pat||read_flags()&BIT(9))return PG_PLATFORM;
+    s->prepared=0;s->direct_owner=x;x->after_mode=wp;
+    arch_puts("STYLEOS OWNED BOOT");field(" inherited=",read_cr3());field(" cr0=",wp);arch_putc('\n');
+    return PG_OK;
+}
+#endif
+
 enum pg_error arch_paging_activate(struct pg_experiment *x)
 {
     struct x86_state *s = &saved;
@@ -589,15 +619,20 @@ enum pg_error arch_paging_attest_image_writable(struct pg_experiment *x,
     /* arch_paging_activate deliberately consumed 'prepared'.  Here we
      * require that activation finished AND the inherited root has really
      * been restored; accepting a stale before-activation flag is unsafe. */
-    if(!x || s->prepared || !x->evidence || !bytes ||
-       x->result.error != PG_OK || !x->result.root ||
-       x->result.root == s->cr3 || x->old_root != s->cr3 ||
+    if(!x || s->prepared || !x->evidence || !bytes || x->old_root != s->cr3 ||
        (va | bytes) & (PG_PAGE-1u) ||
        read_cr3()!=s->cr3 || read_cr0()!=(s->cr0 | BIT(16)) ||
        read_cr4()!=s->cr4 || read_msr(0xc0000080u)!=s->efer ||
        read_msr(0x277u)!=s->pat || read_flags() & BIT(9) ||
        !writable_identity(s,va,bytes,x->evidence->live.image) ||
        !identity_tables(s)) return PG_PLATFORM;
+#ifdef STYLEOS_PROVISIONED_STORAGE_864
+    if(s->direct_owner){
+        if(x!=s->direct_owner||x->result.error||x->result.root||x->result.used||x->after_mode!=(s->cr0|BIT(16)))return PG_PLATFORM;
+        return PG_OK;
+    }
+#endif
+    if(x->result.error!=PG_OK||!x->result.root||x->result.root==s->cr3)return PG_PLATFORM;
     return PG_OK;
 }
 #ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
