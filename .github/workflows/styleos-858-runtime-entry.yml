@@ -1,7 +1,7 @@
 name: StyleOS 858 runtime services under owned root
 on:
   push:
-    branches: [feature/styleos-runtime-entry-858, feature/styleos-runtime-irq-859, feature/styleos-runtime-tick-860, feature/styleos-runtime-join-861, feature/styleos-runtime-select-862]
+    branches: [feature/styleos-runtime-entry-858, feature/styleos-runtime-irq-859, feature/styleos-runtime-tick-860, feature/styleos-runtime-join-861, feature/styleos-runtime-select-862, feature/styleos-desktop-runtime-863]
   workflow_dispatch:
 jobs:
   runtime-entry:

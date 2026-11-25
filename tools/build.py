@@ -450,7 +450,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
                    for name in dict.fromkeys(sources)]
         if test_desktop_input_853:
             sources.append("kernel/desktop_frame_io_852.c")
-    if test_runtime_entry_858:
+    if desktop_v0 or test_runtime_entry_858:
         sources += ["kernel/runtime_entry_858.c"]
     if test_storage_ata_read_857:
         sources += ["kernel/ata_diag_857.c"]

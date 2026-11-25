@@ -13,6 +13,7 @@
 #include "styleos/desktop_process_runtime.h"
 #include "styleos/user_session_runtime.h"
 #include "styleos/native_window_channel.h"
+#include "styleos/runtime_entry_858.h"
 #endif
 #ifdef STYLEOS_TEST_DISK_APP
 #include "styleos/disk_app_demo.h"
@@ -67,32 +68,15 @@ _Noreturn void kernel_main(const struct boot_info *info)
         arch_puts("STYLEOS DESKTOP ERROR framebuffer or map\n");
         arch_halt();
     }
-    /* Runtime state outlives shell UI and initially contains ZERO process
-     * entries, until real scheduler admission has been integrated. */
-    if (pr_snapshot(pr_global(), 0, 0, false) != 0 ||
-        ws_snapshot(ws_global(), 0, 0) != 0) {
-        arch_puts("STYLEOS RUNTIME SERVICE ERROR\n");
+    /* Reuse the same cold-start contract as the audited owned-root path.
+     * Ordinary boot still uses its inherited root; no new hardware grant. */
+    const uint64_t root = dpr_arch_safe_root();
+    if (!rt863_bootstrap(root) || !rt863_bootstrap_ready(root) ||
+        dpr_arch_safe_root() != root) {
+        arch_puts("STYLEOS DESKTOP RUNTIME SERVICE ERROR\n");
         arch_halt();
     }
-    if (dpr_global_start(dpr_arch_safe_root()) != DPR_OK ||
-        !dpr_global_state() ||
-        pr_snapshot(dpr_global_state()->dispatcher.registry, 0, 0, false)) {
-        arch_puts("STYLEOS DESKTOP SCHEDULER ERROR\n");
-        arch_halt();
-    }
-    if (usr_global_start() != USR_OK || !usr_global() ||
-        usr_global()->selected_session ||
-        usr_global()->next_session != 1) {
-        arch_puts("STYLEOS USER SESSION SERVICE ERROR\n");
-        arch_halt();
-    }
-    /* No fake PIDs, no account selection, no app surface at ordinary boot.
-     * This broker stores only kernel-owned, bounded window IPC state. */
-    if (nwc_global_start() != NWC_OK || !nwc_global() ||
-        nwc_port_count(nwc_global()) != 0) {
-        arch_puts("STYLEOS DESKTOP WINDOW IPC SERVICE ERROR\n");
-        arch_halt();
-    }
+    arch_puts("STYLEOS DESKTOP SHARED BOOTSTRAP PASS\n");
     arch_puts("STYLEOS DESKTOP WINDOW IPC READY ports=0\n");
     arch_puts("STYLEOS DESKTOP USER SESSION SERVICE READY sessions=0\n");
     arch_puts("STYLEOS DESKTOP SCHEDULER READY registered=0\n");

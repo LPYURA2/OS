@@ -1,7 +1,7 @@
 name: StyleOS 861 shared runtime host contracts
 on:
   push:
-    branches: [feature/styleos-runtime-join-861, feature/styleos-runtime-select-862]
+    branches: [feature/styleos-runtime-join-861, feature/styleos-runtime-select-862, feature/styleos-desktop-runtime-863]
   workflow_dispatch:
 permissions:
   contents: read

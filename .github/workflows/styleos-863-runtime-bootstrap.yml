@@ -1,0 +1,43 @@
+name: StyleOS 863 shared ordinary and owned-root bootstrap
+on:
+  push:
+    branches: [feature/styleos-desktop-runtime-863]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld
+      - name: Cold-start contract and sticky refusals on GCC and Clang
+        run: |
+          set -euo pipefail
+          mkdir -p build/s863-host
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -Iinclude tests/test_runtime_bootstrap_863.c kernel/{runtime_entry_858,desktop_process_runtime,process_scheduler,process_runtime,window_service,user_session_runtime,native_window_channel}.c -o "build/s863-host/$cc"
+            for mode in ordinary owned dpr usr ipc pid-counter serial window-counter compositor unused-row unused-window dead-process; do
+              "build/s863-host/$cc" "$mode"
+            done | tee "build/s863-host/$cc.log"
+          done
+      - name: Build ordinary Desktop and verify linked shared-bootstrap calls
+        run: |
+          set -euo pipefail
+          python3 tools/build.py --arch x86_64 --desktop-v0 --output build/s863-desktop
+          python3 tools/test_runtime_bootstrap_863_verify.py --efi build/s863-desktop/x86_64/BOOTX64.EFI --map build/s863-desktop/x86_64/kernel.map
+      - name: Preserve host and linked image evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-863-shared-bootstrap
+          path: |
+            build/s863-host/*.log
+            build/s863-desktop/manifest.json
+            build/s863-desktop/x86_64/BOOTX64.EFI
+            build/s863-desktop/x86_64/kernel.map
+          if-no-files-found: warn

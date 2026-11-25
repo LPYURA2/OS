@@ -3,7 +3,8 @@
 #include <styleos/user_session_runtime.h>
 #include <styleos/native_window_channel.h>
 #define BIT(n) (UINT64_C(1)<<(n))
-static unsigned phase;
+static unsigned phase, bootstrap_phase;
+static uint64_t bootstrap_root;
 static uint64_t active_root;
 #ifdef STYLEOS_TEST_RUNTIME_JOIN_861
 #include <styleos/runtime_tick_860.h>
@@ -30,18 +31,37 @@ static bool empty(uint64_t root){
  for(unsigned i=0;i<PS_MAX_SLOTS;i++)if(d->dispatcher.slots[i].pid||d->dispatcher.slots[i].handle||d->dispatcher.slots[i].user_root)return false;
  return true;
 }
+/* Shared cold-start contract for both ordinary and owned-root Desktop.
+ * No CR3 switch, device access, task admission or hardware attestation here. */
+static bool zero_bytes(const void *p,size_t n){
+ const unsigned char *b=p;for(size_t i=0;i<n;i++)if(b[i])return false;return true;
+}
+static bool pristine(void){
+ const struct pr_table *p=pr_global();const struct ws_service *w=ws_global();
+ return p->next_pid==1&&!p->change_serial&&w->next_id==1&&w->compositor_generation==1&&
+  zero_bytes(p->processes,sizeof p->processes)&&zero_bytes(w->windows,sizeof w->windows);
+}
+bool rt863_bootstrap(uint64_t root){
+ if(bootstrap_phase||!page(root))return false;
+ bootstrap_phase=1; /* a valid-root attempt is one-shot, including refusal */
+ if(dpr_global_state()||usr_global()||nwc_global()||!pristine())return false;
+ if(dpr_global_start(root)!=DPR_OK||usr_global_start()!=USR_OK||nwc_global_start()!=NWC_OK||!empty(root)||!pristine())return false;
+ bootstrap_root=root;bootstrap_phase=2;return true;
+}
+bool rt863_bootstrap_ready(uint64_t root){
+ return bootstrap_phase==2&&root==bootstrap_root&&empty(root)&&pristine();
+}
 bool rt858_start(const struct rt858_expected *e,const struct rt858_live *v){
  if(phase||!rt858_validate(e,v))return false;
  phase=1; /* sticky refusal on any partial startup */
- if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||dpr_global_state())return false;
- if(dpr_global_start(e->root)!=DPR_OK||usr_global_start()!=USR_OK||nwc_global_start()!=NWC_OK||!empty(e->root))return false;
+ if(!rt863_bootstrap(e->root))return false;
  active_root=e->root;
 #ifdef STYLEOS_TEST_RUNTIME_JOIN_861
  started_contract=*e;
 #endif
  phase=2;return true;
 }
-bool rt858_ready(uint64_t root){return phase==2&&root==active_root&&empty(root);}
+bool rt858_ready(uint64_t root){return phase==2&&root==active_root&&rt863_bootstrap_ready(root);}
 
 #ifdef STYLEOS_TEST_RUNTIME_JOIN_861
 /* Trusted supervisor snapshot, NOT a CPU attestation. Call only between

@@ -1,7 +1,7 @@
 name: StyleOS 862 registry-driven bounded dispatch loop
 on:
   push:
-    branches: [feature/styleos-runtime-select-862]
+    branches: [feature/styleos-runtime-select-862, feature/styleos-desktop-runtime-863]
   workflow_dispatch:
 permissions:
   contents: read
