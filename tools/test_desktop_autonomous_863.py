@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Cold boot without external permission/input, storage fail-closed, actual tasks."""
-import argparse,hashlib,json,shutil,subprocess,sys
+import argparse,hashlib,json,os,shutil,subprocess,sys
 from pathlib import Path
 from test_desktop_v0 import Desktop
 from test_desktop_interactive_863 import wait,recycle_site
@@ -8,6 +8,35 @@ from test_desktop_storage_service_863 import verify_cold
 from test_desktop_frame_852_host import reference
 from test import ROOT,firmware_path
 def sha(b):return hashlib.sha256(b).hexdigest()
+def verify_preview_media(iso,efi,out):
+    """Bind the firmware boot extent AND the ordinary ISO copy to the linked EFI."""
+    folder=out/'iso-evidence';folder.mkdir()
+    report=subprocess.run(['xorriso','-indev',str(iso),'-report_el_torito','plain'],
+                          check=True,capture_output=True,text=True).stdout
+    (folder/'el-torito.txt').write_text(report)
+    rows=[line.split(':',1)[1].split() for line in report.splitlines()
+          if line.startswith('El Torito boot img :')]
+    if len(rows)!=1 or len(rows[0])!=8 or rows[0][1:4]!=['UEFI','y','none']:
+        raise ValueError('preview must have exactly one bootable UEFI no-emulation entry')
+    lba=int(rows[0][-1])
+    if lba<16:raise ValueError('invalid EFI boot extent')
+    esp=folder/'EFI_BOOT.IMG';tree_efi=folder/'tree-BOOTX64.EFI';boot_efi=folder/'boot-BOOTX64.EFI'
+    subprocess.run(['xorriso','-osirrox','on','-indev',str(iso),
+                    '-extract','/EFI_BOOT.IMG',str(esp),
+                    '-extract','/EFI/BOOT/BOOTX64.EFI',str(tree_efi)],check=True)
+    image=esp.read_bytes()
+    if len(image)!=16*1024*1024:raise ValueError('unexpected EFI partition size')
+    with iso.open('rb') as stream:
+        stream.seek(lba*2048)
+        if stream.read(len(image))!=image:raise ValueError('catalog boot extent differs from ISO ESP')
+    subprocess.run(['mcopy','-i',str(esp),'::/EFI/BOOT/BOOTX64.EFI',str(boot_efi)],
+                   check=True,env={**os.environ,'MTOOLSRC':os.devnull})
+    expected=efi.read_bytes()
+    if tree_efi.read_bytes()!=expected or boot_efi.read_bytes()!=expected:
+        raise ValueError('packaged EFI differs from linked executable')
+    return dict(boot_lba=lba,esp_sha256=sha(image),tree_efi_sha256=sha(tree_efi.read_bytes()),
+                boot_efi_sha256=sha(boot_efi.read_bytes()))
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--preview',action='store_true');args=p.parse_args();preview=args.preview;out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build'
@@ -22,9 +51,11 @@ def main():
     shutil.copyfile(vars,out/'OVMF_VARS.fd');serial=out/'serial.log';trace=out/'cpu-trace.log'
     boot=build/'x86_64/styleos.img';before=sha(boot.read_bytes())
     cmd=[q,'-machine','q35','-accel','tcg,thread=single','-smp','1','-rtc','base=2026-11-25T12:34:00,clock=vm','-m','128M','-display','none','-vga','std','-serial',f'file:{serial}','-monitor','none','-qmp','stdio','-net','none','-no-reboot','-device','isa-debug-exit,iobase=0xf4,iosize=0x04','-drive',f'if=pflash,format=raw,readonly=on,file={code}','-drive',f'if=pflash,format=raw,file={out/"OVMF_VARS.fd"}','-drive',f'if=none,id=styleos,format=raw,readonly=on,file={boot}','-device','virtio-blk-pci,drive=styleos','-d','int,guest_errors','-D',str(trace)]
+    media_evidence=None
     if preview:
         # Boot the packaged ISO, not a substitute raw image. No debug exit device.
         iso=build/'x86_64/StyleOS-owned-root-preview.iso';iso_before=sha(iso.read_bytes())
+        media_evidence=verify_preview_media(iso,efi,out)
         for device in ('isa-debug-exit,iobase=0xf4,iosize=0x04','virtio-blk-pci,drive=styleos'):
             i=cmd.index(device);del cmd[i-1:i+1]
         i=cmd.index(f'if=none,id=styleos,format=raw,readonly=on,file={boot}');del cmd[i-1:i+1]
@@ -79,6 +110,6 @@ def main():
     cold=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863B COLD '))
     prefix=b'\n'.join(lines[:cold])+b'\n'
     root,events=verify_cold(lines,prefix,data,site,ref,out,True,repeatable=True,live_preview=preview)
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,host_exit=rc),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,autonomous_boot=True,storage_authorized=False,root=root,cpu_events=events,uart_sha256=sha(raw),trace_sha256=sha(data),efi_sha256=sha(efi.read_bytes()),boot_sha256=before,preview_iso=preview,iso_sha256=iso_before if preview else None,iso_media=media_evidence,host_exit=rc),indent=2))
     print('S863 autonomous cold shell PASS: no pre-ready input or disk permission, 49 CPU events, four independent launch cycles, no storage writes')
 if __name__=='__main__':main()

@@ -66,6 +66,15 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
         names=['note','after-first-launch','after-tasks']+([f'after-launch-{i}' for i in range(3,count+1)] if repeatable else [])
         frames=[Frame(folder/(name+'.ppm')) for name in names]
         if any((x.w,x.h,x.pixels)!=(frames[0].w,frames[0].h,frames[0].pixels) for x in frames[1:]):raise ValueError('QMP screen changed across launch')
+        if live_preview:
+            # Independently bind QMP RGB pixels to the guest's BGR0 frame receipt.
+            from test_desktop_interactive_863 import fnv_text
+            first=frames[0]
+            if (first.w,first.h)!=(1280,800):raise ValueError('preview display mode')
+            pixels=first.pixels
+            raw=bytearray(first.w*first.h*4)
+            raw[0::4]=pixels[2::3];raw[1::4]=pixels[1::3];raw[2::4]=pixels[0::3]
+            if fnv_text(raw)!=frame:raise ValueError('preview actual framebuffer receipt mismatch')
         exits=[x for x in lines if x.startswith(b'STYLEOS S863 EXIT ')]
         if live_preview:
             if exits:raise ValueError('preview unexpectedly executed test exit')
