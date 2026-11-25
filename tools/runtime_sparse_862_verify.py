@@ -16,10 +16,10 @@ def sparse_site(efi,map_file):
         _range(efi,ro+rel,1,'S862S entry byte');site[name+'_rva']=rva
     return site
 
-def verify(raw,rc,site,reference):
+def verify(raw,rc,site,reference,*,epoch=0):
     try:
         if not all(site.get(x+'_rva') for x in ('sparse_admit862','rt862_bank_open','rt862_bank_admit','rt862_bank_release')):raise ValueError('S862S linked policy')
-        ok,obs=prior(raw,rc,site,reference,sparse=True)
+        ok,obs=prior(raw,rc,site,reference,sparse=True,epoch=epoch)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S862S ')]
         def pos(prefix):
@@ -33,10 +33,10 @@ def verify(raw,rc,site,reference):
         if len(rows)!=4:raise ValueError('S862S record count')
         r=obs['join_roots'];safe=r['safe'];admissions=[];releases=[]
         for i in range(2):
-            identity=(i,i+1,r['gen-'+'ab'[i]],r['ab'[i]],safe)
+            identity=(i,i+1+2*epoch,r['gen-'+'ab'[i]],r['ab'[i]],safe)
             a=row(rows[i],b'ADMIT',('id','pid','handle','root','safe','dispatches','processes','windows'))
             z=row(rows[2+i],b'RELEASE',('id','pid','handle','root','safe','processes'))
-            if tuple(a.values())!=(*identity,i,i+1,i+1) or tuple(z.values())!=(*identity,1-i):raise ValueError('S862S binding/count')
+            if tuple(a.values())!=(*identity,i+10*epoch,i+1,i+1) or tuple(z.values())!=(*identity,1-i):raise ValueError('S862S binding/count')
             admissions.append(a);releases.append(z)
         if not rows[0]<pos(b'STYLEOS S861T READY ')<pos(b'STYLEOS S862B ENTER step=0x0000000000000000 '):raise ValueError('S862S A admission order')
         if not pos(b'STYLEOS S848 BACK step=0x0000000000000000 ')<rows[1]<pos(b'STYLEOS S860 READY ')<pos(b'STYLEOS S862B ENTER step=0x0000000000000001 '):raise ValueError('S862S B admission order')

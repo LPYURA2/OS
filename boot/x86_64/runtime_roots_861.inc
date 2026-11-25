@@ -17,7 +17,11 @@ static struct rt858_live capture861(void){
 static bool boundary861(const struct dpr_service *d,const struct s842_cache *cache){
  struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&(
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
- (d->dispatcher.dispatches==10&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
+ ((d->dispatcher.dispatches==10
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+ ||d->dispatcher.dispatches==20
+#endif
+ )&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_USER_861
  (d->dispatcher.dispatches==4&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
@@ -54,14 +58,32 @@ extern void s847_trial(const struct s846_root [2],const struct s844_lease [2],ui
 #endif
 static void guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena,const struct desktop_surface *s,uint64_t before){
  const uint64_t safe=composed.built.root;const struct dpr_service *d=dpr_global_state();
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+ struct s844_lease old[2]={0};
+ for(unsigned round=0;round<2;round++){
+ const uint64_t expected_generation=4+2*round;
+ if(d->dispatcher.dispatches!=10*round)fail("862-recycle-dispatch-start");
+ arch_puts("STYLEOS S862R BEGIN");field("round",round);field("safe",safe);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);arch_putc('\n');
+#else
+ const uint64_t expected_generation=4;
+#endif
  struct s844_lease l[2];unsigned used;
- if(!base861||!arena||!boundary861(d,cache)||!s844_count(arena,&used)||used||arena->next!=4||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("861-admit");
+ if(!base861||!arena||!boundary861(d,cache)||!s844_count(arena,&used)||used||arena->next!=expected_generation||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("861-admit");
  for(unsigned i=0;i<2;i++){
   if(!s844_acquire(arena,i?S846_OWNER_B:S846_OWNER_A,3,&l[i])||!iszero861(l[i].pa,3*4096))fail("861-lease");
   *(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)=UINT64_C(0x86110000)+i;
  }
  for(unsigned i=0;i<2;i++)if(!s846_build(base861,cache,arena,l,i,guard,child_tables861[i],(uintptr_t)child_tables861[i],&children861[i]))fail("861-build");
  if(!rt861_roots_audit_frozen(base861,cache,&frozen861,p->evidence,arena,l,guard,&composed,&children861[0],&children861[1]))fail("861-audit");
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+ if(round){
+  if(l[0].pa!=old[0].pa||l[1].pa!=old[1].pa||l[0].generation!=old[0].generation+2||l[1].generation!=old[1].generation+2||s846_audit_pair(base861,cache,arena,old,guard,&children861[0],&children861[1]))fail("862-recycle-binding");
+  for(unsigned i=0;i<2;i++)if(s844_release(arena,old[i].owner,old[i])||!s844_count(arena,&used)||used!=6||*(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)!=UINT64_C(0x86110000)+i)fail("862-recycle-stale-lease");
+  if(!rt861_roots_audit_frozen(base861,cache,&frozen861,p->evidence,arena,l,guard,&composed,&children861[0],&children861[1]))fail("862-recycle-audit");
+  arch_puts("STYLEOS S862R REUSE");field("pa-a",l[0].pa);field("pa-b",l[1].pa);field("old-a",old[0].generation);field("old-b",old[1].generation);field("new-a",l[0].generation);field("new-b",l[1].generation);field("stale-leases",2);field("stale-root",1);arch_putc('\n');
+ }
+ old[0]=l[0];old[1]=l[1];
+#endif
  arch_puts("STYLEOS S861 ROOTS");field("safe",safe);field("a",children861[0].built.root);field("b",children861[1].built.root);field("pa-a",l[0].pa);field("pa-b",l[1].pa);field("gen-a",l[0].generation);field("gen-b",l[1].generation);arch_putc('\n');
  for(unsigned i=0;i<2;i++){
   if(!boundary861(d,cache)||!rt861_roots_audit_frozen(base861,cache,&frozen861,p->evidence,arena,l,guard,&composed,&children861[0],&children861[1]))fail("861-before-switch");
@@ -106,4 +128,9 @@ static void guest861(struct pg_experiment *p,const struct s842_cache *cache,cons
  if(after!=before||!boundary861(d,cache))fail("861-frame");
  arch_puts("STYLEOS S861 CLEAN");field("safe",safe);field("used",used);field("next",arena->next);field("tables-zero",1);field("leases-zero",1);field("fnv",after);arch_putc('\n');
  arch_puts("STYLEOS S861 POLICY cpl0-only=yes shared-desktop=yes inherited-return=no cpl3=no timer=no production-cr3=deny\n");
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+ if(arena->next!=expected_generation+2||d->dispatcher.dispatches!=10*(round+1)||pr_global()->next_pid!=3+2*round||ws_global()->next_id!=3+2*round)fail("862-recycle-final");
+ arch_puts("STYLEOS S862R DONE");field("round",round);field("safe",safe);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);field("next-pid",pr_global()->next_pid);field("next-window",ws_global()->next_id);field("used",used);arch_putc('\n');
+ }
+#endif
 }

@@ -16,6 +16,7 @@ enum ps_status rt862_bank_tick(struct rt862_bank *,struct dpr_service *,const st
 enum ps_status rt862_bank_finish(struct rt862_bank *,struct dpr_service *,const struct rt862_selection *,uint64_t,uint64_t,const struct s847_raw *,uint64_t,uint64_t);
 /* Serialized safe-root admission into a vacant slot. Architecture must have
  * already established an independently audited mapping and FP context. */
+/* Empty bank may reopen after all slots are retired; never reset PID or dispatch counters. */
 bool rt862_bank_open(struct rt862_bank *,struct dpr_service *,uint64_t,uint16_t,uint16_t);
 enum ps_status rt862_bank_admit(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint64_t,uint64_t,const char *,uint32_t *);
 /* Architecture must first revoke/scrub mappings, lease and FP state. */

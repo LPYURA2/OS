@@ -1,7 +1,7 @@
 name: StyleOS 857 first ATA PIO read probe
 on:
   push:
-    branches: [test/styleos-storage-ata-read-857, feature/styleos-storage-read-857, feature/styleos-runtime-entry-858, feature/styleos-runtime-irq-859, feature/styleos-runtime-tick-860, feature/styleos-runtime-join-861]
+    branches: [test/styleos-storage-ata-read-857, feature/styleos-storage-read-857, feature/styleos-runtime-entry-858, feature/styleos-runtime-irq-859, feature/styleos-runtime-tick-860, feature/styleos-runtime-join-861, feature/styleos-runtime-select-862]
   workflow_dispatch:
 jobs:
   probe:

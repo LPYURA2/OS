@@ -15,10 +15,10 @@ def loop_site(efi,map_file):
     if rva!=v+rel or not 0<=rel<=min(vs,rs)-8 or not flags&0x40000000 or flags&0xa0000000 or _range(efi,ro+rel,8,'S862L budgets')!=struct.pack('<II',*BUDGETS):raise ValueError('S862L linked budget bytes/rights')
     site['loop_budget_rva']=rva;site['loop_budgets']=list(BUDGETS);return site
 
-def verify(raw,rc,site,reference,*,sparse=False):
+def verify(raw,rc,site,reference,*,sparse=False,epoch=0):
     try:
         if site.get('loop_budgets')!=list(BUDGETS) or not site.get('loop_budget_rva'):raise ValueError('S862L binary policy')
-        ok,obs=prior(raw,rc,site,reference,budgets=BUDGETS,sparse=sparse)
+        ok,obs=prior(raw,rc,site,reference,budgets=BUDGETS,sparse=sparse,epoch=epoch)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S862L ')]
         def pos(prefix):
@@ -37,4 +37,4 @@ def verify(raw,rc,site,reference,*,sparse=False):
         obs.update(loop_ready=ready,loop_empty=empty);return True,obs
     except (ValueError,KeyError,IndexError,TypeError,StopIteration) as e:return False,str(e)
 
-def trace_check(text,obs):return prior_trace(text,obs,budgets=BUDGETS)
+def trace_check(text,obs,*,initial_bp=True):return prior_trace(text,obs,budgets=BUDGETS,initial_bp=initial_bp)

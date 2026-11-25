@@ -1,7 +1,7 @@
 name: StyleOS 861 LAPIC and FP on shared Desktop runtime
 on:
   push:
-    branches: [feature/styleos-runtime-join-861]
+    branches: [feature/styleos-runtime-join-861, feature/styleos-runtime-select-862]
   workflow_dispatch:
 permissions:
   contents: read

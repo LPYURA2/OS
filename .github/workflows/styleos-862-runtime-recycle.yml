@@ -1,0 +1,38 @@
+name: StyleOS 862 recycled physical leases and process identities
+on:
+  push:
+    branches: [feature/styleos-runtime-select-862]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU and OVMF build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: 64 bounded recycle rounds on each compiler (host model only)
+        run: |
+          set -euo pipefail
+          mkdir -p build/s862-recycle-host
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_TICK_860 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_recycle_862.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,physical_arena_844}.c -o "build/s862-recycle-host/$cc"
+            "build/s862-recycle-host/$cc" | tee "build/s862-recycle-host/$cc.log"
+          done
+      - name: Two actual CPL3 rounds on scrubbed reused pages and fresh generations
+        run: python3 tools/test_runtime_recycle_862_guest.py --output build/s862-recycle-guest
+      - name: Independently replay both original CPU and UART rounds
+        run: python3 tools/test_runtime_recycle_862_replay.py build/s862-recycle-guest
+      - name: Preserve raw evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-862-recycle-guest
+          path: |
+            build/s862-recycle-guest/
+            build/s862-recycle-host/*.log
+          if-no-files-found: warn

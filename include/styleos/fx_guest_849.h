@@ -3,6 +3,9 @@
 #include <styleos/user_root_846.h>
 #include <styleos/fx_context_849.h>
 bool s849_guest_init(const struct s846_root child[2],uint64_t safe);
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+bool s849_guest_bind_leases(const struct s844_lease [2],bool reused);
+#endif
 bool s849_guest_dispatch(unsigned id,uint64_t root);
 bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal);
 bool s849_guest_finish(uint64_t safe);

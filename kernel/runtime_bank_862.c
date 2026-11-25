@@ -76,7 +76,7 @@ enum ps_status rt862_bank_finish(struct rt862_bank *b,struct dpr_service *d,cons
 }
 
 bool rt862_bank_open(struct rt862_bank *b,struct dpr_service *d,uint64_t live,uint16_t cs,uint16_t ss){
- if(!layout(b,d,0,0,1,0,0,1)||!zero(b,sizeof *b)||d->dispatcher.current!=-1||d->dispatcher.dispatches||live!=d->dispatcher.safe_root||ws_snapshot(d->windows,0,0))return false;
+ if(!layout(b,d,0,0,1,0,0,1)||!zero(b,sizeof *b)||d->dispatcher.current!=-1||live!=d->dispatcher.safe_root||ws_snapshot(d->windows,0,0))return false;
  struct rt862_bank v={.safe=live,.cs=cs,.ss=ss};
  if(!binding(&v,d))return false;
  *b=v;return true;

@@ -3,8 +3,9 @@ import re
 from runtime_arena_858_verify import verify as prior, POLICY as ARENA
 from irq_trace_accept_859 import HEADER
 POLICY=b'STYLEOS S861 POLICY cpl0-only=yes shared-desktop=yes inherited-return=no cpl3=no timer=no production-cr3=deny'
-def verify(raw,rc,site,reference):
+def verify(raw,rc,site,reference,*,generation_base=4):
     try:
+        if generation_base not in (4,6):raise ValueError('861 generation profile')
         ok,obs=prior(raw,rc,site['rva'],reference)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[x for x in lines if x.startswith(b'STYLEOS S861 ')]
@@ -19,7 +20,7 @@ def verify(raw,rc,site,reference):
             if len(v)!=1:raise ValueError('861 extent')
             return tuple(int(x,16) for x in v[0].split()[-2:])
         r=row(rows[0],b'ROOTS',('safe','a','b','pa-a','pa-b','gen-a','gen-b'));safe=obs['active']['root'];lo,hi=extent(b'IMAGE');sl,sh=extent(b'STACK');pa=obs['arena']['base']
-        if r['safe']!=safe or (r['pa-a'],r['pa-b'],r['gen-a'],r['gen-b'])!=(pa,pa+3*4096,4,5):raise ValueError('861 lease binding')
+        if r['safe']!=safe or (r['pa-a'],r['pa-b'],r['gen-a'],r['gen-b'])!=(pa,pa+3*4096,generation_base,generation_base+1):raise ValueError('861 lease binding')
         # Table spans are disjoint from every prior root/descriptor and stack.
         spans=[(safe,safe+32*4096),(obs['root']['source'],obs['root']['source']+32*4096),(sl,sh),(obs['bridge']['idt'],obs['bridge']['idt']+4096),extent(b'HANDOFF'),extent(b'SOURCE')]+[(v,v+4096) for v in obs['descriptors'].values()]
         for name in ('a','b'):
@@ -34,10 +35,10 @@ def verify(raw,rc,site,reference):
             if not sl<=v['rsp']<sh or v['flags']&0x200 or not v['flags']&2:raise ValueError('861 frame')
             proof.append(v)
         clean=row(rows[3],b'CLEAN',('safe','used','next','tables-zero','leases-zero','fnv'))
-        if tuple(clean.values())!=(safe,0,6,1,1,reference['fnv']):raise ValueError('861 cleanup')
+        if tuple(clean.values())!=(safe,0,generation_base+2,1,1,reference['fnv']):raise ValueError('861 cleanup')
         obs.update(join_roots=r,join_switches=proof,join_clean=clean);return True,obs
     except (ValueError,KeyError,TypeError,IndexError,StopIteration) as exc:return False,str(exc)
-def trace_check(trace,obs):
+def trace_check(trace,obs,*,initial_bp=True):
     roots=obs['join_roots'];root=roots['safe'];headers=list(HEADER.finditer(trace));records=[];started=False
     for i,m in enumerate(headers):
         block=trace[m.start():headers[i+1].start() if i+1<len(headers) else len(trace)]
@@ -50,9 +51,11 @@ def trace_check(trace,obs):
         started=True
         seq,vec,err,soft,cpl,cs,rip,pc,ss,rsp=m.groups()
         records.append((int(seq),tuple(int(v,16) for v in (vec,err,soft,cpl,cs,rip,pc,ss,rsp))+(cr3,one(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b'),one(r'^RIP=([0-9a-fA-F]+)\b'),one(r'\bRSP=([0-9a-fA-F]+)\b'),one(r'^GDT=\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s*$'),one(r'^IDT=\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s*$'),one(r'^TR\s*=([0-9a-fA-F]+)\b'))))
-    if len(records)!=3 or any(b[0]!=a[0]+1 for a,b in zip(records,records[1:])):raise ValueError('861 CPU sequence')
+    if len(records)!=(3 if initial_bp else 2) or any(b[0]!=a[0]+1 for a,b in zip(records,records[1:])):raise ValueError('861 CPU sequence')
     active=obs['active']
-    for (_,v),p,cr3 in zip(records,[obs['bp'],*obs['join_switches']],[root,roots['a'],roots['b']]):
+    points=[obs['bp'],*obs['join_switches']] if initial_bp else obs['join_switches']
+    cr3s=[root,roots['a'],roots['b']] if initial_bp else [roots['a'],roots['b']]
+    for (_,v),p,cr3 in zip(records,points,cr3s):
         rip=p['rip']-1
         expected=(3,0,1,0,p['cs'],rip,rip,p['cs']-8,p['rsp'],cr3,p['flags'],rip,p['rsp'],active['gdt'],active['idt'],active['tr'])
         if v!=expected:raise ValueError('861 CPU binding')

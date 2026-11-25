@@ -1,7 +1,7 @@
 name: StyleOS 858 bounded arena with runtime services
 on:
   push:
-    branches: [test/styleos-runtime-arena-858, feature/styleos-runtime-entry-858, feature/styleos-runtime-irq-859, feature/styleos-runtime-tick-860, feature/styleos-runtime-join-861]
+    branches: [test/styleos-runtime-arena-858, feature/styleos-runtime-entry-858, feature/styleos-runtime-irq-859, feature/styleos-runtime-tick-860, feature/styleos-runtime-join-861, feature/styleos-runtime-select-862]
   workflow_dispatch:
 jobs:
   probe:

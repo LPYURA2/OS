@@ -56,6 +56,13 @@ static struct s847_control ctl848;
 static uint64_t lapic848,sites848[2][3],progress848[2];
 static unsigned ticks848,local848[2];
 static bool active848,armed848;
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+static unsigned dispatch_base848;
+static struct rt862_selection stale862;
+#define DISPATCH_BASE848 dispatch_base848
+#else
+#define DISPATCH_BASE848 0u
+#endif
 extern void s848_irq_entry(void),s847_bad_entry(void);
 extern const unsigned char s848_a_start[],s848_a_loop_end[],s848_a_fault[],s848_a_end[];
 extern const unsigned char s848_b_start[],s848_b_loop_end[],s848_b_exit[],s848_b_end[];
@@ -85,7 +92,7 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  if(!s849_guest_suspend((unsigned)id,root,f->vector!=V))fail848("fx-suspend");
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
- arch_puts("STYLEOS S861T FRAME");fld848("step",runtime860->dispatcher.dispatches-1);fld848("flags",f->rflags);arch_putc('\n');
+ arch_puts("STYLEOS S861T FRAME");fld848("step",runtime860->dispatcher.dispatches-1-DISPATCH_BASE848);fld848("flags",f->rflags);arch_putc('\n');
 #endif
  if(f->vector==V){
   uint32_t isr=rd848(0x120);uint64_t p=word848(S846_DATA);
@@ -134,7 +141,7 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  * registry/context admission is delayed; no new mapping is asserted here. */
 static void sparse_admit862(unsigned id,const struct s846_root child[2],uint64_t safe){
  if(root848()!=safe||(flags848()&0x200)||runtime860->dispatcher.current!=-1||pr_snapshot(pr_global(),0,0,true)!=id||ws_snapshot(ws_global(),0,0)!=id)fail848("862-sparse-before");
- if(id){const struct pr_entry *a=pr_find(pr_global(),pid860[0]);if(!a||a->state!=PR_READY||a->cpu_ticks!=1||runtime860->dispatcher.dispatches!=1)fail848("862-sparse-A");}
+ if(id){const struct pr_entry *a=pr_find(pr_global(),pid860[0]);if(!a||a->state!=PR_READY||a->cpu_ticks!=1||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+1)fail848("862-sparse-A");}
  if(rt862_bank_admit(&bank862,runtime860,safe,id,handle860[id],child[id].built.root,id?"S860 B":"S860 A",&pid860[id])!=PS_OK||pr_account(pr_global(),pid860[id],handle860[id],0,3*P)!=PR_OK||ws_open_app(ws_global(),pr_global(),pid860[id],id?"S860 B":"S860 A",(struct ws_bounds){0,0,400,300},&win860[id])!=WS_OK)fail848("862-sparse-admit");
  if(!id&&ws_set_minimized(ws_global(),pid860[id],win860[id],true)!=WS_OK)fail848("862-sparse-window");
  for(unsigned j=0;j<15;j++)bank862.slots[id].context.gpr[j]=pattern848(id,j);
@@ -152,6 +159,11 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
  struct rt858_live original=live848();runtime860=rt861_dispatcher(&original);
  if(!runtime860||!audit||!audit(opaque))fail848("861-timer-join");
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+ dispatch_base848=runtime860->dispatcher.dispatches;
+ if((dispatch_base848!=0&&dispatch_base848!=10)||armed848||receipt860||frame860||cr2862||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail848("862-recycle-start");
+ ticks848=0;for(unsigned i=0;i<2;i++){local848[i]=0;progress848[i]=0;}
+#endif
 #endif
  __asm__ volatile("sgdt %0;sidt %1;str %2;mov %%cs,%3":"=m"(g0),"=m"(i0),"=r"(tr),"=r"(cs));
  for(unsigned i=0;i<2;i++)if(!writable848(&child[i],lapic848,P)||!writable848(&child[i],g0.base,P)||!writable848(&child[i],(uintptr_t)idt848,sizeof idt848))fail848("mapping");
@@ -186,6 +198,9 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
  if(rd848(0x320)!=(BIT|V)||rd848(0x3e0)!=3||rd848(0x80)||rd848(0xf0)!=((svr&~255u)|0x1ffu))fail848("setup");
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
  if(!s849_guest_init(child,safe))fail848("fx-mode");
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+ if(!s849_guest_bind_leases(leases,DISPATCH_BASE848!=0))fail848("862-recycle-fx");
+#endif
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_TICK_860
 #ifndef STYLEOS_TEST_RUNTIME_TIMER_861
@@ -249,7 +264,7 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
   if(receipt860)fail848("862-loop-receipt");
   enum ps_status selected=dpr_dispatch(runtime860,&chosen,&chosen_pid);
   if(selected==PS_EMPTY){
-   if(expected_windows||completed!=step||runtime860->dispatcher.current!=-1||runtime860->dispatcher.dispatches!=completed)fail848("862-loop-empty");
+   if(expected_windows||completed!=step||runtime860->dispatcher.current!=-1||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+completed)fail848("862-loop-empty");
    arch_puts("STYLEOS S862L EMPTY");fld848("dispatches",completed);fld848("safe",root848());fld848("windows",ws_snapshot(ws_global(),0,0));arch_putc('\n');break;
   }
   if(selected!=PS_OK||step>=32||chosen>1||chosen_pid!=pid860[chosen])fail848("862-loop-dispatch");
@@ -262,6 +277,20 @@ void s848_trial(const struct s846_root child[2],const struct s844_lease leases[2
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
   const struct rt862_selection selection={.slot=chosen,.dispatch=runtime860->dispatcher.dispatches,.pid=chosen_pid,.handle=handle860[chosen],.child_root=child[chosen].built.root,.safe_root=safe};
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+  if(step==0){
+   if(!DISPATCH_BASE848)stale862=selection;
+   else{
+    struct up_context rejected={0};struct rt862_selection bad=selection;
+    if(stale862.slot!=selection.slot||stale862.child_root!=selection.child_root||stale862.safe_root!=selection.safe_root||stale862.pid==selection.pid||stale862.handle==selection.handle||rt862_bank_enter(&bank862,runtime860,&stale862,root848(),&rejected))fail848("862-recycle-stale-ticket");
+    bad.pid=stale862.pid;if(rt862_bank_enter(&bank862,runtime860,&bad,root848(),&rejected))fail848("862-recycle-stale-pid");
+    bad=selection;bad.handle=stale862.handle;if(rt862_bank_enter(&bank862,runtime860,&bad,root848(),&rejected))fail848("862-recycle-stale-handle");
+    const unsigned char *bytes=(const void *)&rejected;for(size_t j=0;j<sizeof rejected;j++)if(bytes[j])fail848("862-recycle-stale-output");
+    arch_puts("STYLEOS S862R STALE");fld848("slot",selection.slot);fld848("root",selection.child_root);fld848("old-pid",stale862.pid);fld848("new-pid",selection.pid);fld848("old-handle",stale862.handle);fld848("new-handle",selection.handle);fld848("old-dispatch",stale862.dispatch);fld848("new-dispatch",selection.dispatch);fld848("refused",3);arch_putc('\n');
+    volatile unsigned char *wipe=(void *)&stale862;for(size_t j=0;j<sizeof stale862;j++)wipe[j]=0;
+   }
+  }
+#endif
   if(!rt862_bank_enter(&bank862,runtime860,&selection,root848(),&ctx))fail848("862-bank-enter");
   id=chosen;
   arch_puts("STYLEOS S862B ENTER");fld848("step",step);fld848("id",id);fld848("pid",chosen_pid);fld848("dispatch",selection.dispatch);fld848("safe",safe);fld848("root",selection.child_root);fld848("pc",ctx.pc);fld848("sp",ctx.sp);fld848("flags",ctx.status);arch_putc('\n');
@@ -436,8 +465,8 @@ void s860_reap(uint64_t safe){
 #ifndef STYLEOS_TEST_RUNTIME_SPARSE_862
  for(unsigned i=0;i<2;i++)if(dpr_release(runtime860,i,handle860[i])!=PS_OK)fail848("860-reap");
 #endif
- if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||runtime860->dispatcher.current!=-1||runtime860->dispatcher.dispatches!=10)fail848("860-reap-state");
- arch_puts("STYLEOS S860 CLEAN");fld848("safe",safe);fld848("dispatches",10);fld848("processes",0);fld848("windows",0);arch_putc('\n');
+ if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||runtime860->dispatcher.current!=-1||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+10)fail848("860-reap-state");
+ arch_puts("STYLEOS S860 CLEAN");fld848("safe",safe);fld848("dispatches",runtime860->dispatcher.dispatches);fld848("processes",0);fld848("windows",0);arch_putc('\n');
  arch_puts("STYLEOS S860 POLICY actual-cpl3-ticks=yes fp=yes existing-dispatcher=yes leases-released=yes production-cr3=deny\n");
 }
 #endif

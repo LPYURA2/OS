@@ -29,14 +29,33 @@ bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
  __asm__ volatile("fxsave64 %0":"=m"(s849_kernel_image)::"memory");
  c.mxcsr_mask=u32(s849_kernel_image.bytes+28);
  if(!s849_init(&bank,&c,child[0].built.root,child[1].built.root)||!s849_image_valid(&s849_kernel_image,bank.mxcsr_mask)||(bank.mxcsr_mask&0x3f80)!=0x3f80)return false;
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+ seen[0]=seen[1]=0;
+#endif
  safe849=safe;arch_puts("STYLEOS S849 READY");field("mask",bank.mxcsr_mask);field("safe",safe);arch_putc('\n');return true;
 }
+#ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
+/* The caller has audited the same two leases and their roots before this
+ * operation. No generation can be reused without a fresh empty FP bank. */
+bool s849_guest_bind_leases(const struct s844_lease leases[2],bool reused){
+ if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||bank.active!=-1||s849_live||!leases||leases[0].generation!=(reused?6u:4u)||leases[1].generation!=leases[0].generation+1)return false;
+ for(unsigned i=0;i<2;i++){
+  if(bank.slot[i].generation!=1||!bank.slot[i].live||seen[i])return false;
+  bank.slot[i].generation=leases[i].generation;
+  if(reused){struct s849_image out={0};if(s849_dispatch(&bank,i,bank.slot[i].root,leases[i].generation-2,&out)||!allzero(&out,sizeof out)||bank.active!=-1)return false;}
+ }
+ arch_puts("STYLEOS S862R FX");field("safe",safe849);field("gen-a",leases[0].generation);field("gen-b",leases[1].generation);field("refused",reused?2:0);arch_putc('\n');return true;
+}
+#define FX_GEN(i) bank.slot[i].generation
+#else
+#define FX_GEN(i) 1
+#endif
 bool s849_guest_dispatch(unsigned id,uint64_t root){
- if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||s849_live||!s849_dispatch(&bank,id,root,1,&s849_user_restore))return false;
+ if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||s849_live||id>1||!s849_dispatch(&bank,id,root,FX_GEN(id),&s849_user_restore))return false;
  scrub(&s849_user_capture,sizeof s849_user_capture);s849_live=1;return true;
 }
 bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
- if(!safe849||id>1||cr3_849()!=root||(flags849()&0x200)||s849_live!=2||!s849_suspend(&bank,id,root,1,&s849_user_capture))return false;
+ if(!safe849||id>1||cr3_849()!=root||(flags849()&0x200)||s849_live!=2||!s849_suspend(&bank,id,root,FX_GEN(id),&s849_user_capture))return false;
  /* Fixtures set XMM14/15 once, before recording integer progress. All
   * other XMM lanes stay zero. Verify each actual trap capture. */
  uint64_t x14=UINT64_C(0x8480000000000000)|((uint64_t)id<<32)|13;
@@ -71,7 +90,7 @@ bool s849_guest_finish(uint64_t safe){
  ||seen[0]!=4||seen[1]!=6
 #endif
  ||bank.active!=-1)return false;
- for(unsigned i=0;i<2;i++)if(!s849_retire(&bank,i,bank.slot[i].root,1)||!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
+ for(unsigned i=0;i<2;i++)if(!s849_retire(&bank,i,bank.slot[i].root,FX_GEN(i))||!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
  scrub(&s849_kernel_image,sizeof s849_kernel_image);scrub(&bank,sizeof bank);safe849=0;
  if(!allzero(&s849_kernel_image,sizeof s849_kernel_image)||!allzero(&bank,sizeof bank)||!allzero(&s849_user_capture,sizeof s849_user_capture)||!allzero(&s849_user_restore,sizeof s849_user_restore)||!allzero(&kernel_check,sizeof kernel_check))return false;
  arch_puts("STYLEOS S849 CLEAN slots-zero=yes kernel-copy-zero=yes\n");return true;
