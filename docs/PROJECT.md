@@ -1,3 +1,7 @@
+## Stage 860 — existing runtime dispatcher tick contract (host candidate)
+
+Accepted S859 0137edea0a27a0a35a02643d41e8c4bd0423bb14. See [handoff](NEXT_CHAT_860.md). New opt-in host/COFF contract only; no real hardware activation. KFA gates open.
+
 ## Stage 859 — final regression fixture correction (candidate)
 
 Five focused CI SUCCESS, actual IRQ/EOI and CPU trace independently verified. Final full CI blocked at old S842 host test: deterministic fixture correction only; full regression must pass before acceptance. See [handoff](NEXT_CHAT_859.md). Kernel code unchanged, KFA gates open.

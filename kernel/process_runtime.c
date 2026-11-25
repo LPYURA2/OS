@@ -147,3 +147,20 @@ size_t pr_snapshot(const struct pr_table *t, struct pr_entry *out,
     }
     return count;
 }
+
+#ifdef STYLEOS_TEST_RUNTIME_TICK_860
+#include <styleos/runtime_tick_860.h>
+enum pr_status pr_tick_860(struct pr_table *t,uint32_t pid,uint64_t handle,uint64_t root)
+{
+    struct pr_entry *e=find_mutable(t,pid);
+    if(!e)return PR_NOT_FOUND;
+    if(e->type!=PR_NATIVE_USER||!handle||handle!=e->scheduler_handle||
+       !root||(root&4095u)||root!=e->page_root)return PR_BAD_EVIDENCE;
+    if(e->state!=PR_RUNNING)return PR_INVALID_STATE;
+    if(e->cpu_ticks==UINT64_MAX||t->change_serial==UINT32_MAX)return PR_EXHAUSTED;
+    ++e->cpu_ticks;
+    e->state=PR_READY;
+    ++t->change_serial;
+    return PR_OK;
+}
+#endif

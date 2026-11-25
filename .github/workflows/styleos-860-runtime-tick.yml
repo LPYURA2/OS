@@ -1,0 +1,43 @@
+name: StyleOS 860 dispatcher tick contract (host and COFF only)
+on:
+  push:
+    branches: [feature/styleos-runtime-tick-860]
+  workflow_dispatch:
+jobs:
+  model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Existing registry dispatcher and desktop service regressions
+        run: |
+          python3 tools/test_process_runtime.py --output build/s860/registry
+          python3 tools/test_process_scheduler.py --output build/s860/scheduler
+          python3 tools/test_desktop_process_runtime.py --output build/s860/desktop
+      - name: Tick contract on GCC and Clang
+        run: |
+          set -euo pipefail
+          mkdir -p build/s860
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEOS_TEST_RUNTIME_TICK_860 -fsanitize=address,undefined -fno-pie -no-pie -Iinclude kernel/{process_runtime,process_scheduler,desktop_process_runtime,window_service,process_api,process_inspector,process_view,runtime_tick_860}.c tests/test_runtime_tick_860.c -o "build/s860/$cc"
+            "build/s860/$cc" | tee "build/s860/$cc.log"
+          done
+      - name: Freestanding x86-64 COFF contract objects
+        run: |
+          set -euo pipefail
+          for name in process_runtime process_scheduler runtime_tick_860; do
+            clang --target=x86_64-pc-windows-msvc -std=c11 -O2 -ffreestanding -fno-builtin -fno-stack-protector -Wall -Wextra -Werror -mno-red-zone -mno-sse -mno-mmx -msoft-float -DSTYLEOS_TEST_RUNTIME_TICK_860 -Iinclude -c "kernel/$name.c" -o "build/s860/$name.obj"
+            objdump -t "build/s860/$name.obj" > "build/s860/$name-symbols.log"
+            if grep -q __chkstk "build/s860/$name-symbols.log"; then exit 1; fi
+          done
+      - name: Preserve model evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-860-tick-model
+          path: |
+            build/s860/**/*.log
+            build/s860/*.obj
+          if-no-files-found: warn

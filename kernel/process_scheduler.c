@@ -105,3 +105,23 @@ enum ps_status ps_reap(struct ps_dispatcher *d, unsigned slot, uint64_t handle)
     *s = (struct ps_slot){0};
     return PS_OK;
 }
+
+#ifdef STYLEOS_TEST_RUNTIME_TICK_860
+#include <styleos/runtime_tick_860.h>
+enum ps_status ps_tick_860(struct ps_dispatcher *d,const struct rt860_tick *t)
+{
+    if(!d||!d->registry||!t||t->slot>=PS_MAX_SLOTS)return PS_ARGUMENT;
+    if(d->current!=(int)t->slot)return PS_STATE;
+    const struct ps_slot *s=&d->slots[t->slot];
+    const struct pr_entry *p=verified(d,s);
+    if(!p||p->state!=PR_RUNNING||!d->dispatches||t->dispatch!=d->dispatches||
+       t->pid!=s->pid||t->handle!=s->handle||t->child_root!=s->user_root||
+       !valid_root(t->safe_root)||t->safe_root!=d->safe_root||
+       t->child_root==t->safe_root||t->vector!=0x50u||t->isr!=1||t->eoi!=1||
+       (t->safe_flags&2u)!=2u||(t->safe_flags&~UINT64_C(0x8d7)))return PS_EVIDENCE;
+    enum pr_status status=pr_tick_860(d->registry,s->pid,s->handle,s->user_root);
+    if(status!=PR_OK)return status==PR_EXHAUSTED?PS_EXHAUSTED:PS_REGISTRY_ERROR;
+    d->current=-1;
+    return PS_OK;
+}
+#endif
