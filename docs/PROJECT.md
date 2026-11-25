@@ -1,6 +1,6 @@
 ## Stage 857 — same-boot storage fixture candidate
 
-Accepted S856 24b424d581b86dd1b500cd57755ac835b8b9903a, CI 45490977416 SUCCESS: 219 PASS, 5 SKIPPED, 0 FAIL; independent raw replay passed. See [handoff](NEXT_CHAT_857.md). No ATA admission or kernel/UI changes. Initial focused guest PASS; artifact independently replayed; BMIDE observation and full regression now required.
+Accepted S856 24b424d581b86dd1b500cd57755ac835b8b9903a, CI 45490977416 SUCCESS: 219 PASS, 5 SKIPPED, 0 FAIL; independent raw replay passed. See [handoff](NEXT_CHAT_857.md). Diagnostic ATA read PASS in fixed QEMU fixture; no general ATA admission or UI changes. Final exact-SHA full and focused regressions required.
 
 ## Stage 856 — terminal storage topology (candidate)
 

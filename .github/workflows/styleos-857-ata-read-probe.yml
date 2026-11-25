@@ -1,7 +1,7 @@
 name: StyleOS 857 first ATA PIO read probe
 on:
   push:
-    branches: [test/styleos-storage-ata-read-857]
+    branches: [test/styleos-storage-ata-read-857, feature/styleos-storage-read-857]
   workflow_dispatch:
 jobs:
   probe:
@@ -26,7 +26,9 @@ jobs:
           python3 tools/test_busmaster_boot_857.py --output build/s857-prior
           python3 tools/test_ata_read_857_verify.py build/s857-prior
       - name: Read actual ATA sectors under owned CR3
-        run: python3 tools/test_ata_read_boot_857.py --output build/s857-ata
+        run: |
+          python3 tools/test_ata_read_boot_857.py --output build/s857-ata
+          python3 tools/test_ata_stats_857.py build/s857-ata
       - name: Preserve raw evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4

@@ -14,6 +14,7 @@ from sector_evidence_856 import fixture
 from guest_fixture_857 import scope_fixture,verify_legacy_io
 from bmdma_857_verify import verify_bar
 from ata_read_857_verify import verify_read
+from ata_stats_857 import verify_counts
 from legacy_ports_857 import pair_dir,verify_pair,verify_ready
 from probe_storage_fixture_856 import probe
 
@@ -54,12 +55,12 @@ def main():
             proc=subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=err,bufsize=0)
             try:
                 m=QMP(proc,transcript);assert 'QMP' in m.receive();m.call('qmp_capabilities')
-                _,report['prelaunch']=snapshot(m,'prelaunch');m.call('cont')
+                prelaunch,report['prelaunch']=snapshot(m,'prelaunch');m.call('cont')
                 wait(proc,serial,b'STYLEOS S853 READY ');m.call('stop')
                 ready,report['owned_root_ready']=snapshot(m,'ready');verify_ready(ready);verify_bar(ready['pci'],ready['mtree']);m.call('cont')
                 m.call('human-monitor-command',**{'command-line':'sendkey a 40'});wait(proc,serial,b'STYLEOS S853 KEY ')
                 m.call('input-send-event',events=[{'type':'rel','data':{'axis':'x','value':20}}]);wait(proc,serial,b'STYLEOS S857 ATA-READY ');m.call('stop')
-                after,report['post_read']=snapshot(m,'post-read');verify_ready(after);verify_bar(after['pci'],after['mtree']);m.call('cont')
+                after,report['post_read']=snapshot(m,'post-read');verify_ready(after);verify_bar(after['pci'],after['mtree']);report['frontend_counts']=verify_counts(prelaunch['stats'],ready['stats'],after['stats']);m.call('cont')
                 m.call('human-monitor-command',**{'command-line':'sendkey b 40'});rc=proc.wait(timeout=30)
             finally:
                 if proc.poll() is None:proc.kill();proc.wait(timeout=8)
