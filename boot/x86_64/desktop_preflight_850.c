@@ -172,8 +172,15 @@ void s863_shell_guard(void){
  * APs are not started. No other CMOS backend is linked. As in S854 we
  * establish a NEW masked-NMI index shadow, never infer inherited port 70.
  * This mask is deliberately retained until diagnostic VM exit. */
-static struct rtc_runtime_863 rtc_runtime863;
-static bool rtc_admitted863;
+/* Own a complete page so the inherited-root attestation can check an
+ * exact, page-aligned interval before switching. */
+static _Alignas(4096) union {
+ struct rtc_runtime_863 state;
+ unsigned char page[4096];
+} rtc_page863;
+_Static_assert(sizeof rtc_page863==4096,"RTC page extent");
+#define rtc_runtime863 (rtc_page863.state)
+static bool rtc_preflight863,rtc_admitted863;
 static unsigned rtc_samples863;
 static bool rtc_observe863(void *ctx,struct rtc_runtime_observation_863 *o)
 {
@@ -196,15 +203,14 @@ static bool rtc_data863(void *ctx,uint8_t *v)
  __asm__ volatile("inb $0x71,%0":"=a"(*v)::"memory");return true;
 }
 static const struct rtc_runtime_ops_863 rtc_ops863={rtc_observe863,rtc_index863,rtc_data863};
-static void rtc_admit863(struct pg_experiment *p)
+static void rtc_admit863(void)
 {
  uint32_t a,b,c,d;
  __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
- if(rtc_admitted863||!shell_fixture863()||((d&(1u<<28))&&((b>>16)&255u)!=1)||
+ if(!rtc_preflight863||rtc_admitted863||!shell_fixture863()||((d&(1u<<28))&&((b>>16)&255u)!=1)||
     read_cr3()!=shell_root863||(flags()&0x200)||
-    arch_paging_attest_image_writable(p,(uintptr_t)&rtc_runtime863,sizeof rtc_runtime863)!=PG_OK||
-    !identity((uintptr_t)&rtc_runtime863,PG_WRITE)||
-    !identity((uintptr_t)&rtc_runtime863+sizeof rtc_runtime863-1,PG_WRITE)||
+    !identity((uintptr_t)&rtc_page863,PG_WRITE)||
+    !identity((uintptr_t)&rtc_page863+sizeof rtc_page863-1,PG_WRITE)||
     !identity((uintptr_t)rtc_runtime_bind_863,PG_EXEC)||
     !identity((uintptr_t)rtc_runtime_read_863,PG_EXEC)||
     !identity((uintptr_t)rtc_observe863,PG_EXEC)||
@@ -440,7 +446,7 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #endif
  shell_boundary863();
 #ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
- rtc_admit863(p);
+ rtc_admit863();
 #endif
  arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
@@ -684,6 +690,15 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
   struct pg_lookup x;
   if(arch_paging_attest_image_writable(p,desc[i],4096)!=PG_OK||pg_lookup(&composed.plan,desc[i],&x)!=PG_OK||x.pa!=desc[i]||x.flags!=PG_WRITE)fail("descriptor-closure");
  }
+#ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
+ /* The old walker is legal ONLY here, with the inherited CR3 active.
+  * The detached plan has already passed the guarded-tree audit. */
+ if(rtc_preflight863||
+    arch_paging_attest_image_writable(p,(uintptr_t)&rtc_page863,sizeof rtc_page863)!=PG_OK||
+    !identity((uintptr_t)&rtc_page863,PG_WRITE)||
+    !identity((uintptr_t)&rtc_page863+sizeof rtc_page863-1,PG_WRITE))fail("863-rtc-preflight-page");
+ rtc_preflight863=true;
+#endif
  if(read_cr3()!=p->old_root||(flags()&0x200))fail("root-changed");
  arch_puts("STYLEOS S850 GOP");field("base",surface->base);field("bytes",surface->bytes);field("width",surface->width);field("height",surface->height);field("stride",surface->stride);field("format",surface->format);arch_putc('\n');
  arch_puts("STYLEOS S850 BAR");field("dev",dev);field("fn",fn);field("command",command);field("raw",bar.raw_lo);field("mask",mask);field("size",composed.gop.bar_bytes);arch_putc('\n');
