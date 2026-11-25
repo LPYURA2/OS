@@ -56,6 +56,14 @@ static struct s847_control ctl848;
 static uint64_t lapic848,sites848[2][3],progress848[2];
 static unsigned ticks848,local848[2];
 static bool active848,armed848;
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+extern const unsigned char s848_a_yield[],s848_b_yield[];
+static unsigned mixed_calls848[2];
+static uint64_t mixed_pc848[2];
+#define EXTRA_DISPATCH848 2u
+#else
+#define EXTRA_DISPATCH848 0u
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
 static unsigned dispatch_base848;
 static struct rt862_selection stale862;
@@ -89,10 +97,28 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  int id=ctl848.current;if(!active848||id<0||id>1||root!=root848()||root!=ctl848.slot[id].root)fail848("origin");
 #endif
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+ bool returning=f->vector==128&&f->gpr[0]==S847_CALL_YIELD;
+ if(!s849_guest_suspend((unsigned)id,root,f->vector!=V&&!returning))fail848("fx-suspend");
+#else
  if(!s849_guest_suspend((unsigned)id,root,f->vector!=V))fail848("fx-suspend");
+#endif
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
  arch_puts("STYLEOS S861T FRAME");fld848("step",runtime860->dispatcher.dispatches-1-DISPATCH_BASE848);fld848("flags",f->rflags);arch_putc('\n');
+#endif
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+ if(returning){
+  if(armed848||mixed_calls848[id]||local848[id]||progress848[id]||word848(S846_DATA)||word848(S846_DATA+8)||
+     rd848(0x390)||rd848(0x320)!=(BIT|V)||pending848(0x100)||pending848(0x200)||
+     f->rip!=mixed_pc848[id]||f->rsp!=S846_STACK+P||f->error||
+     (f->rflags&0x202)!=0x202||(f->rflags&~UINT64_C(0xad7))||f->cs!=bank862.cs||f->ss!=bank862.ss||
+     (uintptr_t)f!=S846_IST+P-16-sizeof *f)fail848("863-mixed-origin");
+  for(unsigned j=1;j<15;j++)if(f->gpr[j]!=pattern848((unsigned)id,j))fail848("863-mixed-gpr");
+  pending860=*f;frame860=(uintptr_t)f;cr2862=0;receipt860=true;++mixed_calls848[id];
+  arch_puts("STYLEOS S863M CALL");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("rsp",f->rsp);fld848("flags",f->rflags);fld848("frame",(uintptr_t)f);fld848("rax",f->gpr[0]);fld848("timer",rd848(0x390));fld848("isr",pending848(0x100));fld848("irr",pending848(0x200));arch_putc('\n');
+  return 0;
+ }
 #endif
  if(f->vector==V){
   uint32_t isr=rd848(0x120);uint64_t p=word848(S846_DATA);
@@ -212,6 +238,11 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   volatile unsigned char *dst=(void *)(uintptr_t)leases[i].pa;for(size_t j=0;j<3*P;j++)dst[j]=j<hi-lo?start[i][j]:0;
   for(size_t j=0;j<hi-lo;j++)if(dst[j]!=start[i][j])fail848("copy");
   sites848[i][0]=S846_CODE;sites848[i][1]=S846_CODE+mid-lo;sites848[i][2]=S846_CODE+last-lo;
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+  uintptr_t call=(uintptr_t)(i?s848_b_yield:s848_a_yield);
+  if(call<=lo||call>=mid||mixed_calls848[i])fail848("863-mixed-site");
+  mixed_pc848[i]=S846_CODE+call-lo;
+#endif
  }
 #ifndef STYLEOS_TEST_DESKTOP_PUMP_863
  struct s847_selectors sel;
@@ -376,8 +407,14 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #else
   bool terminal=step==6||step==9;
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+  bool call_slice=!mixed_calls848[id];
+  if(call_slice&&terminal)fail848("863-mixed-plan");
+#else
+  const bool call_slice=false;
+#endif
   if(terminal)put848(leases[id].pa+P+8,1);
-  else{armed848=true;wr848(0x320,V);wr848(0x380,COUNT);}
+  else if(!call_slice){armed848=true;wr848(0x320,V);wr848(0x380,COUNT);}
   __asm__ volatile("mov %%rsp,%0":"=r"(sp0));s847_enter(&ctx,child[id].built.root,safe);__asm__ volatile("mov %%rsp,%0":"=r"(sp1));
   uint64_t a=word848(leases[id].pa+P),b=word848(leases[1-id].pa+P);
   if(root848()!=safe||(flags848()&0x200)||sp0!=sp1||armed848||b!=progress848[1-id]||a<progress848[id]||(!terminal&&a!=progress848[id]))fail848("safe-return");
@@ -397,8 +434,8 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
   /* S863 pump: retain authenticated IRQ/FP/terminal capture.
    * The existing fixture does not admit returning software traps yet. */
-  if(terminal?(pending860.vector!=14&&pending860.vector!=128):pending860.vector!=V)fail848("863-event-kind");
-  struct rt860_tick t={.slot=id,.dispatch=runtime860->dispatcher.dispatches,.pid=pid860[id],.handle=handle860[id],.child_root=child[id].built.root,.safe_root=root848(),.frame_va=frame860,.vector=pending860.vector,.isr=terminal?0:1,.eoi=terminal?0:1,.safe_flags=flags848(),.frame=pending860};
+  if(terminal?(pending860.vector!=14&&pending860.vector!=128):call_slice?(pending860.vector!=128||pending860.error||pending860.gpr[0]!=S847_CALL_YIELD):pending860.vector!=V)fail848("863-event-kind");
+  struct rt860_tick t={.slot=id,.dispatch=runtime860->dispatcher.dispatches,.pid=pid860[id],.handle=handle860[id],.child_root=child[id].built.root,.safe_root=root848(),.frame_va=frame860,.vector=pending860.vector,.isr=pending860.vector==V,.eoi=pending860.vector==V,.safe_flags=flags848(),.frame=pending860};
   if(rt863_bank_event(&bank862,runtime860,&selection,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
 #else
   if(terminal){
@@ -411,6 +448,10 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   receipt860=false;frame860=0;cr2862=0;volatile unsigned char *zero=(void *)&pending860;for(size_t j=0;j<sizeof pending860;j++)zero[j]=0;
   const struct up_context *stored=&bank862.slots[id].context;unsigned zeroed=1;const unsigned char *bytes=(const void *)stored;for(size_t j=0;j<sizeof *stored;j++)if(bytes[j])zeroed=0;
   if(zeroed!=terminal)fail848("862-bank-context");
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+  if(call_slice&&(mixed_calls848[id]!=1||stored->pc!=mixed_pc848[id]||stored->gpr[0]||stored->sp!=S846_STACK+P))fail848("863-mixed-resume");
+  if(call_slice){arch_puts("STYLEOS S863M RESUME");fld848("id",id);fld848("pc",stored->pc);fld848("rax",stored->gpr[0]);fld848("ticks",local848[id]);arch_putc('\n');}
+#endif
   arch_puts("STYLEOS S862B COMMIT");fld848("step",step);fld848("id",id);fld848("pid",pid860[id]);fld848("state",pr_find(pr_global(),pid860[id])->state);fld848("pc",stored->pc);fld848("sp",stored->sp);fld848("flags",stored->status);fld848("zero",zeroed);arch_putc('\n');
 #else
   if(terminal){
@@ -453,7 +494,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #endif
  }
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
- if(completed!=s862_loop_budget[0]+s862_loop_budget[1]+2||ticks848!=s862_loop_budget[0]+s862_loop_budget[1]||local848[0]!=s862_loop_budget[0]||local848[1]!=s862_loop_budget[1]||runtime860->dispatcher.current!=-1||pr_find(pr_global(),pid860[0])->state!=PR_FAULTED||pr_find(pr_global(),pid860[1])->state!=PR_EXITED)fail848("862-loop-final");
+ if(completed!=s862_loop_budget[0]+s862_loop_budget[1]+2+EXTRA_DISPATCH848||ticks848!=s862_loop_budget[0]+s862_loop_budget[1]||local848[0]!=s862_loop_budget[0]||local848[1]!=s862_loop_budget[1]||runtime860->dispatcher.current!=-1||pr_find(pr_global(),pid860[0])->state!=PR_FAULTED||pr_find(pr_global(),pid860[1])->state!=PR_EXITED)fail848("862-loop-final");
 #elif defined(STYLEOS_TEST_RUNTIME_BANK_862)
  if(ticks848!=8||local848[0]!=3||local848[1]!=5||runtime860->dispatcher.current!=-1||pr_find(pr_global(),pid860[0])->state!=PR_FAULTED||pr_find(pr_global(),pid860[1])->state!=PR_EXITED)fail848("862-bank-final");
 #elif defined(STYLEOS_TEST_RUNTIME_SELECT_862)
@@ -524,7 +565,7 @@ void s860_reap(uint64_t safe){
 #ifndef STYLEOS_TEST_RUNTIME_SPARSE_862
  for(unsigned i=0;i<2;i++)if(dpr_release(runtime860,i,handle860[i])!=PS_OK)fail848("860-reap");
 #endif
- if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||runtime860->dispatcher.current!=-1||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+10)fail848("860-reap-state");
+ if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||runtime860->dispatcher.current!=-1||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+10+EXTRA_DISPATCH848)fail848("860-reap-state");
  arch_puts("STYLEOS S860 CLEAN");fld848("safe",safe);fld848("dispatches",runtime860->dispatcher.dispatches);fld848("processes",0);fld848("windows",0);arch_putc('\n');
  arch_puts("STYLEOS S860 POLICY actual-cpl3-ticks=yes fp=yes existing-dispatcher=yes leases-released=yes production-cr3=deny\n");
 }

@@ -85,7 +85,11 @@ bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
 bool s849_guest_finish(uint64_t safe){
  if(safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+ ||seen[0]!=s862_loop_budget[0]+2||seen[1]!=s862_loop_budget[1]+2
+#else
  ||seen[0]!=s862_loop_budget[0]+1||seen[1]!=s862_loop_budget[1]+1
+#endif
 #else
  ||seen[0]!=4||seen[1]!=6
 #endif

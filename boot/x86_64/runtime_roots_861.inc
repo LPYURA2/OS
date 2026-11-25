@@ -17,7 +17,12 @@ static struct rt858_live capture861(void){
 static bool boundary861(const struct dpr_service *d,const struct s842_cache *cache){
  struct rt858_live v=capture861();return d&&rt861_dispatcher(&v)==d&&same_cache(cache)&&(
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
- ((d->dispatcher.dispatches==10
+ ((d->dispatcher.dispatches==
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+ 12
+#else
+ 10
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
  ||d->dispatcher.dispatches==20
 #endif

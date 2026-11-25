@@ -245,6 +245,15 @@ s848_a_start:
     fld1
     ldmxcsr .Lmxcsr_a849(%rip)
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+    movq $1,%rax
+    int $0x80
+.globl s848_a_yield
+s848_a_yield:
+    testq %rax,%rax
+    jnz .Lmixed_bad_a
+    movabs $0x8480000000000000,%rax
+#endif
 1:  incq (%rdi)
     cmpq $0,8(%rdi)
     je 1b
@@ -252,6 +261,9 @@ s848_a_loop_end:
     movabs $0x400000003000,%rax
 s848_a_fault:
     movq (%rax),%rax
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+.Lmixed_bad_a:
+#endif
     ud2
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
 .Lmxcsr_a849: .long 0x1f80
@@ -265,6 +277,15 @@ s848_b_start:
     fldz
     ldmxcsr .Lmxcsr_b849(%rip)
 #endif
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+    movq $1,%rax
+    int $0x80
+.globl s848_b_yield
+s848_b_yield:
+    testq %rax,%rax
+    jnz .Lmixed_bad_b
+    movabs $0x8480000100000000,%rax
+#endif
 2:  incq (%rdi)
     cmpq $0,8(%rdi)
     je 2b
@@ -272,6 +293,9 @@ s848_b_loop_end:
     movq $2,%rax
     int $0x80
 s848_b_exit:
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+.Lmixed_bad_b:
+#endif
     ud2
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
 .Lmxcsr_b849: .long 0x3f80
