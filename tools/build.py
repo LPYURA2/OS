@@ -767,6 +767,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         sources += ['kernel/system_update.c', 'kernel/desktop_import.c', 'boot/x86_64/desktop_update.c',
                     'third_party/monocypher/monocypher.c',
                     'third_party/monocypher/monocypher-ed25519.c']
+    if integrated_runtime_864:
+        from build_external_workload_865 import build as build_external_workload
+        build_external_workload(cc,folder)
+        flags += ['-I',str(folder)]
     if owned_shell_865:
         # Actual compiler arguments and translation-unit bytes, not inferred profile names.
         (folder / 'owned-shell-compiler.json').write_text(json.dumps({

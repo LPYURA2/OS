@@ -22,7 +22,24 @@ def loop_site(efi,map_file,*,four=False,external=False):
         return v+rel,ro+rel
     site['timer_idt_rva'],_=sym('idt848',r'boot_x86_64_user_preemption_848\.o',True)
     site['common_event_rva'],_=sym('rt863_bank_event',r'kernel_runtime_bank_862\.o')
-    if external:site['external_payloads']=[]
+    if external:
+        if not four:raise ValueError('external workload requires four contexts')
+        if re.search(r'\bs848_[abcd]_(start|yield|loop_end|fault|exit|end)\b',s):raise ValueError('test executable linked in kernel')
+        import hashlib,json
+        from build_external_workload_865 import read_object
+        independent=read_object((map_file.parent/'external-workload-865.o').read_bytes())
+        metadata=json.loads((map_file.parent/'external-workload-865.json').read_text())
+        if metadata!=[m for _,m in independent]:raise ValueError('external metadata provenance')
+        site['external_payloads']=[]
+        for i,(blob,m) in enumerate(independent):
+            if (map_file.parent/f'external-workload-{i}.elf').read_bytes()!=blob or hashlib.sha256(blob).hexdigest()!=m['sha256']:raise ValueError('external ELF provenance')
+            label='abcd'[i];code=blob[4096:];y=m['yield']-CODE;end=m['end']-CODE;term=m['term']-CODE
+            if y!=28 or end!=(74 if i>=2 else 53) or term!=(63,62,74,74)[i]:raise ValueError('external code offsets')
+            if code[y-2:y]!=b'\xcd\x80' or (i==0 and code[term:term+3]!=b'\x48\x8b\x00') or (i==1 and code[term-2:term]!=b'\xcd\x80') or (i==2 and code[term:term+2]!=b'\x0f\x0b') or (i==3 and code[term:term+1]!=b'\xfa'):raise ValueError('external instructions')
+            if i>=2 and code[y:y+4]!=bytes((0x48,0x83,0xf8,0 if i==2 else 3)):raise ValueError('external range result')
+            for k in ('yield','end','term'):site[label+'_'+k]=m[k]
+            site['external_payloads'].append(code)
+        return site
     fixtures=[('a','fault',20),('b','exit',19)]
     if four:fixtures += [('c','fault',31),('d','fault',31)]
     for label,last,delta in fixtures:
@@ -34,11 +51,6 @@ def loop_site(efi,map_file,*,four=False,external=False):
             if _range(efi,yo,4,'range return check')!=bytes((0x48,0x83,0xf8,expected)):raise ValueError('range result instruction')
         if _range(efi,yo-2,2,'yield')!=b'\xcd\x80' or (label=='a' and _range(efi,to,3,'fault')!=b'\x48\x8b\x00') or (label=='b' and _range(efi,to-2,2,'exit')!=b'\xcd\x80') or (label=='c' and _range(efi,to,2,'ud2')!=b'\x0f\x0b') or (label=='d' and _range(efi,to,1,'cli')!=b'\xfa'):raise ValueError('mixed linked instruction')
         site[label+'_yield']=CODE+y-start;site[label+'_end']=CODE+end-start;site[label+'_term']=CODE+term-start
-        if external:
-            finish,fo=sym('s848_'+label+'_end',r'arch_x86_64_process_entry_847\.o')
-            _,so=symbols['start']
-            if not 0<finish-start<=4096 or fo-so!=finish-start:raise ValueError('external ELF extent')
-            site['external_payloads'].append(_range(efi,so,fo-so,'external ELF code'))
     return site
 def row(line,prefix,keys):
     m=re.fullmatch(prefix+b' '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in keys),line)

@@ -249,6 +249,7 @@ def main():
         symbols={token for line in mp.read_text().splitlines() for token in line.split()}
         forbidden={'s847_trial','s863_coop_reap','s847_0_start','s847_0_end','s847_0_fault','s847_0_ok','s847_0_deny','s847_0_yield','s847_1_start','s847_1_end','s847_1_exit','s847_1_ok','s847_1_deny','s847_1_yield'}
         required={'s847_enter','s847_dispatch_raw','s848_dispatch_raw','s848_irq_entry','s847_pf_entry','s847_call_entry'}
+        forbidden.update('s848_'+label+'_'+suffix for label in 'abcd' for suffix in ('start','yield','loop_end','fault','exit','end'))
         if symbols & forbidden or not required <= symbols:
             raise ValueError('integrated preemptive entry provenance')
         (out/'entry-separation.json').write_text(json.dumps({'required':sorted(required),'absent':sorted(forbidden)},indent=2)+'\n')
