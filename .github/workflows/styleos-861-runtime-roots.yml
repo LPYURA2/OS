@@ -17,6 +17,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
       - name: Real supervisor roundtrips on Desktop root and CPU trace
         run: python3 tools/test_runtime_roots_861_guest.py --output build/s861-roots
+      - name: Independently replay and mutate original hardware evidence
+        run: python3 tools/test_runtime_roots_861_replay.py build/s861-roots
       - name: Preserve original guest evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
