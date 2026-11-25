@@ -1,0 +1,38 @@
+name: StyleOS 862 registry-driven bounded dispatch loop
+on:
+  push:
+    branches: [feature/styleos-runtime-select-862]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install QEMU and OVMF build tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld dosfstools mtools xorriso qemu-system-x86 qemu-utils ovmf
+      - name: Registry loop across 81 budget pairs on both compilers (host only)
+        run: |
+          set -euo pipefail
+          mkdir -p build/s862-loop-host
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_TICK_860 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_loop_862.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847}.c -o "build/s862-loop-host/$cc"
+            "build/s862-loop-host/$cc" | tee "build/s862-loop-host/$cc.log"
+          done
+      - name: Actual registry-driven CPL3 loop with reversed retirement order
+        run: python3 tools/test_runtime_loop_862_guest.py --output build/s862-loop-guest
+      - name: Independently replay original loop guest evidence
+        run: python3 tools/test_runtime_loop_862_replay.py build/s862-loop-guest
+      - name: Preserve original evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleos-862-registry-loop
+          path: |
+            build/s862-loop-guest/
+            build/s862-loop-host/*.log
+          if-no-files-found: warn

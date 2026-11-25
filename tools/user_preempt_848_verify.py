@@ -5,6 +5,15 @@ GPRS=('rax','rbx','rcx','rdx','rsi','rdi','rbp','r8','r9','r10','r11','r12','r13
 CODE=0x10000000
 IST=0x400000003000
 ORDER=(0,1,0,1,0,1,0,1,1,1)
+def fixture_order(budgets=(3,5)):
+    if tuple(budgets) not in ((3,5),(5,3)):raise ValueError('S848 unsupported fixture budgets')
+    remaining=list(budgets);live=[True,True];cursor=0;plan=[]
+    while any(live):
+        id=cursor if live[cursor] else 1-cursor;cursor=1-id
+        terminal=remaining[id]==0;plan.append((id,terminal))
+        if terminal:live[id]=False
+        else:remaining[id]-=1
+    return plan
 POLICY=b'STYLEOS S848 POLICY cpl3-timer=yes integer-only=yes single-cpu=yes firmware-timer-phase=discarded production-cr3=deny'
 
 def parse(line,tag,keys):
@@ -14,7 +23,7 @@ def parse(line,tag,keys):
     if not match:raise ValueError('S848 schema '+tag)
     return dict(zip(keys,(int(v,16) for v in match.groups())))
 
-def verify_stage(lines,obs,*,fx=False,before_tag=b'STYLEOS S847 POLICY ',after_tag=b'STYLEOS S846 CLEAN '):
+def verify_stage(lines,obs,*,fx=False,before_tag=b'STYLEOS S847 POLICY ',after_tag=b'STYLEOS S846 CLEAN ',budgets=(3,5)):
     prefix=19 if fx else 0
     policy=POLICY.replace(b'integer-only=yes',b'integer-only=no') if fx else POLICY
     rec=[x for x in lines if x.startswith(b'STYLEOS S848 ')]
@@ -27,8 +36,7 @@ def verify_stage(lines,obs,*,fx=False,before_tag=b'STYLEOS S847 POLICY ',after_t
     r=parse(rec[2],'READY',('safe','a','b','lapic','cs','ss','a-loop-end','b-loop-end','a-fault','b-exit','count'))
     if tuple(r.values())!=(safe,parent['a'],parent['b'],0xfee00000,sel['cs'],sel['ss'],CODE+prefix+10,CODE+prefix+10,CODE+prefix+20,CODE+prefix+19,5000000):raise ValueError('S848 roots/sites')
     i=3;ticks=0;local=[0,0];progress=[0,0];seen=[];backs=[];ends=[]
-    for step,id in enumerate(ORDER):
-        terminal=step in (6,9)
+    for step,(id,terminal) in enumerate(fixture_order(budgets)):
         if terminal:
             v=parse(rec[i],'END',('id','root','rip','vector','error','cr2','state','ticks'))
             if tuple(v.values())!=(id,parent['ab'[id]],CODE+prefix+(19 if id else 20),128 if id else 14,0 if id else 5,0 if id else IST,4 if id else 3,ticks):raise ValueError('S848 terminal evidence')
@@ -47,7 +55,7 @@ def verify_stage(lines,obs,*,fx=False,before_tag=b'STYLEOS S847 POLICY ',after_t
         if b['ab'[1-id]]!=progress[1-id] or b['ab'[id]]<progress[id] or (not terminal and b['ab'[id]]!=progress[id]):raise ValueError('S848 cross-process write')
         progress[id]=b['ab'[id]];backs.append(b)
     total=parse(rec[i],'TOTAL',('ticks','a','b','config-restored','timer-stopped'));i+=1
-    if i!=24 or tuple(total.values())!=(8,3,5,1,1) or ticks!=8 or local!=[3,5]:raise ValueError('S848 totals')
+    if i!=24 or tuple(total.values())!=(8,*budgets,1,1) or ticks!=8 or local!=list(budgets):raise ValueError('S848 totals')
     before=next(j for j,x in enumerate(lines) if x.startswith(before_tag))
     after=next(j for j,x in enumerate(lines) if x.startswith(after_tag))
     indices=[before]+[lines.index(x) for x in rec]+[after]

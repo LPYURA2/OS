@@ -7,6 +7,9 @@ volatile uint64_t s849_live;
 static struct s849_bank bank;
 static uint64_t safe849;
 static unsigned seen[2];
+#ifdef STYLEOS_TEST_RUNTIME_LOOP_862
+extern const unsigned s862_loop_budget[2];
+#endif
 static uint64_t cr3_849(void){uint64_t x;__asm__ volatile("mov %%cr3,%0":"=r"(x));return x;}
 static uint64_t flags849(void){uint64_t x;__asm__ volatile("pushfq;popq %0":"=r"(x));return x;}
 static uint32_t u32(const uint8_t *b){return (uint32_t)b[0]|((uint32_t)b[1]<<8)|((uint32_t)b[2]<<16)|((uint32_t)b[3]<<24);}
@@ -61,7 +64,13 @@ bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
  return true;
 }
 bool s849_guest_finish(uint64_t safe){
- if(safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live||seen[0]!=4||seen[1]!=6||bank.active!=-1)return false;
+ if(safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live
+#ifdef STYLEOS_TEST_RUNTIME_LOOP_862
+ ||seen[0]!=s862_loop_budget[0]+1||seen[1]!=s862_loop_budget[1]+1
+#else
+ ||seen[0]!=4||seen[1]!=6
+#endif
+ ||bank.active!=-1)return false;
  for(unsigned i=0;i<2;i++)if(!s849_retire(&bank,i,bank.slot[i].root,1)||!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
  scrub(&s849_kernel_image,sizeof s849_kernel_image);scrub(&bank,sizeof bank);safe849=0;
  if(!allzero(&s849_kernel_image,sizeof s849_kernel_image)||!allzero(&bank,sizeof bank)||!allzero(&s849_user_capture,sizeof s849_user_capture)||!allzero(&s849_user_restore,sizeof s849_user_restore)||!allzero(&kernel_check,sizeof kernel_check))return false;

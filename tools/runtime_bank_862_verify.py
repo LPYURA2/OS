@@ -22,9 +22,9 @@ def bank_site(efi,map_file):
         site[name+'_rva']=rva
     return site
 
-def verify(raw,rc,site,reference):
+def verify(raw,rc,site,reference,*,budgets=(3,5)):
     try:
-        ok,obs=prior(raw,rc,site,reference)
+        ok,obs=prior(raw,rc,site,reference,budgets=budgets)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();rows=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S862B ')]
         def indices(tag):return [i for i,x in enumerate(lines) if x.startswith(tag)]
@@ -41,7 +41,7 @@ def verify(raw,rc,site,reference):
             i=e['id'];a,b=rows[2*step:2*step+2];en=row(a,b'ENTER',('step','id','pid','dispatch','safe','root','pc','sp','flags'))
             pc,sp,flags=saved[i]
             if tuple(en.values())!=(step,i,e['pid'],e['dispatch'],e['safe'],e['root'],pc,sp,flags|0x200) or not (backs[step-1] if step else ready[0])<a<frames[step]<b<bound[step]<events[step]<backs[step]:raise ValueError('S862B entry/phase')
-            terminal=step in (6,9)
+            terminal=e['state'] in (4,5)
             if terminal:saved[i]=(0,0,0)
             else:
                 t=obs['user_preempt_ticks'][ti];ti+=1;saved[i]=(t['rip'],t['rsp'],t['flags']&~0x200)

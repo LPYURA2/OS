@@ -3,7 +3,7 @@ import re
 from desktop_switch_851_site import bp_site
 from fault_site import _unpack,_range
 from runtime_roots_861_verify import verify as roots_verify,trace_check as roots_trace,HEADER
-from user_preempt_848_verify import verify_stage,ORDER
+from user_preempt_848_verify import verify_stage,ORDER,fixture_order
 from fx_context_849_verify import verify_fx,verify_link_map
 from runtime_tick_860_verify import parse as parse860,KEYS,POLICY
 
@@ -28,14 +28,14 @@ def timer_site(efi,map_file):
         if id=='b' and _range(efi,off-2,2,'INT80')!=b'\xcd\x80':raise ValueError('S861T INT80 bytes')
     return site
 
-def verify(raw,rc,site,reference):
+def verify(raw,rc,site,reference,*,budgets=(3,5)):
     try:
         ok,obs=roots_verify(raw,rc,site,reference)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();r=obs['join_roots'];a=obs['active'];safe=r['safe'];obs['child_roots']=r
         obs['process_selectors']={'cs':0x5b,'ss':0x63}
-        obs.update(verify_stage(lines,obs,fx=True,before_tag=b'STYLEOS S861 SWITCH id=0x0000000000000001 ',after_tag=b'STYLEOS S861T SCRUB '))
-        obs.update(verify_fx(lines,obs,after_tag=b'STYLEOS S861T SCRUB '))
+        obs.update(verify_stage(lines,obs,fx=True,before_tag=b'STYLEOS S861 SWITCH id=0x0000000000000001 ',after_tag=b'STYLEOS S861T SCRUB ',budgets=budgets))
+        obs.update(verify_fx(lines,obs,after_tag=b'STYLEOS S861T SCRUB ',budgets=budgets))
         rows=[x for x in lines if x.startswith(b'STYLEOS S861T ')];pr=[x for x in lines if x.startswith(b'STYLEOS S860 ')]
         if len(rows)!=22 or len(pr)!=13 or pr[-1]!=POLICY:raise ValueError('S861T record count')
         def row(line,tag,keys):
@@ -50,8 +50,7 @@ def verify(raw,rc,site,reference):
         if tuple(ready.values())!=(safe,image+site['timer_idt_rva'],0x5b,0x63,0x67) or tuple(admission.values())!=(safe,1,2,*handles,1,2) or not lines.index(pr[0])<lines.index(rows[0])<pos(b'STYLEOS S848 READY '):raise ValueError('S861T admission')
         events=[x for x in lines if x.startswith((b'STYLEOS S848 TICK ',b'STYLEOS S848 END '))];backs=[x for x in lines if x.startswith(b'STYLEOS S848 BACK ')]
         ticks=[0,0];frames=[];boundaries=[];records=[];ti=0
-        for step,id in enumerate(ORDER):
-            terminal=step in (6,9)
+        for step,(id,terminal) in enumerate(fixture_order(budgets)):
             if not terminal:ticks[id]+=1
             f=row(rows[1+2*step],b'FRAME',('step','flags'))
             if f['step']!=step or not f['flags']&2 or f['flags']&~0xad7 or (not terminal and f['flags']!=obs['user_preempt_ticks'][ti]['flags']):raise ValueError('S861T flags')
@@ -61,11 +60,11 @@ def verify(raw,rc,site,reference):
             if not lines.index(rows[1+2*step])<lines.index(events[step])<lines.index(rows[2+2*step])<lines.index(pr[step+1])<lines.index(backs[step]):raise ValueError('S861T order')
             frames.append(f);boundaries.append(b);records.append(v)
         scrub=row(rows[-1],b'SCRUB',('safe','used','tables-zero','leases-zero'));clean=parse860(pr[-2],b'CLEAN',('safe','dispatches','processes','windows'))
-        if tuple(scrub.values())!=(safe,0,1,1) or tuple(clean.values())!=(safe,10,0,0) or ticks!=[3,5] or not lines.index(backs[-1])<pos(b'STYLEOS S849 POLICY ')<lines.index(rows[-1])<lines.index(pr[-2])<lines.index(POLICY)<pos(b'STYLEOS S861 CLEAN '):raise ValueError('S861T cleanup')
+        if tuple(scrub.values())!=(safe,0,1,1) or tuple(clean.values())!=(safe,10,0,0) or ticks!=list(budgets) or not lines.index(backs[-1])<pos(b'STYLEOS S849 POLICY ')<lines.index(rows[-1])<lines.index(pr[-2])<lines.index(POLICY)<pos(b'STYLEOS S861 CLEAN '):raise ValueError('S861T cleanup')
         obs.update(timer_ready=ready,timer_frames=frames,timer_boundaries=boundaries,timer_scrub=scrub,runtime_ticks=records,runtime_clean=clean,runtime_admission=admission);return True,obs
     except (ValueError,KeyError,IndexError,TypeError,StopIteration) as e:return False,str(e)
 
-def trace_check(text,obs):
+def trace_check(text,obs,*,budgets=(3,5)):
     h=list(HEADER.finditer(text));r=obs['join_roots'];roots=(r['safe'],r['a'],r['b']);start=None
     for i,m in enumerate(h):
         block=text[m.start():h[i+1].start() if i+1<len(h) else len(text)];cr=re.findall(r'\bCR3=([0-9a-fA-F]+)\b',block)
@@ -73,8 +72,8 @@ def trace_check(text,obs):
         if int(cr[0],16) in roots:start=i;break
     if start is None or len(h)-start!=13:raise ValueError('S861T event count')
     records=roots_trace(text[:h[start+3].start()],obs);a=obs['active'];ti=ei=0
-    for step,id in enumerate(ORDER):
-        terminal=step in (6,9);soft=int(step==9)
+    for step,(id,terminal) in enumerate(fixture_order(budgets)):
+        soft=int(terminal and id==1)
         if terminal:p=obs['user_preempt_ends'][ei];ei+=1;vec=p['vector'];error=p['error'];rip=p['rip']-2*soft
         else:p=obs['user_preempt_ticks'][ti];ti+=1;vec=0x50;error=0;rip=p['rip']
         i=start+3+step;m=h[i];block=text[m.start():h[i+1].start() if i+1<len(h) else len(text)]
