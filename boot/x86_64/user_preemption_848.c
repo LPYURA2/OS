@@ -19,6 +19,9 @@ static uint32_t ipc_session864;
 #include <styleos/runtime_entry_858.h>
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
 #include <styleos/runtime_bank_862.h>
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+#include "../../tests/guest/workload_865.h"
+#endif
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_SELECT_862
 #include <styleos/runtime_select_862.h>
@@ -114,6 +117,7 @@ static bool writable848(const struct s846_root *r,uint64_t x,uint64_t n){for(siz
 static void gate848(unsigned i,void(*p)(void),uint16_t cs,uint8_t ist,uint8_t type){uint64_t v=(uintptr_t)p;idt848[i]=(struct gate848){(uint16_t)v,cs,ist,type,(uint16_t)(v>>16),(uint32_t)(v>>32),0};}
 static uint64_t pattern848(unsigned id,unsigned i){return i==5?S846_DATA:UINT64_C(0x8480000000000000)|((uint64_t)id<<32)|i;}
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
 static uint64_t first_call848(unsigned id){
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
  return id>=2?S847_CALL_RANGE:S847_CALL_YIELD;
@@ -121,7 +125,6 @@ static uint64_t first_call848(unsigned id){
  (void)id;return S847_CALL_YIELD;
 #endif
 }
-#ifndef STYLEOS_INTEGRATED_RUNTIME_864
 static uint64_t first_result848(unsigned id){
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
  return id==3?3u:0u;
@@ -398,6 +401,16 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  initial=rd848(0x380);current=rd848(0x390);isr=pending848(0x100);irr=pending848(0x200);
  arch_puts("STYLEOS S848 STOP");fld848("lvt",rd848(0x320));fld848("initial",initial);fld848("current",current);fld848("isr",isr);fld848("irr",irr);arch_putc('\n');
  if(initial||current||isr||irr||rd848(0x320)!=lvt)fail848("timer-stop");
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ struct s865_fixture_image loaded[S846_ROOT_COUNT];
+ if(!audit(opaque)||!s865_fixture_stage(leases,loaded))fail848("865-fixture-stage");
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++){
+  sites848[i][0]=loaded[i].image.entry;
+  sites848[i][1]=loaded[i].loop_end;
+  sites848[i][2]=loaded[i].terminal_pc;
+  mixed_pc848[i]=loaded[i].call_pc;
+ }
+#else
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
  const unsigned char *start[4]={s848_a_start,s848_b_start,s848_c_start,s848_d_start},*loop[4]={s848_a_loop_end,s848_b_loop_end,s848_c_loop_end,s848_d_loop_end},*end[4]={s848_a_end,s848_b_end,s848_c_end,s848_d_end},*term[4]={s848_a_fault,s848_b_exit,s848_c_fault,s848_d_fault};
  const unsigned char *calls[4]={s848_a_yield,s848_b_yield,s848_c_yield,s848_d_yield};
@@ -419,6 +432,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   mixed_pc848[i]=S846_CODE+call-lo;
 #endif
  }
+#endif /* integrated workload provider / historical inline fixture */
 #ifndef STYLEOS_TEST_DESKTOP_PUMP_863
  struct s847_selectors sel;
 #endif
@@ -478,8 +492,8 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
   /* The fixture supplies bytes today; the same admission consumes trusted
    * loader metadata without requiring any particular program instruction. */
-  struct nte_loaded image={.entry=S846_CODE,.code_bytes=(uint32_t)((uintptr_t)end[i]-(uintptr_t)start[i]),.memory_bytes=P};
-  if(!audit(opaque)||rt865_bank_admit_image(&bank862,runtime860,safe,i,&child[i],&leases[i],&image,"S864 process",&initial,&pid860[i])!=PS_OK||
+  initial.pc=loaded[i].image.entry;
+  if(!audit(opaque)||rt865_bank_admit_image(&bank862,runtime860,safe,i,&child[i],&leases[i],&loaded[i].image,"S864 process",&initial,&pid860[i])!=PS_OK||
 #else
   if(rt863_bank_admit_initial(&bank862,runtime860,safe,i,handle860[i],child[i].built.root,"S864 process",&initial,&pid860[i])!=PS_OK||
 #endif

@@ -455,6 +455,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/fx_context_849.c','boot/x86_64/fx_guest_849.c']
     if test_user_preempt_848 or test_runtime_timer_861:
         common += ['kernel/user_preempt_848.c','boot/x86_64/user_preemption_848.c']
+    if integrated_runtime_864:
+        common += ['tests/guest/workload_865.c']
     if test_process_trial_847 or test_runtime_user_861 or test_runtime_timer_861:
         common += ['kernel/process_entry_847.c','kernel/process_trap_847.c','kernel/user_copy_772.c','arch/x86_64/process_entry_847.S','boot/x86_64/process_trial_847.c']
     if test_user_roots_846:
