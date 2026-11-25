@@ -1,3 +1,7 @@
+## Stage 858 — final combined runtime entry and bounded arena candidate
+
+Actual owned-root runtime and S844 arena guest PASS; see [handoff](NEXT_CHAT_858.md). Final exact-SHA full and focused regressions required. No production root, IRQ or task admission. KFA gates open.
+
 ## Stage 858 — runtime entry on owned root (candidate)
 
 Accepted S857 a0db88a21a62cdb85cb0c5df1152799269975476, all three exact-SHA CI SUCCESS, verified full archive and focused raw evidence. See [handoff](NEXT_CHAT_858.md) and [architecture](architecture/RUNTIME_ENTRY_858.md). Runtime service bootstrap under audited CR3 is a separate terminal profile; not production root or application admission. KFA gates remain open.
