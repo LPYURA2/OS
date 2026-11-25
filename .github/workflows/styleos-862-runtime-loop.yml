@@ -23,6 +23,13 @@ jobs:
             "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_TICK_860 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_loop_862.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847}.c -o "build/s862-loop-host/$cc"
             "build/s862-loop-host/$cc" | tee "build/s862-loop-host/$cc.log"
           done
+      - name: Sparse bank admission and reuse on both compilers (host only)
+        run: |
+          set -euo pipefail
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_TICK_860 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_sparse_862.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847}.c -o "build/s862-loop-host/sparse-$cc"
+            "build/s862-loop-host/sparse-$cc" | tee "build/s862-loop-host/sparse-$cc.log"
+          done
       - name: Actual registry-driven CPL3 loop with reversed retirement order
         run: python3 tools/test_runtime_loop_862_guest.py --output build/s862-loop-guest
       - name: Independently replay original loop guest evidence
