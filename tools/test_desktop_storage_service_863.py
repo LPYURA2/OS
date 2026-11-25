@@ -245,7 +245,13 @@ def main():
         with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',*build_args,'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
     efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=None if args.four else bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
-    if args.four:
+    if args.owned_shell:
+        # The shell-only image must not require a linked child workload site.
+        # Bind the real boot BP and demand absence of the child INT3 label.
+        map_text=mp.read_text()
+        site=bp_site(efi.read_bytes(),map_text)
+        if any('s861_bp_return' in line.split() for line in map_text.splitlines()):raise ValueError('child workload entry still linked in owned shell')
+    elif args.four:
         from runtime_mixed_863_verify import loop_site
         site=loop_site(efi.read_bytes(),mp,four=True)
     media=None;iso=None;iso_sha=None
