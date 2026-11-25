@@ -432,22 +432,24 @@ void irq859_once(uint64_t root,uint64_t idt_pa,uint16_t cs,uint64_t stack_lo,uin
  uint32_t low[24],high[24];
  for(unsigned i=0;i<24;i++){low[i]=io_read(io,0x10+2*i);high[i]=io_read(io,0x11+2*i);if(!(low[i]&0x10000u)){arch_puts("STYLEOS S859 BLOCKED");fld("pin",i);fld("low",low[i]);arch_putc('\n');irq859_fail("859-other-irq-unmasked");}}
  /* Observe the complete supported LVT bank before any source change. */
- uint32_t lvt_version=mmio_read(lapic,0x30),lvt_before[IRQ859_LVT_COUNT],lvt_masked[IRQ859_LVT_COUNT],lvt_after[IRQ859_LVT_COUNT],lint0_masked;
+ uint32_t lvt_version=mmio_read(lapic,0x30),lvt_before[IRQ859_LVT_COUNT],lvt_masked[IRQ859_LVT_COUNT],lvt_after[IRQ859_LVT_COUNT],lvt_plan[IRQ859_LVT_COUNT];
  if(((lvt_version>>16)&255u)!=5u){arch_puts("STYLEOS S859 BLOCKED");fld("lvt-version",lvt_version);arch_putc('\n');irq859_fail("859-lvt-version-count");}
  irq859_lvt_read(lapic,lvt_before);irq859_lvt_log("LVT-BEFORE",root,lvt_version,lvt_before);
- if(!irq859_lvt_plan(lvt_version,lvt_before,&lint0_masked))irq859_fail("859-lvt-plan");
+ if(!irq859_lvt_plan(lvt_version,lvt_before,lvt_plan))irq859_fail("859-lvt-plan");
  uint32_t dest=mmio_read(lapic,0x20)>>24,tpr=mmio_read(lapic,0x80),svr=mmio_read(lapic,0xf0),reg=0x10+2*plan.pin;
- if(dest!=0||low[2]!=0x10000u||high[2]!=0||tpr!=0||svr!=0x10fu)irq859_fail("859-initial-registers");
+ if(dest!=0||low[2]!=0x10000u||high[2]!=0||tpr!=0||svr!=0x10fu){arch_puts("STYLEOS S859 BLOCKED");fld("dest",dest);fld("low",low[2]);fld("high",high[2]);fld("tpr",tpr);fld("svr",svr);arch_putc('\n');irq859_fail("859-initial-registers");}
  struct idt_gate807 *live=(void *)(uintptr_t)idt_pa;
  for(unsigned i=0;i<256;i++)irq859_saved[i]=live[i];
  const uintptr_t handler=(uintptr_t)irq807_handler;
  live[IRQ859_VECTOR]=(struct idt_gate807){(uint16_t)handler,cs,1,0x8e,(uint16_t)(handler>>16),(uint32_t)(handler>>32),0};
  irq807_hits=irq807_isr_seen=irq807_eoi_clear=0;irq842_root_seen=irq842_frame_seen=0;irq859_rip=irq859_cs=irq859_flags=irq859_rsp=irq859_wait_rsp=0;
  irq807_lapic_ptr=(volatile uint8_t *)lapic;
- /* PIC is fully masked, IF=0. Isolate inherited ExtINT before enabling IRQ0. */
- if(lvt_before[3]!=lint0_masked)mmio_write(lapic,0x350,lint0_masked);
+ /* Terminal fixture: mask LINT1 NMI first, then LINT0 ExtINT. IF=0
+  * alone does not block NMI; unexpected events are terminal failures. */
+ if(lvt_before[4]!=lvt_plan[4])mmio_write(lapic,0x360,lvt_plan[4]);
+ if(lvt_before[3]!=lvt_plan[3])mmio_write(lapic,0x350,lvt_plan[3]);
  irq859_lvt_read(lapic,lvt_masked);irq859_lvt_log("LVT-MASKED",root,mmio_read(lapic,0x30),lvt_masked);
- for(unsigned i=0;i<IRQ859_LVT_COUNT;i++)if(lvt_masked[i]!=(i==3?lint0_masked:lvt_before[i]))irq859_fail("859-lvt-mask-readback");
+ for(unsigned i=0;i<IRQ859_LVT_COUNT;i++)if(lvt_masked[i]!=lvt_plan[i])irq859_fail("859-lvt-mask-readback");
  if(mmio_read(lapic,0x30)!=lvt_version||!irq859_clear(lapic))irq859_fail("859-lvt-mask-pending");
  mmio_write(lapic,0xf0,0x1ffu);
  io_write(io,reg,0x10050u);io_write(io,reg+1,dest<<24);
@@ -460,9 +462,11 @@ void irq859_once(uint64_t root,uint64_t idt_pa,uint16_t cs,uint64_t stack_lo,uin
  bool drained=irq859_clear(lapic);
  io_write(io,reg+1,high[2]);io_write(io,reg,low[2]);mmio_write(lapic,0xf0,svr);
  live[IRQ859_VECTOR]=irq859_saved[IRQ859_VECTOR];
- /* The test route is masked/restored; IF remains clear. Restore LINT0 only. */
+ /* The test route is masked/restored; IF remains clear. Restore LINT0
+  * and then LINT1, with the original IDT already restored. */
  if(!drained||(irq859_rflags()&0x200)||!irq859_clear(lapic))irq859_fail("859-lvt-restore-context");
- if(lvt_before[3]!=lint0_masked)mmio_write(lapic,0x350,lvt_before[3]);
+ if(lvt_before[3]!=lvt_plan[3])mmio_write(lapic,0x350,lvt_before[3]);
+ if(lvt_before[4]!=lvt_plan[4])mmio_write(lapic,0x360,lvt_before[4]);
  irq859_lvt_read(lapic,lvt_after);irq859_lvt_log("LVT-RESTORED",root,mmio_read(lapic,0x30),lvt_after);
  for(unsigned i=0;i<IRQ859_LVT_COUNT;i++)if(lvt_after[i]!=lvt_before[i])irq859_fail("859-lvt-restore-readback");
  if(mmio_read(lapic,0x30)!=lvt_version)irq859_fail("859-lvt-version");
@@ -473,7 +477,7 @@ void irq859_once(uint64_t root,uint64_t idt_pa,uint16_t cs,uint64_t stack_lo,uin
  __asm__ volatile("sidt %0":"=m"(dt));
  struct irq859_expected e={root,IRQ859_IST,cs,(uintptr_t)irq859_wait_lo,(uintptr_t)irq859_wait_hi,irq859_wait_rsp};
  struct irq859_observed o={irq842_root_seen,irq842_frame_seen,irq859_cs,irq859_rip,irq859_rsp,irq859_flags,irq807_hits,irq807_isr_seen,irq807_eoi_clear};
- if(!drained||!irq859_clear(lapic)||!irq859_frame_ok(&e,&o)||e.rsp<stack_lo||e.rsp>=stack_hi||irq859_root()!=root||irq859_rflags()&0x200||dt.base!=idt_pa||dt.limit!=4095||mmio_read(io,0)!=index||mmio_read(lapic,0x80)!=tpr||mmio_read(lapic,0xf0)!=svr||inb(0x21)!=255||inb(0xa1)!=255)irq859_fail("859-final-proof");
+ if(!drained||!irq859_clear(lapic)||!irq859_frame_ok(&e,&o)||e.rsp<stack_lo||e.rsp>=stack_hi||irq859_root()!=root||irq859_rflags()&0x200||dt.base!=idt_pa||dt.limit!=4095||mmio_read(io,0)!=index||mmio_read(lapic,0x80)!=tpr||mmio_read(lapic,0xf0)!=svr||inb(0x21)!=255||inb(0xa1)!=255){arch_puts("STYLEOS S859 BLOCKED");fld("hits",o.hits);fld("isr",o.isr);fld("eoi",o.eoi);fld("rip",o.rip);fld("rsp",o.rsp);fld("wait-rsp",e.rsp);fld("frame",o.frame);fld("flags",o.rflags);fld("drained",drained);arch_putc('\n');irq859_fail("859-final-proof");}
  arch_puts("STYLEOS S859 IRQ");fld("root",root);fld("idt",idt_pa);fld("ist",e.ist);fld("frame",o.frame);fld("cs",o.cs);fld("rip",o.rip);fld("wait-lo",e.wait_lo);fld("wait-hi",e.wait_hi);fld("rsp",o.rsp);fld("wait-rsp",e.rsp);fld("flags",o.rflags);fld("hits",o.hits);fld("isr",o.isr);fld("eoi",o.eoi);fld("pin",plan.pin);fld("low",low[2]);fld("high",high[2]);fld("svr",svr);fld("tpr",tpr);fld("drained",1);arch_putc('\n');
 }
 #endif

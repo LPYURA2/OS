@@ -1,4 +1,6 @@
-## Stage 859 — IRQ0 under owned runtime root (candidate, ExtINT correction)
+## Stage 859 — IRQ0 under owned runtime root (candidate, exact LVT bank correction)
+
+Third real guest refused at `859-lvt-plan`: inherited LINT1 NMI 0x400. Exact captured LVT bank admission and terminal mask/readback/restore of both LINT entries; real retry required.
 
 UC checks passed in actual guest; inherited LINT0 ExtINT (0x700) blocked before STI. Narrow mask/readback/restore correction; real retry required.
 

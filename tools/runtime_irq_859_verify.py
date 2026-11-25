@@ -43,11 +43,9 @@ def verify(raw,rc,site,reference):
             if not m:raise ValueError('LVT schema')
             snapshots.append(dict(zip(LVT_KEYS,(int(x,16) for x in m.groups()))))
         before,masked,restored=snapshots
-        if before['root']!=obs['active']['root'] or before['version']>0xffffffff or before['version']>>16&255!=5 or before['lint0'] not in (0x700,0x10700):raise ValueError('LVT fixture')
-        for k in LVT_KEYS[2:]:
-            v=before[k]
-            if v>0xffffffff or (k!='lint0' and (not v&0x10000 or v&0x1000)):raise ValueError('LVT source unmasked or pending')
-        if masked!=dict(before,lint0=0x10700) or restored!=before:raise ValueError('LVT mask/restore')
+        if before['root']!=obs['active']['root'] or before['version']!=0x50014 or before['lint0'] not in (0x700,0x10700) or before['lint1'] not in (0x400,0x10400):raise ValueError('LVT fixture')
+        if tuple(before[k] for k in ('timer','thermal','perf','error'))!=(0x30020,0x10000,0x10000,0x10000):raise ValueError('LVT bank mismatch')
+        if masked!=dict(before,lint0=0x10700,lint1=0x10400) or restored!=before:raise ValueError('LVT mask/restore')
         m=re.fullmatch(b'STYLEOS S859 IRQ '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in KEYS),rows[3])
         if not m:raise ValueError('IRQ schema')
         v=dict(zip(KEYS,(int(x,16) for x in m.groups())))
