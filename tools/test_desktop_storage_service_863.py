@@ -7,7 +7,7 @@ from test_desktop_v0 import Desktop
 from test_desktop_interactive_863 import wait,prior,trace_check,recycle_site
 from test_desktop_frame_852_host import reference
 from desktop_switch_851_site import bp_site
-from runtime_entry_858_verify import verify as cold_prior
+from runtime_arena_858_verify import verify as cold_prior
 from irq_trace_accept_859 import HEADER
 from test import ROOT,firmware_path
 from block_fixture_856_verify import CONTROLLER,DEVICE,RAW,FILE
@@ -98,7 +98,7 @@ def main():
         prefix=b'\n'.join(lines[:gate])+b'\n'
         data=trace.read_bytes()
         if cold:
-            ok,obs=cold_prior(prefix,33,site['rva'],ref)
+            ok,obs=cold_prior(prefix,33,site['rva'],ref,cold=True)
             if not ok:raise ValueError('cold root '+str(obs))
             root=obs['active']['root']
             events=cold_trace(data.decode('ascii'),obs)
