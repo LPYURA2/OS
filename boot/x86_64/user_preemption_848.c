@@ -21,6 +21,7 @@ static uint32_t ipc_session864;
 #include <styleos/runtime_bank_862.h>
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
 #include "../../tests/guest/workload_865.h"
+static uint8_t launch_scratch865[8192];
 #endif
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_SELECT_862
@@ -593,15 +594,20 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   if(!leases[i].generation||leases[i].pages!=3||leases[i].owner!=S846_OWNER_A+i||!child[i].ready)fail848("864-lease");
   handle860[i]=leases[i].generation;
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+  struct rt865_launch_request request={.name="S864 process"};
+  for(unsigned j=0;j<15;j++)request.gpr[j]=first_arg848(i,j);
+  struct nte_loaded image={0};struct s865_fixture_image loaded={0};
+  if(!s865_fixture_source(i,&request.source)||
+     rt865_launch_prepared(&bank862,runtime860,safe,i,&child[i],arena,&leases[i],
+      &request,launch_scratch865,sizeof launch_scratch865,audit,opaque,&image,&pid860[i])!=PS_OK||
+     !s865_fixture_observe(i,leases[i],&image,&loaded))fail848("865-launch-slot");
+  sites848[i][0]=image.entry;sites848[i][1]=loaded.loop_end;sites848[i][2]=loaded.terminal_pc;
+  mixed_pc848[i]=loaded.call_pc;
+  if(
+#else
   struct up_context initial={.pc=S846_CODE,.sp=S846_STACK+P,.status=2,.cs=sel.cs,.ss=sel.ss};
   for(unsigned j=0;j<15;j++)initial.gpr[j]=first_arg848(i,j);
-#ifdef STYLEOS_INTEGRATED_RUNTIME_864
-  struct s865_fixture_image loaded={0};
-  if(!audit(opaque)||!s865_fixture_stage_one(arena,i,leases[i],&loaded))fail848("865-load-slot");
-  sites848[i][0]=loaded.image.entry;sites848[i][1]=loaded.loop_end;sites848[i][2]=loaded.terminal_pc;
-  mixed_pc848[i]=loaded.call_pc;initial.pc=loaded.image.entry;
-  if(!audit(opaque)||rt865_bank_admit_image(&bank862,runtime860,safe,i,&child[i],&leases[i],&loaded.image,"S864 process",&initial,&pid860[i])!=PS_OK||
-#else
   if(rt863_bank_admit_initial(&bank862,runtime860,safe,i,handle860[i],child[i].built.root,"S864 process",&initial,&pid860[i])!=PS_OK||
 #endif
      pr_account(pr_global(),pid860[i],handle860[i],0,3*P)!=PR_OK||

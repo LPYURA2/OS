@@ -11,19 +11,19 @@ static void field865(const char *k,uint64_t v){arch_putc(' ');arch_puts(k);arch_
 #define P UINT64_C(4096)
 _Static_assert(S846_ROOT_COUNT==4,"four workload images");
 #include "external_workload_865.h"
-static uint8_t elf865[8192];
-bool s865_fixture_stage_one(const struct s844_arena *arena,unsigned id,struct s844_lease lease,struct s865_fixture_image *out){
- if(!out||id>=S846_ROOT_COUNT||lease.owner!=S846_OWNER_A+id)return false;
+bool s865_fixture_source(unsigned id,struct s865_image_source *out){
+ if(!out||id>=S846_ROOT_COUNT)return false;
  struct s865_image_source source={.read=read865,.lba=3072+16*id,.sectors=4096,.bytes=external865[id].bytes};
  for(unsigned j=0;j<32;j++)source.sha256[j]=external865[id].hash[j];
- struct nte_loaded actual={0};
- enum nte_status result=s865_load_owned(arena,lease,&source,elf865,sizeof elf865,&actual);
- for(size_t j=0;j<sizeof elf865;j++)elf865[j]=0;
- if(result!=NTE_OK||actual.entry!=S846_CODE||actual.code_bytes!=external865[id].code_bytes||actual.memory_bytes!=P)return false;
+ *out=source;return true;
+}
+bool s865_fixture_observe(unsigned id,struct s844_lease lease,const struct nte_loaded *actual,struct s865_fixture_image *out){
+ if(!out||!actual||id>=S846_ROOT_COUNT||lease.owner!=S846_OWNER_A+id||
+    actual->entry!=S846_CODE||actual->code_bytes!=external865[id].code_bytes||actual->memory_bytes!=P)return false;
  uint8_t observed[32];nte_sha256((const void *)(uintptr_t)lease.pa,P,observed);
  for(unsigned j=0;j<32;j++)if(observed[j]!=external865[id].page_hash[j])return false;
- arch_puts("STYLEOS S865 EXTERNAL-ELF");field865("id",id);field865("lba",source.lba);field865("bytes",source.bytes);field865("sectors",(source.bytes+511)/512);arch_putc('\n');
- *out=(struct s865_fixture_image){actual,external865[id].loop,external865[id].term,external865[id].call};
+ arch_puts("STYLEOS S865 EXTERNAL-ELF");field865("id",id);field865("lba",3072+16*id);field865("bytes",external865[id].bytes);field865("sectors",(external865[id].bytes+511)/512);arch_putc('\n');
+ *out=(struct s865_fixture_image){*actual,external865[id].loop,external865[id].term,external865[id].call};
  return true;
 }
 

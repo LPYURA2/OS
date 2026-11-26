@@ -162,6 +162,59 @@ enum ps_status rt865_bank_admit_image(struct rt862_bank *b,struct dpr_service *d
  }
  return rt863_bank_admit_initial(b,d,live,slot,lease->generation,child->built.root,name,initial,pid);
 }
+
+enum ps_status rt865_launch_prepared(struct rt862_bank *b,struct dpr_service *d,
+ uint64_t live,unsigned slot,const struct s846_root *child,const struct s844_arena *arena,
+ const struct s844_lease *lease,const struct rt865_launch_request *request,
+ uint8_t *scratch,size_t capacity,bool (*audit)(void *),void *opaque,
+ struct nte_loaded *image,uint32_t *pid)
+{
+ if(!layout(b,d,child,sizeof *child,_Alignof(struct s846_root),
+            lease,sizeof *lease,_Alignof(struct s844_lease))||
+    !region(arena,sizeof *arena,_Alignof(struct s844_arena))||
+    !region(request,sizeof *request,_Alignof(struct rt865_launch_request))||
+    !region(scratch,capacity,1)||!capacity||
+    !region(image,sizeof *image,_Alignof(struct nte_loaded))||
+    !region(pid,sizeof *pid,_Alignof(uint32_t))||!audit||
+    slot>=S846_ROOT_COUNT||slot>=PS_MAX_SLOTS||
+    !binding(b,d)||live!=b->safe||d->dispatcher.current!=-1||
+    !child->ready||child->built.error!=PG_OK||!root(child->built.root)||
+    child->built.root==live||child->built.root!=child->plan.tables_pa||
+    child->plan.capacity!=PG_TABLE_PAGES||
+    (uintptr_t)child->plan.tables!=child->plan.tables_pa||
+    !region(child->plan.tables,PG_TABLE_BYTES,PG_PAGE)||
+    lease->owner!=S846_OWNER_A+slot||lease->pages!=3||
+    child->lease.pa!=lease->pa||child->lease.generation!=lease->generation||
+    child->lease.owner!=lease->owner||child->lease.pages!=lease->pages||
+    !s844_lease_live(arena,*lease))return PS_EVIDENCE;
+ if(b->slots[slot].pid)return PS_STATE;
+ /* Never let a reader's scratch or output alias the dispatcher, bank,
+  * registry, root descriptors, target tables, arena or request. Other
+  * live architecture objects remain the trusted caller's responsibility. */
+ const void *ptr[]={b,d,d->dispatcher.registry,d->windows,child,arena,lease,
+  request,scratch,image,pid,(const void *)(uintptr_t)arena->base,child->plan.tables};
+ const size_t bytes[]={sizeof *b,sizeof *d,sizeof *d->dispatcher.registry,sizeof *d->windows,
+  sizeof *child,sizeof *arena,sizeof *lease,sizeof *request,capacity,sizeof *image,
+  sizeof *pid,S844_BYTES,PG_TABLE_BYTES};
+ for(unsigned i=0;i<sizeof ptr/sizeof ptr[0];i++){
+  if(!region(ptr[i],bytes[i],1))return PS_ARGUMENT;
+  for(unsigned j=0;j<i;j++)if(!apart(ptr[i],bytes[i],ptr[j],bytes[j]))return PS_ARGUMENT;
+ }
+ const struct rt865_launch_request copy=*request;
+ unsigned n=0;while(n<sizeof copy.name&&copy.name[n])++n;
+ if(!n||n==sizeof copy.name)return PS_ARGUMENT;
+ if(!audit(opaque))return PS_EVIDENCE;
+ struct nte_loaded loaded={0};
+ enum nte_status status=s865_load_owned(arena,*lease,&copy.source,scratch,capacity,&loaded);
+ volatile uint8_t *wipe=scratch;for(size_t i=0;i<capacity;i++)wipe[i]=0;
+ if(status!=NTE_OK||!s844_lease_live(arena,*lease)||!audit(opaque))return PS_EVIDENCE;
+ struct up_context initial={.pc=loaded.entry,.sp=S846_STACK+PAGE,.status=2,.cs=b->cs,.ss=b->ss};
+ for(unsigned i=0;i<15;i++)initial.gpr[i]=copy.gpr[i];
+ uint32_t assigned=0;
+ enum ps_status result=rt865_bank_admit_image(b,d,live,slot,child,lease,&loaded,copy.name,&initial,&assigned);
+ if(result!=PS_OK)return result;
+ *image=loaded;*pid=assigned;return PS_OK;
+}
 #endif
 
 /* Supervisor receipt after actual trap, safe-root restoration and FP save.

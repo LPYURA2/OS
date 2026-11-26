@@ -29,7 +29,7 @@ enum ps_status rt862_bank_release(struct rt862_bank *,struct dpr_service *,uint6
 enum ps_status rt863_bank_admit_initial(struct rt862_bank *,struct dpr_service *,
  uint64_t,unsigned,uint64_t,uint64_t,const char *,const struct up_context *,uint32_t *);
 #if defined(STYLEOS_INTEGRATED_RUNTIME_864) || defined(STYLEOS_TEST_RUNTIME_IMAGE_ADMISSION_865)
-#include <styleos/native_tea_elf.h>
+#include <styleos/native_image_slot_865.h>
 /* Trusted loader admission for the existing bounded three-page layout.
  * The architecture MUST independently audit the actual tables, current
  * arena lease and code provenance immediately before this call. Metadata
@@ -38,6 +38,22 @@ enum ps_status rt863_bank_admit_initial(struct rt862_bank *,struct dpr_service *
 enum ps_status rt865_bank_admit_image(struct rt862_bank *,struct dpr_service *,
  uint64_t,unsigned,const struct s846_root *,const struct s844_lease *,
  const struct nte_loaded *,const char *,const struct up_context *,uint32_t *);
+/* Kernel-owned request. The default zero GPR array is a native entry context;
+ * no workload identity or expected instruction sites are required.
+ * The reader and audit are trusted, serialized, non-mutating capabilities.
+ * Caller owns the detached root, live lease, FP admission and all table
+ * mappings; it must retire them on any refusal. A post-load refusal can
+ * leave validated bytes in the unpublished lease, never a published PID.
+ * Scratch is cleared after the read; outputs are committed only on success. */
+struct rt865_launch_request {
+ struct s865_image_source source;
+ char name[PR_LABEL_BYTES];
+ uint64_t gpr[15];
+};
+enum ps_status rt865_launch_prepared(struct rt862_bank *,struct dpr_service *,
+ uint64_t,unsigned,const struct s846_root *,const struct s844_arena *,
+ const struct s844_lease *,const struct rt865_launch_request *,
+ uint8_t *,size_t,bool (*)(void *),void *,struct nte_loaded *,uint32_t *);
 #endif
 /* Supervisor-only, after authenticated safe-root return and FP suspension.
  * Nonterminal INT80 range/yield/unknown; no user-memory copy or I/O. */
