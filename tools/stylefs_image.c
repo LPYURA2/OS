@@ -166,6 +166,55 @@ static enum sfs_result create_image(const char *to, uint32_t sectors)
     return publish(fd, temp, to, r);
 }
 
+/* Explicit fresh installed-system layout. Keep the legacy "new" command
+ * and existing volumes unchanged. Neither formatting nor directory creation
+ * is a mount-time action. User account creation/ACLs are separate work. */
+static enum sfs_result create_system_image(const char *to, uint32_t sectors)
+{
+    static const char *const dirs[] = {
+        "StyleOS", "Program Files", "ProgramData", "Users", "Recovery", "Temp"
+    };
+    if (sectors < SFS_V2_MIN_SECTORS || !sfs_capacity_valid(sectors)) return SFS_RANGE;
+    char *temp = NULL;
+    int fd = pending_output(to, &temp);
+    if (fd < 0) return SFS_IO;
+    enum sfs_result r = make_volume(&fd, sectors);
+    unsigned users = 0;
+    for (unsigned i = 0; i < sizeof(dirs)/sizeof(*dirs) && r == SFS_OK; ++i) {
+        unsigned id = 0;
+        r = sfs_mkdir(&volume, &work, SFS_ROOT, dirs[i], &id);
+        if (i == 3 && r == SFS_OK) users = id;
+    }
+    if (r == SFS_OK) r = sfs_mkdir(&volume, &work, users, "Public", 0);
+    /* Reopen through the existing decoder before publishing; no synthetic
+     * files or user accounts, no recovery tools claimed to exist yet. */
+    if (r == SFS_OK) {
+        const struct sfs_io io = {&fd, sectors, rd, 0, 0};
+        r = sfs_mount(&old_volume, &work, &io);
+        if (r == SFS_OK) {
+            unsigned roots = 0, children = 0;
+            int u = sfs_find(&old_volume, SFS_ROOT, "Users");
+            for (unsigned i = 0; i < sizeof(dirs)/sizeof(*dirs); ++i) {
+                int id = sfs_find(&old_volume, SFS_ROOT, dirs[i]);
+                const struct sfs_entry *e = id < 0 ? 0 : sfs_entry_at(&old_volume, (unsigned)id);
+                if (!e || e->type != SFS_DIRECTORY) r = SFS_CORRUPT;
+            }
+            for (unsigned i = 1; i < SFS_ENTRIES; ++i) {
+                const struct sfs_entry *e = sfs_entry_at(&old_volume, i);
+                if (!e) continue;
+                if (e->parent == SFS_ROOT) ++roots;
+                else if (u >= 0 && e->parent == (unsigned)u) ++children;
+                else r = SFS_CORRUPT;
+            }
+            int pub = u < 0 ? -1 : sfs_find(&old_volume, (unsigned)u, "Public");
+            const struct sfs_entry *e = pub < 0 ? 0 : sfs_entry_at(&old_volume, (unsigned)pub);
+            if (roots != sizeof(dirs)/sizeof(*dirs) || children != 1 ||
+                !e || e->type != SFS_DIRECTORY || old_volume.format != 2) r = SFS_CORRUPT;
+        }
+    }
+    return publish(fd, temp, to, r);
+}
+
 static enum sfs_result migrate(const char *from, const char *to, uint32_t sectors)
 {
     if (sectors < SFS_V2_MIN_SECTORS) return SFS_RANGE;
@@ -216,6 +265,11 @@ int main(int argc, char **argv)
         r = create_image(argv[2], argc == 4 ? parse_mib(argv[3]) : SFS_DISK_SECTORS);
         goto report;
     }
+    if (!strcmp(cmd, "new-system")) {
+        if (argc != 4) goto usage;
+        r = create_system_image(argv[2], parse_mib(argv[3]));
+        goto report;
+    }
     if (!strcmp(cmd, "migrate")) {
         if (argc != 4 && argc != 5) goto usage;
         r = migrate(argv[2], argv[3], argc == 5 ? parse_mib(argv[4]) : 256 * 2048);
@@ -261,6 +315,6 @@ report:
     if (r != SFS_OK) fprintf(stderr, "StyleFS: %s\n", sfs_result_name(r));
     return r == SFS_OK ? 0 : 1;
 usage:
-    fprintf(stderr, "usage: %s new IMAGE [MiB] | migrate OLD_IMAGE NEW_IMAGE [MiB] | info IMAGE | list/mkdir/remove IMAGE /path | get/put IMAGE /path FILE | move/copy IMAGE /source /target\n", argv[0]);
+    fprintf(stderr, "usage: %s new IMAGE [MiB] | new-system IMAGE MiB | migrate OLD_IMAGE NEW_IMAGE [MiB] | info IMAGE | list/mkdir/remove IMAGE /path | get/put IMAGE /path FILE | move/copy IMAGE /source /target\n", argv[0]);
     return 2;
 }

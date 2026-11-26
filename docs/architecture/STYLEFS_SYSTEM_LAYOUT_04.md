@@ -1,0 +1,16 @@
+# StyleFS 04 — explicit installed-system disk hierarchy (candidate)
+
+Accepted base 379cc8b8e9972a40cc2e85242819e423e60c3e76, stage 03 run 45884839172 all 3 jobs SUCCESS (host volume manager and existing guest block regressions). New code reuses tools/stylefs_image.c and the real StyleFS v2 formatter/mount/mkdir decoder. Explicit host command `stylefs_image new-system IMAGE MiB`: creates a fresh v2 image, verifies actual root directories by remount, publishes through existing no-overwrite mechanism; does not modify existing disks, legacy `new`, migration, or ordinary boot. No format-on-mount. No system binaries or accounts claimed. Current v2 capacities still apply. Host tests use separate image files, verify read-only listing does not change bytes, no overwrite/foreign data, actual root, Public and test-only profile folders, file round-trip, old flat layout. CI pending; unchanged guest regression is not proof of the new layout in the current native kernel.
+
+## Owner-approved direction
+Take proven Windows-style root organization with own filesystem and rights; do not invent alternatives needlessly. Canonical stable internal directory names:
+- StyleOS: kernel, drivers, system components; privileged writes only later.
+- Program Files: installed .tea application packages, protected against ordinary processes.
+- ProgramData: application shared state; scoped application rights.
+- Users: profiles; Public contains shared files, not an account.
+- Recovery: protected recovery tools (currently empty, future contents).
+- Temp: temporary data, scoped per-user/service and safe cleanup.
+Canonical per-user folders Desktop, Documents, Downloads, Pictures, Music, Videos, Projects; display localized Russian names in Explorer while preserving paths. Initial real accounts/profiles created only by explicit account/installer service; test-only directory is not an account. No fake drive letters, directory rows or implicit account provisioning. Installed-system namespace vs physically separate boot/data volumes remains an integration task; updates must leave user data intact. Do not silently migrate existing flat Russian-name data folders; migration separately validated on copies. Access controls and localized labels not implemented by this host provisioning step. Deep Drop file handles, streaming, recovery, big files, later independent app IPC remain mandatory.
+
+## Next technical work
+Current accepted QEMU post-EBS ATA fixture explicitly attests only 4096 sectors DESK-V01 and writes 1..72; cannot mount StyleFS v1/v2 (minimum 16384/65536 sectors). Need separate provisioned large-media profile with exact identity/capacity, tested 28-bit/48-bit as required, bounds, device quarantine and no broader hardware authorization by default. Preserve old profile and verify actual guest mount and root access before claiming Explorer uses new layout. Do not pretend host tests prove physical support. Future large-file format requires checked 64-bit offsets, extents and migration; no artificial 64MiB cap, no unbounded RAM.

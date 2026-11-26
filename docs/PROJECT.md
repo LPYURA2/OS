@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 04 system layout candidate
+Stage 03 CI 45884839172 3/3 SUCCESS. [Explicit system layout and limitations](architecture/STYLEFS_SYSTEM_LAYOUT_04.md), [handoff](NEXT_CHAT_STYLEFS_04.md). New host provisioning only, live guest mount pending.
+
 ## 2026-11-26 — StyleFS 03 volume registry candidate
 Stage 02 CI 45884312517 3/3 SUCCESS. [Volume service and disk hierarchy](architecture/STYLEFS_VOLUME_SERVICE_03.md), [handoff](NEXT_CHAT_STYLEFS_03.md). New host component; physical mount proof pending.
 
