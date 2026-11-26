@@ -1,6 +1,6 @@
 """Externally provisioned native catalog and independent QEMU CPL3 proof.
 No ELF payload or test scheduling policy is linked into the ordinary kernel."""
-import hashlib,re,struct
+import hashlib,re,struct,time
 from irq_trace_accept_859 import HEADER
 from runtime_mixed_863_verify import row
 
@@ -27,6 +27,17 @@ def provision_catalog(path,*,timer_load=False):
         disk.seek(3000*512);disk.write(catalog)
     return hashlib.sha256(catalog).hexdigest()
 
+def wait_native_empty(proc,serial,seconds):
+    deadline=time.monotonic()+seconds
+    while time.monotonic()<deadline:
+        lines=serial.read_bytes().splitlines() if serial.exists() else []
+        failures=[x for x in lines if x.startswith((b'STYLEOS S848 FAIL ',b'STYLEOS S850 FAIL ',b'STYLEOS RUNTIME FAIL '))]
+        if failures:raise RuntimeError('native fail-stop: '+repr(failures[-1]))
+        if any(x.startswith(b'STYLEOS NATIVE EMPTY ') for x in lines):return
+        if proc.poll() is not None:raise RuntimeError('native guest exited')
+        time.sleep(.03)
+    raise RuntimeError('native completion timeout')
+
 def verify_catalog(lines,trace,obs,*,timer_load=False):
     root=obs['active']['root']
     def records(tag,keys):
@@ -44,6 +55,16 @@ def verify_catalog(lines,trace,obs,*,timer_load=False):
     aidx=[j for j,x in enumerate(lines) if x.startswith(b'STYLEOS NATIVE ADMIT ')]
     eidx=[j for j,x in enumerate(lines) if x.startswith(b'STYLEOS NATIVE EVENT ')]
     if not aidx[-1]<next(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS NATIVE CATALOG '))<eidx[0]:raise ValueError('resident before execution')
+    irqs=records(b'STYLEOS NATIVE IRQ-RETIRE',('slot','root','initial','current','lvt','isr','irr'))
+    expected_irqs=[(x['slot'],x['root'],0,0,0x10050,0,0) for x in events if x['vector']==0x50]
+    if [tuple(x.values()) for x in irqs]!=expected_irqs:raise ValueError('native IRQ retirement readback')
+    irq_lines=[j for j,x in enumerate(lines) if x.startswith(b'STYLEOS NATIVE IRQ-RETIRE ')]
+    previous=-1;irq_index=0
+    for event,index in zip(events,eidx):
+        if event['vector']==0x50:
+            if not previous<irq_lines[irq_index]<index:raise ValueError('IRQ retirement order')
+            irq_index+=1
+        previous=index
     per=[[] for _ in roots]
     for event in events:
         i=event['slot']

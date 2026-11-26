@@ -111,9 +111,16 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
   isr=rd848(0x120);
   if(!armed848||rd848(0x390)||rd848(0x320)!=V||!(isr&BIT))
     fail848("865-irq-origin");
-  wr848(0x320,BIT|V);wr848(0xb0,0);
-  if((rd848(0x120)&BIT)||(rd848(0x220)&BIT)||rd848(0x320)!=(BIT|V))
+  /* A completed one-shot has zero current count but retains its initial
+   * count register. Retire that configuration before EOI and safe return. */
+  wr848(0x320,BIT|V);wr848(0x380,0);wr848(0xb0,0);
+  if(rd848(0x380)||rd848(0x390)||pending848(0x100)||pending848(0x200)||rd848(0x320)!=(BIT|V))
     fail848("eoi-mask");
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+  arch_puts("STYLEOS NATIVE IRQ-RETIRE");fld848("slot",(unsigned)id);fld848("root",root);
+  fld848("initial",rd848(0x380));fld848("current",rd848(0x390));fld848("lvt",rd848(0x320));
+  fld848("isr",pending848(0x100));fld848("irr",pending848(0x200));arch_putc('\n');
+#endif
   armed848=false;
  }else if(armed848||rd848(0x390)||rd848(0x320)!=(BIT|V)||
           pending848(0x100)||!timer_only865(0x200))fail848("865-nonirq-timer");

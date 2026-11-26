@@ -430,7 +430,8 @@ def main():
                     count=sum(x.startswith(tag) for x in serial.read_bytes().splitlines())
                     d.key('f9');wait(proc,serial,tag,count+1)
                     if args.native_catalog:
-                        wait(proc,serial,b'STYLEOS NATIVE EMPTY',seconds=600 if args.native_timer_load else 180)
+                        from native_catalog_865_verify import wait_native_empty
+                        wait_native_empty(proc,serial,600 if args.native_timer_load else 180)
                     d.screen('after-denied-fixture')
                     if args.extended_desktop:
                         from native_desktop_acceptance import exercise as extended
