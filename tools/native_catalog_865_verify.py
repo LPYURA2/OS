@@ -68,6 +68,10 @@ def verify_nx_cr2(block,expected):
     if len(values)!=2 or len(header)!=1 or len(regs)!=1 or any(int(x,16)!=expected for x in values+header+regs):
         raise ValueError('NX fault address evidence')
 
+def complete_uart_lines(raw):
+    # Actual QEMU UART is CRLF; ignore an unfinished final line only.
+    return raw[:raw.rfind(b'\n')+1].splitlines()
+
 def hang_progress(lines):
     retired=[j for j,x in enumerate(lines) if x.startswith(b'STYLEOS S865 FX-RETIRE ')]
     if len(retired)!=31:return False
@@ -78,7 +82,7 @@ def wait_hang_progress(proc,serial,seconds=60):
     deadline=time.monotonic()+seconds
     while time.monotonic()<deadline:
         raw=serial.read_bytes() if serial.exists() else b''
-        lines=raw.split(b'\n')[:-1]
+        lines=complete_uart_lines(raw)
         if b' FAIL ' in raw or proc.poll() is not None:raise RuntimeError('hang audit guest stopped')
         if hang_progress(lines):return
         time.sleep(.03)
@@ -87,7 +91,7 @@ def wait_hang_progress(proc,serial,seconds=60):
 def wait_hang_after_input(proc,serial,seconds=20):
     deadline=time.monotonic()+seconds
     while time.monotonic()<deadline:
-        raw=serial.read_bytes();lines=raw.split(b'\n')[:-1]
+        raw=serial.read_bytes();lines=complete_uart_lines(raw)
         if b' FAIL ' in raw or proc.poll() is not None:raise RuntimeError('hang audit guest stopped')
         inputs=[i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S863 EVENT ') and b' key=0x0000000000000040 ' in x]
         if inputs and sum(x.startswith(b'STYLEOS NATIVE EVENT slot=0x0000000000000000 ') and b' vector=0x0000000000000050 ' in x for x in lines[inputs[-1]+1:])>=2:return

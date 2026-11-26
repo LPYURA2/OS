@@ -505,7 +505,8 @@ def main():
         if args.native_hang:
             # A paused QEMU can leave a partial UART line. Retain the raw
             # file, but validate only the completed receipt boundary.
-            lines=raw.split(b'\n')[:-1]
+            from native_catalog_865_verify import complete_uart_lines
+            lines=complete_uart_lines(raw)
             last=max(j for j,x in enumerate(lines) if x.startswith(b'STYLEOS NATIVE EVENT '))
             trailing=lines[last+1:]
             if any(not x.startswith(b'STYLEOS NATIVE IRQ-RETIRE ') for x in trailing) or len(trailing)>1:raise ValueError('unexpected trailing hang evidence')

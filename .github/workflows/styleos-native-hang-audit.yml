@@ -17,6 +17,17 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
       - name: Verify exact QEMU version
         run: qemu-system-x86_64 --version | head -n1 | grep '^QEMU emulator version 8\.2\.2 '
+      - name: Check UART observation boundary
+        run: |
+          python3 -m py_compile tools/native_catalog_865_verify.py tools/test_desktop_storage_service_863.py
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0,'tools')
+          from native_catalog_865_verify import complete_uart_lines
+          assert complete_uart_lines(b'a\r\nb\r\npartial\r')==[b'a',b'b']
+          assert complete_uart_lines(b'a\n')==[b'a']
+          assert complete_uart_lines(b'partial')==[]
+          PY
       - name: Infinite valid user loop and 31 independent peers plus shell input
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-hang --output build/native-hang
       - uses: actions/upload-artifact@v4
