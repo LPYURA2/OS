@@ -20,7 +20,7 @@ def loop_site(efi,map_file,*,four=False,external=False):
         _,vs,v,rs,ro,_,_,_,_,flags=_unpack('<8sIIIIIIHHI',efi,pe+24+opt+40*(seg-1),'section')
         if va-site['preferred_base']!=v+rel or not 0<=rel<max(vs,rs) or bool(flags&0x80000000)!=write or bool(flags&0x20000000)==write:raise ValueError('mixed symbol rights '+name)
         return v+rel,ro+rel
-    site['timer_idt_rva'],_=sym('idt848',r'boot_x86_64_user_preemption_848\.o',True)
+    site['timer_idt_rva'],_=sym('idt848',r'boot_x86_64_native_executor_865\.o' if external else r'boot_x86_64_user_preemption_848\.o',True)
     site['common_event_rva'],_=sym('rt863_bank_event',r'kernel_runtime_bank_862\.o')
     if external:
         if not four:raise ValueError('external workload requires four contexts')

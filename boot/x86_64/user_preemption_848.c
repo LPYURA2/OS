@@ -428,7 +428,9 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  wr848(0x80,0);wr848(0xf0,(svr&~255u)|0x1ffu);wr848(0x320,BIT|V);wr848(0x3e0,3); /* divide by 16 */
  if(rd848(0x320)!=(BIT|V)||rd848(0x3e0)!=3||rd848(0x80)||rd848(0xf0)!=((svr&~255u)|0x1ffu))fail848("setup");
 #ifdef STYLEOS_TEST_FX_CONTEXT_849
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ if(!s865_fx_guest_open(safe))fail848("865-fx-open");
+#elif defined(STYLEOS_TEST_FOUR_GUEST_864)
  if(!s849_guest_init(child,leases,safe))fail848("864-fx-mode");
 #else
  if(!s849_guest_init(child,safe))fail848("fx-mode");
@@ -465,9 +467,10 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   for(unsigned j=0;j<15;j++)request.gpr[j]=first_arg848(i,j);
   struct nte_loaded image={0};struct s865_fixture_image loaded={0};
   if(!s865_fixture_source(i,&request.source)||
-     rt865_launch_prepared(&bank862,runtime860,safe,i,&child[i],arena,&leases[i],
+     s865_executor_launch(i,&child[i],arena,&leases[i],
       &request,launch_scratch865,sizeof launch_scratch865,audit,opaque,&image,&pid860[i])!=PS_OK||
      !s865_fixture_observe(i,leases[i],&image,&loaded))fail848("865-launch-slot");
+  if(leases[i].generation>=5&&!s865_fx_guest_test_stale(i,child[i].built.root,leases[i].generation-4))fail848("865-fx-stale");
   sites848[i][0]=image.entry;sites848[i][1]=loaded.loop_end;sites848[i][2]=loaded.terminal_pc;
   mixed_pc848[i]=loaded.call_pc;
   if(

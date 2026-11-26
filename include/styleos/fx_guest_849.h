@@ -2,7 +2,13 @@
 #define STYLEOS_FX_GUEST_849_H
 #include <styleos/user_root_846.h>
 #include <styleos/fx_context_849.h>
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+bool s865_fx_guest_open(uint64_t);
+bool s865_fx_guest_bind(unsigned,const struct s846_root *,const struct s844_lease *,uint64_t);
+#ifdef STYLEOS_NATIVE_EXECUTOR_OBSERVERS
+bool s865_fx_guest_test_stale(unsigned,uint64_t,uint64_t);
+#endif
+#elif defined(STYLEOS_TEST_FOUR_GUEST_864)
 bool s849_guest_init(const struct s846_root child[S846_ROOT_COUNT],const struct s844_lease leases[S846_ROOT_COUNT],uint64_t safe);
 #else
 bool s849_guest_init(const struct s846_root child[2],uint64_t safe);

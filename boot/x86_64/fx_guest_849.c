@@ -18,6 +18,42 @@ static void field(const char *k,uint64_t x){arch_putc(' ');arch_puts(k);arch_put
 static bool mapped(const struct s846_root *r,const void *v,size_t n){uint64_t x=(uintptr_t)v;for(size_t i=0;i<r->plan.count;i++){const struct pg_mapping *m=&r->plan.maps[i];if(m->va==m->pa&&m->flags==PG_WRITE&&x>=m->va&&x-m->va<m->bytes&&n<=m->bytes-(x-m->va))return true;}return false;}
 static void scrub(void *p,size_t n){volatile uint8_t *b=p;while(n--)*b++=0;}
 static bool allzero(const void *p,size_t n){const uint8_t *b=p;while(n--)if(*b++)return false;return true;}
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+/* Open empty, bind only the independently audited child being admitted. */
+bool s865_fx_guest_open(uint64_t safe){
+ if(!safe||safe849||s849_live||cr3_849()!=safe||(flags849()&0x200))return false;
+ struct s849_caps c={0};uint32_t a,b,mask;
+ __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c.leaf1_ecx),"=d"(c.leaf1_edx):"a"(1),"c"(0));
+ __asm__ volatile("mov %%cr0,%0;mov %%cr4,%1":"=r"(c.cr0),"=r"(c.cr4));
+ arch_puts("STYLEOS S849 MODE");field("ecx",c.leaf1_ecx);field("edx",c.leaf1_edx);field("cr0",c.cr0);field("cr4",c.cr4);arch_putc('\n');
+ if(!s849_admit(&c,&mask))return false;
+ __asm__ volatile("fxsave64 %0":"=m"(s849_kernel_image)::"memory");
+ c.mxcsr_mask=u32(s849_kernel_image.bytes+28);
+ if(!s849_admit(&c,&mask)||!s849_image_valid(&s849_kernel_image,mask)||(mask&0x3f80)!=0x3f80||!s865_fx_open(&bank,&c)){
+  scrub(&s849_kernel_image,sizeof s849_kernel_image);return false;
+ }
+ safe849=safe;arch_puts("STYLEOS S849 READY");field("mask",bank.mxcsr_mask);field("safe",safe);arch_putc('\n');return true;
+}
+bool s865_fx_guest_bind(unsigned id,const struct s846_root *child,const struct s844_lease *lease,uint64_t safe){
+ if(!safe849||safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live||
+    !child||!lease||id>=S846_ROOT_COUNT||!child->ready||!lease->generation||
+    child->lease.generation!=lease->generation||child->lease.pa!=lease->pa||
+    child->lease.pages!=lease->pages||child->lease.owner!=lease->owner||
+    !mapped(child,&bank,sizeof bank)||!mapped(child,&s849_kernel_image,sizeof s849_kernel_image)||
+    !mapped(child,&s849_user_capture,sizeof s849_user_capture)||!mapped(child,&s849_user_restore,sizeof s849_user_restore)||
+    !mapped(child,&kernel_check,sizeof kernel_check)||!mapped(child,(const void *)&s849_live,sizeof s849_live))return false;
+ if(!s865_fx_bind(&bank,id,child->built.root,lease->generation))return false;
+ seen[id]=0;return true;
+}
+#ifdef STYLEOS_NATIVE_EXECUTOR_OBSERVERS
+bool s865_fx_guest_test_stale(unsigned id,uint64_t root,uint64_t old){
+ if(!safe849||cr3_849()!=safe849||(flags849()&0x200)||s849_live)return false;
+ struct s849_image rejected={0};
+ if(s849_dispatch(&bank,id,root,old,&rejected)||!allzero(&rejected,sizeof rejected)||bank.active!=-1)return false;
+ arch_puts("STYLEOS S864 FX-STALE");field("id",id);field("gen",old);arch_putc('\n');return true;
+}
+#endif
+#else /* historical batch-only FP profiles */
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
 bool s849_guest_init(const struct s846_root child[S846_ROOT_COUNT],const struct s844_lease leases[S846_ROOT_COUNT],uint64_t safe){
 #else
@@ -66,6 +102,7 @@ bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
 #endif
  safe849=safe;arch_puts("STYLEOS S849 READY");field("mask",bank.mxcsr_mask);field("safe",safe);arch_putc('\n');return true;
 }
+#endif /* historical FP initialization */
 #ifdef STYLEOS_TEST_RUNTIME_RECYCLE_862
 /* The caller has audited the same two leases and their roots before this
  * operation. No generation can be reused without a fresh empty FP bank. */

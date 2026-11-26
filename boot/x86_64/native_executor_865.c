@@ -187,6 +187,33 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
  return (struct rt865_slice){kind,state,before};
 }
 
+static bool child_writable(const struct s846_root *r,uint64_t x,uint64_t n){
+ if(!r||!r->ready||r->plan.count>PG_MAX_MAPS)return false;
+ for(size_t i=0;i<r->plan.count;i++){
+  const struct pg_mapping *m=&r->plan.maps[i];
+  if(m->va==m->pa&&m->flags==PG_WRITE&&x>=m->va&&x-m->va<m->bytes&&n<=m->bytes-(x-m->va))return true;
+ }
+ return false;
+}
+enum ps_status s865_executor_launch(unsigned id,const struct s846_root *child,
+ const struct s844_arena *arena,const struct s844_lease *lease,const struct rt865_launch_request *request,
+ uint8_t *scratch,size_t capacity,bool (*audit)(void *),void *opaque,struct nte_loaded *image,uint32_t *pid){
+ if(!runtime860||!bank862.safe||root848()!=bank862.safe||(flags848()&0x200)||
+    armed848||receipt860||frame860||cr2862||runtime860->dispatcher.current!=-1||
+    id>=S846_ROOT_COUNT||id>=PS_MAX_SLOTS||bank862.slots[id].pid||
+    !child||!arena||!lease||!audit||!s844_lease_live(arena,*lease)||!audit(opaque))return PS_EVIDENCE;
+ struct rt858_live live=live848();
+ if(rt861_dispatcher(&live)!=runtime860||
+    !child_writable(child,lapic848,4096)||
+    !child_writable(child,live.gdt,4096)||
+    !child_writable(child,(uintptr_t)idt848,sizeof idt848)||
+    !s865_fx_guest_bind(id,child,lease,bank862.safe))return PS_EVIDENCE;
+ enum ps_status result=rt865_launch_prepared(&bank862,runtime860,bank862.safe,id,child,arena,lease,request,
+     scratch,capacity,audit,opaque,image,pid);
+ if(result!=PS_OK&&!s865_fx_retire(id,child->built.root,lease->generation,bank862.safe))
+  fail848("865-launch-fp-rollback");
+ return result;
+}
 void s865_retire_terminal(const struct rt862_selection *t,bool (*audit)(void *),
  bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
  if(!t||!audit||!retire||!runtime860||!active848||armed848||receipt860||
