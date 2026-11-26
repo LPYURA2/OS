@@ -114,8 +114,12 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw):
             d.call("cont")
             deadline = time.monotonic()+100
             while time.monotonic()<deadline and proc.poll() is None:
-                if uart.exists() and any(x.startswith(b"SFS20 ") and x.endswith(b"\n") for x in uart.read_bytes().splitlines(keepends=True)):
-                    break
+                if uart.exists():
+                    lines=uart.read_bytes().splitlines(keepends=True)
+                    failures=[x for x in lines if b" FAIL " in x and x.endswith(b"\n")]
+                    require(not failures,"guest fail-stop: "+repr(failures))
+                    if any(x.startswith(b"SFS20 ") and x.endswith(b"\n") for x in lines):
+                        break
                 time.sleep(.05)
             else:
                 raise RuntimeError("no guest receipt")

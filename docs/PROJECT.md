@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 20.1 workspace correction
+19 CI 6/6 SUCCESS. 20 initial CI 45893651549 6/7, wide guest fail-stop sfs20-workspace (artifact 15153315595). Page-rounded isolated workspaces; no weakened attestation. Retest pending. Owner updated network/browser/online updates and VM disk 20 GB requirements. [Handoff](NEXT_CHAT_STYLEFS_20.md).
+
 ## 2026-11-26 — StyleFS 20 wide journal/stream guest candidate
 19 actual owned-root 4TiB block test SUCCESS, remaining regression pending at start. [Profile and handoff](NEXT_CHAT_STYLEFS_20.md). New isolated post-EBS wide mount, staged cancellation, high-LBA file, cold readback and independent export test. CI pending, no production large-file claim.
 

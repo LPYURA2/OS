@@ -1541,12 +1541,12 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
  if(disk_preflight863||arch_paging_attest_image_writable(p,(uintptr_t)&disk863,sizeof disk863)!=PG_OK||
     !identity((uintptr_t)&disk863,PG_WRITE)||!identity((uintptr_t)&disk863+4095,PG_WRITE))fail("863-shell-storage-page");
 #ifdef STYLEOS_WIDE_GUEST_20
- if(arch_paging_attest_image_writable(p,(uintptr_t)&s20_journal,sizeof s20_journal)!=PG_OK||
-    arch_paging_attest_image_writable(p,(uintptr_t)&s20_stream,sizeof s20_stream)!=PG_OK)fail("sfs20-workspace");
- for(size_t i=0;i<sizeof s20_journal;i+=4096)
-  if(!identity((uintptr_t)&s20_journal+i,PG_WRITE))fail("sfs20-journal-page");
- for(size_t i=0;i<sizeof s20_stream;i+=4096)
-  if(!identity((uintptr_t)&s20_stream+i,PG_WRITE))fail("sfs20-stream-page");
+ if(arch_paging_attest_image_writable(p,(uintptr_t)&s20_journal_storage,sizeof s20_journal_storage)!=PG_OK||
+    arch_paging_attest_image_writable(p,(uintptr_t)&s20_stream_storage,sizeof s20_stream_storage)!=PG_OK)fail("sfs20-workspace");
+ for(size_t i=0;i<sizeof s20_journal_storage;i+=4096)
+  if(!identity((uintptr_t)&s20_journal_storage+i,PG_WRITE))fail("sfs20-journal-page");
+ for(size_t i=0;i<sizeof s20_stream_storage;i+=4096)
+  if(!identity((uintptr_t)&s20_stream_storage+i,PG_WRITE))fail("sfs20-stream-page");
 #endif
  disk_preflight863=true;
 #endif

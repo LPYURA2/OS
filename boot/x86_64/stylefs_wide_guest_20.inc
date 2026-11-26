@@ -88,8 +88,19 @@ static bool s20_flush(void *ctx){
 }
 
 /* Explicitly admitted, static bounded workspace; no file-sized allocation. */
-static _Alignas(4096) struct sfs64_journal s20_journal;
-static _Alignas(4096) struct sfs64_stream s20_stream;
+#define S20_PAGE_ROUND(n) (((n)+4095u)&~(size_t)4095u)
+static _Alignas(4096) union {
+ struct sfs64_journal value;
+ uint8_t pages[S20_PAGE_ROUND(sizeof(struct sfs64_journal))];
+} s20_journal_storage;
+static _Alignas(4096) union {
+ struct sfs64_stream value;
+ uint8_t pages[S20_PAGE_ROUND(sizeof(struct sfs64_stream))];
+} s20_stream_storage;
+_Static_assert(sizeof s20_journal_storage%4096==0,"journal whole pages");
+_Static_assert(sizeof s20_stream_storage%4096==0,"stream whole pages");
+#define s20_journal (s20_journal_storage.value)
+#define s20_stream (s20_stream_storage.value)
 static uint8_t s20_byte(unsigned i){return (uint8_t)(i*37u+i/512u*91u+13u);}
 static _Noreturn void s20_end(const char *s){
  arch_puts(s);arch_putc('\n');arch_halt();for(;;)__asm__ volatile("hlt");
