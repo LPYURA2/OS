@@ -1,7 +1,7 @@
 name: StyleOS native forced stop candidate
 on:
   push:
-    branches: [feature/styleos-kernel-forced-stop, feature/styleos-kernel-forced-stop-guest, feature/styleos-kernel-forced-stop-ownership]
+    branches: [feature/styleos-kernel-forced-stop, feature/styleos-kernel-forced-stop-guest, feature/styleos-kernel-forced-stop-ownership, feature/styleos-kernel-reacceptance]
   workflow_dispatch:
 permissions:
   contents: read

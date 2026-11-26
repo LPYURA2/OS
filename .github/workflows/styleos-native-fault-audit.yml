@@ -1,7 +1,7 @@
 name: StyleOS independent native fault containment audit
 on:
   push:
-    branches: [feature/styleos-kernel-fault-containment-audit]
+    branches: [feature/styleos-kernel-fault-containment-audit, feature/styleos-kernel-reacceptance]
   workflow_dispatch:
 permissions:
   contents: read
