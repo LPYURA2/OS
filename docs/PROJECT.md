@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 06 guest mount candidate
+Stage 05 CI 45885834066 3/3 SUCCESS. [Read-only guest mount profile](architecture/STYLEFS_GUEST_MOUNT_06.md), [handoff](NEXT_CHAT_STYLEFS_06.md). Guest validation pending, ordinary storage retained.
+
 ## 2026-11-26 — StyleFS 05 ATA capacity candidate
 Stage 04 CI 45885303373 3/3 SUCCESS. [Explicit capacity transport](architecture/STYLEFS_ATA_CAPACITY_05.md), [handoff](NEXT_CHAT_STYLEFS_05.md). New host model coverage; old hardware scope unchanged.
 

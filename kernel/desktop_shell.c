@@ -99,7 +99,10 @@ static struct {
     bool lifted;
 } transfer = {.id = -1};
 
-static bool data_writable(void) { return filesystem.mode ? filesystem.disk.mounted : store.writable; }
+static bool data_writable(void) {
+    return filesystem.mode ? filesystem.disk.mounted && filesystem.disk.io.write && filesystem.disk.io.flush : store.writable;
+}
+static bool data_available(void) { return filesystem.mode ? filesystem.disk.mounted : store.writable; }
 
 /* The updatable desktop has one visual identity. Media detection selects a
  * storage backend, never an older skin. Keep old standalone profiles intact. */
@@ -932,7 +935,7 @@ static void draw_window(int id, int top)
     desk_line(r - 31, y - 3, r - 20, y + 8, LIGHT);
     desk_line(r - 20, y - 3, r - 31, y + 8, LIGHT);
 
-    if (id == FILES && modern_shell() && !data_writable()) draw_without_data(b);
+    if (id == FILES && modern_shell() && !data_available()) draw_without_data(b);
     else if (id == FILES && filesystem.mode) desk_fs_draw(&filesystem, b);
     else if (id == FILES) {
         int items[DESK_DOCS + 2];
@@ -1380,7 +1383,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
               filesystem.disk.mounted ? "STYLEOS DESKTOP DATA STYLEFS\n" :
               store.writable ? "STYLEOS DESKTOP DATA LEGACY\n" : "STYLEOS DESKTOP DATA UNRECOGNIZED\n");
 #endif
-    arch_puts(data_writable() ? "STYLEOS DESKTOP DATA MOUNT\n" : "STYLEOS DESKTOP DATA UNAVAILABLE\n");
+    arch_puts(data_available() ? "STYLEOS DESKTOP DATA MOUNT\n" : "STYLEOS DESKTOP DATA UNAVAILABLE\n");
     input_flags = desk_input_init();
     desk_pointer_clock_init();
     arch_puts(input_flags & 1 ? "STYLEOS DESKTOP KEYBOARD PASS\n" : "STYLEOS DESKTOP KEYBOARD UNAVAILABLE\n");

@@ -38,7 +38,12 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
     const struct desk_physical_disk physical = {
         0, sectors, read_sector, write_sector, flush_disk
     };
-    if (!desk_volume_map_init(&b->mapping, &physical, 0, sectors, true)) {
+#ifdef STYLEOS_STYLEFS_MOUNT_RO
+    const bool writable = false;
+#else
+    const bool writable = true;
+#endif
+    if (!desk_volume_map_init(&b->mapping, &physical, 0, sectors, writable)) {
         b->status = "Том StyleFS недоступен. Диск не изменён";
         return;
     }
@@ -46,6 +51,17 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
     if (r == SFS_OK) {
         arch_puts("STYLEOS DESKTOP STYLEFS MOUNT\n");
         if (b->disk.format == 2) arch_puts("STYLEOS DESKTOP STYLEFS V2\n");
+#ifdef STYLEOS_STYLEFS_MOUNT_RO
+        b->status = "Том доступен только для чтения";
+        arch_puts("STYLEOS SFS06 ROOT BEGIN\n");
+        for (unsigned i=1;i<SFS_ENTRIES;++i) {
+            const struct sfs_entry *e=sfs_entry_at(&b->disk,i);
+            if(e&&e->parent==SFS_ROOT&&e->type==SFS_DIRECTORY){
+                arch_puts("STYLEOS SFS06 DIRECTORY ");arch_puts(e->name);arch_putc('\n');
+            }
+        }
+        arch_puts("STYLEOS SFS06 ROOT END\n");
+#endif
     }
     else {
         arch_puts("STYLEOS DESKTOP STYLEFS REFUSED\n");
