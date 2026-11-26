@@ -87,6 +87,11 @@ def main():
                         d.wait_uart("DOCUMENT SAVE",timeout=90)
                         d.screen("saved")
                     elif reopen:
+                        # Seven real root directories followed by one note.
+                        # Select the last row and open it through Explorer,
+                        # not just enumerate the tree or extract on the host.
+                        for _ in range(8):d.key("down")
+                        d.key("ret");d.wait_uart("DOCUMENT OPEN",timeout=90)
                         d.screen("reopened")
                 d.call("stop");o,stats=snapshot("final")
                 verify_ready(o);verify_bar(o["pci"],o["mtree"],0x6060)
@@ -98,18 +103,22 @@ def main():
         if expected:
             if [l for l in lines if b" FAIL " in l]!=[expected] or any(l.startswith(b"STYLEOS SFS07 ADMIT") for l in lines):raise ValueError("foreign disk admitted")
         else:
-            admission=b"STYLEOS SFS06 ADMIT device-sectors=0x0000000000010001 volume-sectors=0x0000000000010000 write=0x0000000000000001 refusals=0x0000000000000003"
+            admission=b"STYLEOS SFS07 ADMIT device-sectors=0x0000000000010001 volume-sectors=0x0000000000010000 write=0x0000000000000001 refusals=0x0000000000000003"
             if lines.count(admission)!=1 or b"STYLEOS DESKTOP STYLEFS V2" not in lines:raise ValueError("real mount receipt")
             if [l for l in lines if l.startswith(b"STYLEOS SFS06 DIRECTORY ")]!=[b"STYLEOS SFS06 DIRECTORY "+n for n in DIRS+([b"lab"] if reopen else [])]:raise ValueError("real root entries")
             if not lines.index(admission)<lines.index(b"STYLEOS SFS06 ROOT BEGIN")<lines.index(b"STYLEOS SFS06 ROOT END"):raise ValueError("receipt order")
             if any(b" FAIL " in l for l in lines) or stats.get("rd_operations",0)<=0:raise ValueError("read proof")
+            if reopen:
+                receipt=[l for l in lines if l.startswith(b"STYLEOS S863S OPENED ")]
+                if len(receipt)!=1 or not receipt[0].endswith(b" bytes=0x0000000000000001 hash=0xaf63dc4c8601ec8c"):
+                    raise ValueError("cold guest note content")
         decoded=folder/"readback.raw";run(img,"convert","-f","qcow2","-O","raw",top,decoded)
         if sha(raw)!=raw_sha:raise ValueError("backing changed")
         if write:
             before=raw.read_bytes();after=decoded.read_bytes()
             if len(after)!=len(before) or after[:512]!=before[:512] or after[N*512:]!=before[N*512:]:raise ValueError("protected sector modified")
             commits=[int(l.split(b"lba=")[1],16) for l in lines if l.startswith(b"STYLEOS SFS07 COMMIT ")]
-            if not commits or any(not 1<=n<N for n in commits) or stats["wr_operations"]!=len(commits):raise ValueError("write receipts")
+            if not commits or any(not 1<=n<N for n in commits) or stats["wr_operations"]!=len(commits) or stats["flush_operations"]!=len(commits) or stats["wr_bytes"]!=512*len(commits):raise ValueError("write/flush receipts")
         elif sha(decoded)!=raw_sha:raise ValueError("disk bytes changed")
         return {"name":name,"status":"PASS","uart_sha256":sha(uart),"disk_sha256":sha(decoded)}
     reports=[boot("valid",base,"STYLEOS-SFS07-RW",None,write=True)]
