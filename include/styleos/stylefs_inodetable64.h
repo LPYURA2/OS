@@ -35,4 +35,7 @@ enum it64_status it64_lookup(struct it64_state *,uint64_t epoch,uint64_t id,
  * during the callback only. No reentry/mutation; false stops the scan. */
 typedef bool (*it64_visit)(void *,const struct sfs64_map *);
 enum it64_status it64_walk(struct it64_state *,uint8_t scratch[IT64_PAGE],it64_visit,void *);
+/* Decode a whole immutable page into borrowed blobs, valid until scratch reuse. */
+enum it64_status it64_page_blobs(struct it64_state *,uint64_t ordinal,uint8_t scratch[IT64_PAGE],
+ struct it64_blob out[IT64_MAX_RECORDS],unsigned *count);
 #endif

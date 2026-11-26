@@ -1,3 +1,6 @@
+## StyleFS 33 — streamed append-only inode candidate
+32.1 CI pending at start; reuse-first adapter integrates existing allocator, staged I/O and inode commit. [Handoff](NEXT_CHAT_STYLEFS_33.md).
+
 ## StyleFS 32.1 — correct retained-overlap fixture
 32 host assertion failed because fixture did not create the intended retained overlap. Correct test, preserve production gate; full CI required. Owner reuse requirement recorded.
 

@@ -1,13 +1,11 @@
 #include <styleos/stylefs_stream64.h>
+#include "stylefs_stream_crc_internal.h"
 
 static uint32_t get32(const uint8_t *p){uint32_t v=0;for(unsigned i=0;i<4;++i)v|=(uint32_t)p[i]<<(8*i);return v;}
 static uint64_t get64(const uint8_t *p){uint64_t v=0;for(unsigned i=0;i<8;++i)v|=(uint64_t)p[i]<<(8*i);return v;}
 static void put32(uint8_t *p,uint32_t v){for(unsigned i=0;i<4;++i)p[i]=(uint8_t)(v>>(8*i));}
 static void copy(uint8_t *p,const uint8_t *q,size_t n){for(size_t i=0;i<n;++i)p[i]=q[i];}
-static uint32_t crc(uint32_t c,const uint8_t *p,size_t n){
-    for(size_t i=0;i<n;++i){c^=p[i];for(unsigned b=0;b<8;++b)c=(c>>1)^((c&1)?UINT32_C(0xedb88320):0);}
-    return c;
-}
+
 static bool disjoint(const void *p,size_t n,const void *q,size_t m){
     if(!n||!m)return true;
     return p&&q&&n<=UINTPTR_MAX-(uintptr_t)p&&m<=UINTPTR_MAX-(uintptr_t)q&&
@@ -134,7 +132,7 @@ static enum sj_status append(struct sfs64_stream *t,const uint8_t *p,size_t n,bo
         }
         done+=count;
     }
-    t->running_crc=crc(t->running_crc,p,n);t->received+=n;return SJ_OK;
+    t->running_crc=sfs64_stream_crc_update(t->running_crc,p,n);t->received+=n;return SJ_OK;
 }
 enum sj_status sfs64_stream_append(struct sfs64_stream *t,const uint8_t *p,size_t n)
 {return append(t,p,n,false);}

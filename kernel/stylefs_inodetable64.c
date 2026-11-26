@@ -146,3 +146,20 @@ enum it64_status it64_walk(struct it64_state *s,uint8_t p[IT64_PAGE],it64_visit 
  if(total!=s->count){s->valid=false;return IT64_CORRUPT;}
  return IT64_OK;
 }
+
+enum it64_status it64_page_blobs(struct it64_state *s,uint64_t ordinal,uint8_t p[IT64_PAGE],
+ struct it64_blob out[IT64_MAX_RECORDS],unsigned *count){
+ if(!s||!s->valid)return IT64_STALE;
+ const void *ptr[]={s,p,out,count,s->block};
+ const size_t sizes[]={sizeof *s,IT64_PAGE,IT64_MAX_RECORDS*sizeof *out,sizeof *count,sizeof *s->block};
+ for(unsigned i=0;i<5;i++)for(unsigned j=0;j<i;j++)if(!sep(ptr[i],sizes[i],ptr[j],sizes[j]))return IT64_INVALID;
+ if(!admitted(s->block,s->owner,s->token,&s->geometry)){s->valid=false;return IT64_STALE;}
+ struct page_info info;
+ enum it64_status rc=read_page(s,ordinal,p,0,&info);
+ if(rc!=IT64_OK)return rc;
+ size_t at=IT64_HEADER;
+ for(unsigned i=0;i<info.count;i++){
+  size_t n=(size_t)get(p+at,4);at+=4;out[i]=(struct it64_blob){p+at,n};at+=n;
+ }
+ *count=info.count;return IT64_OK;
+}
