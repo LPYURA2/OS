@@ -10,4 +10,5 @@ struct s865_fixture_image {
 };
 bool s865_fixture_stage(const struct s844_lease [S846_ROOT_COUNT],
  struct s865_fixture_image [S846_ROOT_COUNT]);
+bool s865_fixture_request_stop(unsigned,uint64_t,const struct s844_lease *,unsigned);
 #endif

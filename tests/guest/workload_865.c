@@ -46,3 +46,10 @@ bool s865_fixture_stage(const struct s844_lease leases[4],struct s865_fixture_im
  for(unsigned i=0;i<4;i++)out[i]=prepared[i];
  return true;
 }
+
+/* Explicit CI workload request; never part of the scheduler's policy. */
+bool s865_fixture_request_stop(unsigned id,uint64_t ticks,const struct s844_lease *lease,unsigned budget){
+ if(!lease||id>=4||lease->owner!=S846_OWNER_A+id||lease->pages!=3||!lease->generation||!lease->pa||(lease->pa&(P-1))||lease->pa>(UINT64_C(1)<<47)-3*P)return false;
+ if(ticks==budget)*(volatile uint64_t *)(uintptr_t)(lease->pa+P+8)=1;
+ return true;
+}
