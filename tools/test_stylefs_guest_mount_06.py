@@ -71,7 +71,7 @@ def main():
                     return o,s[0]
                 snapshot("prelaunch");d.call("cont")
                 if expected:
-                    wait(proc,uart,expected,timeout=90)
+                    wait(proc,uart,expected,seconds=90)
                 else:
                     d.wait_uart("STYLEFS MOUNT",timeout=90)
                     d.wait_uart("READY",timeout=90)
