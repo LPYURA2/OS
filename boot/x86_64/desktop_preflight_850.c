@@ -611,7 +611,12 @@ static void shell_boundary863(void){
      dispatches>20||
 #endif
      live_arena863->next!=S863_INITIAL_ARENA_NEXT+S863_TASKS_PER_BATCH*((dispatches+S863_DISPATCHES_PER_BATCH-1)/S863_DISPATCHES_PER_BATCH)||
-     (used!=0&&used!=3*S863_TASKS_PER_BATCH))fail("863-pump-arena");
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+     used!=3*pr_snapshot(pr_global(),0,0,true)||used!=3*ws_snapshot(ws_global(),0,0)
+#else
+     (used!=0&&used!=3*S863_TASKS_PER_BATCH)
+#endif
+     )fail("863-pump-arena");
   if(!used){
    if(dispatches%S863_DISPATCHES_PER_BATCH||s845_arena()!=live_arena863||pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0))fail("863-pump-empty");
   }else if(!dispatches||s845_arena())fail("863-pump-occupied");

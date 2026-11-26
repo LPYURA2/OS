@@ -48,13 +48,15 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
         if integrated:
             for i in range(4):
                 eq(admits[i],(i,safe,3*(i+1),gen0+base+i),'sparse root admit')
-                eq(retires[i],(i,safe,3*(3-i),gen0+base+i),'sparse root retire')
+            terminal_ids=[i for i,k in order() if k=='end']
+            for k,i in enumerate(terminal_ids):
+                eq(retires[k],(i,safe,3*(3-k),gen0+base+i),'sparse root retire')
             a=[lines.index(x) for x in rows(b'STYLEOS S865 ROOT-ADMIT')]
             r=[lines.index(x) for x in rows(b'STYLEOS S865 ROOT-RETIRE')]
             rt=[lines.index(x) for x in rows(b'STYLEOS S864 ROOT')]
             for i in range(4):
                 if not a[i]<rt[i] or (i and rt[i-1]>=a[i]):raise ValueError('sparse admission order')
-            if not lines.index(rows(b'STYLEOS S848 TOTAL')[0])<r[0]<r[-1]<lines.index(rows(b'STYLEOS S860 CLEAN')[0]):raise ValueError('sparse retirement order')
+            if not r==sorted(r) or r[-1]>=lines.index(rows(b'STYLEOS S848 TOTAL')[0]):raise ValueError('sparse retirement order')
         switches=group(b'STYLEOS S864 SWITCH',('id','child','safe','rip','rsp','cs','flags','frame'),4)
         for i,p in enumerate(switches):
             eq(p,(i,roots[i]['child'],safe,lo+site['child_rva'],p['rsp'],o['bp']['cs'],p['flags'],o['bp']['frame']),'switch')
@@ -171,7 +173,19 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
             eq(stale[i],(i,base-4+i+1,gen0+base+i-4,offset-N+i+1,3),'stale selection')
             eq(fx[i],(i,gen0+base+i-4),'stale FX generation')
         releases=group(b'STYLEOS S862S RELEASE',('id','pid','handle','root','safe','processes'),4)
-        for i,x in enumerate(releases):eq(x,(i,base+i+1,gen0+base+i,roots[i]['child'],safe,3-i),'release')
+        if integrated:
+            fx=group(b'STYLEOS S865 FX-RETIRE',('id','root','gen'),4)
+            terminal_steps=[(step,i) for step,(i,k) in enumerate(order()) if k=='end']
+            for k,(step,i) in enumerate(terminal_steps):
+                eq(fx[k],(i,roots[i]['child'],gen0+base+i),'FP retirement')
+                eq(releases[k],(i,base+i+1,gen0+base+i,roots[i]['child'],safe,3-k),'immediate release')
+                chain=[streams[-1][step],rows(b'STYLEOS S865 FX-RETIRE')[k],rows(b'STYLEOS S865 ROOT-RETIRE')[k],rows(b'STYLEOS S862S RELEASE')[k]]
+                if step+1<N:chain.append(streams[0][step+1])
+                else:chain.append(rows(b'STYLEOS S862L EMPTY')[0])
+                indices=[lines.index(x) for x in chain]
+                if indices!=sorted(set(indices)):raise ValueError('terminal release before next dispatch')
+        else:
+            for i,x in enumerate(releases):eq(x,(i,base+i+1,gen0+base+i,roots[i]['child'],safe,3-i),'release')
         return True,dict(four_roots=roots,four_switches=switches,four_events=events,timer_ready=ready)
     except (ValueError,IndexError,KeyError,TypeError,StopIteration) as e:return False,str(e)
 def verify(raw,rc,site,ref,*,cold=False,clean_fnv=None,storage=False,round_count=4,provisioned=False,host_quit=False,integrated=False):

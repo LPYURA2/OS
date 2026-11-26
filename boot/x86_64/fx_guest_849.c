@@ -130,6 +130,14 @@ bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
  /* Retirement happens later under the safe root. */
  return true;
 }
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+bool s865_fx_retire(unsigned id,uint64_t root,uint64_t generation,uint64_t safe){
+ if(!safe849||safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live||
+    id>=S846_ROOT_COUNT||!s849_retire(&bank,id,root,generation)||!allzero(&bank.slot[id],sizeof bank.slot[id]))return false;
+ arch_puts("STYLEOS S865 FX-RETIRE");field("id",id);field("root",root);field("gen",generation);arch_putc('\n');
+ return true;
+}
+#endif
 bool s849_guest_finish(uint64_t safe){
 #if defined(STYLEOS_TEST_FOUR_GUEST_864) && !defined(STYLEOS_INTEGRATED_RUNTIME_864)
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(seen[i]!=s862_loop_budget[i]+2)return false;
@@ -147,7 +155,13 @@ bool s849_guest_finish(uint64_t safe){
  ||seen[0]!=4||seen[1]!=6
 #endif
  ||bank.active!=-1)return false;
- for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(!s849_retire(&bank,i,bank.slot[i].root,FX_GEN(i))||!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++){
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+  if(!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
+#else
+  if(!s849_retire(&bank,i,bank.slot[i].root,FX_GEN(i))||!allzero(&bank.slot[i],sizeof bank.slot[i]))return false;
+#endif
+ }
  scrub(&s849_kernel_image,sizeof s849_kernel_image);scrub(&bank,sizeof bank);safe849=0;
  if(!allzero(&s849_kernel_image,sizeof s849_kernel_image)||!allzero(&bank,sizeof bank)||!allzero(&s849_user_capture,sizeof s849_user_capture)||!allzero(&s849_user_restore,sizeof s849_user_restore)||!allzero(&kernel_check,sizeof kernel_check))return false;
  arch_puts("STYLEOS S849 CLEAN slots-zero=yes kernel-copy-zero=yes\n");return true;

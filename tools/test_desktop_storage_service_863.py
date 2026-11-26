@@ -56,7 +56,7 @@ def verify_cold(lines,prefix,data,site,ref,folder,tasks,*,repeatable=False,live_
             prev=lines.index(ends[i])
         if not repeatable and not prev<lines.index(req[-1]):raise ValueError('cold refusal order')
         frame=sessions=None;workload=[]
-        workload_tags=(b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862',b'STYLEOS S863M ',b'STYLEOS S865 TIMER-CANCEL ',b'STYLEOS S865 TIMER-DRAIN ',b'STYLEOS S865 PAYLOAD ')
+        workload_tags=(b'STYLEOS S861 ',b'STYLEOS S861T ',b'STYLEOS S848 ',b'STYLEOS S849 ',b'STYLEOS S860 ',b'STYLEOS S862',b'STYLEOS S863M ',b'STYLEOS S865 TIMER-CANCEL ',b'STYLEOS S865 TIMER-DRAIN ',b'STYLEOS S865 PAYLOAD ',b'STYLEOS S865 FX-RETIRE ')
         for i,(begin,end) in enumerate(zip(begins,ends)):
             m=re.fullmatch(rb'STYLEOS S863L BEGIN root=0x([0-9a-f]{16}) dispatches=0x([0-9a-f]{16}) frame=0x([0-9a-f]{16}) sessions=0x([0-9a-f]{16})',begin)
             if not m:raise ValueError('cold task begin')
@@ -187,7 +187,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
             cleanup=kind=='cleanup'
             if kind=='end':windows-=1
             n=i*27+j+1
-            want=(n,before,before+int(not cleanup),0 if cleanup else 12,0 if cleanup else 4,0 if cleanup else windows,int(cleanup))
+            want=(n,before,before+int(not cleanup),0 if cleanup else 3*windows if integrated else 12,0 if cleanup else windows if integrated else 4,0 if cleanup else windows,int(cleanup))
             expect(slices[n-1],b'STYLEOS S863P SLICE',('n','before','after','used','processes','windows','done'),want)
             before=want[2]
     if not integrated:expect(req[-1],b'STYLEOS S863B REQUEST',('root','completed','dispatches','accepted'),(root,4,104,0))

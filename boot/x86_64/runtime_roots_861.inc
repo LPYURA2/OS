@@ -61,7 +61,13 @@ static __attribute__((noinline)) void roundtrip861(unsigned i,uint64_t root,uint
  out[0]=pc;out[1]=sp;out[2]=value;out[3]=s851_frame[1];out[4]=s851_frame[2];
 }
 #if defined(STYLEOS_TEST_RUNTIME_USER_861) || defined(STYLEOS_TEST_RUNTIME_TIMER_861)
-struct user_audit861 {const struct s842_cache *cache;const struct boot_memory_evidence *e;const struct s846_guard *guard;const struct s844_arena *arena;const struct s844_lease *leases;};
+struct user_audit861 {const struct s842_cache *cache;const struct boot_memory_evidence *e;const struct s846_guard *guard;
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ struct s844_arena *arena;struct s844_lease *leases;
+#else
+ const struct s844_arena *arena;const struct s844_lease *leases;
+#endif
+};
 static bool user_audit861(void *opaque){
  const struct user_audit861 *a=opaque;
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
@@ -72,13 +78,33 @@ static bool user_audit861(void *opaque){
  return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt861_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,&children861[0],&children861[1]);
 #endif
 }
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+static bool retire865(void *opaque,unsigned i,uint64_t root,uint64_t generation){
+ struct user_audit861 *a=opaque;
+ unsigned before,after;
+ if(i>=S846_ROOT_COUNT||!a||!user_audit861(a)||!s844_count(a->arena,&before)||before<3||
+    children861[i].built.root!=root||a->leases[i].generation!=generation)return false;
+ const struct s844_lease lease=a->leases[i];
+ zero861(&children861[i],sizeof children861[i]);zero861(child_tables861[i],sizeof child_tables861[i]);
+ if(!iszero861((uintptr_t)child_tables861[i],sizeof child_tables861[i])||
+    !s844_release(a->arena,lease.owner,lease)||!iszero861(lease.pa,3*4096))return false;
+ zero861(&a->leases[i],sizeof a->leases[i]);
+ if(!user_audit861(a)||!s844_count(a->arena,&after)||after+3!=before)return false;
+ arch_puts("STYLEOS S865 ROOT-RETIRE");field("id",i);field("safe",read_cr3());field("used",after);field("gen",generation);arch_putc('\n');
+ return true;
+}
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
 extern bool s848_trial(
 #else
 extern void s848_trial(
 #endif
-const struct s846_root [S846_ROOT_COUNT],const struct s844_lease [S846_ROOT_COUNT],uint64_t,uint64_t,bool (*)(void *),void *);
+const struct s846_root [S846_ROOT_COUNT],const struct s844_lease [S846_ROOT_COUNT],uint64_t,uint64_t,bool (*)(void *),void *
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ ,bool (*)(void *,unsigned,uint64_t,uint64_t)
+#endif
+ );
 extern void s860_reap(uint64_t);
 #else
 extern void s847_trial(const struct s846_root [2],const struct s844_lease [2],uint64_t,bool (*)(void *),void *);
@@ -154,24 +180,18 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
 #endif
  struct user_audit861 a={cache,p->evidence,guard,arena,l};
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
- if(!s848_trial(children861,l,safe,base861->lapic,user_audit861,&a))return false;
+ if(!s848_trial(children861,l,safe,base861->lapic,user_audit861,&a
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ ,retire865
+#endif
+ ))return false;
 #else
  s848_trial(children861,l,safe,base861->lapic,user_audit861,&a);
 #endif
  if(!user_audit861(&a))fail("864-final-audit");
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
- /* The scheduler has returned all processes to terminal states. Revoke
-  * each detached root and scrub its own lease separately; prove the
-  * remaining roots still audit after every retirement. */
- for(unsigned i=0;i<4;i++){
-  const struct s844_lease lease=l[i];
-  zero861(&children861[i],sizeof children861[i]);zero861(child_tables861[i],sizeof child_tables861[i]);
-  if(!iszero861((uintptr_t)child_tables861[i],sizeof child_tables861[i])||
-     !s844_release(arena,lease.owner,lease)||!iszero861(lease.pa,3*4096))fail("865-slot-release");
-  zero861(&l[i],sizeof l[i]);
-  if(!user_audit861(&a)||!s844_count(arena,&used)||used!=3*(3-i))fail("865-slot-retire-audit");
-  arch_puts("STYLEOS S865 ROOT-RETIRE");field("id",i);field("safe",safe);field("used",used);field("gen",lease.generation);arch_putc('\n');
- }
+ /* Actual terminal events already revoked each root independently. */
+ if(!s844_count(arena,&used)||used||!iszero861((uintptr_t)child_tables861,sizeof child_tables861))fail("865-all-retired");
 #else
  zero861(children861,sizeof children861);zero861(child_tables861,sizeof child_tables861);
  if(!iszero861((uintptr_t)child_tables861,sizeof child_tables861))fail("864-table-zero");

@@ -434,6 +434,9 @@ s848_trial(const struct s846_root child[S846_ROOT_COUNT],const struct s844_lease
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
  ,bool (*audit)(void *),void *opaque
 #endif
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ ,bool (*retire)(void *,unsigned,uint64_t,uint64_t)
+#endif
 ){
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  /* Only bounded supervisor state survives a poll. Never retain a stack frame. */
@@ -904,6 +907,19 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   unsigned back_state=ctl848.slot[id].state;
 #endif
   arch_puts("STYLEOS S848 BACK");fld848("step",step);fld848("id",id);fld848("safe",safe);fld848("state",back_state);fld848("a",progress848[0]);fld848("b",progress848[1]);fld848("stack-same",1);arch_putc('\n');
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+  /* Release only the terminal, authenticated process at this safe-root
+   * boundary. Peers retain their own roots, contexts and scheduling state. */
+  if(terminal){
+   const uint64_t dead_root=selection.child_root,gen=selection.handle;
+   if(!retire||!audit(opaque)||!s865_fx_retire(id,dead_root,gen,safe)||
+      !retire(opaque,id,dead_root,gen)||
+      rt862_bank_release(&bank862,runtime860,safe,id,chosen_pid,gen,dead_root)!=PS_OK||
+      pr_find(pr_global(),chosen_pid)||bank862.slots[id].pid||runtime860->dispatcher.slots[id].pid||
+      !audit(opaque))fail848("865-terminal-release");
+   arch_puts("STYLEOS S862S RELEASE");fld848("id",id);fld848("pid",chosen_pid);fld848("handle",gen);fld848("root",dead_root);fld848("safe",safe);fld848("processes",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');
+  }
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
   ++completed;
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
@@ -926,9 +942,8 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  arch_puts("STYLEOS S864 IPC-CLEAN");fld848("session",ipc_session864);fld848("ports",0);arch_putc('\n');ipc_session864=0;
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
-  const struct pr_entry *ended=pr_find(pr_global(),pid860[i]);
-  if(!ended||(ended->state!=PR_EXITED&&ended->state!=PR_FAULTED)||
-     ended->scheduler_handle!=handle860[i]||ended->page_root!=child[i].built.root)fail848("865-final-state");
+  if(pr_find(pr_global(),pid860[i])||bank862.slots[i].pid||
+     runtime860->dispatcher.slots[i].pid||child[i].ready||leases[i].generation)fail848("865-final-state");
  }
 #else
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(local848[i]!=s862_loop_budget[i]||!pr_find(pr_global(),pid860[i])||pr_find(pr_global(),pid860[i])->state!=(normal_exit848(i)?PR_EXITED:PR_FAULTED))fail848("864-final-state");
@@ -957,7 +972,13 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
 #ifndef STYLEOS_TEST_RUNTIME_LOOP_862
  ||dpr_dispatch(runtime860,&slot,&pid)!=PS_EMPTY
 #endif
- ||pr_snapshot(pr_global(),0,0,true)!=S846_ROOT_COUNT||ws_snapshot(ws_global(),0,0))fail848("860-final");
+ ||pr_snapshot(pr_global(),0,0,true)!=
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ 0
+#else
+ S846_ROOT_COUNT
+#endif
+ ||ws_snapshot(ws_global(),0,0))fail848("860-final");
 #endif
 #endif
  active848=false;wr848(0x320,BIT|V);wr848(0x380,0);wr848(0x3e0,div);wr848(0x320,lvt);wr848(0x80,tpr);wr848(0xf0,svr);
@@ -986,6 +1007,10 @@ void s860_reap(uint64_t safe){
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
  if(frame860||cr2862||bank862.safe!=safe)fail848("862-bank-reap");
  const unsigned char *pending=(const void *)&pending860;for(size_t j=0;j<sizeof pending860;j++)if(pending[j])fail848("862-pending-zero");
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ const unsigned char *slots=(const void *)bank862.slots;
+ for(size_t j=0;j<sizeof bank862.slots;j++)if(slots[j])fail848("865-bank-residue");
+#else
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   const struct pr_entry *pe=pr_find(pr_global(),pid860[i]);const struct rt862_bank_slot *slot=&bank862.slots[i];
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
@@ -1005,6 +1030,7 @@ void s860_reap(uint64_t safe){
   arch_puts("STYLEOS S862S RELEASE");fld848("id",i);fld848("pid",pid860[i]);fld848("handle",handle860[i]);fld848("root",child);fld848("safe",safe);fld848("processes",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');
  }
 #endif
+#endif /* integrated processes already released */
  volatile unsigned char *wipe=(void *)&bank862;for(size_t j=0;j<sizeof bank862;j++)wipe[j]=0;
  for(size_t j=0;j<sizeof bank862;j++)if(wipe[j])fail848("862-bank-zero");
  arch_puts("STYLEOS S862B CLEAN");fld848("safe",safe);fld848("bank-zero",1);fld848("pending-zero",1);arch_putc('\n');

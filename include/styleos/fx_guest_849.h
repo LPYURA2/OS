@@ -12,5 +12,8 @@ bool s849_guest_bind_leases(const struct s844_lease [2],bool reused);
 #endif
 bool s849_guest_dispatch(unsigned id,uint64_t root);
 bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal);
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+bool s865_fx_retire(unsigned,uint64_t,uint64_t,uint64_t);
+#endif
 bool s849_guest_finish(uint64_t safe);
 #endif
