@@ -56,6 +56,14 @@ def wait_native_empty(proc,serial,seconds):
         time.sleep(.03)
     raise RuntimeError('native completion timeout')
 
+def verify_nx_cr2(block,expected):
+    # QEMU prints CR2 in the exception header and register dump.
+    values=re.findall(r'\bCR2=([0-9a-fA-F]+)\b',block,re.M)
+    header=re.findall(r'^\s*\d+: v=0e [^\n]*\bCR2=([0-9a-fA-F]+)\b',block,re.M)
+    regs=re.findall(r'^CR0=[0-9a-fA-F]+ CR2=([0-9a-fA-F]+) CR3=',block,re.M)
+    if len(values)!=2 or len(header)!=1 or len(regs)!=1 or any(int(x,16)!=expected for x in values+header+regs):
+        raise ValueError('NX fault address evidence')
+
 def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=None):
     root=obs['active']['root']
     def records(tag,keys):
@@ -164,7 +172,7 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=
         actual_pc=ev['rip']-2*(ev['vector']==128)
         if (vec,err,soft,cpl,cs,rip,pc,ss,sp,cr3)!=(ev['vector'],ev['error'],int(ev['vector']==128),3,0x5b,actual_pc,actual_pc,0x63,ev['sp'],ev['root']):raise ValueError('native raw CPU mismatch')
         if one(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')!=ev['flags'] or one(r'\bRAX=([0-9a-fA-F]+)\b')!=ev['rax'] or one(r'\bR12=([0-9a-fA-F]+)\b')!=(0 if ev['vector']==0x50 and ev['rip']==0x10000000 else ev['slot']+1):raise ValueError('native raw registers')
-        if fault_probe=='execute-nx' and ev['slot']==0 and vec==14 and one(r'\bCR2=([0-9a-fA-F]+)\b')!=0x11000000:raise ValueError('NX fault address')
+        if fault_probe=='execute-nx' and ev['slot']==0 and vec==14:verify_nx_cr2(block,0x11000000)
         result.append((int(m[1]),ev))
     if denied_int is not None or denied_count!=int(fault_probe=='forbidden-int'):raise ValueError('missing denied INT evidence')
     if not started or index!=len(events) or drain_index!=len(drains):raise ValueError('native CPU count')
