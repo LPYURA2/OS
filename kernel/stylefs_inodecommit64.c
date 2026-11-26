@@ -45,8 +45,8 @@ static enum ic64_status write(struct bs_service *b,uint64_t owner,uint64_t token
  uint8_t check[512];
  return bs_write_sector(b,owner,token,at,p)==BS_OK&&bs_read_sector(b,owner,token,at,check)==BS_OK&&equal(p,check,512)?IC64_OK:IC64_UNCERTAIN;
 }
-enum ic64_status ic64_mount(struct ic64_state *s,struct bs_service *b,uint64_t owner,uint64_t token,
- uint64_t n,uint64_t cap,uint64_t start,struct ic64_workspace *w){
+static enum ic64_status mount_internal(struct ic64_state *s,struct bs_service *b,uint64_t owner,uint64_t token,
+ uint64_t n,uint64_t cap,uint64_t start,uint64_t wanted,struct ic64_workspace *w){
  if(!sep(s,sizeof *s,b,sizeof *b)||!sep(s,sizeof *s,w,sizeof *w)||!sep(w,sizeof *w,b,sizeof *b))return IC64_INVALID;
  *s=(struct ic64_state){0};
  if(!geom(n,cap,start)||!grant(b,owner,token,n,false))return IC64_INVALID;
@@ -54,7 +54,7 @@ enum ic64_status ic64_mount(struct ic64_state *s,struct bs_service *b,uint64_t o
  for(unsigned slot=0;slot<2;slot++){
   uint8_t p[512];struct receipt x;
   if(bs_read_sector(b,owner,token,slot,p)!=BS_OK){s->table.valid=false;return IC64_IO;}
-  if(!decode(p,n,cap,start,slot,&x))continue;
+  if(!decode(p,n,cap,start,slot,&x)||(wanted&&x.epoch!=wanted))continue;
   struct it64_geometry g={x.epoch,base(n,slot),x.pages,cap,start};
   struct it64_state candidate;
   enum it64_status rc=it64_mount(&candidate,b,owner,token,&g,w->page);
@@ -64,6 +64,16 @@ enum ic64_status ic64_mount(struct ic64_state *s,struct bs_service *b,uint64_t o
   if(!s->table.valid||x.epoch>s->table.geometry.epoch){s->table=candidate;s->active=slot;}
  }
  return s->table.valid?IC64_OK:IC64_CORRUPT;
+}
+enum ic64_status ic64_mount(struct ic64_state *s,struct bs_service *b,uint64_t owner,uint64_t token,
+ uint64_t n,uint64_t cap,uint64_t start,struct ic64_workspace *w){
+ return mount_internal(s,b,owner,token,n,cap,start,0,w);
+}
+enum ic64_status ic64_mount_epoch(struct ic64_state *s,struct bs_service *b,uint64_t owner,uint64_t token,
+ uint64_t n,uint64_t cap,uint64_t start,uint64_t epoch,struct ic64_workspace *w){
+ if(!epoch||!grant(b,owner,token,n,false))return IC64_INVALID;
+ for(unsigned i=0;i<BS_GRANTS;i++)if(b->grants[i].token==token&&(b->grants[i].rights&BS_WRITE))return IC64_INVALID;
+ return mount_internal(s,b,owner,token,n,cap,start,epoch,w);
 }
 #ifdef STYLEFS_HOST_FORMAT
 enum ic64_status ic64_provision(struct bs_service *b,uint64_t owner,uint64_t token,

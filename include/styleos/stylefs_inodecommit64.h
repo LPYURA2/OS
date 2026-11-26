@@ -26,4 +26,7 @@ enum ic64_status ic64_provision(struct bs_service *,uint64_t owner,uint64_t toke
  uint64_t sectors,uint64_t capacity,uint64_t data_start);
 #endif
 enum ic64_status ic64_publish(struct ic64_state *,struct ic64_workspace *,uint64_t count,ic64_source,void *);
+/* Exact retained snapshot for read-only recovery, no writable rollback. */
+enum ic64_status ic64_mount_epoch(struct ic64_state *,struct bs_service *,uint64_t owner,uint64_t token,
+ uint64_t sectors,uint64_t capacity,uint64_t data_start,uint64_t epoch,struct ic64_workspace *);
 #endif

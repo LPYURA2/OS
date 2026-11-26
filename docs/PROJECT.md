@@ -1,3 +1,6 @@
+## StyleFS 34 — coordinated wide volume candidate
+32.1 and 33 CI 7/7 SUCCESS. Common checkpoint for namespace and packed inode/data, [handoff](NEXT_CHAT_STYLEFS_34.md). Reuse-first and legal gate preserved.
+
 ## StyleFS 33 — streamed append-only inode candidate
 32.1 CI pending at start; reuse-first adapter integrates existing allocator, staged I/O and inode commit. [Handoff](NEXT_CHAT_STYLEFS_33.md).
 
