@@ -52,6 +52,13 @@ bool s844_acquire(struct s844_arena *a,uint32_t owner,uint32_t pages,struct s844
  }
  return false;
 }
+bool s844_lease_live(const struct s844_arena *a,struct s844_lease v){
+ uint32_t used;
+ if(!shape(a,&used)||!v.owner||!v.generation||v.pa<a->base||
+    v.pa>=a->base+S844_BYTES||(v.pa&(P-1)))return false;
+ const struct s844_lease *s=&a->slots[(v.pa-a->base)/P];
+ return s->pa==v.pa&&s->generation==v.generation&&s->owner==v.owner&&s->pages==v.pages;
+}
 bool s844_release(struct s844_arena *a,uint32_t owner,struct s844_lease v){
  uint32_t used;
  if(!shape(a,&used)||!owner||owner!=v.owner||!v.generation||

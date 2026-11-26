@@ -102,7 +102,7 @@ extern void s848_trial(
 #endif
 const struct s846_root [S846_ROOT_COUNT],const struct s844_lease [S846_ROOT_COUNT],uint64_t,uint64_t,bool (*)(void *),void *
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
- ,bool (*)(void *,unsigned,uint64_t,uint64_t)
+ ,bool (*)(void *,unsigned,uint64_t,uint64_t),const struct s844_arena *
 #endif
  );
 extern void s860_reap(uint64_t);
@@ -182,7 +182,7 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
  if(!s848_trial(children861,l,safe,base861->lapic,user_audit861,&a
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
- ,retire865
+ ,retire865,arena
 #endif
  ))return false;
 #else

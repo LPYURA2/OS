@@ -8,8 +8,8 @@ struct s865_fixture_image {
  struct nte_loaded image;
  uint64_t loop_end,terminal_pc,call_pc;
 };
-bool s865_fixture_stage(const struct s844_lease [S846_ROOT_COUNT],
- struct s865_fixture_image [S846_ROOT_COUNT]);
+bool s865_fixture_stage_one(const struct s844_arena *,unsigned,struct s844_lease,
+ struct s865_fixture_image *);
 bool s865_fixture_request_stop(unsigned,uint64_t,const struct s844_lease *,unsigned);
 bool s865_fixture_force_timer(unsigned,uint64_t,uint64_t,unsigned);
 #endif

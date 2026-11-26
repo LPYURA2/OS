@@ -455,6 +455,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/fx_context_849.c','boot/x86_64/fx_guest_849.c']
     if test_user_preempt_848 or test_runtime_timer_861:
         common += ['kernel/user_preempt_848.c','boot/x86_64/user_preemption_848.c']
+    if integrated_runtime_864:
+        common += ['kernel/native_image_slot_865.c']
     if integrated_runtime_864 and not owned_shell_865:
         common += ['tests/guest/workload_865.c']
     if test_process_trial_847 or test_runtime_user_861 or test_runtime_timer_861:

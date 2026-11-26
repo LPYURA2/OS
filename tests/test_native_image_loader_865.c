@@ -1,4 +1,5 @@
 #include <styleos/native_tea_elf.h>
+#include <styleos/native_image_slot_865.h>
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,7 +24,37 @@ static void refuse(enum nte_status status){
  OK(loaded.entry==17&&loaded.code_bytes==18&&loaded.memory_bytes==19);
  for(unsigned i=0;i<sizeof page;i++)OK(page[i]==0xa5);
 }
+static _Alignas(4096) uint8_t arena_mem[S844_BYTES];
+static uint8_t scratch[8192],snapshot[3*4096];
+static unsigned reads,fail_at;
+static bool reader(void *ctx,uint32_t lba,uint8_t out[512]){
+ (void)ctx;++reads;if(reads==fail_at||lba>=16)return false;
+ memcpy(out,elf+512*lba,512);return true;
+}
+static void owned(void){
+ struct s844_arena arena={0};struct s844_lease lease={0};
+ OK(s844_init(&arena,(uintptr_t)arena_mem));OK(s844_acquire(&arena,17,3,&lease));
+ build();struct s865_image_source src={.read=reader,.sectors=16,.bytes=4224};
+ memcpy(src.sha256,digest,32);
+ uint8_t *memory=(void *)(uintptr_t)lease.pa;
+ memset(memory,0xa5,sizeof snapshot);memcpy(snapshot,memory,sizeof snapshot);
+ loaded=(struct nte_loaded){17,18,19};
+ reads=0;fail_at=3;OK(s865_load_owned(&arena,lease,&src,scratch,sizeof scratch,&loaded)==NTE_BOUNDS);
+ OK(!memcmp(memory,snapshot,sizeof snapshot)&&loaded.entry==17&&reads==3);
+ fail_at=0;src.sha256[0]^=1;OK(s865_load_owned(&arena,lease,&src,scratch,sizeof scratch,&loaded)==NTE_HASH);
+ OK(!memcmp(memory,snapshot,sizeof snapshot)&&loaded.entry==17);src.sha256[0]^=1;
+ reads=0;OK(s865_load_owned(&arena,lease,&src,memory,8192,&loaded)==NTE_ARGUMENT);OK(!reads);
+ OK(s865_load_owned(&arena,lease,&src,scratch,sizeof scratch,(void *)(memory+4096))==NTE_ARGUMENT);OK(!reads);
+ OK(s865_load_owned(&arena,lease,&src,scratch,sizeof scratch,&loaded)==NTE_OK);
+ OK(loaded.entry==NTE_USER_CODE_VA+32&&loaded.code_bytes==128&&reads==9);
+ OK(!memcmp(memory,elf+4096,128));for(unsigned i=128;i<sizeof snapshot;i++)OK(!memory[i]);
+ struct s844_lease stale=lease;OK(s844_release(&arena,lease.owner,lease));
+ OK(s844_acquire(&arena,17,3,&lease));OK(lease.pa==stale.pa&&lease.generation!=stale.generation);
+ reads=0;OK(s865_load_owned(&arena,stale,&src,scratch,sizeof scratch,&loaded)==NTE_ARGUMENT);OK(!reads);
+ OK(s844_release(&arena,lease.owner,lease));
+}
 int main(void){
+ owned();
  build();OK(nte_load_x64_image(elf,4224,digest,page,sizeof page,&loaded)==NTE_OK);
  OK(loaded.entry==NTE_USER_CODE_VA+32&&loaded.code_bytes==128&&loaded.memory_bytes==4096);
  OK(!memcmp(page,elf+4096,128));for(unsigned i=128;i<4096;i++)OK(!page[i]);

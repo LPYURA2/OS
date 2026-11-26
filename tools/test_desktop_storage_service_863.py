@@ -263,7 +263,7 @@ def main():
                    's848_dispatch_raw','s848_irq_entry','s847_pf_entry','s847_call_entry',
                    's865_drain_entry','s865_drain_wait','s865_drain_cli',
                    's849_guest_init','s849_guest_dispatch','s849_guest_suspend','s849_guest_finish',
-                   's865_fx_retire','s865_fixture_stage','s865_fixture_request_stop','s865_fixture_force_timer'}
+                   's865_fx_retire','s865_fixture_stage','s865_fixture_stage_one','s865_fixture_request_stop','s865_fixture_force_timer'}
         forbidden.update('s848_'+label+'_'+suffix for label in 'abcd' for suffix in ('start','yield','loop_end','fault','exit','end'))
         present=forbidden.intersection(token for line in map_text.splitlines() for token in line.split())
         if present:raise ValueError('shell fixture entry still linked: '+','.join(sorted(present)))

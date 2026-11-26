@@ -16,6 +16,8 @@ struct s844_arena {
  * mapping, no revocation of previously copied kernel pointers, no DMA claim. */
 bool s844_init(struct s844_arena *,uint64_t base);
 bool s844_acquire(struct s844_arena *,uint32_t owner,uint32_t pages,struct s844_lease *);
+/* Verify current ownership without mutating the arena or its pages. */
+bool s844_lease_live(const struct s844_arena *,struct s844_lease);
 bool s844_release(struct s844_arena *,uint32_t owner,struct s844_lease);
 bool s844_count(const struct s844_arena *,unsigned *);
 bool s844_efi_proof(const struct boot_memory_evidence *,const struct boot_info *,

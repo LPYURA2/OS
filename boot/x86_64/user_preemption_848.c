@@ -435,7 +435,7 @@ s848_trial(const struct s846_root child[S846_ROOT_COUNT],const struct s844_lease
  ,bool (*audit)(void *),void *opaque
 #endif
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
- ,bool (*retire)(void *,unsigned,uint64_t,uint64_t)
+ ,bool (*retire)(void *,unsigned,uint64_t,uint64_t),const struct s844_arena *arena
 #endif
 ){
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
@@ -513,14 +513,9 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  arch_puts("STYLEOS S848 STOP");fld848("lvt",rd848(0x320));fld848("initial",initial);fld848("current",current);fld848("isr",isr);fld848("irr",irr);arch_putc('\n');
  if(initial||current||isr||irr||rd848(0x320)!=lvt)fail848("timer-stop");
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
- struct s865_fixture_image loaded[S846_ROOT_COUNT];
- if(!audit(opaque)||!s865_fixture_stage(leases,loaded))fail848("865-fixture-stage");
- for(unsigned i=0;i<S846_ROOT_COUNT;i++){
-  sites848[i][0]=loaded[i].image.entry;
-  sites848[i][1]=loaded[i].loop_end;
-  sites848[i][2]=loaded[i].terminal_pc;
-  mixed_pc848[i]=loaded[i].call_pc;
- }
+ /* Load each independently owned image directly before its admission.
+  * No batch load, no trusted executable bytes inside the kernel. */
+ if(!arena||!audit(opaque))fail848("865-loader-origin");
 #else
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
  const unsigned char *start[4]={s848_a_start,s848_b_start,s848_c_start,s848_d_start},*loop[4]={s848_a_loop_end,s848_b_loop_end,s848_c_loop_end,s848_d_loop_end},*end[4]={s848_a_end,s848_b_end,s848_c_end,s848_d_end},*term[4]={s848_a_fault,s848_b_exit,s848_c_fault,s848_d_fault};
@@ -601,10 +596,11 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   struct up_context initial={.pc=S846_CODE,.sp=S846_STACK+P,.status=2,.cs=sel.cs,.ss=sel.ss};
   for(unsigned j=0;j<15;j++)initial.gpr[j]=first_arg848(i,j);
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
-  /* The fixture supplies bytes today; the same admission consumes trusted
-   * loader metadata without requiring any particular program instruction. */
-  initial.pc=loaded[i].image.entry;
-  if(!audit(opaque)||rt865_bank_admit_image(&bank862,runtime860,safe,i,&child[i],&leases[i],&loaded[i].image,"S864 process",&initial,&pid860[i])!=PS_OK||
+  struct s865_fixture_image loaded={0};
+  if(!audit(opaque)||!s865_fixture_stage_one(arena,i,leases[i],&loaded))fail848("865-load-slot");
+  sites848[i][0]=loaded.image.entry;sites848[i][1]=loaded.loop_end;sites848[i][2]=loaded.terminal_pc;
+  mixed_pc848[i]=loaded.call_pc;initial.pc=loaded.image.entry;
+  if(!audit(opaque)||rt865_bank_admit_image(&bank862,runtime860,safe,i,&child[i],&leases[i],&loaded.image,"S864 process",&initial,&pid860[i])!=PS_OK||
 #else
   if(rt863_bank_admit_initial(&bank862,runtime860,safe,i,handle860[i],child[i].built.root,"S864 process",&initial,&pid860[i])!=PS_OK||
 #endif
