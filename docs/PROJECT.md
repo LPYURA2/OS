@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 20 wide journal/stream guest candidate
+19 actual owned-root 4TiB block test SUCCESS, remaining regression pending at start. [Profile and handoff](NEXT_CHAT_STYLEFS_20.md). New isolated post-EBS wide mount, staged cancellation, high-LBA file, cold readback and independent export test. CI pending, no production large-file claim.
+
 ## 2026-11-26 — StyleFS 19 owned-root LBA48 block candidate
 17 CI 45892450813 4/4 SUCCESS. 18 new EFI guest step SUCCESS, final regression pending at start. [Profile and handoff](NEXT_CHAT_STYLEFS_19.md). Separate post-EBS 4TiB block service diagnostic; CI pending. Ordinary shell and filesystem formats unchanged.
 
