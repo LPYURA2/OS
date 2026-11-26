@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 13 wide journal candidate
+Stage 12 CI 45890429372 3/3 SUCCESS. [Wide metadata journal](architecture/STYLEFS_WIDE_JOURNAL_13.md), [handoff](NEXT_CHAT_STYLEFS_13.md). Owner update/rollback requirement recorded in STYLEOS_OWNER_REQUIREMENTS.md and POST_KERNEL_ROADMAP.md. CI pending.
+
 ## 2026-11-26 — StyleFS 12 wide allocation candidate
 Stage 11 CI 45889398731 3/3 SUCCESS. [Allocator planning](architecture/STYLEFS_WIDE_ALLOC_12.md), [handoff](NEXT_CHAT_STYLEFS_12.md). CI pending; no new mounted format yet.
 
