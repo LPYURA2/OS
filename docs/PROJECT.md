@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 17 large virtual disk LBA48 candidate
+15 CI 45891701088 3/3 SUCCESS. 16 CI 45891999656 host/source PASS, full large-file and final guest pending at work start. [LBA48 transport](architecture/STYLEFS_LBA48_17.md), [handoff](NEXT_CHAT_STYLEFS_17.md). Owner 100+ GB file requirement recorded. Candidate CI pending.
+
 ## 2026-11-26 — StyleFS 16 large logical file candidate
 [Durable data batch and full large-file workload](architecture/STYLEFS_LARGE_FILE_16.md), [handoff](NEXT_CHAT_STYLEFS_16.md). 15 host/source PASS, final guest pending at work start. 16 CI pending.
 
