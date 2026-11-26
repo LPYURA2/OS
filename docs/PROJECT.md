@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 15 explicit wide image candidate
+Stage 14 CI 45891245187 3/3 SUCCESS. [Wide image host tool](architecture/STYLEFS_WIDE_IMAGE_15.md), [handoff](NEXT_CHAT_STYLEFS_15.md). Owner clarified independence before app implementation and revised Explorer/installer mockups. CI pending.
+
 ## 2026-11-26 — StyleFS 14 integrated wide stream candidate
 [Wide stream transaction](architecture/STYLEFS_WIDE_STREAM_14.md), [handoff](NEXT_CHAT_STYLEFS_14.md). 13 host and early guest PASS at work start, final CI pending; 14 CI pending. Existing v1/v2 unchanged.
 
