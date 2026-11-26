@@ -1,3 +1,6 @@
+## StyleFS 37 — wide-volume reconciliation candidate
+36 host PASS, full CI pending at start. Reuse exact-root recovery and ownership checks for explicit repair, [handoff](NEXT_CHAT_STYLEFS_37.md). File format requirements remain in owner docs; no format handling in kernel.
+
 ## StyleFS 36 — bounded volume read/list/copy candidate
 35 CI 7/7 SUCCESS. Existing namespace and stream/transaction components reused for listing, read and verified copy, [handoff](NEXT_CHAT_STYLEFS_36.md). Reuse-first and legal gate preserved.
 

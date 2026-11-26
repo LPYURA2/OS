@@ -1,5 +1,6 @@
 #include <styleos/stylefs_inodecommit64.h>
 #include "stylefs_ownership_internal.h"
+#include "stylefs_recovery_internal.h"
 static const uint8_t magic[8]={'S','F','6','4','I','C','0','1'};
 struct receipt {uint64_t epoch,pages,count;};
 static bool sep(const void *a,size_t n,const void *b,size_t m){
@@ -160,4 +161,18 @@ enum ic64_status ic64_strict_banks(struct ic64_state *s,struct ic64_workspace *w
     a->geometry.pages!=t->geometry.pages||a->count!=t->count||
     (other->valid&&other->geometry.epoch>=a->geometry.epoch))return IC64_STALE;
  return IC64_OK;
+}
+
+enum ic64_status ic64_repair_select(struct ic64_state *s,struct bs_service *b,uint64_t owner,
+ uint64_t token,uint64_t n,uint64_t cap,uint64_t start,uint64_t wanted,struct ic64_workspace *w,int *discard){
+ if(!wanted||!discard||!geom(n,cap,start)||!grant(b,owner,token,n,true))return IC64_INVALID;
+ enum ic64_status rc=ic64_mount(s,b,owner,token,n,cap,start,w);
+ if(rc!=IC64_OK)return rc;
+ uint64_t latest=s->table.geometry.epoch;
+ if(latest<wanted||latest-wanted>1){s->table.valid=false;return IC64_CORRUPT;}
+ int candidate=latest==wanted?-1:(int)s->active;
+ rc=mount_internal(s,b,owner,token,n,cap,start,wanted,w);
+ if(rc!=IC64_OK)return rc;
+ if(candidate==(int)s->active){s->table.valid=false;return IC64_CORRUPT;}
+ *discard=candidate;return IC64_OK;
 }

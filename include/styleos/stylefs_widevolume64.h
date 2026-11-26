@@ -54,4 +54,10 @@ typedef bool (*wv64_progress)(void *,uint64_t completed,uint64_t total);
 enum wv64_status wv64_copy(struct wv64_state *,struct wv64_workspace *,struct ow64_inventory banks[2],
  const uint8_t *path,size_t length,uint64_t id,uint64_t revision,const struct sd64_record *destination,
  wv64_progress,void *);
+/* Explicit repair under exclusive trusted supervision. Fresh attachment
+ * required after uncertain I/O. Newest common receipt must be intact;
+ * never fall back for writes or adopt a pending root. Only uncommitted
+ * newer metadata headers may be cleared. No file-content writes. */
+enum wv64_status wv64_reconcile(struct wv64_state *,struct bs_service *,const struct wv64_layout *,
+ struct ns64_node *,size_t,struct wv64_workspace *,struct ow64_inventory banks[2]);
 #endif

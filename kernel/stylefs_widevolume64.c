@@ -1,6 +1,7 @@
 #include <styleos/stylefs_widevolume64.h>
 #include "stylefs_checkpoint_common_internal.h"
 #include "stylefs_stream_crc_internal.h"
+#include "stylefs_recovery_internal.h"
 static const uint8_t magic[8]={'S','F','6','4','W','V','0','1'};
 struct geometry {uint64_t identity,start[4],length[4],data_start;};
 struct receipt {uint64_t seq,dir,inode;bool valid;};
@@ -431,5 +432,58 @@ enum wv64_status wv64_copy(struct wv64_state *s,struct wv64_workspace *w,struct 
   * page not touched by inode creation. Both retained roots protect data. */
  rc=wv64_create(s,w,inv,dst,c.map.file.bytes,copy_next,&c);
  if(c.error==WV64_IO||c.error==WV64_CORRUPT){s->ready=false;return c.error;}
+ return rc;
+}
+
+static enum wv64_status clear_pending(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t slot){
+ uint8_t p[512]={0},q[512];
+ if(bs_write_sector(b,owner,token,slot,p)!=BS_OK||
+    bs_read_sector(b,owner,token,slot,q)!=BS_OK||!zero(q,512))return WV64_RECOVERY;
+ return WV64_OK;
+}
+static enum wv64_status repair_inner(struct wv64_state *s,struct wv64_workspace *w,struct ow64_inventory inv[2],
+ const struct geometry *g){
+ struct bs_service *b=s->block;struct wv64_layout *l=&s->layout;
+ struct receipt x[2];enum wv64_status rc=receipts(b,l,g,true,x);
+ if(rc!=WV64_OK)return rc;
+ struct receipt wanted=x[newest(x)];
+ if(!wanted.valid)return WV64_CORRUPT;
+ /* Verify both retained inode banks before discarding anything. This
+  * refuses ambiguous/corrupt metadata rather than reclaiming its sectors. */
+ enum ic64_status ir=ic64_mount(&s->inode,b,l->owner,l->inode,l->inode_sectors,l->data_sectors,l->data_start,&w->stream.commit);
+ if(ir!=IC64_OK)return ir==IC64_IO?WV64_IO:WV64_CORRUPT;
+ rc=ownership(s,w,inv);if(rc!=WV64_OK)return rc;
+ int dd=-1,id=-1;
+ enum dc64_status dr=dc64_repair_select(&s->dir,b,l->owner,l->dir,l->dir_sectors,wanted.dir,&w->writer,&dd);
+ if(dr!=DC64_OK)return dr==DC64_IO?WV64_IO:WV64_CORRUPT;
+ ir=ic64_repair_select(&s->inode,b,l->owner,l->inode,l->inode_sectors,l->data_sectors,l->data_start,
+ wanted.inode,&w->stream.commit,&id);
+ if(ir!=IC64_OK)return ir==IC64_IO?WV64_IO:WV64_CORRUPT;
+ /* Prove exact retained namespace and inode bijection before writes. */
+ rc=validate(s,w);if(rc!=WV64_OK)return rc;
+ s->ready=false;s->proof.valid=false;s->dir.valid=false;s->inode.table.valid=false;
+ if(dd>=0){rc=clear_pending(b,l->owner,l->dir,(uint64_t)dd);if(rc!=WV64_OK)return rc;}
+ if(id>=0){rc=clear_pending(b,l->owner,l->inode,(uint64_t)id);if(rc!=WV64_OK)return rc;}
+ /* Independently remount after repair; common checkpoint unchanged. */
+ struct wv64_layout saved=*l;
+ struct ns64_node *nodes=s->nodes;size_t slots=s->slots;
+ rc=wv64_open(s,b,&saved,true,nodes,slots,w,inv);
+ if(rc!=WV64_OK)return rc;
+ if(s->sequence!=wanted.seq||s->dir_epoch!=wanted.dir||s->inode_epoch!=wanted.inode){
+  s->ready=false;return WV64_CORRUPT;
+ }
+ return WV64_OK;
+}
+enum wv64_status wv64_reconcile(struct wv64_state *s,struct bs_service *b,const struct wv64_layout *l,
+ struct ns64_node *nodes,size_t slots,struct wv64_workspace *w,struct ow64_inventory inv[2]){
+ struct geometry g;
+ if(!slots||slots>SIZE_MAX/sizeof *nodes||!layout(b,l,true,&g))return WV64_INVALID;
+ const void *ptr[]={s,b,l,nodes,w,inv};
+ const size_t sizes[]={sizeof *s,sizeof *b,sizeof *l,slots*sizeof *nodes,sizeof *w,2*sizeof *inv};
+ for(unsigned i=0;i<6;i++)for(unsigned j=0;j<i;j++)if(!sep(ptr[i],sizes[i],ptr[j],sizes[j]))return WV64_INVALID;
+ *s=(struct wv64_state){.block=b,.layout=*l,.nodes=nodes,.slots=slots,.write=true};
+ if(!buffers(s,w,inv))return WV64_INVALID;
+ enum wv64_status rc=repair_inner(s,w,inv,&g);
+ if(rc!=WV64_OK){s->ready=false;s->proof.valid=false;s->dir.valid=false;s->inode.table.valid=false;}
  return rc;
 }
