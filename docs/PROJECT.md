@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 05 ATA capacity candidate
+Stage 04 CI 45885303373 3/3 SUCCESS. [Explicit capacity transport](architecture/STYLEFS_ATA_CAPACITY_05.md), [handoff](NEXT_CHAT_STYLEFS_05.md). New host model coverage; old hardware scope unchanged.
+
 ## 2026-11-26 — StyleFS 04 system layout candidate
 Stage 03 CI 45884839172 3/3 SUCCESS. [Explicit system layout and limitations](architecture/STYLEFS_SYSTEM_LAYOUT_04.md), [handoff](NEXT_CHAT_STYLEFS_04.md). New host provisioning only, live guest mount pending.
 

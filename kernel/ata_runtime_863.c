@@ -48,34 +48,36 @@ static bool delay(struct ata_runtime_863 *a)
  * paths; the existing read-only S857 command allowlist remains unchanged. */
 static bool reg(struct ata_runtime_863 *a,unsigned r,uint8_t v)
 {return a->ops->read_ops.write_reg(a->ctx,r,v)||fault(a,ATA863_REGISTER_IO);}
-static bool bind_identity(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx,const char *serial)
+static bool bind_identity(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx,const char *serial,uint32_t expected)
 {
-    if(!a||!ops||!ops->read_ops.status||!ops->read_ops.write_reg||
+    if(!expected||expected>ATA_LBA28_SECTORS||!a||!ops||!ops->read_ops.status||!ops->read_ops.write_reg||
        !ops->read_ops.read_data||!ops->write_data||a->ops||a->ctx||a->bound||
        a->busy||a->quarantined||a->flush_supported||a->pending_flush||
        a->fault||a->phase||a->status_polls||a->last_status||
-       a->reader.identified||a->reader.busy||a->reader.quarantined)return false;
+       a->reader.identified||a->reader.busy||a->reader.quarantined||a->reader.sectors)return false;
     a->ops=ops;a->ctx=ctx;a->busy=true;a->phase=ATA863_BIND;
     uint16_t w[ATA857_WORDS];
-    if(!ata857_identify(&a->reader,&ops->read_ops,ctx,w)||(serial&&!ata864_serial_match(w,serial)))return finish(a,fault(a,ATA863_IDENTIFY));
+    if(!ata857_identify_capacity(&a->reader,&ops->read_ops,ctx,expected,w)||(serial&&!ata864_serial_match(w,serial)))return finish(a,fault(a,ATA863_IDENTIFY));
     /* IDENTIFY word 83 validity + FLUSH CACHE. No unsupported device writes. */
     if((w[83]&0xc000u)!=0x4000u||!(w[83]&0x1000u))return finish(a,fault(a,ATA863_FLUSH_UNSUPPORTED));
     a->flush_supported=true;a->bound=true;return finish(a,true);
 }
 bool ata_runtime_bind_863(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx)
-{return bind_identity(a,ops,ctx,0);}
+{return bind_identity(a,ops,ctx,0,ATA857_SECTORS);}
 bool ata_runtime_bind_serial_864(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx,const char serial[20])
-{return serial&&bind_identity(a,ops,ctx,serial);}
+{return serial&&bind_identity(a,ops,ctx,serial,ATA857_SECTORS);}
+bool ata_runtime_bind_capacity(struct ata_runtime_863 *a,const struct ata_runtime_ops_863 *ops,void *ctx,const char serial[20],uint32_t expected)
+{return serial&&bind_identity(a,ops,ctx,serial,expected);}
 static bool enter(struct ata_runtime_863 *a)
 {
     if(!a||!a->bound||a->busy||a->quarantined||!a->flush_supported||
-       !a->reader.identified||a->reader.quarantined)return false;
+       !a->reader.identified||a->reader.quarantined||!a->reader.sectors||a->reader.sectors>ATA_LBA28_SECTORS)return false;
     a->busy=true;return true;
 }
 static bool read_sector(void *ctx,uint32_t lba,uint8_t out[512],bool (*pace)(void *))
 {
     struct ata_runtime_863 *a=ctx;
-    if(!a||!out||lba>=ATA857_SECTORS||a->pending_flush||!enter(a))return false;
+    if(!a||!out||lba>=a->reader.sectors||a->pending_flush||!enter(a))return false;
     uint16_t w[ATA857_WORDS];
     a->phase=ATA863_READ;
     if(!(pace?ata857_read_paced(&a->reader,&a->ops->read_ops,a->ctx,lba,w,pace):ata857_read(&a->reader,&a->ops->read_ops,a->ctx,lba,w)))return finish(a,fault(a,ATA863_READ_TRANSFER));
@@ -89,11 +91,11 @@ bool ata_runtime_read_paced_863(void *ctx,uint32_t lba,uint8_t out[512],bool (*p
 bool ata_runtime_write_863(void *ctx,uint32_t lba,const uint8_t in[512])
 {
     struct ata_runtime_863 *a=ctx;
-    if(!a||!in||lba>=ATA857_SECTORS||a->pending_flush||!enter(a))return false;
+    if(!a||!in||lba>=a->reader.sectors||a->pending_flush||!enter(a))return false;
     a->phase=ATA863_WRITE_SETUP;
-    if(!wait_status(a,false,ATA857_POLLS)||!reg(a,8,2)||!reg(a,6,0xe0)||!delay(a)||
+    if(!wait_status(a,false,ATA857_POLLS)||!reg(a,8,2)||!reg(a,6,(uint8_t)(0xe0u|(lba>>24)))||!delay(a)||
        !wait_status(a,false,ATA857_POLLS)||!reg(a,1,0)||!reg(a,2,1)||!reg(a,3,(uint8_t)lba)||
-       !reg(a,4,(uint8_t)(lba>>8))||!reg(a,5,0)||!reg(a,7,0x30)||
+       !reg(a,4,(uint8_t)(lba>>8))||!reg(a,5,(uint8_t)(lba>>16))||!reg(a,7,0x30)||
        !delay(a)||!wait_status(a,true,ATA857_POLLS))return finish(a,false);
     a->phase=ATA863_WRITE_DATA;
     for(unsigned i=0;i<ATA857_WORDS;i++)

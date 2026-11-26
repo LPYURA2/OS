@@ -9,7 +9,7 @@ struct fixture {
     uint8_t regs[9];
     bool timeout,completion_timeout,flush_timeout;
     unsigned completion_busy,flush_busy,pauses;
-    bool pause_fail;
+    bool pause_fail,wide;
 };
 static bool call(struct fixture*f)
 {
@@ -35,7 +35,7 @@ static bool status(void *p,uint8_t *v)
 static bool reg(void *p,unsigned r,uint8_t v)
 {
     struct fixture*f=p;if(!call(f))return false;
-    assert(ata857_allowed(r,v)||(r==7&&(v==0x30||v==0xe7)));
+    assert((f->wide?ata857_allowed_lba28(r,v):ata857_allowed(r,v))||(r==7&&(v==0x30||v==0xe7)));
     f->regs[r]=v;
     if(r==7){f->command=v;f->index=0;f->commands++;
         if(v==0xe7)f->flushes++;
@@ -132,5 +132,38 @@ int main(void)
     a=(struct ata_runtime_863){0};f=fixture(&a);assert(ata_runtime_bind_863(&a,&ops,&f));
     f.completion_timeout=true;
     assert(!ata_runtime_write_863(&a,20,in)&&f.pauses==ATA863_COMPLETION_POLLS-1&&f.commands==2);refused++;
+    /* Explicit wide capacity, exact serial, high address bits, old API
+     * still rejects the wide disk. These are transport model tests only. */
+    const char serial[20]=ATA864_PROVISIONED_SERIAL;
+    const uint32_t capacities[]={65536u,2097152u,ATA_LBA28_SECTORS};
+    for(unsigned i=0;i<sizeof capacities/sizeof capacities[0];++i){
+        uint32_t cap=capacities[i],lba=cap-1;
+        a=(struct ata_runtime_863){0};f=fixture(&a);f.wide=true;
+        f.identify[60]=(uint16_t)cap;f.identify[61]=(uint16_t)(cap>>16);
+        for(unsigned j=0;j<10;++j)f.identify[10+j]=(uint16_t)(((uint16_t)(uint8_t)serial[2*j]<<8)|(uint8_t)serial[2*j+1]);
+        assert(ata_runtime_bind_capacity(&a,&ops,&f,serial,cap)&&a.reader.sectors==cap);
+        unsigned before=f.calls;
+        memset(out,0xa5,sizeof out);
+        assert(!ata_runtime_read_863(&a,cap,out)&&!ata_runtime_write_863(&a,cap,in)&&f.calls==before);
+        for(unsigned j=0;j<512;++j)assert(out[j]==0xa5);
+        assert(ata_runtime_write_863(&a,lba,in)&&f.regs[3]==(uint8_t)lba&&
+               f.regs[4]==(uint8_t)(lba>>8)&&f.regs[5]==(uint8_t)(lba>>16)&&
+               f.regs[6]==(uint8_t)(0xe0u|(lba>>24)));
+        assert(ata_runtime_flush_863(&a)&&ata_runtime_read_863(&a,lba,out)&&!memcmp(in,out,512));
+        assert(f.regs[3]==(uint8_t)lba&&f.regs[4]==(uint8_t)(lba>>8)&&
+               f.regs[5]==(uint8_t)(lba>>16)&&f.regs[6]==(uint8_t)(0xe0u|(lba>>24)));
+    }
+    a=(struct ata_runtime_863){0};f=fixture(&a);f.identify[60]=0;f.identify[61]=1;
+    assert(!ata_runtime_bind_863(&a,&ops,&f)&&a.quarantined&&!f.write_words);
+    a=(struct ata_runtime_863){0};f=fixture(&a);
+    assert(!ata_runtime_bind_capacity(&a,&ops,&f,serial,0)&&f.calls==0);
+    assert(!ata_runtime_bind_capacity(&a,&ops,&f,serial,ATA_LBA28_SECTORS+1)&&f.calls==0);
+    assert(!ata_runtime_bind_capacity(&a,&ops,&f,serial,65536)&&a.quarantined&&!f.write_words);
+    a=(struct ata_runtime_863){0};f=fixture(&a);f.identify[60]=0;f.identify[61]=1;
+    assert(!ata_runtime_bind_capacity(&a,&ops,&f,serial,65536)&&a.quarantined&&!f.write_words);
+    assert(!ata857_allowed(5,1)&&!ata857_allowed(6,0xef));
+    for(unsigned r=0;r<16;r++)for(unsigned v=0;v<256;v++)
+        assert(ata857_allowed_lba28(r,(uint8_t)v)==(ata857_allowed(r,(uint8_t)v)||r==5||(r==6&&v>=0xe0&&v<=0xef)));
+    puts("ATA CAPACITY PASS: 32MiB/1GiB/128GiB model boundaries, exact geometry/serial, old policy, full LBA28 task file, no out-of-range IO");
     printf("S863 PIO write transport: %u positive, %u refusals PASS (host model only)\n",positive,refused);
 }
