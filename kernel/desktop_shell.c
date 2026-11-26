@@ -414,7 +414,9 @@ static bool keyboard(unsigned key, unsigned mods)
 {
     last_file_click.at = 0;
     current_file_click.id = -1;
-#if defined(STYLEOS_TEST_DESKTOP_COLD_TASKS_863) && !defined(STYLEOS_OWNED_SHELL_865)
+#if defined(STYLEOS_OWNED_SHELL_865) && defined(STYLEOS_NATIVE_PINNED_CATALOG)
+    if (key == 0x43 && !mods) { (void)s865_native_catalog_request(); return false; }
+#elif defined(STYLEOS_TEST_DESKTOP_COLD_TASKS_863) && !defined(STYLEOS_OWNED_SHELL_865)
     if (key == 0x43 && !mods) { (void)s863_request_tasks(); return false; }
 #endif
     if (key == 0x44) { restart_shell(); return true; } /* F10, preserve app state and PIDs */

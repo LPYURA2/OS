@@ -183,6 +183,11 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   .frame_va=frame860,.vector=pending860.vector,.isr=pending860.vector==V,
   .eoi=pending860.vector==V,.safe_flags=flags848(),.frame=pending860};
  if(rt863_bank_event(&bank862,runtime860,ticket,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
+#ifdef STYLEOS_OWNED_SHELL_865
+ arch_puts("STYLEOS NATIVE EVENT");fld848("slot",id);fld848("pid",ticket->pid);fld848("root",ticket->child_root);
+ fld848("vector",pending860.vector);fld848("error",pending860.error);fld848("rip",pending860.rip);
+ fld848("sp",pending860.rsp);fld848("flags",pending860.rflags);fld848("rax",pending860.gpr[0]);fld848("state",state);arch_putc('\n');
+#endif
  receipt860=false;frame860=0;cr2862=0;
  volatile unsigned char *wipe=(void *)&pending860;
  for(size_t j=0;j<sizeof pending860;j++)wipe[j]=0;

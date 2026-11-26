@@ -352,11 +352,15 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
       - name: Owned-root shell without test keyboard workload, real save and reboot
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --output build/s865-owned-shell
+      - name: Ordinary executor with 32 external ELF processes, real CPL3 and independent trace
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --output build/s865-native-catalog
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: styleos-865-owned-shell
-          path: build/s865-owned-shell/
+          path: |
+            build/s865-owned-shell/
+            build/s865-native-catalog/
           if-no-files-found: warn
 
 

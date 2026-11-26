@@ -214,7 +214,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
@@ -222,12 +222,17 @@ def main():
     if args.provisioned and not args.iso:p.error('--provisioned requires --iso')
     if args.integrated and not args.provisioned:p.error('--integrated requires --provisioned')
     if args.owned_shell and not (args.integrated and args.four):p.error('--owned-shell requires integrated four-profile boot contract')
+    if args.native_catalog and not args.owned_shell:p.error('native catalog requires owned shell')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base)
     if args.provisioned:
         with base.open('r+b') as stream:
             stream.seek(4095*512);stream.write(b'STYLEOS-S864-PROVISIONED-V1'.ljust(512,b'\0'))
+    catalog_digest=None
+    if args.native_catalog:
+        from native_catalog_865_verify import provision_catalog
+        catalog_digest=provision_catalog(base)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and img and code and vars):raise RuntimeError('real QEMU mandatory')
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
@@ -240,6 +245,7 @@ def main():
         (out/'compile.log').write_text('Reusing exact cold image: '+str(build)+'\n')
     else:
         build_args=['--desktop-owned-shell-865' if args.owned_shell else '--desktop-integrated-864'] if args.integrated else ['--test-desktop-cold-tasks-863' if tasks else '--test-desktop-cold-863' if cold else '--test-desktop-storage-service-863',*(['--mixed-cold-tasks-864'] if mixed else []),*(['--four-live-864'] if args.four else []),*(['--provisioned-storage-864'] if args.provisioned else [])]
+        if catalog_digest:build_args+=['--native-catalog-sha256',catalog_digest]
         with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',*build_args,'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
     efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=None if args.four else bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
@@ -273,6 +279,7 @@ def main():
         if '-DSTYLEOS_OWNED_SHELL_865=1' not in compiler['flags'] or not compiler['sources'] or set(compiler['sources'])!=set(compiler['source_sha256']):raise ValueError('owned shell compiler manifest')
         excluded={'boot/x86_64/user_preemption_848.c','tests/guest/workload_865.c'}
         if '-DSTYLEOS_KERNEL_CAPACITY_32=1' not in compiler['flags'] or '-DSTYLEOS_NATIVE_EXECUTOR_OBSERVERS=1' in compiler['flags']:raise ValueError('native capacity/observer flag')
+        if ('-DSTYLEOS_NATIVE_PINNED_CATALOG=1' in compiler['flags'])!=args.native_catalog:raise ValueError('catalog policy flag')
         if 'boot/x86_64/native_executor_865.c' not in compiler['sources']:raise ValueError('native executor source')
         if excluded.intersection(compiler['sources']) or any(s.startswith('tests/') for s in compiler['sources']):
             raise ValueError('owned shell linked diagnostic translation units')
@@ -399,6 +406,8 @@ def main():
                     tag=b'STYLEOS S863 EVENT '
                     count=sum(x.startswith(tag) for x in serial.read_bytes().splitlines())
                     d.key('f9');wait(proc,serial,tag,count+1)
+                    if args.native_catalog:
+                        wait(proc,serial,b'STYLEOS NATIVE EMPTY',timeout=180)
                     d.screen('after-denied-fixture')
                 elif tasks:
                     d.key('f9')
@@ -471,7 +480,12 @@ def main():
             from runtime_mixed_863_verify import row
             ok,obs=cold_prior(prefix,rc,site['rva'],ref,cold=True,host_quit=True,capacity=96)
             if not ok:raise ValueError('owned shell root '+str(obs))
-            root=obs['active']['root'];events=cold_trace(data.decode('ascii'),obs)
+            root=obs['active']['root']
+            if args.native_catalog:
+                from native_catalog_865_verify import verify_catalog
+                events=verify_catalog(lines,data.decode('ascii'),obs)
+                if stats['rd_operations']<4+32*9:raise ValueError('native catalog actual disk reads')
+            else:events=cold_trace(data.decode('ascii'),obs)
             marker=b'STYLEOS S865 SHELL-ONLY fixture-launch=deny'
             direct=[x for x in lines if x.startswith(b'STYLEOS OWNED BOOT ')]
             ready=[x for x in lines if x.startswith(b'STYLEOS S863 READY ')]
@@ -482,7 +496,9 @@ def main():
             if (r['root'],r['dispatches'],r['next-pid'],r['next-window'],r['input'])!=(root,0,1,1,3):raise ValueError('owned shell initial state')
             inputs=[x for x in lines if x.startswith(b'STYLEOS S863 EVENT ')]
             if len(inputs)<3 or any(b' key=0x'+f'{key:016x}'.encode()+b' ' not in x for key,x in zip((0x43,0x58,0x40),inputs[-3:])):raise ValueError('owned shell F9/F12/F6 input proof')
-            if any(x.startswith((b'STYLEOS S863B REQUEST ',b'STYLEOS S863L BEGIN ',b'STYLEOS S863P SLICE ',b'STYLEOS S864 BATCH-',b'STYLEOS S848 ',b'STYLEOS S863 EXIT ')) for x in lines):raise ValueError('fixture executed in owned shell')
+            denied=(b'STYLEOS S863B REQUEST ',b'STYLEOS S863L BEGIN ',b'STYLEOS S863P SLICE ',b'STYLEOS S864 BATCH-',b'STYLEOS S863 EXIT ')
+            if not args.native_catalog:denied+=(b'STYLEOS S848 ',b'STYLEOS NATIVE ADMIT ',b'STYLEOS NATIVE EVENT ')
+            if any(x.startswith(denied) for x in lines):raise ValueError('fixture or unsolicited process in owned shell')
             from test_desktop_v0 import Frame
             if Frame(folder/'note.ppm').pixels!=Frame(folder/'after-denied-fixture.ppm').pixels:raise ValueError('F9 changed shell frame')
         elif args.four:

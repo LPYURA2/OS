@@ -29,6 +29,9 @@
 void s863_shell_guard(void);
 #ifdef STYLEOS_OWNED_SHELL_865
 void s865_native_pump(void);
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+bool s865_native_catalog_request(void);
+#endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
 void s863_shell_pump(void);
