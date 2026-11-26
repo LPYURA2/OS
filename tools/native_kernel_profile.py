@@ -88,6 +88,7 @@ SOURCES = (
     "kernel/runtime_entry_858.c",
     "kernel/ata_runtime_863.c",
     "kernel/storage_runtime_863.c",
+    "kernel/block_service.c",
     "kernel/ata_diag_857.c",
     "kernel/rtc_runtime_863.c",
     "kernel/rtc_decode.c",
