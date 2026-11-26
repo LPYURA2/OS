@@ -23,7 +23,7 @@ static bool next(void *ctx,uint64_t i,uint8_t *out,size_t limit,size_t *n){
  uint64_t at=HIGH+2*i;
  if(mode==1&&i==0){file.revision=2;at=HIGH+2*FILES+10;}
  if(mode==2&&i==1)at=HIGH;
- if(mode==3&&i==0)file.revision=2;
+ if(mode==3&&i==0){file.revision=3;at=HIGH+2*FILES+10;}
  struct sfs64_run run={at,1};
  assert(limit>=80);*n=80;return sfs64_map_encode(out,*n,file,CAP,32,&run,1);
 }
@@ -42,7 +42,8 @@ int main(void){
  assert(sfs64_allocate(CAP,32,a,c,UINT64_C(100)*1024*1024*1024,plan,8,&count)==SFS64_ALLOC_OK&&count==1&&plan[0].first==32&&plan[0].sectors==209715200);
  assert(ow64_collect(&stale,&w,inv,&result)==OW64_STALE&&!result.valid);
  inv[0].slots=10;assert(ow64_collect(&s,&w,inv,&result)==OW64_OUTPUT&&!result.valid);inv[0].slots=SLOTS;
- /* Different revisions cannot reuse overlapping retained extents. */
+ /* Mode 3 must actually overlap mode 1's retained revised extent.
+  * The earlier test incorrectly used the old, now unretained sector. */
  publish(3);assert(ow64_collect(&s,&w,inv,&result)==OW64_CORRUPT&&!result.valid);
  publish(2);assert(ow64_collect(&s,&w,inv,&result)==OW64_CORRUPT&&!result.valid);
  publish(0);publish(1);assert(ow64_collect(&s,&w,inv,&result)==OW64_OK);

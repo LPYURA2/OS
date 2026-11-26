@@ -1,3 +1,6 @@
+## StyleFS 32.1 — correct retained-overlap fixture
+32 host assertion failed because fixture did not create the intended retained overlap. Correct test, preserve production gate; full CI required. Owner reuse requirement recorded.
+
 ## StyleFS 32 — retained extent ownership candidate
 31 CI 7/7 SUCCESS. Strict two-bank inventory and overlap detection, allocation planning, [handoff](NEXT_CHAT_STYLEFS_32.md). Legal gate preserved.
 
