@@ -120,7 +120,7 @@ static bool pio_reg863(void *ctx,unsigned r,uint8_t v){
 #ifdef STYLEOS_STYLEFS_MOUNT_RO
  /* Only the separately selected read-only profile, exact busy transport,
   * and existing per-callback safe-root/PCI/DMA checks. No new command. */
- if(p->ata.busy&&!p->writable&&ata857_allowed_lba28(r,v)&&ata857_live_check(p->live)){
+ if(p->ata.busy&&ata857_allowed_lba28(r,v)&&ata857_live_check(p->live)){
   uint16_t port=r==8?0x376:(uint16_t)(0x170+r);
   __asm__ volatile("outb %0,%1"::"a"(v),"Nd"(port):"memory");return true;
  }
@@ -167,7 +167,7 @@ static bool pio_observe863(void *ctx,struct storage_obs_863 *o){
  struct pio863*p=ctx;
  if(!p||!o||!p->ata.bound||p->ata.quarantined||!ata857_live_check(p->live))return false;
  *o=(struct storage_obs_863){.root=read_cr3(),.epoch=1,.device=UINT64_C(0x701080862800),
- .sectors=4096,.post_ebs=true,.single_cpu=true,.kernel_context=true,.exclusive_pio=true,
+ .sectors=p->ata.reader.sectors,.post_ebs=true,.single_cpu=true,.kernel_context=true,.exclusive_pio=true,
  .dma_denied=true,.disposable_data=true,.flush_supported=p->ata.flush_supported};return true;
 }
 #ifdef STYLEOS_OWNED_SHELL_865
@@ -210,8 +210,13 @@ static bool pio_read863(void *ctx,uint32_t lba,uint8_t *out){
 static bool pio_write863(void *ctx,uint32_t lba,const uint8_t *in){
  struct pio863*p=ctx;
 #if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+ /* Explicit profile only. Never write superblock or outside the volume. */
+ return p->writable&&p->ata.reader.sectors==65537u&&lba>=1&&lba<65536u&&ata_runtime_write_863(&p->ata,lba,in);
+#else
  /* Four legacy note slots, two nine-sector banks per slot; never LBA 0. */
  return p->writable&&lba>=1&&lba<=72&&ata_runtime_write_863(&p->ata,lba,in);
+#endif
 #else
  return p->writable&&lba==2049&&ata_runtime_write_863(&p->ata,lba,in);
 #endif
@@ -585,13 +590,24 @@ static bool block_attach863(void){
 #ifdef STYLEOS_STYLEFS_MOUNT_RO
 #define STYLEFS_RO_SECTORS UINT32_C(65536)
 #define STYLEFS_RO_DEVICE_SECTORS (STYLEFS_RO_SECTORS+1u)
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+#define STYLEFS_RO_SERIAL "STYLEOS-SFS07-RW    "
+#define STYLEFS_TAG "STYLEOS-SFS07-WRITABLE-V1"
+#else
 #define STYLEFS_RO_SERIAL "STYLEOS-SFS06-RO    "
+#define STYLEFS_TAG "STYLEOS-SFS06-READONLY-V1"
+#endif
 static bool large_ready863(void){
  const struct ata_runtime_863 *a=&disk863.s.pio.ata;
  s863_shell_guard();
  if(!disk863.s.ready||!a->bound||a->busy||a->quarantined||a->pending_flush||
     a->fault||!a->reader.identified||a->reader.busy||a->reader.quarantined||
-    a->reader.sectors!=STYLEFS_RO_DEVICE_SECTORS||disk863.s.pio.writable)return false;
+    a->reader.sectors!=STYLEFS_RO_DEVICE_SECTORS)return false;
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+ if(!disk863.s.pio.writable||disk863.s.store.quarantined||disk863.s.store.busy||disk863.s.store.fault)return false;
+#else
+ if(disk863.s.pio.writable)return false;
+#endif
  /* Renew the finite budget only at a complete, quiescent sector request. */
  disk863.s.live.ops=0;
  if(!same_cache(&shell_cache863)||!ata857_live_check(&disk863.s.live)){
@@ -603,13 +619,44 @@ static bool large_read863(void *ctx,uint64_t lba,uint8_t out[512]){
  return ctx==&disk863.s.pio&&lba<STYLEFS_RO_SECTORS&&large_ready863()&&
         pio_read863(ctx,(uint32_t)lba,out);
 }
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+static bool large_write863(void *ctx,uint64_t lba,const uint8_t in[512]){
+ if(ctx!=&disk863.s.pio||lba<1||lba>=STYLEFS_RO_SECTORS||!large_ready863())return false;
+ /* Reuse verified commit: write, hardware flush, readback, same budget. */
+ if(!storage_commit_863(&disk863.s.store,(uint32_t)lba-1,in))return false;
+ arch_puts("STYLEOS SFS07 COMMIT");field("lba",lba);arch_putc('\n');return true;
+}
+static bool large_flush863(void *ctx){
+ /* Previous verified commit already flushed; no new command or budget reset. */
+ return ctx==&disk863.s.pio&&disk863.s.store.bound&&!disk863.s.store.busy&&
+  !disk863.s.store.quarantined&&!disk863.s.pio.ata.pending_flush&&
+  !disk863.s.pio.ata.busy&&!disk863.s.pio.ata.quarantined&&
+  same_cache(&shell_cache863)&&ata857_live_check(&disk863.s.live);
+}
+#endif
 static bool large_attach863(void){
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+ const struct bs_backend backend={&disk863.s.pio,UINT64_C(0x701080862801),
+    STYLEFS_RO_SECTORS,true,false,large_read863,large_write863,large_flush863};
+#else
  const struct bs_backend backend={&disk863.s.pio,UINT64_C(0x701080862801),
     STYLEFS_RO_SECTORS,false,false,large_read863,0,0};
+#endif
  struct bs_service *b=&disk863.s.block;
  if(!identity((uintptr_t)bs_read_sector,PG_EXEC)||
-    bs_attach(b,&backend,&disk863.s.block_generation)!=BS_OK||
-    bs_grant_range(b,disk863.s.block_generation,BLOCK_SHELL_OWNER,0,
+    bs_attach(b,&backend,&disk863.s.block_generation)!=BS_OK)return false;
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+ if(bs_grant_range(b,disk863.s.block_generation,BLOCK_SHELL_OWNER,0,1,BS_READ,&disk863.s.block_ro0)!=BS_OK||
+    bs_grant_range(b,disk863.s.block_generation,BLOCK_SHELL_OWNER,1,STYLEFS_RO_SECTORS-1,BS_READ|BS_WRITE,&disk863.s.block_rw)!=BS_OK)return false;
+ uint8_t probe[512]={0};unsigned ops=disk863.s.live.ops;
+ if(bs_write_sector(b,BLOCK_SHELL_OWNER,disk863.s.block_ro0,0,probe)!=BS_DENIED||
+    bs_write_sector(b,BLOCK_SHELL_OWNER,disk863.s.block_rw,STYLEFS_RO_SECTORS-1,probe)!=BS_RANGE||
+    bs_read_sector(b,BLOCK_SHELL_OWNER+1,disk863.s.block_rw,0,probe)!=BS_DENIED||
+    disk863.s.live.ops!=ops)return false;
+ arch_puts("STYLEOS SFS07 ADMIT");field("device-sectors",STYLEFS_RO_DEVICE_SECTORS);
+ field("volume-sectors",STYLEFS_RO_SECTORS);field("write",1);field("refusals",3);arch_putc('\n');
+#else
+ if(bs_grant_range(b,disk863.s.block_generation,BLOCK_SHELL_OWNER,0,
                    STYLEFS_RO_SECTORS,BS_READ,&disk863.s.block_ro0)!=BS_OK)return false;
  uint8_t probe[512]={0};unsigned ops=disk863.s.live.ops;
  if(bs_write_sector(b,BLOCK_SHELL_OWNER,disk863.s.block_ro0,0,probe)!=BS_DENIED||
@@ -618,6 +665,7 @@ static bool large_attach863(void){
     disk863.s.live.ops!=ops)return false;
  arch_puts("STYLEOS SFS06 ADMIT");field("device-sectors",STYLEFS_RO_DEVICE_SECTORS);
  field("volume-sectors",STYLEFS_RO_SECTORS);field("write",0);field("refusals",3);arch_putc('\n');
+#endif
  return true;
 }
 #endif
@@ -669,9 +717,19 @@ static void disk_admit863(void){
         STYLEFS_RO_SERIAL,STYLEFS_RO_DEVICE_SECTORS))fail("sfs06-serial-capacity");
  /* Identity tag outside the exposed volume. Never grant or write this LBA. */
  if(!pio_read863(&disk863.s.pio,STYLEFS_RO_SECTORS,super))fail("sfs06-tag-read");
- static const char tag[]="STYLEOS-SFS06-READONLY-V1";
+ static const char tag[]=STYLEFS_TAG;
  for(unsigned i=0;i<512;++i)
   if(super[i]!=(i<sizeof tag-1?(uint8_t)tag[i]:0))fail("sfs06-tag");
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+ /* Verify the superblock magic before enabling writes; the filesystem
+  * decoder validates the complete superblock and tree before mutation. */
+ if(!pio_read863(&disk863.s.pio,0,super))fail("sfs07-super-read");
+ static const char fs_magic[]="STYLEFS2";
+ for(unsigned i=0;i<8;++i)if(super[i]!=(uint8_t)fs_magic[i])fail("sfs07-super");
+ disk863.s.pio.writable=true;
+ if(!storage_bind_capacity_863(&disk863.s.store,&store_ops863,&disk863.s.pio,shell_root863,
+    1,UINT64_C(0x701080862800),STYLEFS_RO_DEVICE_SECTORS,1,STYLEFS_RO_SECTORS-1,true))fail("sfs07-storage-bind");
+#endif
  if(!large_attach863())fail("sfs06-block-bind");
  disk863.s.ready=true;
  return;
@@ -721,7 +779,13 @@ static bool disk_ready863(void){
 }
 void s863_storage_document(bool saved,unsigned slot,const char *data,size_t bytes){
  s863_shell_guard();
+#ifdef STYLEOS_STYLEFS_MOUNT_RO
+ /* StyleFS entry IDs are not legacy note slots. Document receipt is not
+  * a new disk operation; a later device fault must not halt the shell. */
+ if(!data||slot>=256u)return;
+#else
  if(!disk_ready863()||slot>=DESK_DOCS||!data||bytes>DESK_TEXT_LIMIT)fail("863-shell-storage-document");
+#endif
  uint64_t hash=UINT64_C(14695981039346656037);
  for(size_t i=0;i<bytes;i++){hash^=(uint8_t)data[i];hash*=UINT64_C(1099511628211);}
  arch_puts(saved?"STYLEOS S863S SAVED":"STYLEOS S863S OPENED");
@@ -753,7 +817,11 @@ uint32_t s863_disk_probe(void){
 bool s863_disk_read(uint32_t lba,uint8_t out[512]){
 #ifdef STYLEOS_STYLEFS_MOUNT_RO
  if(!out||!disk863.s.ready||lba>=STYLEFS_RO_SECTORS)return false;
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+ return bs_read_sector(&disk863.s.block,BLOCK_SHELL_OWNER,lba?disk863.s.block_rw:disk863.s.block_ro0,lba?lba-1:0,out)==BS_OK;
+#else
  return bs_read_sector(&disk863.s.block,BLOCK_SHELL_OWNER,disk863.s.block_ro0,lba,out)==BS_OK;
+#endif
 #endif
 #ifdef STYLEOS_OWNED_SHELL_865
  if(!out||lba>=4096||!disk_ready863())return false;
@@ -771,7 +839,10 @@ bool s863_disk_read(uint32_t lba,uint8_t out[512]){
 #endif
 }
 bool s863_disk_write(uint32_t lba,const uint8_t in[512]){
-#ifdef STYLEOS_STYLEFS_MOUNT_RO
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+ if(!in||!disk863.s.ready||lba<1||lba>=STYLEFS_RO_SECTORS)return false;
+ return bs_write_sector(&disk863.s.block,BLOCK_SHELL_OWNER,disk863.s.block_rw,lba-1,in)==BS_OK;
+#elif defined(STYLEOS_STYLEFS_MOUNT_RO)
  (void)lba;(void)in;return false;
 #endif
  if(!in||lba<1||lba>72||!disk_ready863())return false;
@@ -795,7 +866,9 @@ bool s863_disk_write(uint32_t lba,const uint8_t in[512]){
  return true;
 }
 bool s863_disk_flush(void){
-#ifdef STYLEOS_STYLEFS_MOUNT_RO
+#ifdef STYLEOS_STYLEFS_MOUNT_RW
+ return large_flush863(&disk863.s.pio);
+#elif defined(STYLEOS_STYLEFS_MOUNT_RO)
  return false;
 #endif
  /* No queued writes exist after verified commit; check actual live transport. */

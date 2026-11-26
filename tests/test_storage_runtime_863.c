@@ -86,6 +86,13 @@ int main(void)
     s=(struct storage_runtime_863){0};f=fixture(&s);
     assert(!storage_bind_863(&s,&ops,&f,0x1000,1,42,4095,2,true));
     assert(!storage_bind_863(&s,&ops,&f,0x1000,1,42,0,0,true));bad+=2;
+    s=(struct storage_runtime_863){0};f=fixture(&s);f.o.sectors=65537;
+    assert(storage_bind_capacity_863(&s,&ops,&f,0x1000,1,42,65537,1,65535,true));
+    assert(storage_commit_863(&s,65534,src)&&f.last==65535);
+    unsigned oldcalls=calls(&f);
+    assert(!storage_commit_863(&s,65535,src)&&calls(&f)==oldcalls);
+    f.o.sectors=65536;
+    assert(!storage_read_863(&s,0,out)&&s.quarantined&&calls(&f)==oldcalls);
     /* The finite callback budget is renewable only between operations.
      * Simulate many completed requests and guard against reentrant reset. */
     s=(struct storage_runtime_863){0};f=fixture(&s);assert(bind(&f,true));

@@ -27,7 +27,7 @@ struct storage_runtime_863 {
     const struct storage_ops_863 *ops;
     void *ctx;
     uint64_t root,epoch,device;
-    uint32_t first,count;
+    uint32_t first,count,sectors;
     bool writable,bound,busy,quarantined;
     enum storage863_fault fault;
 };
@@ -42,6 +42,9 @@ static inline bool storage_budget_begin_864(const struct storage_runtime_863 *s,
 }
 bool storage_bind_863(struct storage_runtime_863 *,const struct storage_ops_863 *,
     void *,uint64_t,uint64_t,uint64_t,uint32_t,uint32_t,bool);
+/* Explicit separately attested geometry; legacy binding still requires 4096. */
+bool storage_bind_capacity_863(struct storage_runtime_863 *,const struct storage_ops_863 *,
+    void *,uint64_t,uint64_t,uint64_t,uint32_t,uint32_t,uint32_t,bool);
 bool storage_read_863(struct storage_runtime_863 *,uint32_t,uint8_t [S863_SECTOR_BYTES]);
 /* Single-sector verified commit: write, flush, then readback. A failure may
  * leave changed media; quarantine prevents reuse, not atomic rollback. */

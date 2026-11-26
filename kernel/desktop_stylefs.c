@@ -38,7 +38,7 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
     const struct desk_physical_disk physical = {
         0, sectors, read_sector, write_sector, flush_disk
     };
-#ifdef STYLEOS_STYLEFS_MOUNT_RO
+#if defined(STYLEOS_STYLEFS_MOUNT_RO) && !defined(STYLEOS_STYLEFS_MOUNT_RW)
     const bool writable = false;
 #else
     const bool writable = true;
@@ -52,7 +52,9 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
         arch_puts("STYLEOS DESKTOP STYLEFS MOUNT\n");
         if (b->disk.format == 2) arch_puts("STYLEOS DESKTOP STYLEFS V2\n");
 #ifdef STYLEOS_STYLEFS_MOUNT_RO
+#ifndef STYLEOS_STYLEFS_MOUNT_RW
         b->status = "Том доступен только для чтения";
+#endif
         arch_puts("STYLEOS SFS06 ROOT BEGIN\n");
         for (unsigned i=1;i<SFS_ENTRIES;++i) {
             const struct sfs_entry *e=sfs_entry_at(&b->disk,i);

@@ -4,24 +4,27 @@ static bool guard(struct storage_runtime_863 *s)
     if(s->quarantined)return false;
     struct storage_obs_863 o={0};
     if(!s->ops->observe(s->ctx,&o)||o.root!=s->root||o.epoch!=s->epoch||
-       o.device!=s->device||o.sectors!=S863_DISK_SECTORS||
+       o.device!=s->device||o.sectors!=s->sectors||
        !o.post_ebs||!o.single_cpu||!o.kernel_context||!o.exclusive_pio||
        !o.dma_denied||!o.disposable_data||(s->writable&&!o.flush_supported)){
         s->quarantined=true;if(!s->fault)s->fault=STORAGE863_GUARD;return false;
     }
     return true;
 }
-bool storage_bind_863(struct storage_runtime_863 *s,const struct storage_ops_863 *ops,
-    void *ctx,uint64_t root,uint64_t epoch,uint64_t device,uint32_t first,uint32_t count,bool writable)
+bool storage_bind_capacity_863(struct storage_runtime_863 *s,const struct storage_ops_863 *ops,
+    void *ctx,uint64_t root,uint64_t epoch,uint64_t device,uint32_t sectors,uint32_t first,uint32_t count,bool writable)
 {
     if(!s||!ops||!ops->observe||!ops->read||(writable&&(!ops->write||!ops->flush))||
-       !root||(root&4095u)||!epoch||!device||!count||first>=S863_DISK_SECTORS||
-       count>S863_DISK_SECTORS-first||s->ops||s->ctx||s->root||s->epoch||
-       s->device||s->first||s->count||s->writable||s->bound||s->busy||s->quarantined||s->fault)return false;
+       !root||(root&4095u)||!epoch||!device||!count||!sectors||first>=sectors||
+       count>sectors-first||s->ops||s->ctx||s->root||s->epoch||
+       s->device||s->first||s->count||s->sectors||s->writable||s->bound||s->busy||s->quarantined||s->fault)return false;
     s->ops=ops;s->ctx=ctx;s->root=root;s->epoch=epoch;s->device=device;
-    s->first=first;s->count=count;s->writable=writable;s->busy=true;
+    s->first=first;s->count=count;s->sectors=sectors;s->writable=writable;s->busy=true;
     bool ok=guard(s);s->bound=ok;s->busy=false;return ok;
 }
+bool storage_bind_863(struct storage_runtime_863 *s,const struct storage_ops_863 *ops,
+    void *ctx,uint64_t root,uint64_t epoch,uint64_t device,uint32_t first,uint32_t count,bool writable)
+{return storage_bind_capacity_863(s,ops,ctx,root,epoch,device,S863_DISK_SECTORS,first,count,writable);}
 static bool enter(struct storage_runtime_863 *s,uint32_t lba)
 {
     if(!s||!s->bound||s->busy||s->quarantined||lba>=s->count)return false;
