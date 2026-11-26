@@ -1,3 +1,6 @@
+## StyleFS 25 — namespace integrity candidate
+24 CI pending at start; new checked graph/path service and mutation gate, [handoff](NEXT_CHAT_STYLEFS_25.md). [Legal gate](LEGAL_RELEASE_GATE.md) unchanged.
+
 ## StyleFS 24 — bounded atomic batch edits candidate
 22 CI 7/7; 23 host PASS, guest regression apt HTTP 403, other checks pending at start. New batch directory API and write-amplification test. [Handoff](NEXT_CHAT_STYLEFS_24.md). [Legal release gate](LEGAL_RELEASE_GATE.md) preserved.
 
