@@ -1,0 +1,5 @@
+# StyleOS continuation — forced stop candidate
+
+Parent: a77437baec01ab68ddb480228ace70977913d05b; exact hang coexistence CI 45835660124 SUCCESS. Candidate code commit b12a6a98cc2fbf221f3672c2513786cfed477baf in feature/styleos-kernel-forced-stop. This handoff is a documentation-only descendant; check exact HEAD and Actions before claiming any PASS.
+
+Read AGENTS.md, docs/PROJECT.md, docs/architecture/NATIVE_FORCED_STOP_CANDIDATE.md. The new trusted ready-only stop is not yet a proved guest path. Check the GCC/Clang host refusals and existing QEMU 8.2.2 hang regression. Then add a separate test that actually calls s865_native_stop at the quiescent safe-root boundary after real timer preemption, with stale and unauthorized refusal, surviving peer and responsive Desktop, verified FP/root/lease cleanup, fresh PID/generation and resource reuse; bind UART to actual CPU trace. No simulated trap or host VM stop may count as process termination. No automatic kill based on CPU use. Full exact-SHA CI and independent audit afterwards. Preserve main and older branches. No new UI or filesystem work before acceptance.
