@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 08 scoped file service candidate
+Stage 07 writable guest and cold reopen PASS in 45887441791, full regression pending at branch creation. [Scoped file service](architecture/STYLEFS_FILE_SCOPES_08.md), [handoff](NEXT_CHAT_STYLEFS_08.md). No guest permissions claimed yet.
+
 ## 2026-11-26 — StyleFS 07 writable guest candidate
 Stage 06 CI 45886576512 3/3 SUCCESS. [Writable scoped profile](architecture/STYLEFS_GUEST_WRITE_07.md), [handoff](NEXT_CHAT_STYLEFS_07.md). CI pending.
 

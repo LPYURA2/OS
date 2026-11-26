@@ -129,6 +129,8 @@ enum sv_status sv_unmount(struct sv_service *s,uint64_t mount)
     if(!v)return SV_STALE;
     enum bs_status b=bs_revoke(v->block,v->owner,v->token);
     if(b!=BS_OK&&b!=BS_STALE)return block_result(b);
+    for(unsigned i=0;i<SV_SCOPES;++i)
+        if(s->scopes[i].mount==mount)s->scopes[i]=(struct sv_scope){0};
     v->active=false;v->fs.mounted=false;v->token=0;v->block=0;v->mount=0;
     return SV_OK;
 }
@@ -206,4 +208,178 @@ enum sv_status sv_read_to(struct sv_service *s,struct sv_ref ref,sfs_sink sink,v
     if(e->type!=SFS_FILE)return SV_TYPE;
     s->busy=true;v->last_block=BS_OK;
     return finish(s,v,sfs_read_to(&v->fs,ref.index,sink,ctx));
+}
+
+/* Scope checks use the real validated directory graph, not path prefixes
+ * or a caller-supplied entry number alone. Bound traversal even if an
+ * internal invariant is violated. Raw sv_* operations remain trusted-only. */
+static bool inside(const struct sfs_volume *fs,unsigned root,unsigned id)
+{
+    for(unsigned n=0;n<SFS_ENTRIES;++n){
+        const struct sfs_entry *e=sfs_entry_at(fs,id);
+        if(!e)return false;
+        if(id==root)return true;
+        if(id==SFS_ROOT)return false;
+        id=e->parent;
+    }
+    return false;
+}
+static struct sv_scope *scope_find(struct sv_service *s,uint64_t token)
+{
+    if(!token)return 0;
+    for(unsigned i=0;i<SV_SCOPES;++i)
+        if(s->scopes[i].token==token)return &s->scopes[i];
+    return 0;
+}
+static enum sv_status scope_live(struct sv_service *s,uint64_t owner,uint64_t token,unsigned right,
+                                 struct sv_scope **out,struct sv_slot **v)
+{
+    if(!s||!owner||!token)return SV_INVALID;
+    if(s->busy)return SV_BUSY;
+    struct sv_scope *q=scope_find(s,token);
+    if(!q)return SV_STALE;
+    if(q->owner!=owner||!(q->rights&right))return SV_DENIED;
+    enum sv_status r=live(s,q->mount,v);
+    if(r!=SV_OK)return r;
+    if(q->revision!=(*v)->fs.generation)return SV_STALE;
+    if(right==SV_SCOPE_WRITE&&!(*v)->writable)return SV_DENIED;
+    const struct sfs_entry *anchor=sfs_entry_at(&(*v)->fs,q->root);
+    if(!anchor||anchor->type!=SFS_DIRECTORY)return SV_STALE;
+    *out=q;return SV_OK;
+}
+static enum sv_status scope_entry(struct sv_service *s,uint64_t owner,uint64_t token,unsigned right,
+                                  struct sv_ref ref,struct sv_scope **q,struct sv_slot **v)
+{
+    enum sv_status r=scope_live(s,owner,token,right,q,v);
+    if(r!=SV_OK)return r;
+    if(ref.mount!=(*q)->mount)return SV_DENIED;
+    if(ref.revision!=(*q)->revision)return SV_STALE;
+    return inside(&(*v)->fs,(*q)->root,ref.index)?SV_OK:SV_DENIED;
+}
+enum sv_status sv_scope_grant(struct sv_service *s,uint64_t owner,struct sv_ref profile,unsigned rights,uint64_t *token)
+{
+    if(!owner||!token||!(rights&SV_SCOPE_READ)||(rights&~(SV_SCOPE_READ|SV_SCOPE_WRITE)))return SV_INVALID;
+    struct sv_slot *v;const struct sfs_entry *e;
+    enum sv_status r=entry(s,profile,&v,&e);
+    if(r!=SV_OK)return r;
+    int users=sfs_find(&v->fs,SFS_ROOT,"Users");
+    const struct sfs_entry *u=users<0?0:sfs_entry_at(&v->fs,(unsigned)users);
+    if(!u||u->type!=SFS_DIRECTORY||profile.index==SFS_ROOT||
+       e->type!=SFS_DIRECTORY||e->parent!=(unsigned)users)return SV_DENIED;
+    if((rights&SV_SCOPE_WRITE)&&!v->writable)return SV_DENIED;
+    unsigned i=0;while(i<SV_SCOPES&&s->scopes[i].token)++i;
+    if(i==SV_SCOPES||s->serial==UINT64_MAX)return SV_FULL;
+    s->scopes[i]=(struct sv_scope){++s->serial,owner,profile.mount,profile.revision,profile.index,rights};
+    *token=s->serial;return SV_OK;
+}
+enum sv_status sv_scope_revoke(struct sv_service *s,uint64_t owner,uint64_t token)
+{
+    if(!s||!owner||!token)return SV_INVALID;
+    if(s->busy)return SV_BUSY;
+    struct sv_scope *q=scope_find(s,token);
+    if(!q)return SV_STALE;
+    if(q->owner!=owner)return SV_DENIED;
+    *q=(struct sv_scope){0};return SV_OK;
+}
+enum sv_status sv_scope_revoke_owner(struct sv_service *s,uint64_t owner)
+{
+    if(!s||!owner)return SV_INVALID;
+    if(s->busy)return SV_BUSY;
+    for(unsigned i=0;i<SV_SCOPES;++i)
+        if(s->scopes[i].owner==owner)s->scopes[i]=(struct sv_scope){0};
+    return SV_OK;
+}
+enum sv_status sv_scope_root(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref *out)
+{
+    if(!out)return SV_INVALID;
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_live(s,owner,token,SV_SCOPE_READ,&q,&v);
+    if(r!=SV_OK)return r;
+    *out=reference(v,q->root);return SV_OK;
+}
+enum sv_status sv_scope_lookup(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref parent,const char *name,struct sv_ref *out)
+{
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_READ,parent,&q,&v);
+    return r==SV_OK?sv_lookup(s,parent,name,out):r;
+}
+enum sv_status sv_scope_next(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref parent,unsigned after,struct sv_ref *out,struct sfs_entry *meta)
+{
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_READ,parent,&q,&v);
+    return r==SV_OK?sv_next(s,parent,after,out,meta):r;
+}
+enum sv_status sv_scope_stat(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref ref,struct sfs_entry *out)
+{
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_READ,ref,&q,&v);
+    return r==SV_OK?sv_stat(s,ref,out):r;
+}
+enum sv_status sv_scope_read_to(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref ref,sfs_sink sink,void *ctx)
+{
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_READ,ref,&q,&v);
+    return r==SV_OK?sv_read_to(s,ref,sink,ctx):r;
+}
+static enum sv_status scope_mutated(struct sv_scope *q,struct sv_slot *v,enum sv_status r)
+{
+    if(r==SV_OK)q->revision=v->fs.generation;
+    return r;
+}
+enum sv_status sv_scope_mkdir(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref parent,const char *name,struct sv_ref *out)
+{
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_WRITE,parent,&q,&v);
+    if(r!=SV_OK)return r;
+    r=sv_mkdir(s,parent,name,out);return scope_mutated(q,v,r);
+}
+enum sv_status sv_scope_create(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref parent,const char *name,const uint8_t *data,size_t n,struct sv_ref *out)
+{
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_WRITE,parent,&q,&v);
+    if(r!=SV_OK)return r;
+    r=sv_create(s,parent,name,data,n,out);return scope_mutated(q,v,r);
+}
+enum sv_status sv_scope_write(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref ref,const uint8_t *data,size_t n,struct sv_ref *out)
+{
+    if(!out||(n&&!data))return SV_INVALID;
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_WRITE,ref,&q,&v);
+    if(r!=SV_OK)return r;
+    if(ref.index==q->root)return SV_DENIED;
+    s->busy=true;v->last_block=BS_OK;
+    r=finish(s,v,sfs_write(&v->fs,&v->work,ref.index,data,n));
+    if(r==SV_OK)*out=reference(v,ref.index);
+    return scope_mutated(q,v,r);
+}
+static enum sv_status scope_transfer(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref source,
+                                     struct sv_ref parent,const char *name,struct sv_ref *out,bool copy)
+{
+    if(!name||!out)return SV_INVALID;
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_WRITE,source,&q,&v);
+    if(r!=SV_OK)return r;
+    if(source.index==q->root)return SV_DENIED;
+    r=scope_entry(s,owner,token,SV_SCOPE_WRITE,parent,&q,&v);
+    if(r!=SV_OK)return r;
+    unsigned id=source.index;s->busy=true;v->last_block=BS_OK;
+    enum sfs_result fs=copy?sfs_copy(&v->fs,&v->work,source.index,parent.index,name,&id):
+        sfs_move(&v->fs,&v->work,source.index,parent.index,name);
+    r=finish(s,v,fs);
+    if(r==SV_OK)*out=reference(v,id);
+    return scope_mutated(q,v,r);
+}
+enum sv_status sv_scope_move(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref source,struct sv_ref parent,const char *name,struct sv_ref *out)
+{return scope_transfer(s,owner,token,source,parent,name,out,false);}
+enum sv_status sv_scope_copy(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref source,struct sv_ref parent,const char *name,struct sv_ref *out)
+{return scope_transfer(s,owner,token,source,parent,name,out,true);}
+enum sv_status sv_scope_remove(struct sv_service *s,uint64_t owner,uint64_t token,struct sv_ref ref)
+{
+    struct sv_scope *q;struct sv_slot *v;
+    enum sv_status r=scope_entry(s,owner,token,SV_SCOPE_WRITE,ref,&q,&v);
+    if(r!=SV_OK)return r;
+    if(ref.index==q->root)return SV_DENIED;
+    s->busy=true;v->last_block=BS_OK;
+    r=finish(s,v,sfs_remove(&v->fs,&v->work,ref.index));
+    return scope_mutated(q,v,r);
 }
