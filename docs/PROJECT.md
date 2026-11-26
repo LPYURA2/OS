@@ -1,3 +1,6 @@
+## StyleFS 35 — checked volume edits candidate
+34 CI 7/7 SUCCESS. Reuse checked namespace and inode commits for mkdir, rename/move and deletion, [handoff](NEXT_CHAT_STYLEFS_35.md). Legal and reuse-first gates preserved.
+
 ## StyleFS 34 — coordinated wide volume candidate
 32.1 and 33 CI 7/7 SUCCESS. Common checkpoint for namespace and packed inode/data, [handoff](NEXT_CHAT_STYLEFS_34.md). Reuse-first and legal gate preserved.
 

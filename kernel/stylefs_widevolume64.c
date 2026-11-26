@@ -42,7 +42,7 @@ static enum wv64_status receipts(struct bs_service *b,const struct wv64_layout *
  if(x[0].valid&&x[1].valid){
   const struct receipt *a=x[0].seq>x[1].seq?x:x+1,*z=a==x?x+1:x;
   if(a->seq-z->seq!=1||a->dir<=z->dir||a->dir-z->dir!=1||
-     a->inode<=z->inode||a->inode-z->inode!=1)return WV64_CORRUPT;
+     a->inode<z->inode||a->inode-z->inode>1)return WV64_CORRUPT;
  }
  return WV64_OK;
 }
@@ -203,4 +203,99 @@ enum wv64_status wv64_stat(struct wv64_state *s,struct wv64_workspace *w,const u
  enum it64_status ir=it64_lookup(&s->inode.table,s->inode_epoch,id,w->stream.old_page,&m);
  if(ir!=IT64_OK){s->ready=false;return ir==IT64_IO?WV64_IO:WV64_CORRUPT;}
  *out=m.file;return WV64_OK;
+}
+
+/* Stream existing manifests except the one removed from the namespace.
+ * The previous inode bank continues to protect deleted file extents. */
+struct remove_map {
+ struct it64_state old;
+ struct wv64_workspace *w;
+ uint64_t id,page,ordinal;
+ unsigned at,count;
+ bool removed;
+ enum it64_status error;
+};
+static bool remove_next(void *ctx,uint64_t i,uint8_t *out,size_t limit,size_t *n){
+ struct remove_map *m=ctx;
+ if(i!=m->ordinal++)return false;
+ for(;;){
+  if(m->at==m->count){
+   if(m->page>=m->old.geometry.pages)return false;
+   m->error=it64_page_blobs(&m->old,m->page++,m->w->stream.old_page,m->w->stream.old,&m->count);
+   if(m->error!=IT64_OK)return false;
+   m->at=0;
+  }
+  struct it64_blob blob=m->w->stream.old[m->at++];
+  struct sfs64_map map;
+  if(!sfs64_map_decode(blob.bytes,blob.length,m->old.geometry.capacity,m->old.geometry.data_start,&map))return false;
+  if(map.file.id==m->id){if(m->removed)return false;m->removed=true;continue;}
+  if(blob.length>limit)return false;
+  for(size_t j=0;j<blob.length;j++)out[j]=blob.bytes[j];
+  *n=blob.length;return true;
+ }
+}
+enum wv64_status wv64_edit(struct wv64_state *s,struct wv64_workspace *w,struct ow64_inventory inv[2],
+ const struct dc64_edit *e){
+ if(!s||!s->ready||!s->write||s->busy)return WV64_LOCKED;
+ if(!buffers(s,w,inv)||!e||!sep(e,sizeof *e,s,sizeof *s)||!sep(e,sizeof *e,w,sizeof *w)||
+    !sep(e,sizeof *e,s->block,sizeof *s->block)||!sep(e,sizeof *e,s->nodes,s->slots*sizeof *s->nodes)||
+    !sep(e,sizeof *e,inv,2*sizeof *inv)||
+    !sep(e,sizeof *e,inv[0].entries,inv[0].slots*sizeof *inv[0].entries)||
+    !sep(e,sizeof *e,inv[1].entries,inv[1].slots*sizeof *inv[1].entries)||
+    !sep(e,sizeof *e,inv[0].runs,inv[0].slots*sizeof *inv[0].runs)||
+    !sep(e,sizeof *e,inv[1].runs,inv[1].slots*sizeof *inv[1].runs))return WV64_INVALID;
+ if((e->op!=DC64_INSERT&&e->op!=DC64_DELETE&&e->op!=DC64_RENAME)||
+    (e->op==DC64_INSERT&&e->entry.kind!=SD64_DIRECTORY))return WV64_INVALID;
+ struct dc64_edit edit=*e;
+ bool remove=edit.op==DC64_DELETE&&edit.entry.kind==SD64_FILE;
+ if((edit.op==DC64_INSERT&&s->dir.count>=s->slots)||s->sequence==UINT64_MAX||
+    s->dir_epoch==UINT64_MAX||(remove&&s->inode_epoch==UINT64_MAX))return WV64_FULL;
+ struct geometry g;struct receipt x[2];struct wv64_layout *l=&s->layout;
+ if(!layout(s->block,l,true,&g)||receipts(s->block,l,&g,true,x)!=WV64_OK){s->ready=false;return WV64_RECOVERY;}
+ unsigned last=newest(x);
+ if(!x[last].valid||x[last].seq!=s->sequence||x[last].dir!=s->dir_epoch||
+    x[last].inode!=s->inode_epoch||s->dir.epoch!=s->dir_epoch||
+    s->inode.table.geometry.epoch!=s->inode_epoch){s->ready=false;return WV64_RECOVERY;}
+ struct dc64_state fresh;
+ if(dc64_mount(&fresh,s->block,l->owner,l->dir,l->dir_sectors,&w->writer)!=DC64_OK||
+    fresh.epoch!=s->dir_epoch||fresh.active!=s->dir.active||fresh.count!=s->dir.count||
+    ownership(s,w,inv)!=WV64_OK||validate(s,w)!=WV64_OK){s->ready=false;return WV64_RECOVERY;}
+ /* Verify the inode exists before removing the name. */
+ if(remove){
+  struct sfs64_map map;
+  enum it64_status rc=it64_lookup(&s->inode.table,s->inode_epoch,edit.entry.target,w->stream.old_page,&map);
+  if(rc==IT64_MISSING)return WV64_MISSING;
+  if(rc!=IT64_OK){s->ready=false;return WV64_RECOVERY;}
+ }
+ s->busy=true;s->ready=false;
+ enum ns64_status nr=ns64_apply(&s->dir,&s->proof,&w->writer,&w->reader,&edit);
+ if(nr!=NS64_OK){
+  s->busy=false;
+  if(s->dir.valid&&s->dir.epoch==s->dir_epoch&&s->proof.valid&&
+     nr!=NS64_IO&&nr!=NS64_UNCERTAIN&&nr!=NS64_CORRUPT){
+   s->ready=true;
+   return nr==NS64_FULL?WV64_FULL:nr==NS64_MISSING?WV64_MISSING:
+    nr==NS64_CONFLICT||nr==NS64_NOT_EMPTY?WV64_CONFLICT:WV64_INVALID;
+  }
+  return WV64_RECOVERY;
+ }
+ /* Namespace layer treats exact no-op rename as success without write. */
+ if(s->dir.epoch==s->dir_epoch&&!remove&&edit.op==DC64_RENAME){
+  s->ready=true;s->busy=false;return WV64_OK;
+ }
+ if(remove){
+  struct remove_map m={.old=s->inode.table,.w=w,.id=edit.entry.target,.error=IT64_OK};
+  /* A trailing deleted manifest need not be consumed by the callback.
+   * Prior lookup and the final namespace/table bijection verify removal. */
+  enum ic64_status rc=ic64_publish(&s->inode,&w->stream.commit,s->inode.table.count-1,remove_next,&m);
+  if(rc!=IC64_OK){s->busy=false;return WV64_RECOVERY;}
+ }
+ if(validate(s,w)!=WV64_OK||s->dir.epoch!=s->dir_epoch+1||
+    s->inode.table.geometry.epoch!=s->inode_epoch+(remove?1u:0u)){
+  s->busy=false;return WV64_RECOVERY;
+ }
+ enum wv64_status rc=save(s->block,l,&g,(struct receipt){s->sequence+1,s->dir.epoch,s->inode.table.geometry.epoch,true},last^1u);
+ s->busy=false;
+ if(rc!=WV64_OK)return WV64_RECOVERY;
+ ++s->sequence;s->dir_epoch=s->dir.epoch;s->inode_epoch=s->inode.table.geometry.epoch;s->ready=true;return WV64_OK;
 }

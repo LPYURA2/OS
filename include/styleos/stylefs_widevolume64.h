@@ -4,7 +4,7 @@
 #include <styleos/stylefs_inodestream64.h>
 /* Isolated candidate format with four exclusive, disjoint grant slices.
  * A supervisor owns stable state/inventory/workspaces, serialized calls,
- * and prevents all raw I/O or callback reentry. Only file creation exposed.
+ * and prevents all raw I/O or callback reentry. File creation and checked namespace edits exposed.
  * Mount never formats; explicit host initial checkpoint on empty pair.
  * Read-only recovery selects an exact retained pair. Writable open refuses
  * pending/mismatching roots; explicit reconciliation is a later stage. */
@@ -30,4 +30,8 @@ enum wv64_status wv64_open(struct wv64_state *,struct bs_service *,const struct 
 enum wv64_status wv64_create(struct wv64_state *,struct wv64_workspace *,struct ow64_inventory banks[2],
  const struct sd64_record *,uint64_t bytes,is64_source,void *);
 enum wv64_status wv64_stat(struct wv64_state *,struct wv64_workspace *,const uint8_t *,size_t,struct sfs64_file *);
+/* Checked mkdir, move/rename, and delete (empty directories or files).
+ * Exact expected ID/kind/key; no recursive removal or overwrite.
+ * Object IDs are supplied by trusted supervisor, not user capabilities. */
+enum wv64_status wv64_edit(struct wv64_state *,struct wv64_workspace *,struct ow64_inventory banks[2],const struct dc64_edit *);
 #endif
