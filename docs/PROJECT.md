@@ -1,3 +1,6 @@
+## 2026-11-26 — Processes phase 01 (candidate)
+Owner proceeds on bounded working prototype, not full KFA or 1.0. Trusted live process snapshot candidate; actual guest viewer and full application remain open. See [phase](architecture/PROCESS_LIVE_SNAPSHOT_01.md), [handoff](NEXT_CHAT_PROCESSES_01.md). Deep Drop remains mandatory.
+
 ## Stage 863 — common startup and ordinary Desktop integration candidate
 
 Accepted S862 `7b1c5d1187903dfd78f6bbf98f378aca42687b24`; all 16 CI SUCCESS, full 219 PASS / 5 historical SKIPPED / 0 FAIL, exact artifacts and two-round recycling replay verified. See [handoff](NEXT_CHAT_863.md). New ordinary cold-start path shares existing S858 runtime service bootstrap; hardware integration, normal guest and KFA acceptance pending. Style Kernel 1.0 only after full KFA acceptance.

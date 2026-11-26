@@ -47,4 +47,10 @@ enum pa_status pa_read(const struct pr_table *processes,
                        const struct pa_request *request,
                        struct pa_row *rows, size_t capacity,
                        struct pa_reply *reply);
+/* Trusted supervisor only: no CPL3 entry or caller-provided capability.
+ * Must be invoked at a serialized scheduler boundary with kernel-owned buffers.
+ * Generic snapshots do not claim measurement provenance. */
+enum pa_status pa_read_supervisor(const struct pr_table *,const struct ws_service *,
+                                  const struct pa_request *,struct pa_row *,size_t,
+                                  struct pa_reply *);
 #endif

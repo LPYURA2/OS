@@ -65,6 +65,15 @@ enum pa_status dpr_snapshot(struct dpr_service *s, uint32_t caller,
                    query, rows, capacity, reply);
 }
 
+enum pa_status dpr_supervisor_snapshot(const struct dpr_service *s,
+                                       const struct pa_request *q,
+                                       struct pa_row *rows,size_t capacity,
+                                       struct pa_reply *reply)
+{
+    if (!s || !s->started || s->dispatcher.current != -1) return PA_DENIED;
+    return pa_read_supervisor(s->dispatcher.registry,s->windows,q,rows,capacity,reply);
+}
+
 enum dpr_status dpr_global_start(uint64_t safe_root)
 {
     return dpr_start(&boot_service, pr_global(), ws_global(), safe_root);

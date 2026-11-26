@@ -10,10 +10,8 @@ static int request_valid(const struct pa_request *r)
     return 0;
 }
 
-enum pa_status pa_read(const struct pr_table *processes,
+enum pa_status pa_read_supervisor(const struct pr_table *processes,
                        const struct ws_service *windows,
-                       uint32_t kernel_authenticated_pid,
-                       bool kernel_inspect_granted,
                        const struct pa_request *request,
                        struct pa_row *rows, size_t capacity,
                        struct pa_reply *reply)
@@ -21,9 +19,6 @@ enum pa_status pa_read(const struct pr_table *processes,
     if (!processes || !windows || !request || !reply ||
         capacity > PA_MAX_ROWS || (capacity && !rows))
         return PA_BAD_REQUEST;
-    /* Check authorization BEFORE disclosing row counts or modifying buffers. */
-    if (!kernel_inspect_granted ||
-        !pr_is_live(processes, kernel_authenticated_pid)) return PA_DENIED;
     if (!request_valid(request)) return PA_BAD_REQUEST;
 
     struct pi_row scratch[PA_MAX_ROWS];
@@ -63,4 +58,20 @@ enum pa_status pa_read(const struct pr_table *processes,
         .measurement_flags = 0, /* NO fabricated CPU% or RAM confidence */
     };
     return view.matched > capacity ? PA_TRUNCATED : PA_OK;
+}
+
+/* Existing authenticated kernel broker contract remains unchanged. */
+enum pa_status pa_read(const struct pr_table *processes,
+                       const struct ws_service *windows,
+                       uint32_t kernel_authenticated_pid,
+                       bool kernel_inspect_granted,
+                       const struct pa_request *request,
+                       struct pa_row *rows, size_t capacity,
+                       struct pa_reply *reply)
+{
+    if (!processes || !windows || !request || !reply ||
+        capacity > PA_MAX_ROWS || (capacity && !rows)) return PA_BAD_REQUEST;
+    if (!kernel_inspect_granted ||
+        !pr_is_live(processes,kernel_authenticated_pid)) return PA_DENIED;
+    return pa_read_supervisor(processes,windows,request,rows,capacity,reply);
 }

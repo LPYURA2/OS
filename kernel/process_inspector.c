@@ -31,13 +31,23 @@ enum pi_status pi_collect(const struct pr_table *processes,
     result.cpu_percentage_available = false;
     size_t written = 0;
     for (unsigned group = PI_APPLICATIONS; group <= PI_SYSTEM; ++group) {
-        /* PID order is insertion order since IDs never recycle. */
-        for (unsigned i = 0; i < PR_MAX_PROCESSES; ++i) {
-            const struct pr_entry *p = &processes->processes[i];
-            if (!p->pid || !live(p->state)) continue;
-            const unsigned windows_for_pid = window_count(windows, p->pid);
-            const enum pi_group category = group_for(p, windows_for_pid);
-            if ((unsigned)category != group) continue;
+        /* Reaping reuses slots, not PIDs. Sort by real PID even for truncated
+         * results. The fixed registry bounds the selection scan. */
+        uint32_t after = 0;
+        for (unsigned step = 0; step < PR_MAX_PROCESSES; ++step) {
+            const struct pr_entry *p = 0;
+            unsigned windows_for_pid = 0;
+            for (unsigned i = 0; i < PR_MAX_PROCESSES; ++i) {
+                const struct pr_entry *candidate = &processes->processes[i];
+                if (candidate->pid <= after || !live(candidate->state) ||
+                    (p && candidate->pid >= p->pid)) continue;
+                const unsigned n = window_count(windows, candidate->pid);
+                if ((unsigned)group_for(candidate,n) != group) continue;
+                p = candidate; windows_for_pid = n;
+            }
+            if (!p) break;
+            after = p->pid;
+            const enum pi_group category = (enum pi_group)group;
             ++result.total;
             if (category == PI_APPLICATIONS) ++result.applications;
             else if (category == PI_BACKGROUND) ++result.background;

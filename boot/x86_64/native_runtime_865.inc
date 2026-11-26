@@ -83,6 +83,28 @@ enum ps_status s865_native_stop(uint32_t pid,uint64_t generation,bool authorized
  return s865_executor_stop(id,pid,generation,native_roots[id].built.root,
                            authorized,native_audit,native_release,0);
 }
+enum pa_status s865_native_snapshot(const struct pa_request *q,struct pa_row *rows,
+                                    size_t capacity,struct pa_reply *reply){
+ if(!native_ready||!s865_executor_idle()||!native_audit(0)||
+    runtime860->dispatcher.current!=-1)return PA_DENIED;
+ /* Verify provenance of every live row before publishing measurement validity.
+  * No fake system tasks or CPU percentages. Reject unaccounted registry rows. */
+ const struct pr_table *p=runtime860->dispatcher.registry;
+ if(!p||p!=pr_global())return PA_DENIED;
+ for(unsigned i=0;i<PR_MAX_PROCESSES;i++){
+  const struct pr_entry *e=&p->processes[i];
+  if(e->state!=PR_READY&&e->state!=PR_RUNNING&&e->state!=PR_WAITING)continue;
+  if(e->type!=PR_NATIVE_USER||e->state==PR_RUNNING||e->resident_bytes!=3*4096u)return PA_DENIED;
+  unsigned id=0;
+  while(id<S846_ROOT_COUNT&&bank862.slots[id].pid!=e->pid)++id;
+  if(id==S846_ROOT_COUNT||bank862.slots[id].handle!=e->scheduler_handle||
+     native_leases[id].generation!=e->scheduler_handle||native_leases[id].pages!=3||
+     native_roots[id].built.root!=e->page_root||!s844_lease_live(native_arena,native_leases[id]))return PA_DENIED;
+ }
+ enum pa_status r=dpr_supervisor_snapshot(runtime860,q,rows,capacity,reply);
+ if(r==PA_OK||r==PA_TRUNCATED)reply->measurement_flags=PA_MEASURE_CPU_TICKS|PA_MEASURE_MEMORY_BYTES;
+ return r;
+}
 void s865_native_pump(void){
  if(!native_ready)fail("native-runtime-not-ready");
  if(!pr_snapshot(pr_global(),0,0,true))return;

@@ -44,6 +44,11 @@ enum pa_status dpr_snapshot(struct dpr_service *service,
                             struct pa_row *rows, size_t capacity,
                             struct pa_reply *reply);
 
+/* Trusted kernel supervisor read at an idle dispatcher boundary. Architecture
+ * must prove safe root/interrupt serialization; no user entry or permission grant. */
+enum pa_status dpr_supervisor_snapshot(const struct dpr_service *,const struct pa_request *,
+                                       struct pa_row *,size_t,struct pa_reply *);
+
 /* Ordinary desktop boot-only singleton. Never reset while processes are alive. */
 enum dpr_status dpr_global_start(uint64_t safe_root);
 const struct dpr_service *dpr_global_state(void);
