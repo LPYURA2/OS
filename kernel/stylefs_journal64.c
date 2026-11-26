@@ -82,6 +82,8 @@ static bool grant(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t ca
     }
     return false;
 }
+bool sfs64_journal_ready(const struct sfs64_journal *j,bool write)
+{return j&&j->valid&&j->active<2&&grant(j->block,j->owner,j->token,j->capacity,write);}
 static enum sj_status put(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t lba,const uint8_t p[512])
 {
     uint8_t check[512];
@@ -93,7 +95,7 @@ enum sj_status sfs64_journal_mount(struct sfs64_journal *j,struct bs_service *b,
                                   uint64_t owner,uint64_t token,uint64_t cap,uint64_t start)
 {
     if(!j)return SJ_INVALID;
-    j->valid=false;
+    j->valid=false;j->writer=0;
     if(!geometry(cap,start)||!grant(b,owner,token,cap,false))return SJ_STALE;
     uint8_t p[512],expected[512];super(expected,cap,start);
     if(bs_read_sector(b,owner,token,0,p)!=BS_OK)return SJ_IO;
@@ -117,7 +119,7 @@ enum sj_status sfs64_journal_mount(struct sfs64_journal *j,struct bs_service *b,
 }
 enum sj_status sfs64_journal_publish(struct sfs64_journal *j,const uint8_t *p,size_t n)
 {
-    if(!j||!j->valid||j->active>1)return SJ_STALE;
+    if(!j||!j->valid||j->active>1||j->writer)return SJ_STALE;
     if(!grant(j->block,j->owner,j->token,j->capacity,true)){j->valid=false;return SJ_STALE;}
     if(n>SFS64_BANK_BYTES)return SJ_FULL;
     if(!sfs64_snapshot_valid(p,n,j->capacity,j->data_start))return SJ_INVALID;

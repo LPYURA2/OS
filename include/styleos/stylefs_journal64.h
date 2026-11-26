@@ -19,8 +19,10 @@ struct sfs64_journal {
     size_t length[2];
     unsigned active;
     bool valid;
+    const void *writer; /* trusted stream transaction, never a user pointer */
     uint8_t payload[2][SFS64_BANK_BYTES];
 };
+bool sfs64_journal_ready(const struct sfs64_journal *,bool write);
 bool sfs64_snapshot_valid(const uint8_t *,size_t,uint64_t capacity,uint64_t data_start);
 /* Read only. Never initialize on error. On any transport error refuse
  * the mount rather than mistaking an unavailable bank for corruption. */

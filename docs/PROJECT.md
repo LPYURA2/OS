@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 14 integrated wide stream candidate
+[Wide stream transaction](architecture/STYLEFS_WIDE_STREAM_14.md), [handoff](NEXT_CHAT_STYLEFS_14.md). 13 host and early guest PASS at work start, final CI pending; 14 CI pending. Existing v1/v2 unchanged.
+
 ## 2026-11-26 — StyleFS 13 wide journal candidate
 Stage 12 CI 45890429372 3/3 SUCCESS. [Wide metadata journal](architecture/STYLEFS_WIDE_JOURNAL_13.md), [handoff](NEXT_CHAT_STYLEFS_13.md). Owner update/rollback requirement recorded in STYLEOS_OWNER_REQUIREMENTS.md and POST_KERNEL_ROADMAP.md. CI pending.
 
