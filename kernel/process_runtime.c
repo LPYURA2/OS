@@ -75,6 +75,7 @@ enum pr_status pr_admit(struct pr_table *t, const struct pr_admission *s,
             return PR_CONFLICT;
     }
     if (!free_slot) return PR_FULL;
+    if (t->change_serial == UINT32_MAX) return PR_EXHAUSTED;
     zero(free_slot, sizeof(*free_slot));
     free_slot->pid = t->next_pid++;
     free_slot->parent_pid = s->parent_pid;
@@ -101,6 +102,7 @@ enum pr_status pr_transition(struct pr_table *t, uint32_t pid,
     if (next != PR_RUNNING && next != PR_READY && next != PR_WAITING &&
         next != PR_EXITED && next != PR_FAULTED) return PR_INVALID_STATE;
     if (next == PR_RUNNING && e->state == PR_RUNNING) return PR_INVALID_STATE;
+    if (t->change_serial == UINT32_MAX) return PR_EXHAUSTED;
     e->state = next;
     ++t->change_serial;
     return PR_OK;
@@ -112,7 +114,8 @@ enum pr_status pr_account(struct pr_table *t, uint32_t pid,
     if (!e) return PR_NOT_FOUND;
     if (!handle || handle != e->scheduler_handle) return PR_BAD_EVIDENCE;
     if (!live(e->state)) return PR_INVALID_STATE;
-    if (ticks > UINT64_MAX - e->cpu_ticks) return PR_EXHAUSTED;
+    if (ticks > UINT64_MAX - e->cpu_ticks ||
+        t->change_serial == UINT32_MAX) return PR_EXHAUSTED;
     e->cpu_ticks += ticks;
     e->resident_bytes = memory;
     ++t->change_serial;
@@ -125,6 +128,7 @@ enum pr_status pr_reap(struct pr_table *t, uint32_t pid,
     if (!e) return PR_NOT_FOUND;
     if (!handle || handle != e->scheduler_handle) return PR_BAD_EVIDENCE;
     if (e->state != PR_EXITED && e->state != PR_FAULTED) return PR_INVALID_STATE;
+    if (t->change_serial == UINT32_MAX) return PR_EXHAUSTED;
     for (unsigned i = 0; i < PR_MAX_PROCESSES; ++i)
         if (t->processes[i].state != PR_UNUSED &&
             t->processes[i].parent_pid == pid)

@@ -5,6 +5,43 @@
 #include <string.h>
 static struct pr_table table;
 static struct pr_entry list[PR_MAX_PROCESSES];
+/* Each mutation must succeed at MAX-1, then refuse at MAX without
+ * modifying any registry byte, output PID, or child parent link. */
+static void serial_boundary(void)
+{
+    struct pr_table t, before;
+    uint32_t parent=0, child=0, output=0xdeadbeef;
+    struct pr_admission a={PR_NATIVE_USER,0,1,0x2000,4096,"parent"};
+    pr_init(&t);
+    t.change_serial=UINT32_MAX-1;
+    assert(pr_admit(&t,&a,&parent)==PR_OK && t.change_serial==UINT32_MAX);
+    a.parent_pid=parent; a.scheduler_handle=2; a.page_root=0x3000; a.label="child";
+    memcpy(&before,&t,sizeof t);
+    assert(pr_admit(&t,&a,&output)==PR_EXHAUSTED && output==0xdeadbeef);
+    assert(memcmp(&before,&t,sizeof t)==0);
+    t.change_serial=UINT32_MAX-1;
+    assert(pr_transition(&t,parent,1,PR_RUNNING)==PR_OK && t.change_serial==UINT32_MAX);
+    memcpy(&before,&t,sizeof t);
+    assert(pr_transition(&t,parent,1,PR_WAITING)==PR_EXHAUSTED);
+    assert(memcmp(&before,&t,sizeof t)==0);
+    t.change_serial=UINT32_MAX-1;
+    assert(pr_account(&t,parent,1,7,8192)==PR_OK && t.change_serial==UINT32_MAX);
+    memcpy(&before,&t,sizeof t);
+    assert(pr_account(&t,parent,1,1,4096)==PR_EXHAUSTED);
+    assert(memcmp(&before,&t,sizeof t)==0);
+    t.change_serial=0;
+    assert(pr_admit(&t,&a,&child)==PR_OK);
+    assert(pr_transition(&t,parent,1,PR_EXITED)==PR_OK);
+    t.change_serial=UINT32_MAX;
+    memcpy(&before,&t,sizeof t);
+    assert(pr_reap(&t,parent,1)==PR_EXHAUSTED);
+    assert(memcmp(&before,&t,sizeof t)==0 && pr_find(&t,child)->parent_pid==parent);
+    t.change_serial=UINT32_MAX-1;
+    assert(pr_reap(&t,parent,1)==PR_OK && t.change_serial==UINT32_MAX);
+    assert(!pr_find(&t,parent) && pr_find(&t,child)->parent_pid==0);
+    assert(pr_transition(&t,child,2,PR_RUNNING)==PR_EXHAUSTED);
+    puts("PROCESS SERIAL BOUNDARY PASS: four mutators, no wrap or partial mutation");
+}
 int main(void)
 {
     assert(pr_global() == pr_global());
@@ -57,6 +94,7 @@ int main(void)
     task.scheduler_handle=88;
     table.next_pid=UINT32_MAX;
     assert(pr_admit(&table,&task,&new_pid)==PR_EXHAUSTED);
+    serial_boundary();
     puts("PROCESS REGISTRY PASS: real-context admission, kernel/user, lifecycle, metrics, no fake sessions");
     return 0;
 }

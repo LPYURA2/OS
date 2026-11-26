@@ -381,6 +381,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
       - name: KFA-05 actual LAPIC preemption of every one of 32 external processes
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-timer-load --output build/kfa-native-timer
+      - name: Audit actual malformed user RSP containment, other processes must survive
+        if: always()
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-bad-rsp --output build/kfa-native-bad-rsp
       - name: KFA-10 extended actual ordinary ISO shell regression
         if: always()
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --output build/kfa-native-desktop
@@ -390,6 +393,7 @@ jobs:
           name: styleos-kfa-native-completion
           path: |
             build/kfa-native-timer/
+            build/kfa-native-bad-rsp/
             build/kfa-native-desktop/
           if-no-files-found: error
 

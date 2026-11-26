@@ -4,7 +4,8 @@ import hashlib,re,struct,time
 from irq_trace_accept_859 import HEADER
 from runtime_mixed_863_verify import row
 
-def provision_catalog(path,*,timer_load=False):
+def provision_catalog(path,*,timer_load=False,bad_rsp=False):
+    if timer_load and bad_rsp:raise ValueError("separate audit workload")
     catalog=bytearray(2048)
     struct.pack_into('<8sII',catalog,0,b'STYLNAT1',1,32)
     with path.open('r+b') as disk:
@@ -16,7 +17,11 @@ def provision_catalog(path,*,timer_load=False):
             # All 32 residents must suffer real LAPIC preemption before yield.
             if timer_load:code+=b'\xb9'+struct.pack('<I',100_000_000)+b'\xff\xc9\x75\xfc'
             code+=b'\xb8\x01\x00\x00\x00\xcd\x80'
-            code+=b'\x0f\x0b' if i%8==7 else b'\xb8\x02\x00\x00\x00\xcd\x80\x0f\x0b'
+            if bad_rsp and i==0:
+                # After one normal yield, move RSP outside its user stack and
+                # execute UD2. No kernel-side injection or altered trap policy.
+                code+=b'\xbc'+struct.pack('<I',0x12000000)+b'\x0f\x0b'
+            else:code+=b'\x0f\x0b' if i%8==7 else b'\xb8\x02\x00\x00\x00\xcd\x80\x0f\x0b'
             blob=bytearray(4096)+code
             blob[:7]=b'\x7fELF\x02\x01\x01'
             struct.pack_into('<HHIQQQIHHHHHH',blob,16,2,62,1,0x10000000,64,0,0,64,56,1,0,0,0)
@@ -38,7 +43,7 @@ def wait_native_empty(proc,serial,seconds):
         time.sleep(.03)
     raise RuntimeError('native completion timeout')
 
-def verify_catalog(lines,trace,obs,*,timer_load=False):
+def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False):
     root=obs['active']['root']
     def records(tag,keys):
         return [row(x,tag,keys) for x in lines if x.startswith(tag+b' ')]
@@ -68,7 +73,7 @@ def verify_catalog(lines,trace,obs,*,timer_load=False):
     per=[[] for _ in roots]
     for event in events:
         i=event['slot']
-        if not 0<=i<32 or event['pid']!=i+1 or event['root']!=roots[i] or event['sp']!=0x11001000 or event['flags']&0x202!=0x202 or event['error']:raise ValueError('native event identity')
+        if not 0<=i<32 or event['pid']!=i+1 or event['root']!=roots[i] or event['sp']!=(0x12000000 if bad_rsp and i==0 and event['vector']==6 else 0x11001000) or event['flags']&0x202!=0x202 or event['error']:raise ValueError('native event identity')
         expected_state=1 if event['vector']==0x50 or event['vector']==128 and event['rax']==1 else 4 if event['vector']==128 and event['rax']==2 else 5 if event['vector']==6 else -1
         if event['state']!=expected_state:raise ValueError('native lifecycle state')
         per[i].append(event)
@@ -85,7 +90,11 @@ def verify_catalog(lines,trace,obs,*,timer_load=False):
         actual=[(x['vector'],x['rip'],x['rax']) for x in seq if x['vector']!=0x50]
         off=9 if timer_load else 0
         expected=[(128,0x1000000d+off,1),(6,0x1000000d+off,0) if i%8==7 else (128,0x10000014+off,2)]
+        if bad_rsp and i==0:expected=[(128,0x1000000d,1),(6,0x10000012,0)]
         if actual!=expected:raise ValueError('native yield/terminal '+str((i,actual)))
+    if bad_rsp:
+        bad_index=next(j for j,x in enumerate(events) if x['slot']==0 and x['vector']==6)
+        if not any(x['slot']!=0 and x['state']==4 for x in events[bad_index+1:]):raise ValueError('no surviving process after malformed RSP')
     retired=records(b'STYLEOS S865 FX-RETIRE',('id','root','gen'))
     if sorted((x['id'],x['root'],x['gen']) for x in retired)!=[(i,roots[i],i+1) for i in range(32)]:raise ValueError('per-owner retirement')
     # Independent hardware trace: match every user event, never accept
