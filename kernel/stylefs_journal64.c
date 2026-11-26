@@ -117,6 +117,17 @@ enum sj_status sfs64_journal_mount(struct sfs64_journal *j,struct bs_service *b,
     j->block=b;j->owner=owner;j->token=token;j->capacity=cap;j->data_start=start;j->valid=true;
     return SJ_OK;
 }
+enum sj_status sfs64_journal_mount_generation(struct sfs64_journal *j,struct bs_service *b,
+ uint64_t owner,uint64_t token,uint64_t cap,uint64_t start,uint64_t wanted){
+ if(!j)return SJ_INVALID;
+ j->valid=false;
+ if(!wanted||!grant(b,owner,token,cap,false))return SJ_STALE;
+ for(unsigned i=0;i<BS_GRANTS;i++)if(b->grants[i].token==token&&(b->grants[i].rights&BS_WRITE))return SJ_INVALID;
+ enum sj_status rc=sfs64_journal_mount(j,b,owner,token,cap,start);
+ if(rc!=SJ_OK)return rc;
+ for(unsigned bank=0;bank<2;bank++)if(j->generation[bank]==wanted){j->active=bank;return SJ_OK;}
+ j->valid=false;return SJ_CORRUPT;
+}
 enum sj_status sfs64_journal_publish(struct sfs64_journal *j,const uint8_t *p,size_t n)
 {
     if(!j||!j->valid||j->active>1||j->writer)return SJ_STALE;

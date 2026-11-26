@@ -21,6 +21,9 @@ typedef bool (*dc64_next)(void *,uint64_t,struct sd64_record *);
  * deterministic child layout. Read failure is not evidence of corruption. */
 enum dc64_status dc64_mount(struct dc64_state *,struct bs_service *,uint64_t owner,
                              uint64_t token,uint64_t sectors,struct dc64_workspace *);
+/* Exact retained epoch, read-only grant required; never writable rollback. */
+enum dc64_status dc64_mount_epoch(struct dc64_state *,struct bs_service *,uint64_t owner,
+ uint64_t token,uint64_t sectors,uint64_t epoch,struct dc64_workspace *);
 /* Blank header initialization only; never erase or autoformat on mount. */
 #ifdef STYLEFS_HOST_FORMAT
 enum dc64_status dc64_provision(struct bs_service *,uint64_t owner,uint64_t token,uint64_t sectors);

@@ -28,6 +28,9 @@ bool sfs64_snapshot_valid(const uint8_t *,size_t,uint64_t capacity,uint64_t data
  * the mount rather than mistaking an unavailable bank for corruption. */
 enum sj_status sfs64_journal_mount(struct sfs64_journal *,struct bs_service *,
                                    uint64_t owner,uint64_t token,uint64_t capacity,uint64_t data_start);
+/* Exact retained generation, read-only grant required. */
+enum sj_status sfs64_journal_mount_generation(struct sfs64_journal *,struct bs_service *,
+ uint64_t owner,uint64_t token,uint64_t capacity,uint64_t data_start,uint64_t generation);
 /* New payload must be a disjoint immutable trusted span. Write inactive
  * payload and confirm each sector, then durable header. Failure invalidates
  * the live journal. Reopen after recovery before deciding what committed. */

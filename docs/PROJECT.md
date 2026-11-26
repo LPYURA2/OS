@@ -1,3 +1,6 @@
+## StyleFS 27 — exact pair checkpoint candidate
+26 host PASS; new explicit checkpoint receipts and read-only exact recovery, CI pending. [Handoff](NEXT_CHAT_STYLEFS_27.md). [Legal gate](LEGAL_RELEASE_GATE.md) preserved.
+
 ## StyleFS 26 — ordered durable file binding candidate
 25 host PASS, full regression pending. [Handoff](NEXT_CHAT_STYLEFS_26.md). File data before namespace publication, orphan retention, cross-journal consistency check. Legal gate unchanged.
 

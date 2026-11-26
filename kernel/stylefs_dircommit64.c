@@ -119,6 +119,26 @@ enum dc64_status dc64_mount(struct dc64_state *s,struct bs_service *b,uint64_t o
  }
  return s->valid?DC64_OK:DC64_CORRUPT;
 }
+enum dc64_status dc64_mount_epoch(struct dc64_state *s,struct bs_service *b,uint64_t owner,
+ uint64_t token,uint64_t n,uint64_t wanted,struct dc64_workspace *w){
+ if(!separate(s,sizeof *s,w,sizeof *w)||!separate(s,sizeof *s,b,sizeof *b)||
+    !separate(w,sizeof *w,b,sizeof *b))return DC64_INVALID;
+ *s=(struct dc64_state){0};
+ if(!wanted||!grant(b,owner,token,n,false))return DC64_INVALID;
+ for(unsigned i=0;i<BS_GRANTS;i++)if(b->grants[i].token==token&&(b->grants[i].rights&BS_WRITE))return DC64_INVALID;
+ s->block=b;s->owner=owner;s->token=token;s->sectors=n;
+ for(unsigned bank=0;bank<2;bank++){
+  uint8_t h[512];uint64_t epoch,count;struct plan p;
+  if(bs_read_sector(b,owner,token,bank,h)!=BS_OK){s->valid=false;return DC64_IO;}
+  if(!decode_header(h,n,bank,&epoch,&count)||epoch!=wanted||!plan(count,bank_size(n)/8,&p))continue;
+  enum dc64_status rc=validate(s,w,bank,epoch,&p);
+  if(rc==DC64_IO){s->valid=false;return rc;}
+  if(rc!=DC64_OK)continue;
+  if(s->valid){s->valid=false;return DC64_CORRUPT;}
+  select_bank(s,bank,epoch,count,&p);
+ }
+ return s->valid?DC64_OK:DC64_CORRUPT;
+}
 #ifdef STYLEFS_HOST_FORMAT
 enum dc64_status dc64_provision(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t n){
  if(!grant(b,owner,token,n,true))return DC64_INVALID;
