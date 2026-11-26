@@ -4,13 +4,13 @@ from runtime_entry_858_verify import verify as prior, POLICY as RUNTIME
 POLICY=b'STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny'
 ARENA_POLICY=b'STYLEOS S844 POLICY bounded-efi-arena=yes candidate-grants=no reclaim=no dma-grants=no production-cr3=deny'
 
-def verify(raw,rc,rva,reference,*,cold=False,host_quit=False,capacity=16):
+def verify(raw,rc,rva,reference,*,cold=False,host_quit=False,capacity=16,clean_boot=False):
     if capacity!=16 and not (cold and capacity==96):return False,'unsupported arena capacity'
     try:
         lines=raw.splitlines()
         final=[x for x in lines if x.startswith(b'STYLEOS S858 ARENA')]
         if len(final)!=2 or final[-1]!=POLICY:raise ValueError('arena final records')
-        ok,obs=prior(b'\n'.join(x for x in lines if not x.startswith(b'STYLEOS S858 ARENA'))+b'\n',rc,rva,reference,host_quit=host_quit)
+        ok,obs=prior(b'\n'.join(x for x in lines if not x.startswith(b'STYLEOS S858 ARENA'))+b'\n',rc,rva,reference,host_quit=host_quit,clean_boot=clean_boot)
         if not ok:raise ValueError(obs)
         rec=[x for x in lines if x.startswith(b'STYLEOS S844 ')]
         if len(rec)!=(2 if cold else 4) or (not cold and rec[-1]!=ARENA_POLICY):raise ValueError('S844 records')

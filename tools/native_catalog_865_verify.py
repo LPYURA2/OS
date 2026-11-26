@@ -67,10 +67,14 @@ def verify_catalog(lines,trace,obs):
             return int(values[0],16)
         cr3=one(r'\bCR3=([0-9a-fA-F]+)\b')
         if not started:
-            if cr3!=root:continue
-            if tuple(int(x,16) for x in m.groups()[1:5])!=(3,0,1,0):raise ValueError('native safe breakpoint')
-            if int(m[7],16)!=obs['bp']['rip']-1:raise ValueError('native breakpoint site')
-            started=True;continue
+            if obs.get('boot_probes') is False:
+                if cr3 not in [root,*roots]:continue
+                started=True
+            else:
+                if cr3!=root:continue
+                if tuple(int(x,16) for x in m.groups()[1:5])!=(3,0,1,0):raise ValueError('native safe breakpoint')
+                if int(m[7],16)!=obs['bp']['rip']-1:raise ValueError('native breakpoint site')
+                started=True;continue
         vec,err,soft,cpl,cs,rip,pc,ss,sp=map(lambda x:int(x,16),m.groups()[1:])
         if cpl==0:
             if drain_index>=len(drains):raise ValueError('unaccounted kernel interrupt')

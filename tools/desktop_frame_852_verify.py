@@ -1,14 +1,14 @@
 """Verify full real framebuffer readback after S851 transition."""
 import re
-from desktop_switch_851_verify import verify as prior, POLICY as SWITCH
+from desktop_switch_851_verify import verify as prior, POLICY as SWITCH, CLEAN_POLICY
 POLICY=b'STYLEOS S852 POLICY first-frame=yes input=no storage=no app-admission=no production-cr3=deny'
 
-def verify(raw,rc,rva,reference,*,host_quit=False):
+def verify(raw,rc,rva,reference,*,host_quit=False,clean_boot=False):
     try:
-        ok,obs=prior(raw,rc,rva,host_quit=host_quit)
+        ok,obs=prior(raw,rc,rva,host_quit=host_quit,clean_boot=clean_boot)
         if not ok:raise ValueError(obs)
         lines=raw.splitlines();records=[x for x in lines if x.startswith(b'STYLEOS S852 ')]
-        if len(records)!=2 or records[1]!=POLICY or lines.index(SWITCH)>=lines.index(records[0]) or lines.index(records[0])>=lines.index(records[1]):raise ValueError('852 record order/policy')
+        if len(records)!=2 or records[1]!=POLICY or lines.index(CLEAN_POLICY if clean_boot else SWITCH)>=lines.index(records[0]) or lines.index(records[0])>=lines.index(records[1]):raise ValueError('852 record order/policy')
         if any(b' FAIL ' in x for x in lines):raise ValueError('guest failure')
         keys=('root','width','height','writes','fnv','first','last')
         match=re.fullmatch(b'STYLEOS S852 FRAME '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in keys),records[0])

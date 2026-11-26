@@ -1,16 +1,16 @@
 """Validate real S851/S852 evidence plus service bootstrap under owned CR3."""
 import re
 from desktop_frame_852_verify import verify as prior, POLICY as FRAME
-from desktop_switch_851_verify import POLICY as SWITCH
+from desktop_switch_851_verify import POLICY as SWITCH, CLEAN_POLICY
 POLICY=b'STYLEOS S858 POLICY runtime-services=yes empty-registry=yes frame=yes irq=no app-admission=no storage=no production-cr3=deny'
 KEYS=('root','old','gdt','idt','tr','cs','rsp','cr0','cr4','efer','flags','gdt-limit','idt-limit','safe-root','processes','windows','session-next','selected','ports')
-def verify(raw,rc,rva,reference,*,host_quit=False):
+def verify(raw,rc,rva,reference,*,host_quit=False,clean_boot=False):
     try:
-        ok,data=prior(raw,rc,rva,reference,host_quit=host_quit)
+        ok,data=prior(raw,rc,rva,reference,host_quit=host_quit,clean_boot=clean_boot)
         if not ok:raise ValueError(data)
         lines=raw.splitlines();records=[x for x in lines if x.startswith(b'STYLEOS S858 ')]
         if len(records)!=2 or records[1]!=POLICY or any(b' FAIL ' in x for x in lines):raise ValueError('858 record/policy')
-        if not lines.index(SWITCH)<lines.index(records[0])<lines.index(next(x for x in lines if x.startswith(b'STYLEOS S852 FRAME ')))<lines.index(FRAME)<lines.index(POLICY):raise ValueError('858 order')
+        if not lines.index(CLEAN_POLICY if clean_boot else SWITCH)<lines.index(records[0])<lines.index(next(x for x in lines if x.startswith(b'STYLEOS S852 FRAME ')))<lines.index(FRAME)<lines.index(POLICY):raise ValueError('858 order')
         m=re.fullmatch(b'STYLEOS S858 RUNTIME '+b' '.join(k.encode()+b'=0x([0-9a-f]{16})' for k in KEYS),records[0])
         if not m:raise ValueError('858 schema')
         v=dict(zip(KEYS,(int(x,16) for x in m.groups())))

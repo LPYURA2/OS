@@ -1,7 +1,7 @@
 /* Acceptance-only external launch provider; never compiled into ordinary image. */
 #include <styleos/native_runtime_865.h>
 #include <styleos/arch.h>
-#include "native_executor_865.h"
+#include "../../boot/x86_64/native_executor_865.h"
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
 #error catalog driver requires explicit acceptance profile
 #endif

@@ -263,8 +263,8 @@ def main():
         # The shell-only image must not require a linked child workload site.
         # Bind the real boot BP and demand absence of the child INT3 label.
         map_text=mp.read_text()
-        site=bp_site(efi.read_bytes(),map_text)
-        forbidden={'s861_bp_return','s863_live_run','s863_request_tasks','s863_shell_pump',
+        site={'rva':None}
+        forbidden={'s851_bp_return','s851_bp','s851_frame','s851_frame_address','s861_bp_return','s863_live_run','s863_request_tasks','s863_shell_pump',
                    's848_trial','s860_reap','s849_guest_init','s865_fx_guest_test_stale',
                    's865_test_force_timer','s865_test_observe_trap','s865_fixture_source','s865_fixture_observe',
                    's865_fixture_stage','s865_fixture_stage_one','s865_fixture_request_stop','s865_fixture_force_timer'}
@@ -343,6 +343,7 @@ def main():
                     o={}
                     for key,method,kw in [('status','query-status',{}),('pci','query-pci',{}),('blocks','query-block',{}),('nodes','query-named-block-nodes',{}),('graph','x-debug-query-block-graph',{}),('qtree','human-monitor-command',{'command-line':'info qtree'}),('mtree','human-monitor-command',{'command-line':'info mtree -f -o'}),('unit','qom-get',{'path':'/machine/peripheral/'+DEVICE,'property':'unit'}),('stats','query-blockstats',{'query-nodes':False})]:
                         o[key]=d.call(method,**kw)
+                    if args.owned_shell and tag=='gate':o['registers']=d.call('human-monitor-command',**{'command-line':'info registers'})
                     (folder/(tag+'.json')).write_text(json.dumps(o,indent=2))
                     if pre:scope_fixture(o,base,top);verify_legacy_io(o['mtree'])
                     if args.iso:
@@ -484,14 +485,30 @@ def main():
         data=trace.read_bytes()
         if args.owned_shell:
             from runtime_mixed_863_verify import row
-            ok,obs=cold_prior(prefix,rc,site['rva'],ref,cold=True,host_quit=True,capacity=96)
+            ok,obs=cold_prior(prefix,rc,site['rva'],ref,cold=True,host_quit=True,capacity=96,clean_boot=True)
             if not ok:raise ValueError('owned shell root '+str(obs))
             root=obs['active']['root']
+            regs=json.loads((folder/'gate.json').read_text())['registers']
+            def live_reg(pattern):
+                found=re.findall(pattern,regs,re.M)
+                if len(found)!=1:raise ValueError('live CPU register '+pattern)
+                return int(found[0],16)
+            active=obs['active'];runtime=obs['runtime']
+            if (live_reg(r'\bCR3=([0-9a-fA-F]+)\b'),
+                live_reg(r'^GDT=\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s*$'),
+                live_reg(r'^IDT=\s+([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s*$'),
+                live_reg(r'^TR\s*=([0-9a-fA-F]+)\b'),
+                live_reg(r'^CS\s*=([0-9a-fA-F]+)\b'))!=(root,active['gdt'],active['idt'],active['tr'],runtime['cs']):
+                raise ValueError('ordinary live descriptor snapshot')
+            if live_reg(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')&0x200:raise ValueError('ordinary shell IF')
             if args.native_catalog:
                 from native_catalog_865_verify import verify_catalog
                 events=verify_catalog(lines,data.decode('ascii'),obs)
                 if stats['rd_operations']<4+32*9:raise ValueError('native catalog actual disk reads')
-            else:events=cold_trace(data.decode('ascii'),obs)
+            else:
+                events=[]
+                for m in re.finditer(r'\bCR3=([0-9a-fA-F]+)\b',data.decode('ascii')):
+                    if int(m[1],16)==root:raise ValueError('unsolicited interrupt under ordinary safe root')
             marker=b'STYLEOS S865 SHELL-ONLY fixture-launch=deny'
             direct=[x for x in lines if x.startswith(b'STYLEOS OWNED BOOT ')]
             ready=[x for x in lines if x.startswith(b'STYLEOS S863 READY ')]
