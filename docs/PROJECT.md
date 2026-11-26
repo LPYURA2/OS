@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 19 owned-root LBA48 block candidate
+17 CI 45892450813 4/4 SUCCESS. 18 new EFI guest step SUCCESS, final regression pending at start. [Profile and handoff](NEXT_CHAT_STYLEFS_19.md). Separate post-EBS 4TiB block service diagnostic; CI pending. Ordinary shell and filesystem formats unchanged.
+
 ## 2026-11-26 — StyleFS 18 isolated LBA48 guest candidate
 16 CI 45891999656 4/4 SUCCESS including full 4GiB+17 host file SHA256. 17 host/source PASS, final regression pending at work start. [Stage 18 design, limitations and handoff](NEXT_CHAT_STYLEFS_18.md). Terminal EFI test of actual Q35 sparse disks 256GiB–4TiB, no ordinary kernel or UI change; CI pending. Full wide filesystem guest mount and 100+GiB transfer remain open.
 
