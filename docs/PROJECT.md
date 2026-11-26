@@ -1,3 +1,6 @@
+## StyleFS 30 — packed inode manifest table candidate
+29 CI 7/7 SUCCESS. New immutable packed page codec, full table order validation and bounded binary search, [handoff](NEXT_CHAT_STYLEFS_30.md). Legal gate preserved.
+
 ## StyleFS 29 — explicit writable reconciliation candidate
 28 CI 7/7 SUCCESS. New recovery of uncheckpointed metadata using retained exact receipt; no data writes. [Handoff](NEXT_CHAT_STYLEFS_29.md). Legal gate preserved.
 
