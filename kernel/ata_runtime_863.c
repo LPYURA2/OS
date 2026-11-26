@@ -72,16 +72,20 @@ static bool enter(struct ata_runtime_863 *a)
        !a->reader.identified||a->reader.quarantined)return false;
     a->busy=true;return true;
 }
-bool ata_runtime_read_863(void *ctx,uint32_t lba,uint8_t out[512])
+static bool read_sector(void *ctx,uint32_t lba,uint8_t out[512],bool (*pace)(void *))
 {
     struct ata_runtime_863 *a=ctx;
     if(!a||!out||lba>=ATA857_SECTORS||a->pending_flush||!enter(a))return false;
     uint16_t w[ATA857_WORDS];
     a->phase=ATA863_READ;
-    if(!ata857_read(&a->reader,&a->ops->read_ops,a->ctx,lba,w))return finish(a,fault(a,ATA863_READ_TRANSFER));
+    if(!(pace?ata857_read_paced(&a->reader,&a->ops->read_ops,a->ctx,lba,w,pace):ata857_read(&a->reader,&a->ops->read_ops,a->ctx,lba,w)))return finish(a,fault(a,ATA863_READ_TRANSFER));
     for(unsigned i=0;i<ATA857_WORDS;i++){out[2*i]=(uint8_t)w[i];out[2*i+1]=(uint8_t)(w[i]>>8);}
     return finish(a,true);
 }
+bool ata_runtime_read_863(void *ctx,uint32_t lba,uint8_t out[512])
+{return read_sector(ctx,lba,out,0);}
+bool ata_runtime_read_paced_863(void *ctx,uint32_t lba,uint8_t out[512],bool (*pace)(void *))
+{return pace&&read_sector(ctx,lba,out,pace);}
 bool ata_runtime_write_863(void *ctx,uint32_t lba,const uint8_t in[512])
 {
     struct ata_runtime_863 *a=ctx;

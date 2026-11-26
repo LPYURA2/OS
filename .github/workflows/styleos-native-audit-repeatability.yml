@@ -1,11 +1,32 @@
 name: StyleOS audit repeatability on two host CPUs
 on:
   push:
-    branches: [feature/styleos-kernel-audit-repeatability, feature/styleos-kernel-storage-read-diagnostics]
+    branches: [feature/styleos-kernel-audit-repeatability, feature/styleos-kernel-storage-read-diagnostics, feature/styleos-kernel-ata-read-pacing]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
+  read-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Native and legacy ATA host tests with sanitizers
+        run: |
+          set -euo pipefail
+          mkdir -p build/read-contract
+          for cc in gcc clang; do
+            for test in test_ata_read_pacing test_ata_diag_857 test_ata_runtime_863; do
+              "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude "tests/$test.c" kernel/ata_diag_857.c kernel/ata_runtime_863.c -o "build/read-contract/$cc-$test"
+              "build/read-contract/$cc-$test" | tee "build/read-contract/$cc-$test.log"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ata-read-contract
+          path: build/read-contract/
   repeatability:
     runs-on: ubuntu-24.04
     timeout-minutes: 60

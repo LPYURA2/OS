@@ -159,12 +159,27 @@ static bool pio_observe863(void *ctx,struct storage_obs_863 *o){
  .sectors=4096,.post_ebs=true,.single_cpu=true,.kernel_context=true,.exclusive_pio=true,
  .dma_denied=true,.disposable_data=true,.flush_supported=p->ata.flush_supported};return true;
 }
+#ifdef STYLEOS_OWNED_SHELL_865
+/* Same bounded PAUSE used by the completion path. No port I/O, no replay.
+ * Read-only admission remains possible before writable is granted. */
+static bool pio_read_pause863(void *ctx){
+ struct pio863*p=ctx;
+ if(!p||!p->live||!p->ata.busy||p->ata.phase!=ATA863_READ||
+    read_cr3()!=p->live->root||(flags()&0x200))return false;
+ for(unsigned i=0;i<256;i++)__asm__ volatile("pause":::"memory");
+ return read_cr3()==p->live->root&&!(flags()&0x200);
+}
+#endif
 static bool pio_read863(void *ctx,uint32_t lba,uint8_t *out){
  struct pio863*p=ctx;
 #ifdef STYLEOS_OWNED_SHELL_865
  p->read_status_count=p->read_words=p->read_busy=p->read_io_refusals=0;p->read_status=0;
 #endif
+ #ifdef STYLEOS_OWNED_SHELL_865
+ bool ok=ata_runtime_read_paced_863(&p->ata,lba,out,pio_read_pause863);
+#else
  bool ok=ata_runtime_read_863(&p->ata,lba,out);
+#endif
 #ifdef STYLEOS_OWNED_SHELL_865
  if(!ok){
   arch_puts("STYLEOS ATA863 READ-DIAG lba=");paging_hex(lba);

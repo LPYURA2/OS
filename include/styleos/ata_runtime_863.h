@@ -55,6 +55,8 @@ static inline bool ata864_tag_match(const uint8_t sector[512])
 }
 bool ata_runtime_bind_serial_864(struct ata_runtime_863 *,const struct ata_runtime_ops_863 *,void *,const char [20]);
 bool ata_runtime_read_863(void *,uint32_t,uint8_t [512]);
+/* Caller supplies finite guarded pacing; read command and poll budget unchanged. */
+bool ata_runtime_read_paced_863(void *,uint32_t,uint8_t [512],bool (*pace)(void *));
 bool ata_runtime_write_863(void *,uint32_t,const uint8_t [512]);
 bool ata_runtime_flush_863(void *);
 #endif

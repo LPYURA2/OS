@@ -15,6 +15,9 @@ struct ata857_ops {
 struct ata857_state {bool identified,busy,quarantined;};
 bool ata857_identify(struct ata857_state *,const struct ata857_ops *,void *,uint16_t out[ATA857_WORDS]);
 bool ata857_read(struct ata857_state *,const struct ata857_ops *,void *,uint32_t lba,uint16_t out[ATA857_WORDS]);
+/* Optional bounded pause between BUSY samples after the one READ command.
+ * Same poll ceiling; no retries, new command or changed status checks. */
+bool ata857_read_paced(struct ata857_state *,const struct ata857_ops *,void *,uint32_t,uint16_t out[ATA857_WORDS],bool (*pace)(void *));
 bool ata857_geometry(const uint16_t words[ATA857_WORDS]);
 bool ata857_allowed(unsigned reg,uint8_t value);
 #endif
