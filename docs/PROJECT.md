@@ -1,3 +1,6 @@
+## StyleFS 31 — durable packed inode table candidate
+30 CI 7/7 SUCCESS. Streamed two-bank manifest table publication and recovery, [handoff](NEXT_CHAT_STYLEFS_31.md). Legal gate preserved.
+
 ## StyleFS 30 — packed inode manifest table candidate
 29 CI 7/7 SUCCESS. New immutable packed page codec, full table order validation and bounded binary search, [handoff](NEXT_CHAT_STYLEFS_30.md). Legal gate preserved.
 
