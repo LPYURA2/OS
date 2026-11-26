@@ -672,7 +672,7 @@ static bool large_attach863(void){
 #ifdef STYLEOS_LBA48_BLOCK_19
 #include "stylefs_lba48_block_19.inc"
 #endif
-#ifdef STYLEOS_WIDE_GUEST_20
+#if defined(STYLEOS_WIDE_GUEST_20) || defined(STYLEOS_WIDE_VOLUME_38)
 #include "stylefs_wide_guest_20.inc"
 #endif
 static void disk_admit863(void){
@@ -720,7 +720,7 @@ static void disk_admit863(void){
 #ifdef STYLEOS_LBA48_BLOCK_19
  s19_run();
 #endif
-#ifdef STYLEOS_WIDE_GUEST_20
+#if defined(STYLEOS_WIDE_GUEST_20) || defined(STYLEOS_WIDE_VOLUME_38)
  s20_run();
 #endif
  uint8_t super[512];
@@ -1540,13 +1540,19 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
 #if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  if(disk_preflight863||arch_paging_attest_image_writable(p,(uintptr_t)&disk863,sizeof disk863)!=PG_OK||
     !identity((uintptr_t)&disk863,PG_WRITE)||!identity((uintptr_t)&disk863+4095,PG_WRITE))fail("863-shell-storage-page");
-#ifdef STYLEOS_WIDE_GUEST_20
+#if defined(STYLEOS_WIDE_GUEST_20) || defined(STYLEOS_WIDE_VOLUME_38)
+#ifdef STYLEOS_WIDE_VOLUME_38
+ if(arch_paging_attest_image_writable(p,(uintptr_t)&s38_storage,sizeof s38_storage)!=PG_OK)fail("sfs38-workspace");
+ for(size_t i=0;i<sizeof s38_storage;i+=4096)
+  if(!identity((uintptr_t)&s38_storage+i,PG_WRITE))fail("sfs38-workspace-page");
+#else
  if(arch_paging_attest_image_writable(p,(uintptr_t)&s20_journal_storage,sizeof s20_journal_storage)!=PG_OK||
     arch_paging_attest_image_writable(p,(uintptr_t)&s20_stream_storage,sizeof s20_stream_storage)!=PG_OK)fail("sfs20-workspace");
  for(size_t i=0;i<sizeof s20_journal_storage;i+=4096)
   if(!identity((uintptr_t)&s20_journal_storage+i,PG_WRITE))fail("sfs20-journal-page");
  for(size_t i=0;i<sizeof s20_stream_storage;i+=4096)
   if(!identity((uintptr_t)&s20_stream_storage+i,PG_WRITE))fail("sfs20-stream-page");
+#endif
 #endif
  disk_preflight863=true;
 #endif

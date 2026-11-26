@@ -64,7 +64,7 @@ def build(folder, n):
             "-DSTYLEOS_WIDE_GUEST_20=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, prefix=b"SFS20 ", timeout=100):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -112,13 +112,13 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw):
                 return o,stats[0]
             _, start = snapshot("prelaunch")
             d.call("cont")
-            deadline = time.monotonic()+100
+            deadline = time.monotonic()+timeout
             while time.monotonic()<deadline and proc.poll() is None:
                 if uart.exists():
                     lines=uart.read_bytes().splitlines(keepends=True)
                     failures=[x for x in lines if b" FAIL " in x and x.endswith(b"\n")]
                     require(not failures,"guest fail-stop: "+repr(failures))
-                    if any(x.startswith(b"SFS20 ") and x.endswith(b"\n") for x in lines):
+                    if any(x.startswith(prefix) and x.endswith(b"\n") for x in lines):
                         break
                 time.sleep(.05)
             else:
@@ -129,7 +129,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw):
             bar = [x for bus in o["pci"] for x in bus["devices"] if x.get("qdev_id")==CONTROLLER][0]["regions"]
             require(len(bar)==1,"BAR count")
             verify_bar(o["pci"],o["mtree"],bar[0]["address"])
-            rows = [x for x in uart.read_bytes().splitlines() if x.startswith(b"SFS20 ")]
+            rows = [x for x in uart.read_bytes().splitlines() if x.startswith(prefix)]
             require(rows==[receipt.encode()], "unexpected guest result "+repr(rows))
             require(b"STYLEOS S863S DMA-AFTER " in uart.read_bytes() and b"STYLEOS S863S BAR4 " in uart.read_bytes(), "missing owned-root DMA admission receipts")
             require(not any(b" FAIL " in x for x in uart.read_bytes().splitlines()),"kernel failure receipt")

@@ -1,13 +1,27 @@
 /* Included only in the separately selected post-EBS test profile.
  * Existing safe-root/PCI/DMA guard remains authoritative. No general grant. */
 #include <styleos/ata_runtime_48.h>
+#ifdef STYLEOS_WIDE_VOLUME_38
+#include <styleos/stylefs_widevolume64.h>
+#else
 #include <styleos/stylefs_stream64.h>
+#endif
 #define S20_N (UINT64_C(4096)<<21)
 #define S20_CAP (S20_N-1)
 #define S20_START (S20_CAP-32)
 #define S20_BYTES 1041u
+#ifdef STYLEOS_WIDE_VOLUME_38
+#define S20_SERIAL "STYLEOS-SFS38-DATA  "
+#define S20_TAG "STYLEOS-SFS38-PRIVATE-V1"
+#define S38_DIR UINT64_C(258)
+#define S38_INO UINT64_C(258)
+#define S38_META (2+S38_DIR+S38_INO)
+#define S38_DATA (S20_CAP-S38_META)
+#define S38_START (S38_DATA-32)
+#else
 #define S20_SERIAL "STYLEOS-SFS20-DATA  "
 #define S20_TAG "STYLEOS-SFS20-PRIVATE-V1"
+#endif
 enum s20_action { S20_IDENT,S20_READ,S20_WRITE,S20_FLUSH };
 struct s20_guard {
  struct ata857_live *live; struct ata_runtime_48 ata;
@@ -27,8 +41,13 @@ static void s20_add(struct s20_guard *g,unsigned r,uint8_t v){
 static bool s20_begin(struct s20_guard *g,enum s20_action a,uint64_t lba){
  if(g->denied||g->pos!=g->len||(g->issued&&g->words!=(g->action==S20_FLUSH?0u:256u)))return s20_deny(g);
  if((a==S20_WRITE||a==S20_FLUSH)&&!g->tagged)return s20_deny(g);
+#ifdef STYLEOS_WIDE_VOLUME_38
+ if(a==S20_WRITE&&!(lba>=1&&lba<=S38_META)&&!(lba>=S20_N-32&&lba<S20_N))return s20_deny(g);
+ if(a==S20_READ&&!(lba<=S38_META)&&!(lba>=S20_N-32&&lba<S20_N))return s20_deny(g);
+#else
  if(a==S20_WRITE&&!(lba>=2&&lba<=19)&&!(lba>=S20_START+1&&lba<S20_N))return s20_deny(g);
  if(a==S20_READ&&!(lba<=19)&&!(lba>=S20_START+1&&lba<S20_N))return s20_deny(g);
+#endif
  if((a==S20_READ||a==S20_WRITE)&&g->ata.bound&&!g->ata.busy&&!g->ata.pending_flush&&!g->ata.quarantined){
   g->live->ops=0;
   if(!same_cache(&shell_cache863)||!s20_live(g))return s20_deny(g);
@@ -89,6 +108,9 @@ static bool s20_flush(void *ctx){
 
 /* Explicitly admitted, static bounded workspace; no file-sized allocation. */
 #define S20_PAGE_ROUND(n) (((n)+4095u)&~(size_t)4095u)
+#ifdef STYLEOS_WIDE_VOLUME_38
+#include "stylefs_wide_volume_38.inc"
+#else
 static _Alignas(4096) union {
  struct sfs64_journal value;
  uint8_t pages[S20_PAGE_ROUND(sizeof(struct sfs64_journal))];
@@ -160,3 +182,5 @@ static _Noreturn void s20_run(void){
     s20_journal.generation[s20_journal.active]!=2||!s20_check(&s20_journal,1))fail("sfs20-commit");
  s863_shell_guard();s20_end("SFS20 WRITE PASS");
 }
+
+#endif

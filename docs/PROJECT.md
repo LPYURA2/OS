@@ -1,3 +1,6 @@
+## StyleFS 38 — actual coordinated volume guest candidate
+36 CI 7/7 SUCCESS, 37 pending at start. Separate guarded LBA48 volume diagnostic and independent fixture, [handoff](NEXT_CHAT_STYLEFS_38.md). Main unchanged.
+
 ## StyleFS 37 — wide-volume reconciliation candidate
 36 host PASS, full CI pending at start. Reuse exact-root recovery and ownership checks for explicit repair, [handoff](NEXT_CHAT_STYLEFS_37.md). File format requirements remain in owner docs; no format handling in kernel.
 
