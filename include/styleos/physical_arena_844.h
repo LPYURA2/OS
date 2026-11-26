@@ -2,9 +2,9 @@
 #define STYLEOS_PHYSICAL_ARENA_844_H
 #include <styleos/boot_memory.h>
 #include <stdbool.h>
-/* The old guest profile stays byte-compatible in layout. The expanded
- * capacity contract is exercised with actual detached tables and owned
- * memory on the host, not yet authorized for ordinary guest boot. */
+/* Historical narrow profiles retain 16 pages. The ordinary owned-shell
+ * profile enables STYLEOS_KERNEL_CAPACITY_32 (96 pages), with the same
+ * bounded, kernel-owned, single-CPU arena contract. No general RAM grant. */
 #ifdef STYLEOS_KERNEL_CAPACITY_32
 #define S844_PAGES 96u
 #else

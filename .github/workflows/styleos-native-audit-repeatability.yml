@@ -1,0 +1,55 @@
+name: StyleOS audit repeatability on two host CPUs
+on:
+  push:
+    branches: [feature/styleos-kernel-audit-repeatability]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  repeatability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [sequential, parallel]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install same guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Check syntax and exact QEMU version
+        run: |
+          python3 -m py_compile tools/native_audit_repeatability.py
+          qemu-system-x86_64 --version | head -n1 | grep '^QEMU emulator version 8\.2\.2 '
+      - name: Measured unchanged guest attempts
+        run: python3 tools/native_audit_repeatability.py --mode ${{ matrix.mode }} --rounds 2 --output build/repeatability
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-audit-repeatability-${{ matrix.mode }}
+          path: |
+            build/repeatability/**/*.json
+            build/repeatability/**/*.jsonl
+            build/repeatability/**/*.log
+            build/repeatability/**/*.txt
+            build/repeatability/**/*.ppm
+          if-no-files-found: error
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact tracked source
+        run: |
+          mkdir -p build/source
+          git archive --format=tar --prefix="StyleOS-$GITHUB_SHA/" "$GITHUB_SHA" | gzip -n > "build/source/StyleOS-$GITHUB_SHA.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > build/source/git-identities.txt
+          (cd build/source && sha256sum -- *.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: styleos-source-${{ github.sha }}
+          path: build/source/
+          if-no-files-found: error
