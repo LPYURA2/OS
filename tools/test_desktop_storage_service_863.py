@@ -347,6 +347,23 @@ def main():
                 else:
                     # Legacy root rows: Documents, Projects, seeded slot 0, saved slot 1.
                     d.key('f2');d.click(688*1280//1536+115,746*128//804+42+12+3*45+12);d.wait_uart('DOCUMENT OPEN')
+                if args.integrated:
+                    # DOCUMENT SAVE/OPEN is emitted before framebuffer repaint.
+                    # Bind the screenshot to the subsequent real input/render
+                    # receipt rather than assuming UART completion means paint.
+                    marker=b'STYLEOS DESKTOP DOCUMENT '+(b'SAVE' if write else b'OPEN')
+                    before=serial.read_bytes().splitlines()
+                    if before.count(marker)!=1:raise ValueError('document marker count')
+                    offset=before.index(marker)
+                    tag=b'STYLEOS S863 EVENT '
+                    count=sum(x.startswith(tag) for x in before[:offset])
+                    wait(proc,serial,tag,count+1)
+                    receipts=[x for x in serial.read_bytes().splitlines()[offset+1:] if x.startswith(tag)]
+                    if not receipts:raise ValueError('missing post-document render receipt')
+                    fields=dict(part.split(b'=',1) for part in receipts[0].split()[3:])
+                    if (int(fields[b'text'],16)!=1 or int(fields[b'text-hash'],16)!=0xaf63dc4c8601ec8c or
+                        int(fields[b'text-dirty'],16)!=0 or not int(fields[b'writes'],16)):
+                        raise ValueError('post-document render state')
                 d.screen('note')
                 if args.owned_shell:
                     tag=b'STYLEOS S863 EVENT '
