@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 03 volume registry candidate
+Stage 02 CI 45884312517 3/3 SUCCESS. [Volume service and disk hierarchy](architecture/STYLEFS_VOLUME_SERVICE_03.md), [handoff](NEXT_CHAT_STYLEFS_03.md). New host component; physical mount proof pending.
+
 ## 2026-11-26 — StyleFS 02 block integration candidate
 StyleFS 01 CI 45883459790 SUCCESS. [Live scoped adapter and Deep Drop inventory](architecture/STYLEFS_BLOCK_INTEGRATION_02.md), [handoff](NEXT_CHAT_STYLEFS_02.md). Guest proof pending; preserve existing Deep Drop and develop file transfer in FS phase.
 
