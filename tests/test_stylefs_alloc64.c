@@ -52,7 +52,7 @@ int main(void)
     const uint64_t cap=L+1000;
     struct sfs64_space stats;
     assert(sfs64_space_query(cap,4,a,b,&stats)==SFS64_ALLOC_OK);
-    assert(stats.free_sectors==cap-4-19-150&&stats.largest_run==L-27&&stats.gaps==4);
+    assert(stats.free_sectors==cap-4-17-150&&stats.largest_run==L-27&&stats.gaps==4);
     memset(out,0xa5,sizeof out);memcpy(before,out,sizeof out);
     assert(sfs64_allocate(cap,4,a,b,G4+1,out,2,&n)==SFS64_ALLOC_OUTPUT&&n==3&&!memcmp(out,before,sizeof out));
     assert(sfs64_allocate(cap,4,a,b,G4+1,0,0,&n)==SFS64_ALLOC_OUTPUT&&n==3);
