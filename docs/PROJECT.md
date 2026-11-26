@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 02 block integration candidate
+StyleFS 01 CI 45883459790 SUCCESS. [Live scoped adapter and Deep Drop inventory](architecture/STYLEFS_BLOCK_INTEGRATION_02.md), [handoff](NEXT_CHAT_STYLEFS_02.md). Guest proof pending; preserve existing Deep Drop and develop file transfer in FS phase.
+
 ## 2026-11-26 — StyleFS 01 block service candidate
 Processes 04 accepted, CI 45882838910 3/3 SUCCESS. [Block service and large-file requirement](architecture/STYLEFS_BLOCK_SERVICE_01.md), [handoff](NEXT_CHAT_STYLEFS_01.md). New kernel-only component, not yet guest-integrated. Source and previous refs preserved.
 

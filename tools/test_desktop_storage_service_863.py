@@ -215,7 +215,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');p.add_argument('--process-stop',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');p.add_argument('--process-stop',action='store_true');p.add_argument('--block-service',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
@@ -232,6 +232,7 @@ def main():
     if args.extended_desktop and (not args.owned_shell or args.native_catalog):p.error('extended desktop requires ordinary no-catalog ISO')
     if args.process_view and not (args.owned_shell and args.native_hang):p.error('process view requires native hang profile')
     if args.process_stop and not args.process_view:p.error('process stop requires live process view')
+    if args.block_service and not args.owned_shell:p.error('block service requires owned shell')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base)
@@ -627,6 +628,18 @@ def main():
         if args.provisioned and not lines.index(bars[0])<lines.index(b'STYLEOS S863S PROVISIONED-IDENTITY')<lines.index(admits[0]):raise ValueError('identity must precede write admission')
         if admits!=[f'STYLEOS S863S ADMIT root=0x{root:016x} first-write=0x0000000000000001 last-write=0x0000000000000048 dma=0x0000000000000000'.encode()]:raise ValueError('admission evidence')
         if any(not x.startswith(f'STYLEOS S863S COMMIT root=0x{root:016x} '.encode()) for x in commits):raise ValueError('commit root')
+        if args.block_service:
+            from runtime_mixed_863_verify import row
+            def block_rows(tag,keys):
+                return [(i,row(x,tag,keys)) for i,x in enumerate(lines) if x.startswith(tag+b' ')]
+            admits_block=block_rows(b'STYLEOS BLOCK863 ADMIT',('gen','sectors','first-write','last-write','refusals'))
+            reads_block=block_rows(b'STYLEOS BLOCK863 READ',('lba','bytes'))
+            writes_block=block_rows(b'STYLEOS BLOCK863 WRITE',('lba','bytes'))
+            if len(admits_block)!=1 or tuple(admits_block[0][1].values())!=(1,4096,1,72,4):raise ValueError('block scoped admission')
+            if len(reads_block)!=1 or tuple(reads_block[0][1].values())!=(0,512):raise ValueError('block real initial read')
+            if not lines.index(b'STYLEOS S863S PROVISIONED-IDENTITY')<admits_block[0][0]<lines.index(admits[0])<reads_block[0][0]:raise ValueError('block admission order')
+            if [tuple(v.values()) for _,v in writes_block]!=([(20,512),(19,512)] if write else []):raise ValueError('block committed sectors')
+            if any(i+1!=lines.index(c) for (i,_),c in zip(writes_block,commits)):raise ValueError('block receipt not tied to physical commit')
         receipts=[x for x in lines if x.startswith(b'STYLEOS S865 EXTERNAL-ELF ')]
         want=[f'STYLEOS S865 EXTERNAL-ELF id=0x{i:016x} lba=0x{lba:016x} bytes=0x{n:016x} sectors=0x{sectors:016x}'.encode() for i,lba,n,sectors in external_receipts]*8
         if receipts!=want:raise ValueError('external executable receipt count/content')

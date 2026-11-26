@@ -512,6 +512,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         sources += ["kernel/runtime_entry_858.c"]
     if test_storage_pio_runtime_863 or test_desktop_storage_service_863:
         sources += ["kernel/ata_runtime_863.c", "kernel/storage_runtime_863.c"]
+    if owned_shell_865:
+        sources += ["kernel/block_service.c"]
     if test_storage_ata_read_857 or test_desktop_storage_service_863:
         sources += ["kernel/ata_diag_857.c"]
     if desktop_owned_root_preview:

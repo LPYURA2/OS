@@ -2,6 +2,9 @@
  * Not called by Desktop or a live display driver. No MMIO access. */
 #include <styleos/desktop_root_850.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_OWNED_SHELL_865
+#include <styleos/block_service.h>
+#endif
 #include <styleos/ist_guard_plan_785.h>
 #ifdef STYLEOS_TEST_RUNTIME_IRQ_859
 #include <styleos/runtime_irq_859.h>
@@ -500,7 +503,13 @@ bool s863_shell_clock(unsigned *hour,unsigned *minute){
 #endif
 #if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 static _Alignas(4096) union {
- struct {struct ata857_live live;struct pio863 pio;struct storage_runtime_863 store;bool ready;} s;
+ struct {struct ata857_live live;struct pio863 pio;struct storage_runtime_863 store;bool ready;
+#ifdef STYLEOS_OWNED_SHELL_865
+  struct bs_service block;
+  uint64_t block_generation,block_ro0,block_rw,block_ro_tail;
+  bool block_read_proven;
+#endif
+ } s;
  unsigned char page[4096];
 } disk863;
 _Static_assert(sizeof disk863==4096,"disk service page");
@@ -523,6 +532,48 @@ static void disk_dma_receipt863(const char *tag,const struct bm857_snapshot *s){
  arch_puts("STYLEOS S863S DMA-");arch_puts(tag);field("root",s->root);field("bar4",s->bar4);field("command-status",s->command_status);
  field("primary-command",s->bm[0]);field("primary-status",s->bm[1]);field("secondary-command",s->bm[2]);field("secondary-status",s->bm[3]);arch_putc('\n');
 }
+#ifdef STYLEOS_OWNED_SHELL_865
+/* Kernel shell principal in this fixed trusted profile, not a user PID or
+ * a capability exported to CPL3. Keep old physical guard and exact ranges. */
+#define BLOCK_SHELL_OWNER UINT64_C(1)
+static bool block_read863(void *ctx,uint64_t lba,uint8_t out[512]){
+ return ctx==&disk863.s.store&&lba<4096&&storage_read_863(ctx,(uint32_t)lba,out);
+}
+static bool block_write863(void *ctx,uint64_t lba,const uint8_t in[512]){
+ return ctx==&disk863.s.store&&lba>=1&&lba<=72&&storage_commit_863(ctx,(uint32_t)lba,in);
+}
+static bool block_flush863(void *ctx){
+ /* storage_commit_863 has already physically flushed and read back the
+  * sector. Verify quiescence; do not issue another ATA FLUSH command. */
+ return ctx==&disk863.s.store&&disk863.s.store.bound&&!disk863.s.store.busy&&
+  !disk863.s.store.quarantined&&!disk863.s.pio.ata.pending_flush&&
+  !disk863.s.pio.ata.busy&&!disk863.s.pio.ata.quarantined&&
+  same_cache(&shell_cache863)&&ata857_live_check(&disk863.s.live);
+}
+static bool block_attach863(void){
+ const struct bs_backend backend={&disk863.s.store,UINT64_C(0x701080862800),4096,
+   true,false,block_read863,block_write863,block_flush863};
+ struct bs_service *b=&disk863.s.block;
+ if(!identity((uintptr_t)bs_read_sector,PG_EXEC)||
+    !identity((uintptr_t)bs_write_sector,PG_EXEC)||
+    bs_attach(b,&backend,&disk863.s.block_generation)!=BS_OK)return false;
+ uint64_t gen=disk863.s.block_generation;
+ if(bs_grant_range(b,gen,BLOCK_SHELL_OWNER,0,1,BS_READ,&disk863.s.block_ro0)!=BS_OK||
+    bs_grant_range(b,gen,BLOCK_SHELL_OWNER,1,72,BS_READ|BS_WRITE,&disk863.s.block_rw)!=BS_OK||
+    bs_grant_range(b,gen,BLOCK_SHELL_OWNER,73,4096-73,BS_READ,&disk863.s.block_ro_tail)!=BS_OK)return false;
+ /* Exercise actual refusal path with an external kernel buffer and prove
+  * that invalid operations don't enter the physical callback. */
+ uint8_t probe[512]={0};unsigned ops=disk863.s.live.ops;
+ if(bs_write_sector(b,BLOCK_SHELL_OWNER,disk863.s.block_ro0,0,probe)!=BS_DENIED||
+    bs_write_sector(b,BLOCK_SHELL_OWNER,disk863.s.block_ro_tail,0,probe)!=BS_DENIED||
+    bs_write_sector(b,BLOCK_SHELL_OWNER,disk863.s.block_rw,72,probe)!=BS_RANGE||
+    bs_read_sector(b,BLOCK_SHELL_OWNER+1,disk863.s.block_rw,0,probe)!=BS_DENIED||
+    disk863.s.live.ops!=ops)return false;
+ arch_puts("STYLEOS BLOCK863 ADMIT");field("gen",gen);field("sectors",4096);
+ field("first-write",1);field("last-write",72);field("refusals",4);arch_putc('\n');
+ return true;
+}
+#endif
 static void disk_admit863(void){
  uint32_t a,b,c,d;
  __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
@@ -584,6 +635,9 @@ static void disk_admit863(void){
  for(unsigned i=0;i<512;i++)if(super[i]!=(i<sizeof magic-1?(uint8_t)magic[i]:0))fail("863-shell-storage-signature");
  disk863.s.pio.writable=true;
  if(!storage_bind_863(&disk863.s.store,&store_ops863,&disk863.s.pio,shell_root863,1,UINT64_C(0x701080862800),0,4096,true))fail("863-shell-storage-bind");
+#ifdef STYLEOS_OWNED_SHELL_865
+ if(!block_attach863())fail("863-shell-block-bind");
+#endif
  disk863.s.ready=true;
  arch_puts("STYLEOS S863S ADMIT");field("root",shell_root863);field("first-write",1);field("last-write",72);field("dma",0);arch_putc('\n');
 }
@@ -629,18 +683,39 @@ void s863_storage_document(bool saved,unsigned slot,const char *data,size_t byte
 }
 uint32_t s863_disk_probe(void){return disk_ready863()?4096:0;}
 bool s863_disk_read(uint32_t lba,uint8_t out[512]){
+#ifdef STYLEOS_OWNED_SHELL_865
+ if(!out||lba>=4096||!disk_ready863())return false;
+ uint64_t token=lba==0?disk863.s.block_ro0:lba<=72?disk863.s.block_rw:disk863.s.block_ro_tail;
+ uint64_t relative=lba==0?0:lba<=72?lba-1:lba-73;
+ enum bs_status r=bs_read_sector(&disk863.s.block,BLOCK_SHELL_OWNER,token,relative,out);
+ if(r!=BS_OK)return false;
+ if(!disk863.s.block_read_proven){
+  disk863.s.block_read_proven=true;
+  arch_puts("STYLEOS BLOCK863 READ");field("lba",lba);field("bytes",512);arch_putc('\n');
+ }
+ return true;
+#else
  return out&&lba<4096&&disk_ready863()&&storage_read_863(&disk863.s.store,lba,out);
+#endif
 }
 bool s863_disk_write(uint32_t lba,const uint8_t in[512]){
  if(!in||lba<1||lba>72||!disk_ready863())return false;
  /* Every successful write already includes hardware flush and readback. */
+#ifdef STYLEOS_OWNED_SHELL_865
+ enum bs_status r=bs_write_sector(&disk863.s.block,BLOCK_SHELL_OWNER,disk863.s.block_rw,lba-1,in);
+ if(r!=BS_OK){
+#else
  if(!storage_commit_863(&disk863.s.store,lba,in)){
+#endif
   arch_puts("STYLEOS S863S REFUSAL");field("root",shell_root863);field("lba",lba);
   field("store",disk863.s.store.fault);field("ata",disk863.s.pio.ata.fault);
   field("phase",disk863.s.pio.ata.phase);field("polls",disk863.s.pio.ata.status_polls);
   field("status",disk863.s.pio.ata.last_status);field("ops",disk863.s.live.ops);
   field("pending-flush",disk863.s.pio.ata.pending_flush);arch_putc('\n');return false;
  }
+#ifdef STYLEOS_OWNED_SHELL_865
+ arch_puts("STYLEOS BLOCK863 WRITE");field("lba",lba);field("bytes",512);arch_putc('\n');
+#endif
  arch_puts("STYLEOS S863S COMMIT");field("root",shell_root863);field("lba",lba);arch_putc('\n');
  return true;
 }
