@@ -109,7 +109,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw):
             d.call("cont")
             deadline = time.monotonic()+100
             while time.monotonic()<deadline and proc.poll() is None:
-                if uart.exists() and any(x.startswith(b"SFS18 ") for x in uart.read_bytes().splitlines()):
+                if uart.exists() and any(x.startswith(b"SFS18 ") and x.endswith(b"\n") for x in uart.read_bytes().splitlines(keepends=True)):
                     break
                 time.sleep(.05)
             else:
