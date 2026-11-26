@@ -171,3 +171,104 @@ enum dc64_status dc64_publish(struct dc64_state *s,struct dc64_workspace *w,uint
  if(write_sector(s,target,h)!=DC64_OK)return DC64_UNCERTAIN;
  select_bank(s,target,epoch,count,&p);return DC64_OK;
 }
+
+enum dc64_status dc64_entry_at(struct dc64_state *s,struct dc64_workspace *w,
+                              uint64_t epoch,uint64_t ordinal,struct sd64_record *out){
+ if(!separate(s,sizeof *s,w,sizeof *w)||!separate(s,sizeof *s,out,sizeof *out)||
+    !separate(w,sizeof *w,out,sizeof *out)||!s->valid||s->active>1||
+    !separate(s,sizeof *s,s->block,sizeof *s->block)||
+    !separate(w,sizeof *w,s->block,sizeof *s->block)||
+    !separate(out,sizeof *out,s->block,sizeof *s->block))return DC64_INVALID;
+ if(epoch!=s->epoch)return DC64_STALE;
+ if(!grant(s->block,s->owner,s->token,s->sectors,false)){s->valid=false;return DC64_STALE;}
+ if(ordinal>=s->count)return DC64_MISSING;
+ struct plan p;
+ if(!plan(s->count,bank_size(s->sectors)/8,&p)){s->valid=false;return DC64_CORRUPT;}
+ unsigned n=0;uint64_t index=ordinal/SD64_FANOUT;
+ enum dc64_status rc=load(s,w,location(base(s->sectors,s->active),&p,0,index),epoch,0,w->records,&n);
+ if(rc!=DC64_OK||n!=expected(&p,0,index)){s->valid=false;return rc==DC64_OK?DC64_CORRUPT:rc;}
+ *out=w->records[ordinal%SD64_FANOUT];return DC64_OK;
+}
+static enum dc64_status lower_bound(struct dc64_state *s,struct dc64_workspace *w,
+ uint64_t epoch,const struct sd64_key *k,uint64_t *pos,struct sd64_record *found,bool *exists){
+ uint64_t lo=0,hi=s->count;
+ while(lo<hi){
+  uint64_t mid=lo+(hi-lo)/2;struct sd64_record r;
+  enum dc64_status rc=dc64_entry_at(s,w,epoch,mid,&r);
+  if(rc!=DC64_OK)return rc;
+  if(sd64_compare(&r.key,k)<0)lo=mid+1;else hi=mid;
+ }
+ *pos=lo;*exists=false;
+ if(lo<s->count){
+  enum dc64_status rc=dc64_entry_at(s,w,epoch,lo,found);
+  if(rc!=DC64_OK)return rc;
+  *exists=sd64_compare(&found->key,k)==0;
+ }return DC64_OK;
+}
+struct edit_source {
+ struct dc64_state *s;struct dc64_workspace *w;
+ uint64_t epoch,remove,insert,cached_page;unsigned cached_count;
+ struct sd64_record record;
+ bool remove_one,insert_one,cached;
+ enum dc64_status error;
+};
+static bool edit_next(void *ctx,uint64_t i,struct sd64_record *out){
+ struct edit_source *a=ctx;
+ if(a->insert_one&&i==a->insert){*out=a->record;return true;}
+ uint64_t source=i-(a->insert_one&&i>a->insert?1u:0u);
+ if(a->remove_one&&source>=a->remove)++source;
+ if(!a->s->valid||a->s->epoch!=a->epoch||source>=a->s->count){a->error=DC64_STALE;return false;}
+ uint64_t page=source/SD64_FANOUT;
+ if(!a->cached||a->cached_page!=page){
+  struct sd64_record check;
+  a->error=dc64_entry_at(a->s,a->w,a->epoch,source,&check);
+  if(a->error!=DC64_OK)return false;
+  a->cached_page=page;a->cached=true;
+  uint64_t rem=a->s->count-page*SD64_FANOUT;
+  a->cached_count=rem<SD64_FANOUT?(unsigned)rem:SD64_FANOUT;
+ }
+ unsigned slot=(unsigned)(source%SD64_FANOUT);
+ if(slot>=a->cached_count){a->error=DC64_CORRUPT;return false;}
+ *out=a->w->records[slot];return true;
+}
+enum dc64_status dc64_apply(struct dc64_state *s,struct dc64_workspace *writer,
+                           struct dc64_workspace *reader,uint64_t epoch,const struct dc64_edit *edit){
+ if(!separate(s,sizeof *s,writer,sizeof *writer)||!separate(s,sizeof *s,reader,sizeof *reader)||
+    !separate(reader,sizeof *reader,writer,sizeof *writer)||!separate(s,sizeof *s,edit,sizeof *edit)||
+    !separate(reader,sizeof *reader,edit,sizeof *edit)||!separate(writer,sizeof *writer,edit,sizeof *edit)||
+    !s->valid||s->active>1||!separate(edit,sizeof *edit,s->block,sizeof *s->block)||
+    !separate(reader,sizeof *reader,s->block,sizeof *s->block)||
+    !separate(writer,sizeof *writer,s->block,sizeof *s->block)||
+    !separate(s,sizeof *s,s->block,sizeof *s->block)||
+    !sd64_key_valid(&edit->entry.key)||!edit->entry.target||
+    (edit->entry.kind!=SD64_FILE&&edit->entry.kind!=SD64_DIRECTORY)||
+    (edit->op!=DC64_INSERT&&edit->op!=DC64_DELETE&&edit->op!=DC64_RENAME))return DC64_INVALID;
+ if(epoch!=s->epoch)return DC64_STALE;
+ if(!grant(s->block,s->owner,s->token,s->sectors,true))return DC64_INVALID;
+ struct edit_source a={.s=s,.w=reader,.epoch=epoch,.record=edit->entry};
+ struct sd64_record old={0};bool exists=false;uint64_t old_pos=0,count=s->count;
+ enum dc64_status rc=lower_bound(s,reader,epoch,&edit->entry.key,&old_pos,&old,&exists);
+ if(rc!=DC64_OK)return rc;
+ if(edit->op==DC64_INSERT){
+  if(exists)return DC64_CONFLICT;
+  if(count==UINT64_MAX)return DC64_FULL;
+  a.insert_one=true;a.insert=old_pos;++count;
+ }else{
+  if(!exists)return DC64_MISSING;
+  if(old.target!=edit->entry.target||old.kind!=edit->entry.kind)return DC64_STALE;
+  a.remove_one=true;a.remove=old_pos;--count;
+  if(edit->op==DC64_RENAME){
+   if(!sd64_key_valid(&edit->destination))return DC64_INVALID;
+   if(sd64_compare(&old.key,&edit->destination)==0)return DC64_OK;
+   uint64_t pos=0;
+   rc=lower_bound(s,reader,epoch,&edit->destination,&pos,&old,&exists);
+   if(rc!=DC64_OK)return rc;
+   if(exists)return DC64_CONFLICT;
+   a.record.key=edit->destination;a.insert_one=true;
+   a.insert=pos-(pos>old_pos?1u:0u);++count;
+  }
+ }
+ rc=dc64_publish(s,writer,count,edit_next,&a);
+ if(rc==DC64_CANCELLED&&a.error!=DC64_OK){s->valid=false;return a.error;}
+ return rc;
+}

@@ -1,3 +1,6 @@
+## StyleFS 23 — directory operations and legal release gate
+22 host PASS, other regressions pending at start. New ordinal read and atomic insert/delete/rename candidate, [handoff](NEXT_CHAT_STYLEFS_23.md). Owner legal release requirement [gate](LEGAL_RELEASE_GATE.md).
+
 ## 2026-11-26 — StyleFS 22 durable directory snapshots candidate
 20.1 and 21 full CI 7/7 SUCCESS. [Handoff](NEXT_CHAT_STYLEFS_22.md). Two-bank directory snapshot writer, bounded workspace and full-tree validation, interruption testing pending. No ordinary boot changes.
 

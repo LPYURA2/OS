@@ -6,7 +6,7 @@
  * or ordinary filesystem formats are touched. Trusted serialized caller
  * owns sole write grant; explicitly provisioned blank region only.
  * A new complete sorted snapshot is built into the inactive bank. */
-enum dc64_status { DC64_OK, DC64_INVALID, DC64_CORRUPT, DC64_IO, DC64_FULL, DC64_UNCERTAIN, DC64_CANCELLED };
+enum dc64_status { DC64_OK, DC64_INVALID, DC64_CORRUPT, DC64_IO, DC64_FULL, DC64_UNCERTAIN, DC64_CANCELLED, DC64_MISSING, DC64_CONFLICT, DC64_STALE };
 struct dc64_state {
  struct bs_service *block;uint64_t owner,token,sectors,epoch,count;
  unsigned active;bool valid;
@@ -30,4 +30,24 @@ enum dc64_status dc64_provision(struct bs_service *,uint64_t owner,uint64_t toke
  * On I/O uncertainty remount is required. No live page is overwritten. */
 enum dc64_status dc64_publish(struct dc64_state *,struct dc64_workspace *,
                                uint64_t count,dc64_next,void *);
+
+/* Read one entry by ordinal, with exact epoch. Workspace/output disjoint.
+ * No allocation; 8 sector reads. Missing is distinct from corruption.
+ * A corrupt or unreadable current page invalidates the mounted state. */
+enum dc64_status dc64_entry_at(struct dc64_state *,struct dc64_workspace *,
+                              uint64_t epoch,uint64_t ordinal,struct sd64_record *);
+/* Atomic insert/delete/rename in the namespace snapshot; exact old key,
+ * expected target and kind for delete/rename. No inode ownership or parent
+ * validation here. Caller serializes and verifies those independently.
+ * A rename keeps target/kind and refuses occupied destination.
+ * Two disjoint workspaces, no heap; still full-snapshot rebuild. */
+enum dc64_edit_kind { DC64_INSERT, DC64_DELETE, DC64_RENAME };
+struct dc64_edit {
+ enum dc64_edit_kind op;
+ struct sd64_record entry;
+ struct sd64_key destination;
+};
+enum dc64_status dc64_apply(struct dc64_state *,struct dc64_workspace *writer,
+                           struct dc64_workspace *reader,uint64_t epoch,
+                           const struct dc64_edit *);
 #endif
