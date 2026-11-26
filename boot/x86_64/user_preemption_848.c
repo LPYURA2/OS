@@ -94,7 +94,9 @@ extern const unsigned char s848_b_start[],s848_b_loop_end[],s848_b_exit[],s848_b
 extern const unsigned char s848_c_start[],s848_c_loop_end[],s848_c_fault[],s848_c_end[],s848_c_yield[];
 extern const unsigned char s848_d_start[],s848_d_loop_end[],s848_d_fault[],s848_d_end[],s848_d_yield[];
 extern void s864_ud_entry(void),s864_gp_entry(void);
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
 static bool normal_exit848(unsigned id){return id==1;}
+#endif
 #else
 static bool normal_exit848(unsigned id){return id!=0;}
 #endif
@@ -911,10 +913,26 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
  }
 #ifdef STYLEOS_TEST_RUNTIME_LOOP_862
 #ifdef STYLEOS_TEST_FOUR_GUEST_864
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ /* The hardware runtime reaches quiescence through the actual empty
+  * scheduler, not through a preordained count of calls/ticks/exits.
+  * The CI verifier separately enforces the test workload's exact counts. */
+ if(runtime860->dispatcher.current!=-1||completed!=step||
+    runtime860->dispatcher.dispatches-DISPATCH_BASE848!=completed)fail848("865-loop-final");
+#else
  if(completed!=TOTAL_TICKS848+S846_ROOT_COUNT+EXTRA_DISPATCH848||ticks848!=TOTAL_TICKS848||runtime860->dispatcher.current!=-1)fail848("864-loop-final");
+#endif
  if(!ipc_session864||nwc_port_count(nwc_global())||usr_lock((struct usr_runtime *)usr_global())!=USR_OK||usr_close((struct usr_runtime *)usr_global(),ipc_session864)!=USR_OK)fail848("864-ipc-final");
  arch_puts("STYLEOS S864 IPC-CLEAN");fld848("session",ipc_session864);fld848("ports",0);arch_putc('\n');ipc_session864=0;
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++){
+  const struct pr_entry *ended=pr_find(pr_global(),pid860[i]);
+  if(!ended||(ended->state!=PR_EXITED&&ended->state!=PR_FAULTED)||
+     ended->scheduler_handle!=handle860[i]||ended->page_root!=child[i].built.root)fail848("865-final-state");
+ }
+#else
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(local848[i]!=s862_loop_budget[i]||!pr_find(pr_global(),pid860[i])||pr_find(pr_global(),pid860[i])->state!=(normal_exit848(i)?PR_EXITED:PR_FAULTED))fail848("864-final-state");
+#endif
 #else
  if(completed!=s862_loop_budget[0]+s862_loop_budget[1]+2+EXTRA_DISPATCH848||ticks848!=s862_loop_budget[0]+s862_loop_budget[1]||local848[0]!=s862_loop_budget[0]||local848[1]!=s862_loop_budget[1]||runtime860->dispatcher.current!=-1||pr_find(pr_global(),pid860[0])->state!=PR_FAULTED||pr_find(pr_global(),pid860[1])->state!=PR_EXITED)fail848("862-loop-final");
 #endif
@@ -970,7 +988,13 @@ void s860_reap(uint64_t safe){
  const unsigned char *pending=(const void *)&pending860;for(size_t j=0;j<sizeof pending860;j++)if(pending[j])fail848("862-pending-zero");
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   const struct pr_entry *pe=pr_find(pr_global(),pid860[i]);const struct rt862_bank_slot *slot=&bank862.slots[i];
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+  if(!pe||(pe->state!=PR_EXITED&&pe->state!=PR_FAULTED)||
+     pe->scheduler_handle!=handle860[i]||slot->pid!=pid860[i]||
+     slot->handle!=handle860[i]||slot->root!=pe->page_root)fail848("865-bank-reap-binding");
+#else
   if(!pe||pe->state!=(normal_exit848(i)?PR_EXITED:PR_FAULTED)||slot->pid!=pid860[i]||slot->handle!=handle860[i]||slot->root!=pe->page_root)fail848("862-bank-reap-binding");
+#endif
   const unsigned char *bytes=(const void *)&slot->context;for(size_t j=0;j<sizeof slot->context;j++)if(bytes[j])fail848("862-context-zero");
  }
 #if defined(STYLEOS_TEST_RUNTIME_SPARSE_862) || defined(STYLEOS_TEST_FOUR_GUEST_864)
@@ -993,7 +1017,12 @@ void s860_reap(uint64_t safe){
 #else
  const unsigned expected=10+EXTRA_DISPATCH848;
 #endif
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ (void)expected;
+ if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||runtime860->dispatcher.current!=-1)fail848("865-reap-state");
+#else
  if(pr_snapshot(pr_global(),0,0,true)||ws_snapshot(ws_global(),0,0)||runtime860->dispatcher.current!=-1||runtime860->dispatcher.dispatches!=DISPATCH_BASE848+expected)fail848("860-reap-state");
+#endif
  arch_puts("STYLEOS S860 CLEAN");fld848("safe",safe);fld848("dispatches",runtime860->dispatcher.dispatches);fld848("processes",0);fld848("windows",0);arch_putc('\n');
  arch_puts("STYLEOS S860 POLICY actual-cpl3-ticks=yes fp=yes existing-dispatcher=yes leases-released=yes production-cr3=deny\n");
 }

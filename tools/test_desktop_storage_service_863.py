@@ -361,9 +361,23 @@ def main():
                     receipts=[x for x in serial.read_bytes().splitlines()[offset+1:] if x.startswith(tag)]
                     if not receipts:raise ValueError('missing post-document render receipt')
                     fields=dict(part.split(b'=',1) for part in receipts[0].split()[3:])
-                    if (int(fields[b'text'],16)!=1 or int(fields[b'text-hash'],16)!=0xaf63dc4c8601ec8c or
-                        int(fields[b'text-dirty'],16)!=0 or not int(fields[b'writes'],16)):
-                        raise ValueError('post-document render state')
+                    # The save scenario uses Notes; reopening a file via
+                    # Explorer starts the independent text editor instead.
+                    # The Notes observer is not the editor's text buffer.
+                    if write:
+                        if (int(fields[b'active'],16)!=4 or int(fields[b'text'],16)!=1 or
+                            int(fields[b'text-hash'],16)!=0xaf63dc4c8601ec8c or int(fields[b'text-dirty'],16)!=0):
+                            raise ValueError('post-save Notes state')
+                    else:
+                        if int(fields[b'active'],16)!=1 or int(fields[b'note-session'],16)!=0:
+                            raise ValueError('post-open editor state')
+                        opened=[x for x in serial.read_bytes().splitlines()[offset+1:] if x.startswith(b'STYLEOS S863S OPENED ')]
+                        if len(opened)!=1:raise ValueError('post-open disk evidence')
+                        from runtime_mixed_863_verify import row
+                        receipt=row(opened[0],b'STYLEOS S863S OPENED',('root','slot','bytes','hash'))
+                        if tuple(receipt.values())!=(int(fields[b'root'],16),1,1,0xaf63dc4c8601ec8c):
+                            raise ValueError('post-open file content')
+                    if not int(fields[b'writes'],16):raise ValueError('post-document render did not write pixels')
                 d.screen('note')
                 if args.owned_shell:
                     tag=b'STYLEOS S863 EVENT '
