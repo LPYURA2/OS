@@ -669,6 +669,9 @@ static bool large_attach863(void){
  return true;
 }
 #endif
+#ifdef STYLEOS_LBA48_BLOCK_19
+#include "stylefs_lba48_block_19.inc"
+#endif
 static void disk_admit863(void){
  uint32_t a,b,c,d;
  __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
@@ -711,6 +714,9 @@ static void disk_admit863(void){
  disk863.s.live.command_status=after.command_status;
  arch_puts("STYLEOS S863S BAR4");field("root",shell_root863);field("bar4",before.bar4);arch_putc('\n');
  disk863.s.pio.live=&disk863.s.live;
+#ifdef STYLEOS_LBA48_BLOCK_19
+ s19_run();
+#endif
  uint8_t super[512];
 #ifdef STYLEOS_STYLEFS_MOUNT_RO
  if(!ata_runtime_bind_capacity(&disk863.s.pio.ata,&pio_ops863,&disk863.s.pio,
