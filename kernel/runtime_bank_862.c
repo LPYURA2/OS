@@ -327,6 +327,19 @@ enum ps_status rt863_bank_event(struct rt862_bank *b,struct dpr_service *d,
  if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),r,sizeof *r,_Alignof(struct rt860_tick))||
     !ticket(b,d,t,live)||r->slot!=t->slot||r->dispatch!=t->dispatch||r->pid!=t->pid||
     r->handle!=t->handle||r->child_root!=t->child_root||r->safe_root!=live||r->vector!=r->frame.vector)return PS_EVIDENCE;
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ /* Recheck the original raw receipt on the safe root. Never commit a
+  * normalized user context or execute a syscall from an invalid stack. */
+ if(rt865_classify_native_frame(&r->frame,r->frame_va,cr2,t->child_root,live,b->cs,b->ss,r->vector==0x50)==RT865_USER_FAULT){
+  if((r->safe_flags&~UINT64_C(0x8d7))||!(r->safe_flags&2)||
+     r->isr!=(r->vector==0x50)||r->eoi!=(r->vector==0x50))return PS_EVIDENCE;
+  enum ps_status status=dpr_observe(d,t->slot,t->handle,t->child_root,live,PS_FAULT);
+  if(status!=PS_OK)return status;
+  volatile unsigned char *p=(void *)&b->slots[t->slot].context;
+  for(size_t i=0;i<sizeof(struct up_context);i++)p[i]=0;
+  return PS_OK;
+ }
+#endif
  if(r->vector==0x50){
   if(cr2||r->isr!=1||r->eoi!=1)return PS_EVIDENCE;
   return rt862_bank_tick(b,d,t,live,r);

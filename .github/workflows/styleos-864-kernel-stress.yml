@@ -430,6 +430,8 @@ jobs:
           for cc in gcc clang; do
             "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_RUNTIME_ENTRY_CLASSIFIER_865 -DSTYLEOS_TEST_FOUR_GUEST_864 -Iinclude kernel/process_entry_847.c tests/test_entry_classification_865.c -o "build/s865-entry-classification/$cc"
             "build/s865-entry-classification/$cc" | tee "build/s865-entry-classification/$cc.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_OWNED_SHELL_865 -DSTYLEOS_INTEGRATED_RUNTIME_864 -DSTYLEOS_KERNEL_CAPACITY_32 -Iinclude tests/test_native_bad_rsp.c kernel/{runtime_bank_862,desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/s865-entry-classification/bank-$cc"
+            "build/s865-entry-classification/bank-$cc" | tee "build/s865-entry-classification/bank-$cc.log"
           done
       - uses: actions/upload-artifact@v4
         if: always()

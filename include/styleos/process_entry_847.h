@@ -20,8 +20,12 @@ bool s847_decode(const struct s847_raw *,uint64_t frame_va,uint64_t cr2,uint64_t
  * expected GPR patterns, progress words and fixture tick budgets.
  * Caller authenticates actual root/owner/IST/FP and IRQ/EOI. This does not
  * admit a task or a hardware resource. Non-PF CR2 must be normalized to 0. */
-enum rt865_frame_kind { RT865_INVALID, RT865_TICK, RT865_SYSCALL, RT865_TERMINAL };
+enum rt865_frame_kind { RT865_INVALID, RT865_TICK, RT865_SYSCALL, RT865_TERMINAL, RT865_USER_FAULT };
 enum rt865_frame_kind rt865_classify_frame(const struct s847_raw *,uint64_t,uint64_t,
+ uint64_t,uint64_t,uint16_t,uint16_t,bool);
+/* Native executor: authenticated trap with an invalid user RSP is terminal.
+ * The strict classifier above remains the resumable-context contract. */
+enum rt865_frame_kind rt865_classify_native_frame(const struct s847_raw *,uint64_t,uint64_t,
  uint64_t,uint64_t,uint16_t,uint16_t,bool);
 #endif
 /* Bridge a validated raw trap to the lifecycle model. Return true with

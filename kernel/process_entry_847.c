@@ -55,6 +55,19 @@ enum rt865_frame_kind rt865_classify_frame(const struct s847_raw *f,uint64_t va,
  if(!s847_decode(&n,va,cr2,child,cs,ss,&c,&e))return RT865_INVALID;
  return e.kind==UP_FAULT||f->gpr[0]==S847_CALL_EXIT?RT865_TERMINAL:RT865_SYSCALL;
 }
+enum rt865_frame_kind rt865_classify_native_frame(const struct s847_raw *f,uint64_t va,
+ uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed)
+{
+ enum rt865_frame_kind kind=rt865_classify_frame(f,va,cr2,child,safe,cs,ss,armed);
+ if(kind!=RT865_INVALID||!region(f,sizeof *f,_Alignof(struct s847_raw))||
+    (f->rsp>S846_STACK&&f->rsp<=S846_STACK+P))return kind;
+ /* Only RSP is user-controlled and out of range. Check every other field,
+  * including exact IST, selectors, roots, flags and vector/error evidence.
+  * The temporary copy is never published or used for IRET. */
+ struct s847_raw copy=*f;copy.rsp=S846_STACK+P;
+ return rt865_classify_frame(&copy,va,cr2,child,safe,cs,ss,armed)==RT865_INVALID?
+    RT865_INVALID:RT865_USER_FAULT;
+}
 #endif
 
 bool s847_apply_raw(struct s847_control *ctl,struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root,struct s847_decision *out){

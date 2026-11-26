@@ -37,5 +37,19 @@ int main(void){
  f.rip=S846_CODE+4096;CHECK(check(f,VA,0,false)==RT865_INVALID);f.rip=S846_CODE;
  CHECK(rt865_classify_frame(&f,VA,0,0x1000,0x1000,0x5b,0x63,false)==RT865_INVALID);
  CHECK(rt865_classify_frame(&f,VA,0,0x2001,0x1000,0x5b,0x63,false)==RT865_INVALID);
+ /* Existing strict expectations above are unchanged. New terminal-only
+  * classifier accepts bad RSP, not forged kernel evidence. */
+ f.rsp=0x12000000;
+ for(unsigned i=0;i<3;i++){
+  f.vector=i==0?6:i==1?128:0x50;
+  uint64_t va=i==0?FAULT_VA:VA;bool armed=i==2;
+  CHECK(check(f,va,0,armed)==RT865_INVALID);
+  CHECK(rt865_classify_native_frame(&f,va,0,0x2000,0x1000,0x5b,0x63,armed)==RT865_USER_FAULT);
+  CHECK(rt865_classify_native_frame(&f,va+8,0,0x2000,0x1000,0x5b,0x63,armed)==RT865_INVALID);
+  CHECK(rt865_classify_native_frame(&f,va,0,0x1000,0x1000,0x5b,0x63,armed)==RT865_INVALID);
+  f.cs=0x38;CHECK(rt865_classify_native_frame(&f,va,0,0x2000,0x1000,0x5b,0x63,armed)==RT865_INVALID);f.cs=0x5b;
+  f.error=1;CHECK(rt865_classify_native_frame(&f,va,0,0x2000,0x1000,0x5b,0x63,armed)==RT865_INVALID);f.error=0;
+  CHECK(rt865_classify_native_frame(&f,va,0,0x2000,0x1000,0x5b,0x63,!armed)==RT865_INVALID);
+ }
  printf("S865 host frame classifier PASS: %u checks (not hardware evidence)\n",n);
 }
