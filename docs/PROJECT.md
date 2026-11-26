@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 18 isolated LBA48 guest candidate
+16 CI 45891999656 4/4 SUCCESS including full 4GiB+17 host file SHA256. 17 host/source PASS, final regression pending at work start. [Stage 18 design, limitations and handoff](NEXT_CHAT_STYLEFS_18.md). Terminal EFI test of actual Q35 sparse disks 256GiB–4TiB, no ordinary kernel or UI change; CI pending. Full wide filesystem guest mount and 100+GiB transfer remain open.
+
 ## 2026-11-26 — StyleFS 17 large virtual disk LBA48 candidate
 15 CI 45891701088 3/3 SUCCESS. 16 CI 45891999656 host/source PASS, full large-file and final guest pending at work start. [LBA48 transport](architecture/STYLEFS_LBA48_17.md), [handoff](NEXT_CHAT_STYLEFS_17.md). Owner 100+ GB file requirement recorded. Candidate CI pending.
 
