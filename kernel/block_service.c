@@ -156,7 +156,7 @@ enum bs_status bs_write_staged_batch(struct bs_service *s,uint64_t owner,uint64_
     uint64_t count=n/BS_SECTOR_BYTES+(n%BS_SECTOR_BYTES!=0);
     if(!count||count-1>UINT64_MAX-sector)return BS_RANGE;
     struct bs_device *d,*last;uint64_t lba,end;
-    uint8_t probe[BS_SECTOR_BYTES];
+    uint8_t probe[BS_SECTOR_BYTES]={0};
     enum bs_status r=access(s,owner,token,sector,probe,BS_WRITE,&d,&lba);
     if(r!=BS_OK)return r;
     r=access(s,owner,token,sector+count-1,probe,BS_WRITE,&last,&end);

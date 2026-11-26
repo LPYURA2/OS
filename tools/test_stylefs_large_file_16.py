@@ -34,7 +34,7 @@ def main():
             # on both sides of the 32-bit offset boundary.
             for off in range(0,SIZE,1024*1024):
                 f.seek(off);f.write(struct.pack("<QQ",off,off^0xA55A123456789ABC))
-            f.seek((1<<32)-8);f.write(b"crossing-4GiB-marker-data!")
+            f.seek((1<<32)-8);f.write(b"crossing-4GiB-marker-data")
             f.truncate(SIZE);f.flush();os.fsync(f.fileno())
         expected=hashes(src);assert expected[0]==SIZE
         print("SOURCE",expected,flush=True)
@@ -50,6 +50,6 @@ def main():
         assert hashes(dst)==expected and hashes(src)==expected
         with disk.open("rb") as f:
             f.seek(START*512+(1<<32)-8)
-            assert f.read(25)==b"crossing-4GiB-marker-data!"
+            assert f.read(25)==b"crossing-4GiB-marker-data"
         print("STYLEFS FULL LARGE FILE PASS",SIZE,"bytes",expected[1],flush=True)
 if __name__=="__main__":main()
