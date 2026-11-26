@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 22 durable directory snapshots candidate
+20.1 and 21 full CI 7/7 SUCCESS. [Handoff](NEXT_CHAT_STYLEFS_22.md). Two-bank directory snapshot writer, bounded workspace and full-tree validation, interruption testing pending. No ordinary boot changes.
+
 ## 2026-11-26 — StyleFS 21 directory index candidate
 20.1 wide guest PASS; full CI pending at start. New immutable directory page codec and bounded lookup, host 100000-entry workload pending. [Handoff](NEXT_CHAT_STYLEFS_21.md). First full release VM 4GB RAM/20GB disk confirmed.
 

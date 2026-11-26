@@ -19,6 +19,9 @@ int sd64_compare(const struct sd64_key *,const struct sd64_key *);
  * No writes, allocation, publication or mutation of retained snapshots. */
 bool sd64_encode(uint8_t page[SD64_PAGE],uint64_t epoch,unsigned level,
                  const struct sd64_record *,unsigned count);
+/* Validate a complete canonical page before publishing decoded records. */
+bool sd64_decode_page(const uint8_t page[SD64_PAGE],uint64_t epoch,unsigned level,
+                      struct sd64_record out[SD64_FANOUT],unsigned *count);
 /* Read at most (SD64_MAX_LEVEL+1)*8 sectors, one page scratch, no heap.
  * Validates all entries on visited pages and child level/fence continuity.
  * Only returns an object ID, not authority to open it. No output on error. */

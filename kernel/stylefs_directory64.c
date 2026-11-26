@@ -64,6 +64,25 @@ static bool decode(const uint8_t *p,unsigned i,unsigned level,struct sd64_record
  copy(r->key.name,q+20,SD64_NAME);
  return !q[19]&&zero(q+275,RECORD-275)&&record_valid(r,level);
 }
+bool sd64_decode_page(const uint8_t p[SD64_PAGE],uint64_t epoch,unsigned level,
+                      struct sd64_record out[SD64_FANOUT],unsigned *count){
+ if(!epoch||level>SD64_MAX_LEVEL||
+    !separate(p,SD64_PAGE,out,SD64_FANOUT*sizeof *out)||
+    !separate(p,SD64_PAGE,count,sizeof *count)||
+    !separate(out,SD64_FANOUT*sizeof *out,count,sizeof *count))return false;
+ for(unsigned i=0;i<8;i++)if(p[i]!=magic[i])return false;
+ uint64_t n=get(p+20,4);
+ if(get(p+8,8)!=epoch||get(p+16,4)!=level||!n||n>SD64_FANOUT||
+    get(p+CRC_AT,4)!=crc(p)||!zero(p+28,HEADER-28)||
+    !zero(p+HEADER+n*RECORD,SD64_PAGE-HEADER-n*RECORD))return false;
+ struct sd64_record a={0},prev={0};
+ for(unsigned i=0;i<n;i++){
+  if(!decode(p,i,level,&a)||(i&&sd64_compare(&prev.key,&a.key)>=0))return false;
+  prev=a;
+ }
+ for(unsigned i=0;i<n;i++)(void)decode(p,i,level,out+i);
+ *count=(unsigned)n;return true;
+}
 static bool inside(const struct sd64_root *r,uint64_t s){
  return s>=r->region_start&&s-r->region_start<=r->region_sectors-SD64_SECTORS&&
         (s-r->region_start)%SD64_SECTORS==0;
