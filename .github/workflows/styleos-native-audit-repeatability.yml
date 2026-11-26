@@ -1,7 +1,7 @@
 name: StyleOS audit repeatability on two host CPUs
 on:
   push:
-    branches: [feature/styleos-kernel-audit-repeatability, feature/styleos-kernel-storage-read-diagnostics, feature/styleos-kernel-ata-read-pacing]
+    branches: [feature/styleos-kernel-audit-repeatability, feature/styleos-kernel-storage-read-diagnostics, feature/styleos-kernel-ata-read-pacing, feature/styleos-kernel-final-storage-recheck]
   workflow_dispatch:
 permissions:
   contents: read

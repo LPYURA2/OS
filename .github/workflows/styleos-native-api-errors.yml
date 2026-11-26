@@ -1,7 +1,7 @@
 name: StyleOS ordinary native process error regression
 on:
   push:
-    branches: [feature/styleos-kernel-process-error-review]
+    branches: [feature/styleos-kernel-process-error-review, feature/styleos-kernel-final-storage-recheck]
   workflow_dispatch:
 permissions:
   contents: read

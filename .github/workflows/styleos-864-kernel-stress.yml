@@ -1,7 +1,7 @@
 name: StyleOS 864 preliminary restricted kernel endurance
 on:
   push:
-    branches: [feature/styleos-kernel-stress-864, feature/styleos-kernel-integration-864-final, feature/styleos-kernel-final-acceptance, feature/styleos-kernel-fault-containment-audit, feature/styleos-kernel-reacceptance]
+    branches: [feature/styleos-kernel-stress-864, feature/styleos-kernel-integration-864-final, feature/styleos-kernel-final-acceptance, feature/styleos-kernel-fault-containment-audit, feature/styleos-kernel-reacceptance, feature/styleos-kernel-final-storage-recheck]
   workflow_dispatch:
 permissions:
   contents: read
@@ -370,7 +370,7 @@ jobs:
 
 
   acceptance-native-completion:
-    if: github.ref_name == 'feature/styleos-kernel-final-acceptance' || github.ref_name == 'feature/styleos-kernel-fault-containment-audit' || github.ref_name == 'feature/styleos-kernel-reacceptance'
+    if: github.ref_name == 'feature/styleos-kernel-final-acceptance' || github.ref_name == 'feature/styleos-kernel-fault-containment-audit' || github.ref_name == 'feature/styleos-kernel-reacceptance' || github.ref_name == 'feature/styleos-kernel-final-storage-recheck'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -398,7 +398,7 @@ jobs:
           if-no-files-found: error
 
   acceptance-base-regression:
-    if: github.ref_name == 'feature/styleos-kernel-final-acceptance' || github.ref_name == 'feature/styleos-kernel-fault-containment-audit' || github.ref_name == 'feature/styleos-kernel-reacceptance'
+    if: github.ref_name == 'feature/styleos-kernel-final-acceptance' || github.ref_name == 'feature/styleos-kernel-fault-containment-audit' || github.ref_name == 'feature/styleos-kernel-reacceptance' || github.ref_name == 'feature/styleos-kernel-final-storage-recheck'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
