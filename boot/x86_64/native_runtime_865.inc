@@ -83,6 +83,15 @@ enum ps_status s865_native_stop(uint32_t pid,uint64_t generation,bool authorized
  return s865_executor_stop(id,pid,generation,native_roots[id].built.root,
                            authorized,native_audit,native_release,0);
 }
+enum ps_status s865_native_stop_selected(uint32_t pid){
+ if(!native_ready||!s865_executor_idle()||runtime860->dispatcher.current!=-1)return PS_STATE;
+ if(!native_audit(0))return PS_EVIDENCE;
+ const struct pr_table *p=runtime860->dispatcher.registry;
+ if(p!=pr_global()||pi_can_request_end(p,pid)!=PI_TARGET_ELIGIBLE)return PS_EVIDENCE;
+ const struct pr_entry *e=pr_find(p,pid);
+ if(!e||e->state!=PR_READY)return PS_STATE;
+ return s865_native_stop(pid,e->scheduler_handle,true);
+}
 enum pa_status s865_native_snapshot(const struct pa_request *q,struct pa_row *rows,
                                     size_t capacity,struct pa_reply *reply){
  if(!native_ready||!s865_executor_idle()||!native_audit(0)||

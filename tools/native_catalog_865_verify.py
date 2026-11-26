@@ -99,7 +99,8 @@ def wait_hang_after_input(proc,serial,seconds=20):
         time.sleep(.03)
     raise RuntimeError('no timer progress after shell input')
 
-def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False):
+def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,ui_stop=False):
+    if ui_stop and not hang_load:raise ValueError('UI stop requires hang workload')
     root=obs['active']['root']
     def records(tag,keys):
         return [row(x,tag,keys) for x in lines if x.startswith(tag+b' ')]
@@ -113,7 +114,15 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=
     for i,a in enumerate(admissions):
         if (a['slot'],a['pid'],a['gen'],a['entry'])!=(i,i+1,i+1,0x10000000) or not a['root'] or a['root']&4095:raise ValueError('native admission')
     if hang_load:
-        if empty or not hang_progress(lines):raise ValueError('infinite workload not resident or peers not reclaimed')
+        if ui_stop:
+            stops=records(b'STYLEOS NATIVE FORCED-STOP',('slot','pid','gen','root'))
+            if empty or [tuple(x.values()) for x in stops]!=[(0,1,1,roots[0])]:raise ValueError('UI forced stop identity')
+            at=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS NATIVE FORCED-STOP '))
+            if not any(x.startswith(b'STYLEOS S865 FX-RETIRE ') and b' gen=0x0000000000000001' in x for x in lines[:at]):raise ValueError('UI stop retirement')
+            if any(x.startswith(b'STYLEOS NATIVE EVENT ') for x in lines[at+1:]):raise ValueError('execution after stop')
+            retire0=next(i for i,x in enumerate(lines) if x.startswith(b'STYLEOS S865 FX-RETIRE ') and b' gen=0x0000000000000001' in x)
+            if not hang_progress(lines[:retire0]):raise ValueError('pre-stop workload not proved')
+        elif empty or not hang_progress(lines):raise ValueError('infinite workload not resident or peers not reclaimed')
     elif len(empty)!=1 or tuple(empty[0].values())!=(0,len(events)) or len(events)<64:raise ValueError('native final reclamation')
     aidx=[j for j,x in enumerate(lines) if x.startswith(b'STYLEOS NATIVE ADMIT ')]
     eidx=[j for j,x in enumerate(lines) if x.startswith(b'STYLEOS NATIVE EVENT ')]
@@ -173,7 +182,7 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=
         bad_index=max(j for j,x in enumerate(events) if x['slot']<3 and x['state']==5)
         if not any(x['slot']>=3 and x['state']==4 for x in events[bad_index+1:]):raise ValueError('no surviving process after malformed RSP')
     retired=records(b'STYLEOS S865 FX-RETIRE',('id','root','gen'))
-    if sorted((x['id'],x['root'],x['gen']) for x in retired)!=[(i,roots[i],i+1) for i in range(1 if hang_load else 0,32)]:raise ValueError('per-owner retirement')
+    if sorted((x['id'],x['root'],x['gen']) for x in retired)!=[(i,roots[i],i+1) for i in range(1 if hang_load and not ui_stop else 0,32)]:raise ValueError('per-owner retirement')
     if hang_load:
         # The observation ends after an input receipt and at least two more
         # completed slices. The loop intentionally survives host teardown.
@@ -183,7 +192,7 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=
         lang=row(lines[inputs[-1]],b'STYLEOS S863 EVENT',fields)
         prev=next(row(x,b'STYLEOS S863 EVENT',fields) for x in reversed(lines[:inputs[-1]]) if x.startswith(b'STYLEOS S863 EVENT '))
         if lang['root']!=root or lang['mouse'] or lang['ru']==prev['ru'] or not lang['writes']:raise ValueError('shell did not respond to language switch')
-        if sum(x.startswith(b'STYLEOS NATIVE EVENT slot=0x0000000000000000 ') and b' vector=0x0000000000000050 ' in x for x in lines[inputs[-1]+1:])<2:raise ValueError('no continued IRQ after input')
+        if not ui_stop and sum(x.startswith(b'STYLEOS NATIVE EVENT slot=0x0000000000000000 ') and b' vector=0x0000000000000050 ' in x for x in lines[inputs[-1]+1:])<2:raise ValueError('no continued IRQ after input')
     # Independent hardware trace: match every user event, never accept
     # software receipts alone. Kernel drain records are independently bound.
     headers=list(HEADER.finditer(trace));result=[];started=False;index=0;denied_int=None;denied_count=0;tail=0
@@ -222,7 +231,7 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=
             # Host can stop after the last complete UART receipt but before
             # the next IRQ has committed. Only one such in-flight slice is
             # allowed; it must be the exact same live loop and child root.
-            if not hang_load or tail or (vec,err,soft,cpl,cs,rip,pc,ss,sp,cr3)!=(0x50,0,0,3,0x5b,0x1000000d,0x1000000d,0x63,0x11001000,roots[0]) or one(r'\bR12=([0-9a-fA-F]+)\b')!=1 or one(r'\bRAX=([0-9a-fA-F]+)\b')!=0:
+            if not hang_load or ui_stop or tail or (vec,err,soft,cpl,cs,rip,pc,ss,sp,cr3)!=(0x50,0,0,3,0x5b,0x1000000d,0x1000000d,0x63,0x11001000,roots[0]) or one(r'\bR12=([0-9a-fA-F]+)\b')!=1 or one(r'\bRAX=([0-9a-fA-F]+)\b')!=0:
                 raise ValueError('extra CPL3 trap')
             tail+=1;continue
         ev=events[index];index+=1

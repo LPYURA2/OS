@@ -170,6 +170,28 @@ static struct pa_reply process_reply;
 static bool process_valid, process_refresh, process_was_visible;
 static unsigned process_offset;
 static unsigned process_poll;
+static uint32_t process_selected,process_pending;
+static bool process_confirm_drawn,process_dirty;
+static const char *process_notice;
+static bool process_has_pid(uint32_t pid)
+{
+    if(!process_valid||!pid)return false;
+    for(unsigned i=0;i<process_reply.returned;++i)
+        if(process_rows[i].pid==pid&&process_rows[i].type==PR_NATIVE_USER&&
+           process_rows[i].state==PR_READY)return true;
+    return false;
+}
+static void process_cancel(void)
+{
+    if(process_pending){process_pending=0;process_confirm_drawn=false;
+        process_notice="Отменено";process_dirty=true;}
+}
+static void process_select(uint32_t pid)
+{
+    process_cancel();
+    process_selected=process_has_pid(pid)?pid:0;
+    process_notice=0;process_dirty=true;
+}
 static void process_decimal(char out[24], uint64_t value)
 {
     char rev[24]; unsigned n=0;
@@ -185,6 +207,28 @@ static unsigned process_page_size(void)
 {
     int n=(win[TASKS].box.h-153)/24;
     return (unsigned)(n>0?n:1);
+}
+/* UI actions are consumed in the trusted single-CPU shell, outside CPL3.
+ * Confirmation binds to a PID, not a recycled row index, and must have been
+ * rendered in a previous input batch. Enter/second click cannot auto-arm. */
+static void process_arm(void)
+{
+    if(process_pending||!process_has_pid(process_selected))return;
+    process_pending=process_selected;process_confirm_drawn=false;
+    process_notice=0;process_dirty=true;
+    arch_puts("STYLEOS PROCESSES ARM");process_field(" pid=",process_pending);arch_puts("\n");
+}
+static void process_confirm(void)
+{
+    if(!process_pending||!process_confirm_drawn)return;
+    const uint32_t pid=process_pending;
+    process_pending=0;process_confirm_drawn=false;process_selected=0;
+    enum ps_status status=s865_native_stop_selected(pid);
+    process_notice=status==PS_OK?"Процесс завершён":"Завершение отклонено";
+    process_dirty=true;
+    arch_puts("STYLEOS PROCESSES STOP");process_field(" pid=",pid);
+    process_field(" status=",status);
+    process_field(" remaining=",pr_snapshot(pr_global(),0,0,false));arch_puts("\n");
 }
 static bool process_sample(bool report)
 {
@@ -209,6 +253,9 @@ static bool process_sample(bool report)
         process_reply=(struct pa_reply){0};process_offset=0;
     }
     process_valid=valid;
+    if(process_selected&&!process_has_pid(process_selected)){
+        process_cancel();process_selected=0;changed=true;
+    }
     if(report){
         arch_puts("STYLEOS PROCESSES SNAPSHOT");
         process_field(" valid=",valid);process_field(" total=",process_reply.returned);
@@ -483,6 +530,27 @@ static bool keyboard(unsigned key, unsigned mods)
 {
     last_file_click.at = 0;
     current_file_click.id = -1;
+#ifdef STYLEOS_OWNED_SHELL_865
+    if(active()==TASKS&&!menu&&!mods){
+        if(key==0x01&&process_pending){process_cancel();return true;}
+        if(key==0x153){process_arm();return true;}
+        if(key==0x1c&&process_pending){process_confirm();return true;}
+        if(key==0x148||key==0x150){
+            unsigned idx=process_offset;
+            for(unsigned i=0;i<process_reply.returned;++i)
+                if(process_rows[i].pid==process_selected){
+                    idx=key==0x148?(i?i-1:0):i+1;break;
+                }
+            if(idx<process_reply.returned){
+                process_select(process_rows[idx].pid);
+                if(idx<process_offset||idx>=process_offset+process_page_size())
+                    process_offset=idx;
+            }
+            return true;
+        }
+    }
+    process_cancel();
+#endif
 #if defined(STYLEOS_OWNED_SHELL_865) && defined(STYLEOS_NATIVE_PINNED_CATALOG)
     if (key == 0x43 && !mods) { (void)s865_native_catalog_request(); return false; }
 #elif defined(STYLEOS_TEST_DESKTOP_COLD_TASKS_863) && !defined(STYLEOS_OWNED_SHELL_865)
@@ -684,6 +752,23 @@ static void maximize(int id)
 
 static void click(int x, int y)
 {
+#ifdef STYLEOS_OWNED_SHELL_865
+    if(!menu&&window_at(x,y)==TASKS){
+        struct desk_box b=win[TASKS].box;
+        if(y>=b.y+b.h-28&&y<b.y+b.h-4&&x>=b.x+b.w-160&&x<b.x+b.w-10){
+            front(TASKS);
+            if(process_pending)process_confirm();else process_arm();
+            return;
+        }
+        if(y>=b.y+110&&y<b.y+b.h-48){
+            unsigned i=process_offset+(unsigned)(y-b.y-110)/24;
+            front(TASKS);
+            process_select(i<process_reply.returned&&i<process_offset+process_page_size()?process_rows[i].pid:0);
+            return;
+        }
+    }
+    process_cancel();
+#endif
     if (contains(start_box(), x, y)) { menu = !menu; return; }
     if (contains(language_box(), x, y)) { menu = false; toggle_language(); return; }
     if (menu) {
@@ -897,6 +982,7 @@ static void draw_window(int id, int top)
                 const struct pa_row *p=&process_rows[i];
                 int y=b.y+110+(int)(i-process_offset)*24;
                 char buf[24];
+                if(p->pid==process_selected)desk_fill(b.x+9,y-2,b.w-18,23,0x344154);
                 desk_text(b.x+12,y,a-3,p->name,LIGHT);
                 process_decimal(buf,p->pid);desk_text(a,y,c-3,buf,LIGHT);
                 desk_text(c,y,d-3,p->state==PR_READY?"Готов":p->state==PR_WAITING?"Ждёт":"Вып.",LIGHT);
@@ -905,7 +991,15 @@ static void draw_window(int id, int top)
             }
         }
         desk_text(b.x+12,b.y+b.h-48,r-10,"CPU %: нет данных; память: страницы",MUTED);
-        desk_text(b.x+12,b.y+b.h-25,r-10,"F8: обновить  PgUp/PgDn: список",MUTED);
+        if(process_pending){
+            char buf[24];process_decimal(buf,process_pending);
+            int after=desk_text(b.x+12,b.y+b.h-25,r-165,"Завершить PID ",GOLD);
+            desk_text(after,b.y+b.h-25,r-165,buf,GOLD);
+        }else desk_text(b.x+12,b.y+b.h-25,r-165,process_notice?process_notice:"F8 / PgUp / PgDn",MUTED);
+        if(process_pending||process_has_pid(process_selected)){
+            desk_round((struct desk_box){r-160,b.y+b.h-28,150,24},0x76572f);
+            desk_text(r-154,b.y+b.h-25,r-12,process_pending?"Подтвердить":"Завершить",LIGHT);
+        }
 #else
         const struct desk_sessions *sessions = desk_sessions_global();
         desk_text(b.x + 18, b.y + 55, r - 15, "Процессы StyleOS", GOLD);
@@ -1130,6 +1224,9 @@ static void restart_shell(void)
     transfer.lifted = false;
     initial_windows();
     for (int i = 0; i < WINDOWS; ++i) win[i].open = opened[i];
+#ifdef STYLEOS_OWNED_SHELL_865
+    process_cancel();process_selected=0;process_notice=0;process_dirty=true;
+#endif
     shell_refreshed = true;
     print_pid("STYLEOS SHELL RESTART pid=", new_pid);
 #if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
@@ -1270,12 +1367,13 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
         const bool process_shown=visible(TASKS);
         bool periodic=false;
         if(++process_poll==128u){process_poll=0;periodic=true;}
-        if(process_shown&&(process_refresh||!process_was_visible||
+        if(!process_shown||active()!=TASKS||menu)process_cancel();
+        if(process_shown&&(process_refresh||process_dirty||!process_was_visible||
             (periodic&&(!process_valid||pr_global()->change_serial!=process_reply.process_serial)))){
-            process_changed=process_sample(process_refresh)||process_refresh||!process_was_visible;
+            process_changed=process_sample(process_refresh)||process_refresh||process_dirty||!process_was_visible;
             if(process_changed)desk_damage_add(&damage,win[TASKS].box);
         }
-        process_refresh=false;process_was_visible=process_shown;
+        process_refresh=false;process_dirty=false;process_was_visible=process_shown;
 #endif
         if (captured || clock || imported || shell_refreshed || native_changes || process_changed) {
             if (shell_refreshed) { damage.all = true; shell_refreshed = false; }
@@ -1294,6 +1392,9 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                 cursor_only = false;
             }
             size_t writes = desk_present(&damage, draw);
+#ifdef STYLEOS_OWNED_SHELL_865
+            if(process_pending&&active()==TASKS&&!menu&&writes)process_confirm_drawn=true;
+#endif
 #if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
             writes863=writes;
 #endif

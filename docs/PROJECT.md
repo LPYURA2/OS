@@ -1,3 +1,6 @@
+## 2026-11-26 — Processes 03 safe stop candidate
+Phase 02 exact CI 45881630264 SUCCESS. [Safe stop](architecture/PROCESS_SAFE_STOP_03.md), [handoff](NEXT_CHAT_PROCESSES_03.md). Candidate, guest evidence pending.
+
 ## 2026-11-26 — Processes 02 live view candidate
 Real native registry F8 view; see [architecture](architecture/PROCESS_LIVE_VIEW_02.md), [handoff](NEXT_CHAT_PROCESSES_02.md). Guest proof pending, no independent .tea or stop yet.
 

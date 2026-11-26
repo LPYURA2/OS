@@ -16,5 +16,8 @@ enum pa_status s865_native_snapshot(const struct pa_request *,struct pa_row *,si
                                    struct pa_reply *);
 /* Trusted supervisor authenticates request, not a user syscall. */
 enum ps_status s865_native_stop(uint32_t pid,uint64_t generation,bool authorized);
+/* Trusted local supervisor only; resolve the never-reused PID to current
+ * generation after validating idle/root and target policy. No user syscall. */
+enum ps_status s865_native_stop_selected(uint32_t pid);
 #endif
 #endif
