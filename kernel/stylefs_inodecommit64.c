@@ -1,4 +1,5 @@
 #include <styleos/stylefs_inodecommit64.h>
+#include "stylefs_ownership_internal.h"
 static const uint8_t magic[8]={'S','F','6','4','I','C','0','1'};
 struct receipt {uint64_t epoch,pages,count;};
 static bool sep(const void *a,size_t n,const void *b,size_t m){
@@ -125,4 +126,28 @@ enum ic64_status ic64_publish(struct ic64_state *s,struct ic64_workspace *w,uint
  encode(p,n,cap,start,target,(struct receipt){g.epoch,pages,count});
  if(write(t->block,t->owner,t->token,target,p)!=IC64_OK){t->valid=false;return IC64_UNCERTAIN;}
  s->table=candidate;s->active=target;return IC64_OK;
+}
+
+/* Strict bank enumeration for the allocation supervisor: unlike recovery,
+ * no structurally invalid nonblank receipt may silently disappear. */
+enum ic64_status ic64_strict_banks(struct ic64_state *s,struct ic64_workspace *w,struct it64_state out[2]){
+ if(!s||!s->table.valid||s->active>1||!w||!out)return IC64_INVALID;
+ struct it64_state *t=&s->table;
+ uint64_t n=s->sectors,cap=t->geometry.capacity,start=t->geometry.data_start;
+ if(!geom(n,cap,start)||!grant(t->block,t->owner,t->token,n,false))return IC64_STALE;
+ for(unsigned i=0;i<2;i++){
+  uint8_t p[512];struct receipt x;
+  out[i]=(struct it64_state){0};
+  if(bs_read_sector(t->block,t->owner,t->token,i,p)!=BS_OK)return IC64_IO;
+  if(zero(p,512))continue;
+  if(!decode(p,n,cap,start,i,&x))return IC64_CORRUPT;
+  struct it64_geometry g={x.epoch,base(n,i),x.pages,cap,start};
+  enum it64_status rc=it64_mount(&out[i],t->block,t->owner,t->token,&g,w->page);
+  if(rc!=IT64_OK||out[i].count!=x.count)return rc==IT64_IO?IC64_IO:IC64_CORRUPT;
+ }
+ const struct it64_state *a=&out[s->active],*other=&out[s->active^1u];
+ if(!a->valid||a->geometry.epoch!=t->geometry.epoch||a->geometry.start!=t->geometry.start||
+    a->geometry.pages!=t->geometry.pages||a->count!=t->count||
+    (other->valid&&other->geometry.epoch>=a->geometry.epoch))return IC64_STALE;
+ return IC64_OK;
 }

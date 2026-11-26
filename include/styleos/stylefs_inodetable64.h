@@ -30,4 +30,9 @@ enum it64_status it64_mount(struct it64_state *,struct bs_service *,uint64_t own
  * Refuse stale epoch/grant, invalidate state on media/canonical errors. */
 enum it64_status it64_lookup(struct it64_state *,uint64_t epoch,uint64_t id,
  uint8_t scratch[IT64_PAGE],struct sfs64_map *);
+
+/* Scan all maps in a mounted immutable table. Each view borrows scratch
+ * during the callback only. No reentry/mutation; false stops the scan. */
+typedef bool (*it64_visit)(void *,const struct sfs64_map *);
+enum it64_status it64_walk(struct it64_state *,uint8_t scratch[IT64_PAGE],it64_visit,void *);
 #endif

@@ -123,3 +123,26 @@ enum it64_status it64_lookup(struct it64_state *s,uint64_t epoch,uint64_t id,
  }
  return IT64_MISSING;
 }
+
+enum it64_status it64_walk(struct it64_state *s,uint8_t p[IT64_PAGE],it64_visit visit,void *ctx){
+ if(!s||!s->valid)return IT64_STALE;
+ if(!visit||!sep(s,sizeof *s,p,IT64_PAGE)||!sep(p,IT64_PAGE,s->block,sizeof *s->block))return IT64_INVALID;
+ if(!admitted(s->block,s->owner,s->token,&s->geometry)){s->valid=false;return IT64_STALE;}
+ uint64_t prev=0,total=0;
+ for(uint64_t i=0;i<s->geometry.pages;i++){
+  struct page_info info;enum it64_status rc=read_page(s,i,p,0,&info);
+  if(rc!=IT64_OK)return rc;
+  if(info.first<=prev||info.count>UINT64_MAX-total){s->valid=false;return IT64_CORRUPT;}
+  prev=info.last;total+=info.count;
+  size_t at=IT64_HEADER;
+  for(unsigned j=0;j<info.count;j++){
+   size_t n=(size_t)get(p+at,4);at+=4;
+   struct sfs64_map m;
+   if(!sfs64_map_decode(p+at,n,s->geometry.capacity,s->geometry.data_start,&m)){s->valid=false;return IT64_CORRUPT;}
+   if(!visit(ctx,&m))return IT64_INVALID;
+   at+=n;
+  }
+ }
+ if(total!=s->count){s->valid=false;return IT64_CORRUPT;}
+ return IT64_OK;
+}

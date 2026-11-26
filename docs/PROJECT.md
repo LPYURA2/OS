@@ -1,3 +1,6 @@
+## StyleFS 32 — retained extent ownership candidate
+31 CI 7/7 SUCCESS. Strict two-bank inventory and overlap detection, allocation planning, [handoff](NEXT_CHAT_STYLEFS_32.md). Legal gate preserved.
+
 ## StyleFS 31 — durable packed inode table candidate
 30 CI 7/7 SUCCESS. Streamed two-bank manifest table publication and recovery, [handoff](NEXT_CHAT_STYLEFS_31.md). Legal gate preserved.
 
