@@ -1,3 +1,6 @@
+## 2026-11-26 — Style Kernel 0.1, accepted limited foundation
+Owner-approved status and immutable source checkpoint: 371ef59f4419955dd4a63de820e8eea1391495bb. [Acceptance and retained risks](architecture/STYLE_KERNEL_0_1.md). Processes phase 01 CI 3/3 SUCCESS; actual guest snapshot still open. [Proposed kernel/StyleFS contract](architecture/STYLEFS_KERNEL_CONTRACT_01.md). No claim of 1.0; existing KFA gaps preserved. [Handoff](NEXT_CHAT_KERNEL_0_1_CONTRACT.md).
+
 ## 2026-11-26 — Processes phase 01 (candidate)
 Owner proceeds on bounded working prototype, not full KFA or 1.0. Trusted live process snapshot candidate; actual guest viewer and full application remain open. See [phase](architecture/PROCESS_LIVE_SNAPSHOT_01.md), [handoff](NEXT_CHAT_PROCESSES_01.md). Deep Drop remains mandatory.
 
