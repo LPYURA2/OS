@@ -458,7 +458,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if integrated_runtime_864:
         common += ['kernel/native_image_slot_865.c']
     if integrated_runtime_864 and not owned_shell_865:
-        common += ['tests/guest/workload_865.c']
+        common += ['boot/x86_64/native_executor_865.c','tests/guest/workload_865.c']
     if test_process_trial_847 or test_runtime_user_861 or test_runtime_timer_861:
         common += ['kernel/process_entry_847.c','kernel/process_trap_847.c','kernel/user_copy_772.c','arch/x86_64/process_entry_847.S','boot/x86_64/process_trial_847.c']
     if test_user_roots_846:
@@ -772,7 +772,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if integrated_runtime_864 and not owned_shell_865:
         from build_external_workload_865 import build as build_external_workload
         build_external_workload(cc,folder)
-        flags += ['-I',str(folder)]
+        flags += ['-I',str(folder),'-DSTYLEOS_NATIVE_EXECUTOR_OBSERVERS=1']
     if owned_shell_865:
         # This boot-only profile must not link the batch executor, its
         # exception entry adapter or its guest FP observer. Common kernel

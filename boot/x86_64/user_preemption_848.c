@@ -20,6 +20,7 @@ static uint32_t ipc_session864;
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
 #include <styleos/runtime_bank_862.h>
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
+#include "native_executor_865.h"
 #include "../../tests/guest/workload_865.h"
 static uint8_t launch_scratch865[8192];
 #endif
@@ -28,17 +29,24 @@ static uint8_t launch_scratch865[8192];
 #include <styleos/runtime_select_862.h>
 #endif
 #endif
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
 static struct dpr_service *runtime860;
 static struct s847_raw pending860;
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
 static struct rt862_bank bank862;
 static uint64_t cr2862;
+#endif
 #else
 static struct s847_raw saved860[2];
 #endif
-static uint64_t frame860,handle860[S846_ROOT_COUNT];
-static uint32_t pid860[S846_ROOT_COUNT],win860[S846_ROOT_COUNT];
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
+static uint64_t frame860;
 static bool receipt860;
+#endif
+static uint64_t handle860[S846_ROOT_COUNT];
+static uint32_t pid860[S846_ROOT_COUNT],win860[S846_ROOT_COUNT];
 #ifndef STYLEOS_TEST_RUNTIME_BANK_862
 static bool have860[2];
 #endif
@@ -57,18 +65,25 @@ const unsigned s862_loop_budget[2]={5,3};
 #define TOTAL_TICKS848 8u
 #endif
 #endif
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
 struct desc848 {uint16_t limit;uint64_t base;}__attribute__((packed));
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_TIMER_861
 static struct rt858_live live848(void){return rt864_arch_capture();}
 #endif
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
 struct gate848 {uint16_t lo,cs;uint8_t ist,type;uint16_t mid;uint32_t hi,zero;}__attribute__((packed));
 static _Alignas(16) struct gate848 idt848[256];
+#endif
 #ifndef STYLEOS_TEST_RUNTIME_BANK_862
 static struct s847_control ctl848;
 #endif
-static uint64_t lapic848,sites848[S846_ROOT_COUNT][3],progress848[S846_ROOT_COUNT];
-static unsigned ticks848,local848[S846_ROOT_COUNT];
+#ifndef STYLEOS_INTEGRATED_RUNTIME_864
+static uint64_t lapic848;
 static bool active848,armed848;
+#endif
+static uint64_t sites848[S846_ROOT_COUNT][3],progress848[S846_ROOT_COUNT];
+static unsigned ticks848,local848[S846_ROOT_COUNT];
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
 extern const unsigned char s848_a_yield[],s848_b_yield[];
 static unsigned mixed_calls848[S846_ROOT_COUNT];
@@ -146,111 +161,11 @@ static uint64_t first_arg848(unsigned id,unsigned reg){
 }
 #endif
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
-extern void s865_drain_wait(void),s865_drain_entry(void),s865_drain_cli(void);
-volatile uint64_t s865_drain_root,s865_drain_lapic,s865_drain_seen;
-static bool timer_only865(unsigned base){
- for(unsigned i=0;i<8;i++)if(rd848(base+16*i)&~(i==2?BIT:0u))return false;
- return true;
+bool s865_test_force_timer(unsigned id,uint64_t vector,uint64_t call){
+ return s865_fixture_force_timer(id,vector,call,mixed_calls848[id]);
 }
-/* A real pending timer IRQ must be delivered and acknowledged, never
- * discarded via a synthetic EOI. Only the owned safe root can drain it. */
-static bool drain865(uint64_t safe,uint16_t cs,unsigned id){
- if(root848()!=safe||(flags848()&0x200)||armed848||!receipt860||
-    rd848(0x320)!=(BIT|V)||rd848(0x390)||rd848(0x380)||
-    pending848(0x100)||!timer_only865(0x200)||rd848(0x80)||
-    s865_drain_root||s865_drain_lapic||s865_drain_seen)return false;
- if(!rd848(0x220))return true;
- struct gate848 saved=idt848[V];
- s865_drain_root=safe;s865_drain_lapic=lapic848;
- gate848(V,s865_drain_entry,cs,0,0x8e);
- __asm__ volatile("":::"memory");
- for(unsigned attempt=0;attempt<256&&!s865_drain_seen;attempt++)s865_drain_wait();
- __asm__ volatile("":::"memory");
- idt848[V]=saved;
- bool ok=s865_drain_seen==1&&root848()==safe&&!(flags848()&0x200)&&
-    !pending848(0x100)&&!pending848(0x200)&&!rd848(0x390)&&!rd848(0x380)&&rd848(0x320)==(BIT|V);
- s865_drain_root=0;s865_drain_lapic=0;s865_drain_seen=0;
- if(ok){arch_puts("STYLEOS S865 TIMER-DRAIN");fld848("id",id);fld848("safe",safe);fld848("pc",(uintptr_t)s865_drain_cli);fld848("vector",V);arch_putc('\n');}
- return ok;
-}
-#endif
-bool s848_active(void){return active848;}
-unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
-#ifdef STYLEOS_TEST_RUNTIME_BANK_862
- int id=runtime860?runtime860->dispatcher.current:-1;
- if(!active848||id<0||(unsigned)id>=S846_ROOT_COUNT||root!=root848()||root!=bank862.slots[id].root||receipt860||(flags848()&0x200))fail848("862-origin");
-#else
- int id=ctl848.current;if(!active848||id<0||id>1||root!=root848()||root!=ctl848.slot[id].root)fail848("origin");
-#endif
-#ifdef STYLEOS_TEST_FX_CONTEXT_849
-#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
-#ifdef STYLEOS_INTEGRATED_RUNTIME_864
- /* Validate actual non-IRQ frame before retiring our timer. The
-  * classifier's armed argument describes the post-retirement contract.
-  * Never discard a pending or in-service IRQ to manufacture a syscall. */
- enum rt865_frame_kind kind=rt865_classify_frame(f,(uintptr_t)f,f->vector==14?cr2:0,
-    root,bank862.safe,bank862.cs,bank862.ss,f->vector==V&&armed848);
- if(kind==RT865_INVALID)fail848("865-frame-contract");
- if(kind!=RT865_TICK){
-  if(!armed848||rd848(0x320)!=V||rd848(0x380)!=COUNT||
-     pending848(0x100)||!timer_only865(0x200))fail848("865-timer-cancel-origin");
-  /* Explicit CI injection: let a real timer expire during the first
-   * returning trap. Never needed by the retirement algorithm itself. */
-  if(s865_fixture_force_timer((unsigned)id,f->vector,f->gpr[0],mixed_calls848[id])){
-   unsigned spins=0;
-   while(!(rd848(0x220)&BIT)&&spins++<10000000u)__asm__ volatile("pause");
-   if(!(rd848(0x220)&BIT)||rd848(0x390)||!timer_only865(0x200))fail848("865-race-test-not-observed");
-  }
-  uint32_t remaining=rd848(0x390);
-  if(remaining>COUNT)fail848("865-timer-cancel-count");
-  wr848(0x320,BIT|V);wr848(0x380,0);
-  uint32_t after=rd848(0x390),initial=rd848(0x380),lvt=rd848(0x320);
-  uint32_t isr=pending848(0x100),irr=pending848(0x200);
-  if(after||initial||lvt!=(BIT|V)||isr||!timer_only865(0x200))fail848("865-timer-cancel-pending");
-  armed848=false;
-  arch_puts("STYLEOS S865 TIMER-CANCEL");fld848("id",(unsigned)id);fld848("root",root);
-  fld848("vector",f->vector);fld848("remaining",remaining);fld848("initial",initial);
-  fld848("current",after);fld848("lvt",lvt);fld848("isr",isr);fld848("irr",irr);arch_putc('\n');
- }
- bool returning=kind==RT865_SYSCALL;
- /* Classification is an architectural decision, not a fixture prediction. */
-#else
- bool returning=f->vector==128&&f->gpr[0]==first_call848((unsigned)id);
-#endif
- if(!s849_guest_suspend((unsigned)id,root,f->vector!=V&&!returning))fail848("fx-suspend");
-#else
- if(!s849_guest_suspend((unsigned)id,root,f->vector!=V))fail848("fx-suspend");
-#endif
-#endif
-#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+void s865_test_observe_trap(unsigned id,enum rt865_frame_kind kind,const struct s847_raw *f,uint64_t root,uint32_t isr){
  arch_puts("STYLEOS S861T FRAME");fld848("step",runtime860->dispatcher.dispatches-1-DISPATCH_BASE848);fld848("flags",f->rflags);arch_putc('\n');
-#endif
-#ifdef STYLEOS_INTEGRATED_RUNTIME_864
- /* Authenticate the current owner against the actual scheduler and bank.
-  * The event is classified by the CPU frame, never by user program bytes. */
- const struct ps_slot *owner=&runtime860->dispatcher.slots[id];
- const struct rt862_bank_slot *context=&bank862.slots[id];
- const struct pr_entry *running=pr_find(runtime860->dispatcher.registry,owner->pid);
- if(!running||running->state!=PR_RUNNING||!owner->pid||
-    owner->pid!=context->pid||owner->handle!=context->handle||
-    owner->user_root!=root||context->root!=root||
-    running->scheduler_handle!=owner->handle||running->page_root!=root||
-    runtime860->dispatcher.safe_root!=bank862.safe)fail848("865-current-owner");
- uint32_t isr=0;
- if(kind==RT865_TICK){
-  isr=rd848(0x120);
-  if(!armed848||rd848(0x390)||rd848(0x320)!=V||!(isr&BIT))
-    fail848("865-irq-origin");
-  wr848(0x320,BIT|V);wr848(0xb0,0);
-  if((rd848(0x120)&BIT)||(rd848(0x220)&BIT)||rd848(0x320)!=(BIT|V))
-    fail848("eoi-mask");
-  armed848=false;
- }else if(armed848||rd848(0x390)||rd848(0x320)!=(BIT|V)||
-          pending848(0x100)||!timer_only865(0x200))fail848("865-nonirq-timer");
- /* Only authenticated receipt is consumed by the scheduler on safe root.
-  * No expected instruction PC, GPR signature or per-task tick budget. */
- pending860=*f;frame860=(uintptr_t)f;
- cr2862=f->vector==14?cr2:0;receipt860=true;
  /* The integrated stress driver still needs observations for its external
   * verifier. These user words and register values grant no authority. */
  uint64_t p=word848(S846_DATA),signal=word848(S846_DATA+8);
@@ -270,8 +185,27 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
   unsigned state=f->vector==128?S847_EXITED:S847_FAULTED;
   arch_puts("STYLEOS S848 END");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("vector",f->vector);fld848("error",f->error);fld848("cr2",cr2862);fld848("state",state);fld848("ticks",ticks848);arch_putc('\n');
  }
- return 0;
-#else /* historical fixture-specific raw trap validation */
+}
+#else
+bool s848_active(void){return active848;}
+unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
+#ifdef STYLEOS_TEST_RUNTIME_BANK_862
+ int id=runtime860?runtime860->dispatcher.current:-1;
+ if(!active848||id<0||(unsigned)id>=S846_ROOT_COUNT||root!=root848()||root!=bank862.slots[id].root||receipt860||(flags848()&0x200))fail848("862-origin");
+#else
+ int id=ctl848.current;if(!active848||id<0||id>1||root!=root848()||root!=ctl848.slot[id].root)fail848("origin");
+#endif
+#ifdef STYLEOS_TEST_FX_CONTEXT_849
+#ifdef STYLEOS_TEST_RUNTIME_MIXED_863
+ bool returning=f->vector==128&&f->gpr[0]==first_call848((unsigned)id);
+ if(!s849_guest_suspend((unsigned)id,root,f->vector!=V&&!returning))fail848("fx-suspend");
+#else
+ if(!s849_guest_suspend((unsigned)id,root,f->vector!=V))fail848("fx-suspend");
+#endif
+#endif
+#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+ arch_puts("STYLEOS S861T FRAME");fld848("step",runtime860->dispatcher.dispatches-1-DISPATCH_BASE848);fld848("flags",f->rflags);arch_putc('\n');
+#endif
 #ifdef STYLEOS_TEST_RUNTIME_MIXED_863
  if(returning){
   if(armed848||mixed_calls848[id]||local848[id]||progress848[id]||word848(S846_DATA)||word848(S846_DATA+8)||
@@ -335,74 +269,6 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  unsigned terminal_state=ctl848.slot[id].state;
 #endif
  arch_puts("STYLEOS S848 END");fld848("id",id);fld848("root",root);fld848("rip",f->rip);fld848("vector",f->vector);fld848("error",f->error);fld848("cr2",id?0:cr2);fld848("state",terminal_state);fld848("ticks",ticks848);arch_putc('\n');return 0;
-#endif /* integrated raw event / historical fixture */
-}
-#ifdef STYLEOS_INTEGRATED_RUNTIME_864
-/* One authenticated hardware dispatch, independent of a workload, window,
- * session, expected syscall or batch counter. Caller owns the current
- * admitted selection and has installed the audited task descriptor tables.
- * No user pointer or external caller has authority over this interface.
- * Restore the original descriptors and audit before committing any event. */
-struct rt865_slice {
- enum rt865_frame_kind kind;
- enum pr_state state;
- uint64_t ticks_before;
-};
-static struct rt865_slice run865(const struct rt862_selection *ticket,
- const struct up_context *ctx,const struct desc848 *g0,const struct desc848 *i0,
- const struct rt858_live *original,bool (*audit)(void *),void *opaque){
- const uint64_t safe=ticket->safe_root;
- const unsigned id=ticket->slot;
- if(!active848||!runtime860||id>=S846_ROOT_COUNT||root848()!=safe||
-    flags848()&0x200||receipt860||frame860||cr2862||armed848||
-    rd848(0x320)!=(BIT|V)||rd848(0x390)||pending848(0x100)||pending848(0x200))
-  fail848("865-dispatch-boundary");
- /* Re-derive the context from the authenticated bank, never trust a
-  * caller-provided replacement PC/register file. */
- struct up_context expected={0};
- if(!rt862_bank_enter(&bank862,runtime860,ticket,safe,&expected)||
-    ctx->pc!=expected.pc||ctx->sp!=expected.sp||ctx->status!=expected.status||
-    ctx->cs!=expected.cs||ctx->ss!=expected.ss)fail848("865-dispatch-ticket");
- for(unsigned i=0;i<15;i++)if(ctx->gpr[i]!=expected.gpr[i])fail848("865-dispatch-register");
- const struct pr_entry *running=pr_find(runtime860->dispatcher.registry,ticket->pid);
- if(!running||running->state!=PR_RUNNING||running->scheduler_handle!=ticket->handle||
-    running->page_root!=ticket->child_root)fail848("865-dispatch-owner");
- const uint64_t before=running->cpu_ticks;
- const uint64_t resident=running->resident_bytes;
- if(!s849_guest_dispatch(id,ticket->child_root))fail848("fx-dispatch");
- armed848=true;wr848(0x320,V);wr848(0x380,COUNT);
- uint64_t sp0,sp1;
- __asm__ volatile("mov %%rsp,%0":"=r"(sp0));
- s847_enter(&expected,ticket->child_root,safe);
- __asm__ volatile("mov %%rsp,%0":"=r"(sp1));
- if(root848()!=safe||(flags848()&0x200)||sp0!=sp1||armed848||!receipt860||
-    rd848(0x390)||rd848(0x320)!=(BIT|V)||pending848(0x100)||!timer_only865(0x200))
-  fail848("865-safe-return");
- if(pending860.vector!=V){if(!drain865(safe,original->cs,id))fail848("865-timer-drain");}
- else if(pending848(0x200))fail848("865-irq-duplicate");
- enum rt865_frame_kind kind=rt865_classify_frame(&pending860,frame860,cr2862,
-     ticket->child_root,safe,bank862.cs,bank862.ss,pending860.vector==V);
- if(kind==RT865_INVALID)fail848("865-receipt-kind");
- enum pr_state state=kind==RT865_TERMINAL?(pending860.vector==128?PR_EXITED:PR_FAULTED):PR_READY;
- __asm__ volatile("lidt %0;lgdt %1"::"m"(*i0),"m"(*g0):"memory");
- struct rt858_live returned=live848();
- if(returned.root!=safe||returned.gdt!=original->gdt||returned.idt!=original->idt||
-    returned.gdt_limit!=original->gdt_limit||returned.idt_limit!=original->idt_limit||
-    returned.tr!=original->tr||returned.cs!=original->cs||(returned.rflags&0x200)||
-    !audit||!audit(opaque))fail848("861-timer-restore");
- struct rt860_tick t={.slot=id,.dispatch=ticket->dispatch,.pid=ticket->pid,
-  .handle=ticket->handle,.child_root=ticket->child_root,.safe_root=root848(),
-  .frame_va=frame860,.vector=pending860.vector,.isr=pending860.vector==V,
-  .eoi=pending860.vector==V,.safe_flags=flags848(),.frame=pending860};
- if(rt863_bank_event(&bank862,runtime860,ticket,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
- receipt860=false;frame860=0;cr2862=0;
- volatile unsigned char *wipe=(void *)&pending860;
- for(size_t j=0;j<sizeof pending860;j++)wipe[j]=0;
- const struct pr_entry *after=pr_find(runtime860->dispatcher.registry,ticket->pid);
- if(!after||after->state!=state||after->resident_bytes!=resident||
-    after->cpu_ticks!=before+(kind==RT865_TICK)||runtime860->dispatcher.current!=-1)
-  fail848("865-committed-state");
- return (struct rt865_slice){kind,state,before};
 }
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_SPARSE_862
@@ -691,7 +557,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   if(receipt860||dpr_dispatch(runtime860,&chosen,&chosen_pid)!=PS_OK||chosen>=S846_ROOT_COUNT||chosen_pid!=pid860[chosen])fail848("860-dispatch");
 #endif
 #endif
-#ifdef STYLEOS_TEST_RUNTIME_TIMER_861
+#if defined(STYLEOS_TEST_RUNTIME_TIMER_861) && !defined(STYLEOS_INTEGRATED_RUNTIME_864)
   __asm__ volatile("lgdt %0;lidt %1"::"m"(g),"m"(d):"memory");
 #endif
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
@@ -763,7 +629,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
   /* This termination request is solely a test workload policy. */
   const struct pr_entry *running=pr_find(pr_global(),chosen_pid);
   if(!running||!s865_fixture_request_stop(id,running->cpu_ticks,&leases[id],s862_loop_budget[id]))fail848("865-fixture-policy");
-  struct rt865_slice slice=run865(&selection,&ctx,&g0,&i0,&original,audit,opaque);
+  struct rt865_slice slice=run865(&selection,&ctx,&g0,&i0,&g,&d,&original,audit,opaque);
   const enum rt865_frame_kind observed=slice.kind;
   const bool terminal=observed==RT865_TERMINAL,call_slice=observed==RT865_SYSCALL;
   const enum pr_state final_state=slice.state;
@@ -914,11 +780,7 @@ struct acpi806_topology topo={0};uint64_t apic=msr848(0x1b);
    * boundary. Peers retain their own roots, contexts and scheduling state. */
   if(terminal){
    const uint64_t dead_root=selection.child_root,gen=selection.handle;
-   if(!retire||!audit(opaque)||!s865_fx_retire(id,dead_root,gen,safe)||
-      !retire(opaque,id,dead_root,gen)||
-      rt862_bank_release(&bank862,runtime860,safe,id,chosen_pid,gen,dead_root)!=PS_OK||
-      pr_find(pr_global(),chosen_pid)||bank862.slots[id].pid||runtime860->dispatcher.slots[id].pid||
-      !audit(opaque))fail848("865-terminal-release");
+   s865_retire_terminal(&selection,audit,retire,opaque);
    arch_puts("STYLEOS S862S RELEASE");fld848("id",id);fld848("pid",chosen_pid);fld848("handle",gen);fld848("root",dead_root);fld848("safe",safe);fld848("processes",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');
   }
 #endif

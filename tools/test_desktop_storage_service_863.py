@@ -270,7 +270,7 @@ def main():
         compiler=json.loads((build/'x86_64/owned-shell-compiler.json').read_text())
         if '-DSTYLEOS_OWNED_SHELL_865=1' not in compiler['flags'] or not compiler['sources'] or set(compiler['sources'])!=set(compiler['source_sha256']):raise ValueError('owned shell compiler manifest')
         excluded={'boot/x86_64/user_preemption_848.c','boot/x86_64/fx_guest_849.c',
-                  'boot/x86_64/process_trial_847.c','arch/x86_64/process_entry_847.S','tests/guest/workload_865.c'}
+                  'boot/x86_64/process_trial_847.c','boot/x86_64/native_executor_865.c','arch/x86_64/process_entry_847.S','tests/guest/workload_865.c'}
         if excluded.intersection(compiler['sources']) or any(s.startswith('tests/') for s in compiler['sources']):
             raise ValueError('owned shell linked diagnostic translation units')
         if any((build/'x86_64').glob('external-workload-*')) or (build/'x86_64/external_workload_865.h').exists():
