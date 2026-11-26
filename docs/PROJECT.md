@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 01 block service candidate
+Processes 04 accepted, CI 45882838910 3/3 SUCCESS. [Block service and large-file requirement](architecture/STYLEFS_BLOCK_SERVICE_01.md), [handoff](NEXT_CHAT_STYLEFS_01.md). New kernel-only component, not yet guest-integrated. Source and previous refs preserved.
+
 ## 2026-11-26 — Processes 04 tabs candidate
 Phase 03 CI 45882253963 3/3 SUCCESS. [Tabs](architecture/PROCESS_TABS_04.md), [handoff](NEXT_CHAT_PROCESSES_04.md). Guest validation pending; next StyleFS.
 

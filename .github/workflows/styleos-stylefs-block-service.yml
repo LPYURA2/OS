@@ -1,0 +1,68 @@
+name: StyleOS StyleFS block service
+on:
+  push:
+    branches: [feature/styleos-stylefs-block-service-01]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Block service and existing StyleFS regression (GCC/Clang sanitizers)
+        run: |
+          set -euo pipefail
+          mkdir -p build/stylefs-tests
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_block_service.c kernel/block_service.c -o "build/stylefs-tests/$cc-block"
+            "build/stylefs-tests/$cc-block" | tee "build/stylefs-tests/$cc-block.log"
+            for t in test_stylefs test_stylefs_v2 test_stylefs_background_copy test_desktop_volume_io; do
+              "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude "tests/$t.c" kernel/stylefs.c kernel/desktop_volume_io.c -o "build/stylefs-tests/$cc-$t"
+              "build/stylefs-tests/$cc-$t" | tee "build/stylefs-tests/$cc-$t.log"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-block-service-host
+          path: build/stylefs-tests/
+  guest-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Existing ordinary ISO and storage regression (new service not linked)
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --output build/stylefs-ordinary
+      - name: Existing process and storage isolation regression
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-forced-stop --output build/stylefs-peer
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-block-service-regression
+          path: |
+            build/stylefs-ordinary/
+            build/stylefs-peer/
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact source
+        run: |
+          set -euo pipefail
+          mkdir -p build/source
+          git archive --format=tar --prefix="StyleOS-$GITHUB_SHA/" "$GITHUB_SHA" | gzip -n > "build/source/StyleOS-$GITHUB_SHA.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > build/source/git-identities.txt
+          (cd build/source && sha256sum -- *.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: styleos-source-${{ github.sha }}
+          path: build/source/
