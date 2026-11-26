@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 10 wide extent data path candidate
+[64-bit extent windows](architecture/STYLEFS_LARGE_EXTENT_10.md), [handoff](NEXT_CHAT_STYLEFS_10.md). Old v1/v2 preserved, new host component; actual large file format/guest pending.
+
 ## 2026-11-26 — StyleFS 09 desktop permissions candidate
 08 host and RW/RO guest PASS; final regression pending at work start. [Scoped guest filesystem](architecture/STYLEFS_DESKTOP_PERMISSIONS_09.md), [handoff](NEXT_CHAT_STYLEFS_09.md). CI pending; no login/production ACL claim.
 
