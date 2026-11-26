@@ -64,7 +64,9 @@ static __attribute__((noinline)) void roundtrip861(unsigned i,uint64_t root,uint
 struct user_audit861 {const struct s842_cache *cache;const struct boot_memory_evidence *e;const struct s846_guard *guard;const struct s844_arena *arena;const struct s844_lease *leases;};
 static bool user_audit861(void *opaque){
  const struct user_audit861 *a=opaque;
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt865_roots_audit_sparse_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,children861);
+#elif defined(STYLEOS_TEST_FOUR_GUEST_864)
  return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt864_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,children861);
 #else
  return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt861_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,&children861[0],&children861[1]);
@@ -109,14 +111,21 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  if(d->dispatcher.dispatches!=26*round||pr_global()->next_pid!=1+4*round||ws_global()->next_id!=1+4*round)fail("864-batch-start");
  arch_puts("STYLEOS S864 BATCH-BEGIN");field("round",round);field("dispatches",d->dispatcher.dispatches);field("next",arena->next);arch_putc('\n');
  if(!base861||!arena||!boundary861(d,cache)||!s844_count(arena,&used)||used||arena->next!=gen||!s850_desktop_audit_frozen_861(base861,cache,&frozen861,p->evidence,guard,&composed))fail("864-admit");
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ struct user_audit861 sparse={cache,p->evidence,guard,arena,l};
+ if(!user_audit861(&sparse))fail("865-empty-audit");
+ for(unsigned i=0;i<4;i++){
+  if(!s844_acquire(arena,S846_OWNER_A+i,3,&l[i])||!iszero861(l[i].pa,3*4096))fail("865-slot-lease");
+  *(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)=UINT64_C(0x86110000)+i;
+  if(!s865_root_build(base861,cache,arena,l,i,guard,child_tables861[i],(uintptr_t)child_tables861[i],&children861[i])||
+     !user_audit861(&sparse)||!s844_count(arena,&used)||used!=3*(i+1))fail("865-slot-build");
+  arch_puts("STYLEOS S865 ROOT-ADMIT");field("id",i);field("safe",safe);field("used",used);field("gen",l[i].generation);arch_putc('\n');
+#else
  for(unsigned i=0;i<4;i++){
   if(!s844_acquire(arena,S846_OWNER_A+i,3,&l[i])||!iszero861(l[i].pa,3*4096))fail("864-lease");
   *(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)=UINT64_C(0x86110000)+i;
  }
  for(unsigned i=0;i<4;i++){
-#ifdef STYLEOS_INTEGRATED_RUNTIME_864
-  if(!s865_root_build(base861,cache,arena,l,i,guard,child_tables861[i],(uintptr_t)child_tables861[i],&children861[i]))fail("865-build");
-#else
   if(!s846_build(base861,cache,arena,l,i,guard,child_tables861[i],(uintptr_t)child_tables861[i],&children861[i]))fail("864-build");
 #endif
   arch_puts("STYLEOS S864 ROOT");field("id",i);field("safe",safe);field("child",children861[i].built.root);field("pa",l[i].pa);field("gen",l[i].generation);arch_putc('\n');
@@ -150,9 +159,24 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
  s848_trial(children861,l,safe,base861->lapic,user_audit861,&a);
 #endif
  if(!user_audit861(&a))fail("864-final-audit");
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ /* The scheduler has returned all processes to terminal states. Revoke
+  * each detached root and scrub its own lease separately; prove the
+  * remaining roots still audit after every retirement. */
+ for(unsigned i=0;i<4;i++){
+  const struct s844_lease lease=l[i];
+  zero861(&children861[i],sizeof children861[i]);zero861(child_tables861[i],sizeof child_tables861[i]);
+  if(!iszero861((uintptr_t)child_tables861[i],sizeof child_tables861[i])||
+     !s844_release(arena,lease.owner,lease)||!iszero861(lease.pa,3*4096))fail("865-slot-release");
+  zero861(&l[i],sizeof l[i]);
+  if(!user_audit861(&a)||!s844_count(arena,&used)||used!=3*(3-i))fail("865-slot-retire-audit");
+  arch_puts("STYLEOS S865 ROOT-RETIRE");field("id",i);field("safe",safe);field("used",used);field("gen",lease.generation);arch_putc('\n');
+ }
+#else
  zero861(children861,sizeof children861);zero861(child_tables861,sizeof child_tables861);
  if(!iszero861((uintptr_t)child_tables861,sizeof child_tables861))fail("864-table-zero");
  for(unsigned i=0;i<4;i++)if(!s844_release(arena,S846_OWNER_A+i,l[i])||!iszero861(l[i].pa,3*4096))fail("864-release");
+#endif
  struct rt858_live v=capture861();
  if(rt861_dispatcher(&v)!=d||!s844_count(arena,&used)||used)fail("864-reap-boundary");
  s860_reap(safe);

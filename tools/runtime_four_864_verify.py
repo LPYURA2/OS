@@ -43,6 +43,18 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
             end=child+32*4096
             if child%4096 or not lo<=child<end<=hi or any(child<b and a<end for a,b in spans):raise ValueError('table overlap')
             spans.append((child,end))
+        admits=group(b'STYLEOS S865 ROOT-ADMIT',('id','safe','used','gen'),4 if integrated else 0)
+        retires=group(b'STYLEOS S865 ROOT-RETIRE',('id','safe','used','gen'),4 if integrated else 0)
+        if integrated:
+            for i in range(4):
+                eq(admits[i],(i,safe,3*(i+1),gen0+base+i),'sparse root admit')
+                eq(retires[i],(i,safe,3*(3-i),gen0+base+i),'sparse root retire')
+            a=[lines.index(x) for x in rows(b'STYLEOS S865 ROOT-ADMIT')]
+            r=[lines.index(x) for x in rows(b'STYLEOS S865 ROOT-RETIRE')]
+            rt=[lines.index(x) for x in rows(b'STYLEOS S864 ROOT')]
+            for i in range(4):
+                if not a[i]<rt[i] or (i and rt[i-1]>=a[i]):raise ValueError('sparse admission order')
+            if not lines.index(rows(b'STYLEOS S848 TOTAL')[0])<r[0]<r[-1]<lines.index(rows(b'STYLEOS S860 CLEAN')[0]):raise ValueError('sparse retirement order')
         switches=group(b'STYLEOS S864 SWITCH',('id','child','safe','rip','rsp','cs','flags','frame'),4)
         for i,p in enumerate(switches):
             eq(p,(i,roots[i]['child'],safe,lo+site['child_rva'],p['rsp'],o['bp']['cs'],p['flags'],o['bp']['frame']),'switch')

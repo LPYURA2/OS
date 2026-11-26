@@ -78,5 +78,23 @@ int main(void){
  memset(roots,0,sizeof roots);memset(ct,0,sizeof ct);
  for(unsigned i=0;i<4;i++)CHECK(s844_release(&arena,leases[i].owner,leases[i]));
  unsigned used;CHECK(s844_count(&arena,&used)&&!used);
+ memset(leases,0,sizeof leases);
+ CHECK(rt865_roots_audit_sparse(&base,&req,&arena,leases,&guard,&desktop,roots));
+ CHECK(s844_acquire(&arena,S846_OWNER_A+3,3,&leases[3]));
+ REJECT(rt865_roots_audit_sparse(&base,&req,&arena,leases,&guard,&desktop,roots));
+ CHECK(s865_root_build(&base,&c,&arena,leases,3,&guard,ct[3],0x200000+5*PG_TABLE_BYTES,&roots[3]));
+ CHECK(rt865_roots_audit_sparse(&base,&req,&arena,leases,&guard,&desktop,roots));
+ CHECK(s844_acquire(&arena,S846_OWNER_A,3,&leases[0]));
+ CHECK(s865_root_build(&base,&c,&arena,leases,0,&guard,ct[0],0x200000+2*PG_TABLE_BYTES,&roots[0]));
+ CHECK(rt865_roots_audit_sparse(&base,&req,&arena,leases,&guard,&desktop,roots));
+ uint64_t *x=leaf(&roots[3].plan,S846_CODE),saved=*x;*x=leases[0].pa|5;
+ REJECT(rt865_roots_audit_sparse(&base,&req,&arena,leases,&guard,&desktop,roots));*x=saved;
+ CHECK(s844_release(&arena,leases[0].owner,leases[0]));memset(&leases[0],0,sizeof leases[0]);
+ REJECT(rt865_roots_audit_sparse(&base,&req,&arena,leases,&guard,&desktop,roots));
+ memset(&roots[0],0,sizeof roots[0]);memset(ct[0],0,sizeof ct[0]);
+ CHECK(rt865_roots_audit_sparse(&base,&req,&arena,leases,&guard,&desktop,roots));
+ CHECK(s844_release(&arena,leases[3].owner,leases[3]));memset(&leases[3],0,sizeof leases[3]);
+ memset(&roots[3],0,sizeof roots[3]);memset(ct[3],0,sizeof ct[3]);
+ CHECK(rt865_roots_audit_sparse(&base,&req,&arena,leases,&guard,&desktop,roots));
  printf("S864 joint four roots HOST ONLY: %u checks, %u refusals PASS\n",count,refused);
 }
