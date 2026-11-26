@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 21 directory index candidate
+20.1 wide guest PASS; full CI pending at start. New immutable directory page codec and bounded lookup, host 100000-entry workload pending. [Handoff](NEXT_CHAT_STYLEFS_21.md). First full release VM 4GB RAM/20GB disk confirmed.
+
 ## 2026-11-26 — StyleFS 20.1 workspace correction
 19 CI 6/6 SUCCESS. 20 initial CI 45893651549 6/7, wide guest fail-stop sfs20-workspace (artifact 15153315595). Page-rounded isolated workspaces; no weakened attestation. Retest pending. Owner updated network/browser/online updates and VM disk 20 GB requirements. [Handoff](NEXT_CHAT_STYLEFS_20.md).
 
