@@ -53,3 +53,6 @@ bool s865_fixture_request_stop(unsigned id,uint64_t ticks,const struct s844_leas
  if(ticks==budget)*(volatile uint64_t *)(uintptr_t)(lease->pa+P+8)=1;
  return true;
 }
+
+/* One actual pending IRQ per batch, induced only by the CI workload. */
+bool s865_fixture_force_timer(unsigned id,uint64_t vector,uint64_t call,unsigned seen){return id==0&&vector==128&&call==1&&!seen;}

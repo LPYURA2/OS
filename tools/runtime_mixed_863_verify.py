@@ -24,6 +24,8 @@ def loop_site(efi,map_file,*,four=False,external=False):
     site['common_event_rva'],_=sym('rt863_bank_event',r'kernel_runtime_bank_862\.o')
     if external:
         if not four:raise ValueError('external workload requires four contexts')
+        site['drain_rva'],off=sym('s865_drain_cli',r'arch_x86_64_process_entry_847\.o')
+        if _range(efi,off-2,4,'drain wait')!=b'\xfb\x90\xfa\xc3':raise ValueError('kernel drain instructions')
         if re.search(r'\bs848_[abcd]_(start|yield|loop_end|fault|exit|end)\b',s):raise ValueError('test executable linked in kernel')
         import hashlib,json
         from build_external_workload_865 import read_object

@@ -86,6 +86,48 @@ s848_irq_entry:
     pushq $0x50
     jmp .Ltrap847
 #endif
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+/* Kernel-only retirement of an already pending one-shot timer interrupt.
+ * The gate is installed only on safe CR3 with IF clear. No synthetic INT,
+ * no user frame, no FPU use. The only admissible interrupted RIP is CLI. */
+.globl s865_drain_wait,s865_drain_cli,s865_drain_entry
+s865_drain_wait:
+    sti
+    nop
+s865_drain_cli:
+    cli
+    ret
+s865_drain_entry:
+    pushq %rax
+    pushq %r10
+    pushq %r11
+    leaq s865_drain_cli(%rip),%rax
+    cmpq %rax,24(%rsp)
+    jne .Lbad847
+    testq $3,32(%rsp)
+    jnz .Lbad847
+    testq $0x200,40(%rsp)
+    jz .Lbad847
+    movq %cr3,%rax
+    cmpq s865_drain_root(%rip),%rax
+    jne .Lbad847
+    cmpq $0,s865_drain_seen(%rip)
+    jne .Lbad847
+    movq s865_drain_lapic(%rip),%r10
+    testq %r10,%r10
+    jz .Lbad847
+    cmpl $0x10000,0x120(%r10)
+    jne .Lbad847
+    cmpl $0,0x220(%r10)
+    jne .Lbad847
+    movl $0,0xb0(%r10)
+    movq $1,s865_drain_seen(%rip)
+    andq $-513,40(%rsp)
+    popq %r11
+    popq %r10
+    popq %rax
+    iretq
+#endif
 .Ltrap847:
     pushq %r15
     pushq %r14

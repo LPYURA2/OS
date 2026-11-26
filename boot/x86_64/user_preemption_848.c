@@ -142,6 +142,35 @@ static uint64_t first_arg848(unsigned id,unsigned reg){
  return pattern848(id,reg);
 }
 #endif
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+extern void s865_drain_wait(void),s865_drain_entry(void),s865_drain_cli(void);
+volatile uint64_t s865_drain_root,s865_drain_lapic,s865_drain_seen;
+static bool timer_only865(unsigned base){
+ for(unsigned i=0;i<8;i++)if(rd848(base+16*i)&~(i==2?BIT:0u))return false;
+ return true;
+}
+/* A real pending timer IRQ must be delivered and acknowledged, never
+ * discarded via a synthetic EOI. Only the owned safe root can drain it. */
+static bool drain865(uint64_t safe,uint16_t cs,unsigned id){
+ if(root848()!=safe||(flags848()&0x200)||armed848||!receipt860||
+    rd848(0x320)!=(BIT|V)||rd848(0x390)||rd848(0x380)||
+    pending848(0x100)||!timer_only865(0x200)||rd848(0x80)||
+    s865_drain_root||s865_drain_lapic||s865_drain_seen)return false;
+ if(!rd848(0x220))return true;
+ struct gate848 saved=idt848[V];
+ s865_drain_root=safe;s865_drain_lapic=lapic848;
+ gate848(V,s865_drain_entry,cs,0,0x8e);
+ __asm__ volatile("":::"memory");
+ for(unsigned attempt=0;attempt<256&&!s865_drain_seen;attempt++)s865_drain_wait();
+ __asm__ volatile("":::"memory");
+ idt848[V]=saved;
+ bool ok=s865_drain_seen==1&&root848()==safe&&!(flags848()&0x200)&&
+    !pending848(0x100)&&!pending848(0x200)&&!rd848(0x390)&&!rd848(0x380)&&rd848(0x320)==(BIT|V);
+ s865_drain_root=0;s865_drain_lapic=0;s865_drain_seen=0;
+ if(ok){arch_puts("STYLEOS S865 TIMER-DRAIN");fld848("id",id);fld848("safe",safe);fld848("pc",(uintptr_t)s865_drain_cli);fld848("vector",V);arch_putc('\n');}
+ return ok;
+}
+#endif
 bool s848_active(void){return active848;}
 unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
 #ifdef STYLEOS_TEST_RUNTIME_BANK_862
@@ -161,13 +190,20 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  if(kind==RT865_INVALID)fail848("865-frame-contract");
  if(kind!=RT865_TICK){
   if(!armed848||rd848(0x320)!=V||rd848(0x380)!=COUNT||
-     pending848(0x100)||pending848(0x200))fail848("865-timer-cancel-origin");
+     pending848(0x100)||!timer_only865(0x200))fail848("865-timer-cancel-origin");
+  /* Explicit CI injection: let a real timer expire during the first
+   * returning trap. Never needed by the retirement algorithm itself. */
+  if(s865_fixture_force_timer((unsigned)id,f->vector,f->gpr[0],mixed_calls848[id])){
+   unsigned spins=0;
+   while(!(rd848(0x220)&BIT)&&spins++<10000000u)__asm__ volatile("pause");
+   if(!(rd848(0x220)&BIT)||rd848(0x390)||!timer_only865(0x200))fail848("865-race-test-not-observed");
+  }
   uint32_t remaining=rd848(0x390);
-  if(!remaining||remaining>COUNT)fail848("865-timer-cancel-expired");
+  if(remaining>COUNT)fail848("865-timer-cancel-count");
   wr848(0x320,BIT|V);wr848(0x380,0);
   uint32_t after=rd848(0x390),initial=rd848(0x380),lvt=rd848(0x320);
   uint32_t isr=pending848(0x100),irr=pending848(0x200);
-  if(after||initial||lvt!=(BIT|V)||isr||irr)fail848("865-timer-cancel-pending");
+  if(after||initial||lvt!=(BIT|V)||isr||!timer_only865(0x200))fail848("865-timer-cancel-pending");
   armed848=false;
   arch_puts("STYLEOS S865 TIMER-CANCEL");fld848("id",(unsigned)id);fld848("root",root);
   fld848("vector",f->vector);fld848("remaining",remaining);fld848("initial",initial);
@@ -207,7 +243,7 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
     fail848("eoi-mask");
   armed848=false;
  }else if(armed848||rd848(0x390)||rd848(0x320)!=(BIT|V)||
-          pending848(0x100)||pending848(0x200))fail848("865-nonirq-timer");
+          pending848(0x100)||!timer_only865(0x200))fail848("865-nonirq-timer");
  /* Only authenticated receipt is consumed by the scheduler on safe root.
   * No expected instruction PC, GPR signature or per-task tick budget. */
  pending860=*f;frame860=(uintptr_t)f;
@@ -337,8 +373,10 @@ static struct rt865_slice run865(const struct rt862_selection *ticket,
  s847_enter(&expected,ticket->child_root,safe);
  __asm__ volatile("mov %%rsp,%0":"=r"(sp1));
  if(root848()!=safe||(flags848()&0x200)||sp0!=sp1||armed848||!receipt860||
-    rd848(0x390)||rd848(0x320)!=(BIT|V)||pending848(0x100)||pending848(0x200))
+    rd848(0x390)||rd848(0x320)!=(BIT|V)||pending848(0x100)||!timer_only865(0x200))
   fail848("865-safe-return");
+ if(pending860.vector!=V){if(!drain865(safe,original->cs,id))fail848("865-timer-drain");}
+ else if(pending848(0x200))fail848("865-irq-duplicate");
  enum rt865_frame_kind kind=rt865_classify_frame(&pending860,frame860,cr2862,
      ticket->child_root,safe,bank862.cs,bank862.ss,pending860.vector==V);
  if(kind==RT865_INVALID)fail848("865-receipt-kind");

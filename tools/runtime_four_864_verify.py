@@ -71,6 +71,8 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
         fx_observed=group(b'STYLEOS S849 OBSERVED',('id','root','n','control','other-zero'),N if integrated else 0)
         cancel_rows=rows(b'STYLEOS S865 TIMER-CANCEL')
         if len(cancel_rows)!=(8 if integrated else 0):raise ValueError('timer cancellation count')
+        drain_rows=rows(b'STYLEOS S865 TIMER-DRAIN')
+        drain_index=0
         cancel_index=0
         ticks=[0]*4;seen=[0]*4;prog=[0]*4;saved=[(CODE,SP,2)]*4;events=[];windows=4;recv_index=close_index=0
         for step,(i,kind) in enumerate(order()):
@@ -94,15 +96,24 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
                 if (kind=='call' and obs['progress']!=0) or (kind=='tick' and obs['progress']<=prog[i]) or (end and obs['progress']<prog[i]):
                     raise ValueError('payload progress')
                 if not lines.index(frame)<lines.index(rows(b'STYLEOS S865 PAYLOAD')[step])<lines.index(traps[step]):raise ValueError('payload observation order')
+            pending=0;drained=False
             if integrated and kind!='tick':
                 line=cancel_rows[cancel_index];cancel_index+=1
                 c=row(line,b'STYLEOS S865 TIMER-CANCEL',('id','root','vector','remaining','initial','current','lvt','isr','irr'))
-                if not 0<c['remaining']<=5000000:raise ValueError('timer cancellation before expiry')
-                eq(c,(i,child,vec,c['remaining'],0,0,0x10050,0,0),'timer retirement')
+                if not 0<=c['remaining']<=5000000 or c['irr'] not in (0,0x10000):raise ValueError('timer cancellation state')
+                pending=c['irr']
+                eq(c,(i,child,vec,c['remaining'],0,0,0x10050,0,pending),'timer retirement')
+                # Bind a late IRQ to the exact non-IRQ receipt and safe root.
+                candidates=[x for x in drain_rows if lines.index(traps[step])<lines.index(x)<lines.index(commit)]
+                if len(candidates)>1 or (pending and not candidates):raise ValueError('timer drain missing or duplicate')
+                if candidates:
+                    eq(row(candidates[0],b'STYLEOS S865 TIMER-DRAIN',('id','safe','pc','vector')),(i,safe,lo+site['drain_rva'],0x50),'kernel drain')
+                    drain_index+=1;drained=True
+                if step==0 and (c['remaining'] or pending!=0x10000 or not drained):raise ValueError('required actual timer race')
                 if not lines.index(en)<lines.index(line)<lines.index(fp):raise ValueError('timer retirement order')
             if kind=='call':
                 rip=t['yield']
-                check(traps[step],b'STYLEOS S863M CALL',('id','root','rip','rsp','flags','frame','rax','timer','isr','irr'),(i,child,rip,SP,flags,IST+4096-16-176,3 if i>=2 else 1,0,0,0),'returning syscall')
+                check(traps[step],b'STYLEOS S863M CALL',('id','root','rip','rsp','flags','frame','rax','timer','isr','irr'),(i,child,rip,SP,flags,IST+4096-16-176,3 if i>=2 else 1,0,0,pending),'returning syscall')
                 eq(returns[i],(i,rip,3 if i==3 else 0,0),'syscall result')
                 eq(ipc_recv[recv_index],(i,base+i+1,offset+step+1,child,3,0 if i else 3,1 if i else 0xffffffff,0x41+i if i else 0),'IPC receive');recv_index+=1
             elif kind=='tick':
@@ -129,8 +140,9 @@ def verify_batch(lines,site,ref,o,epoch,*,gen0=4,clean_fnv=None,integrated=False
             check(back,tags[7],('step','id','safe','state','a','b','stack-same'),(step,i,safe,4 if end and i==1 else 3 if end else 1,*prog[:2],1),'safe stack')
             chain=[en,fp,frame,traps[step],commit,boundary,event,progress,back]
             if [lines.index(x) for x in chain]!=sorted(lines.index(x) for x in chain):raise ValueError('event order')
-            events.append(dict(id=i,kind=kind,vector=vec,error=err,rip=rip,flags=flags,root=child))
+            events.append(dict(id=i,kind=kind,vector=vec,error=err,rip=rip,flags=flags,root=child,drain=(lo+site['drain_rva'],sl,sh) if drained else None))
         eq(one(b'STYLEOS S864 IPC-CLEAN',('session','ports')),(epoch+1,0),'IPC cleanup')
+        if drain_index!=len(drain_rows) or (integrated and not drain_index):raise ValueError('timer drain coverage')
         if recv_index!=4 or close_index!=4:raise ValueError('IPC coverage')
         if ticks!=list(BUDGET) or seen!=[x+2 for x in BUDGET] or windows:raise ValueError('incomplete schedule')
         eq(one(b'STYLEOS S848 TOTAL',('ticks','a','b','config-restored','timer-stopped')),(18,5,3,1,1),'timer cleanup')
@@ -193,7 +205,9 @@ def trace_check(text,o):
     plan=[('bp',o['bp'],safe,None)]
     for b in o['batches']:
         plan.extend(('bp',p,roots[i],None) for i,p in enumerate(b['four_switches']))
-        plan.extend(('user',e,e['root'],b['timer_ready']['idt']) for e in b['four_events'])
+        for e in b['four_events']:
+            plan.append(('user',e,e['root'],b['timer_ready']['idt']))
+            if e.get('drain'):plan.append(('drain',e,safe,b['timer_ready']['idt']))
     records=[]
     for j,m in enumerate(h):
         block=text[m.start():h[j+1].start() if j+1<len(h) else len(text)]
@@ -210,6 +224,10 @@ def trace_check(text,o):
         if kind=='bp':
             rip=p['rip']-1
             want=(3,0,1,0,p['cs'],rip,rip,p['cs']-8,p['rsp'],root,p['flags'],rip,p['rsp'],active['gdt'],active['idt'],active['tr'])
+        elif kind=='drain':
+            rip,sl,sh=p['drain'];cs=o['bp']['cs'];sp=rec[8];flags=rec[10]
+            if not sl<=sp<sh or not flags&0x200:raise ValueError('kernel drain stack/IF')
+            want=(0x50,0,0,0,cs,rip,rip,cs-8,sp,safe,flags,rip,sp,active['gdt'],idt,active['tr'])
         else:
             e=p;soft=int(e['vector']==128);rip=e['rip']-2*soft
             want=(e['vector'],e['error'],soft,3,0x5b,rip,rip,0x63,SP,root,e['flags'],rip,SP,active['gdt'],idt,active['tr'])
@@ -224,5 +242,5 @@ def trace_check(text,o):
                 if val(r'\b'+name.upper()+r'\s*=([0-9a-fA-F]+)\b')!=expected:raise ValueError('CPU GPR '+name)
         if rec!=want or (records and int(m[1])!=records[-1][0]+1):raise ValueError('CPU binding')
         records.append((int(m[1]),rec))
-    if len(records)!=len(plan) or len(plan)!=1+30*len(o['batches']):raise ValueError('CPU count')
+    if len(records)!=len(plan) or len(plan)!=1+30*len(o['batches'])+sum(bool(e.get('drain')) for b in o['batches'] for e in b['four_events']):raise ValueError('CPU count')
     return records
