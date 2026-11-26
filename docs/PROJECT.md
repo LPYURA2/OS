@@ -1,3 +1,6 @@
+## StyleFS 36 — bounded volume read/list/copy candidate
+35 CI 7/7 SUCCESS. Existing namespace and stream/transaction components reused for listing, read and verified copy, [handoff](NEXT_CHAT_STYLEFS_36.md). Reuse-first and legal gate preserved.
+
 ## StyleFS 35 — checked volume edits candidate
 34 CI 7/7 SUCCESS. Reuse checked namespace and inode commits for mkdir, rename/move and deletion, [handoff](NEXT_CHAT_STYLEFS_35.md). Legal and reuse-first gates preserved.
 

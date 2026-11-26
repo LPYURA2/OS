@@ -21,6 +21,7 @@ struct wv64_state {
 struct wv64_workspace {
  struct dc64_workspace writer,reader;
  struct is64_workspace stream;
+ uint8_t copy_page[IT64_PAGE];
 };
 #ifdef STYLEFS_HOST_FORMAT
 enum wv64_status wv64_provision_checkpoint(struct bs_service *,const struct wv64_layout *,struct wv64_workspace *);
@@ -34,4 +35,23 @@ enum wv64_status wv64_stat(struct wv64_state *,struct wv64_workspace *,const uin
  * Exact expected ID/kind/key; no recursive removal or overwrite.
  * Object IDs are supplied by trusted supervisor, not user capabilities. */
 enum wv64_status wv64_edit(struct wv64_state *,struct wv64_workspace *,struct ow64_inventory banks[2],const struct dc64_edit *);
+/* Epoch-scoped directory cursor. Enumerates direct children only.
+ * A cursor is valid for the same mounted session/sequence and parent.
+ * No recursive scan, no callback, at most 14 entries per call. */
+struct wv64_cursor {uint64_t sequence,parent,ordinal,token;};
+enum wv64_status wv64_list_open(struct wv64_state *,struct wv64_workspace *,const uint8_t *,size_t,struct wv64_cursor *);
+enum wv64_status wv64_list_next(struct wv64_state *,struct wv64_workspace *,struct wv64_cursor *,
+ struct sd64_record out[SD64_FANOUT],unsigned *count);
+/* Bounded read (up to 32 KiB), no output on error. Short read at EOF.
+ * expected ID/revision guard stale file selection; no whole-file CRC promise
+ * for arbitrary partial reads. Copy verifies the entire original CRC. */
+enum wv64_status wv64_read(struct wv64_state *,struct wv64_workspace *,const uint8_t *,size_t,
+ uint64_t id,uint64_t revision,uint64_t offset,uint8_t *,size_t,size_t *);
+typedef bool (*wv64_progress)(void *,uint64_t completed,uint64_t total);
+/* Same-volume single-file copy, no overwrite or source deletion.
+ * Progress callback returns false to cancel, cannot reenter the volume.
+ * Completion is acknowledged only after checkpoint publication. */
+enum wv64_status wv64_copy(struct wv64_state *,struct wv64_workspace *,struct ow64_inventory banks[2],
+ const uint8_t *path,size_t length,uint64_t id,uint64_t revision,const struct sd64_record *destination,
+ wv64_progress,void *);
 #endif

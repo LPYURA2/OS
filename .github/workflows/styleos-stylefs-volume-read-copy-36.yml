@@ -1,0 +1,221 @@
+name: StyleOS StyleFS volume read copy 36
+on:
+  push:
+    branches: [feature/styleos-stylefs-volume-read-copy-36]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Block service and existing StyleFS regression (GCC/Clang sanitizers)
+        run: |
+          set -euo pipefail
+          mkdir -p build/stylefs-tests
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_volumeread64.c kernel/{stylefs_widevolume64,stylefs_inodestream64,stylefs_ownership64,stylefs_inodecommit64,stylefs_inodetable64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-volumeread64"
+            "build/stylefs-tests/$cc-volumeread64" | tee "build/stylefs-tests/$cc-volumeread64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_volumeops64.c kernel/{stylefs_widevolume64,stylefs_inodestream64,stylefs_ownership64,stylefs_inodecommit64,stylefs_inodetable64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-volumeops64"
+            "build/stylefs-tests/$cc-volumeops64" | tee "build/stylefs-tests/$cc-volumeops64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_widevolume64.c kernel/{stylefs_widevolume64,stylefs_inodestream64,stylefs_ownership64,stylefs_inodecommit64,stylefs_inodetable64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-widevolume64"
+            "build/stylefs-tests/$cc-widevolume64" | tee "build/stylefs-tests/$cc-widevolume64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_inodestream64.c kernel/{stylefs_inodestream64,stylefs_ownership64,stylefs_inodecommit64,stylefs_inodetable64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-inodestream64"
+            "build/stylefs-tests/$cc-inodestream64" | tee "build/stylefs-tests/$cc-inodestream64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_ownership64.c kernel/{stylefs_ownership64,stylefs_inodecommit64,stylefs_inodetable64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-ownership64"
+            "build/stylefs-tests/$cc-ownership64" | tee "build/stylefs-tests/$cc-ownership64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_inodecommit64.c kernel/{stylefs_inodecommit64,stylefs_inodetable64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-inodecommit64"
+            "build/stylefs-tests/$cc-inodecommit64" | tee "build/stylefs-tests/$cc-inodecommit64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_inodetable64.c kernel/{stylefs_inodetable64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-inodetable64"
+            "build/stylefs-tests/$cc-inodetable64" | tee "build/stylefs-tests/$cc-inodetable64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_reconcile64.c kernel/{stylefs_transaction64,stylefs_checkpoint64,stylefs_filebind64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_stream64,stylefs_journal64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-reconcile64"
+            "build/stylefs-tests/$cc-reconcile64" | tee "build/stylefs-tests/$cc-reconcile64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_transaction64.c kernel/{stylefs_transaction64,stylefs_checkpoint64,stylefs_filebind64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_stream64,stylefs_journal64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-transaction64"
+            "build/stylefs-tests/$cc-transaction64" | tee "build/stylefs-tests/$cc-transaction64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_checkpoint64.c kernel/{stylefs_checkpoint64,stylefs_filebind64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_stream64,stylefs_journal64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-checkpoint64"
+            "build/stylefs-tests/$cc-checkpoint64" | tee "build/stylefs-tests/$cc-checkpoint64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_filebind64.c kernel/{stylefs_filebind64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_stream64,stylefs_journal64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-filebind64"
+            "build/stylefs-tests/$cc-filebind64" | tee "build/stylefs-tests/$cc-filebind64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_namespace64.c kernel/{stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,block_service}.c -o "build/stylefs-tests/$cc-namespace64"
+            "build/stylefs-tests/$cc-namespace64" | tee "build/stylefs-tests/$cc-namespace64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_dirbatch64.c kernel/{stylefs_dircommit64,stylefs_directory64,block_service}.c -o "build/stylefs-tests/$cc-dirbatch64"
+            "build/stylefs-tests/$cc-dirbatch64" | tee "build/stylefs-tests/$cc-dirbatch64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_dirops64.c kernel/{stylefs_dircommit64,stylefs_directory64,block_service}.c -o "build/stylefs-tests/$cc-dirops64"
+            "build/stylefs-tests/$cc-dirops64" | tee "build/stylefs-tests/$cc-dirops64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_dircommit64.c kernel/{stylefs_dircommit64,stylefs_directory64,block_service}.c -o "build/stylefs-tests/$cc-dircommit64"
+            "build/stylefs-tests/$cc-dircommit64" | tee "build/stylefs-tests/$cc-dircommit64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_directory64.c kernel/{stylefs_directory64,block_service}.c -o "build/stylefs-tests/$cc-directory64"
+            "build/stylefs-tests/$cc-directory64" | tee "build/stylefs-tests/$cc-directory64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_block_service.c kernel/block_service.c -o "build/stylefs-tests/$cc-block"
+            "build/stylefs-tests/$cc-block" | tee "build/stylefs-tests/$cc-block.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_extent64.c kernel/{stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-extent64"
+            "build/stylefs-tests/$cc-extent64" | tee "build/stylefs-tests/$cc-extent64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_map64.c kernel/{stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-map64"
+            "build/stylefs-tests/$cc-map64" | tee "build/stylefs-tests/$cc-map64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_alloc64.c kernel/{stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-alloc64"
+            "build/stylefs-tests/$cc-alloc64" | tee "build/stylefs-tests/$cc-alloc64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_journal64.c kernel/{stylefs_journal64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-journal64"
+            "build/stylefs-tests/$cc-journal64" | tee "build/stylefs-tests/$cc-journal64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_stream64.c kernel/{stylefs_stream64,stylefs_journal64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-stream64"
+            "build/stylefs-tests/$cc-stream64" | tee "build/stylefs-tests/$cc-stream64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_batch64.c kernel/{stylefs_stream64,stylefs_journal64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-batch64"
+            "build/stylefs-tests/$cc-batch64" | tee "build/stylefs-tests/$cc-batch64.log"
+            "$cc" -std=c11 -O2 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tools/stylefs_wide_image.c kernel/{stylefs_stream64,stylefs_journal64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-wide-image"
+            python3 tools/test_stylefs_wide_image_15.py --tool "build/stylefs-tests/$cc-wide-image" | tee "build/stylefs-tests/$cc-wide-image.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_storage_runtime_863.c kernel/storage_runtime_863.c -o "build/stylefs-tests/$cc-storage"
+            "build/stylefs-tests/$cc-storage" | tee "build/stylefs-tests/$cc-storage.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_ata_runtime_48.c kernel/{ata_runtime_48,ata_diag_857}.c -o "build/stylefs-tests/$cc-ata48"
+            "build/stylefs-tests/$cc-ata48" | tee "build/stylefs-tests/$cc-ata48.log"
+            for t in test_ata_diag_857 test_ata_runtime_863 test_ata_read_pacing; do
+              "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude "tests/$t.c" kernel/{ata_diag_857,ata_runtime_863}.c -o "build/stylefs-tests/$cc-$t"
+              "build/stylefs-tests/$cc-$t" | tee "build/stylefs-tests/$cc-$t.log"
+            done
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_volume_service.c kernel/{volume_service,block_service,stylefs}.c -o "build/stylefs-tests/$cc-volume"
+            "build/stylefs-tests/$cc-volume" | tee "build/stylefs-tests/$cc-volume.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tools/stylefs_image.c kernel/stylefs.c -o "build/stylefs-tests/$cc-image"
+            python3 tools/test_stylefs_system_layout.py --tool "build/stylefs-tests/$cc-image" --output "build/stylefs-tests/$cc-layout" | tee "build/stylefs-tests/$cc-layout.log"
+            for t in test_stylefs test_stylefs_v2 test_stylefs_background_copy test_desktop_volume_io; do
+              "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude "tests/$t.c" kernel/stylefs.c kernel/desktop_volume_io.c -o "build/stylefs-tests/$cc-$t"
+              "build/stylefs-tests/$cc-$t" | tee "build/stylefs-tests/$cc-$t.log"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-lba48-host
+          path: build/stylefs-tests/
+  large-file:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Full 4GiB+17 byte file import, cold reopen, export and SHA256
+        run: |
+          set -euo pipefail
+          mkdir -p build/large-file
+          gcc -std=c11 -O3 -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -Iinclude tools/stylefs_wide_image.c kernel/{stylefs_stream64,stylefs_journal64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o build/large-file/wide-image
+          python3 tools/test_stylefs_large_file_16.py --tool build/large-file/wide-image | tee build/large-file/result.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-lba48-full-file-test
+          path: build/large-file/result.log
+  guest-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3 update
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3 install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Real 32 MiB read-only StyleFS mount and foreign media rejection
+        run: python3 tools/test_stylefs_guest_mount_06.py --output build/stylefs-mount
+      - name: Actual StyleFS v2 writes and cold reopen
+        run: python3 tools/test_stylefs_guest_write_07.py --output build/stylefs-write
+      - name: Desktop scope actual filesystem deny and allowed write
+        run: python3 tools/test_stylefs_desktop_scope_09.py --output build/stylefs-scope
+      - name: Real block service boot, protected writes, cold reopen
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --block-service --output build/stylefs-ordinary
+      - name: Existing process and storage isolation regression
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-forced-stop --block-service --output build/stylefs-peer
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-lba48-regression
+          path: |
+            build/stylefs-mount/
+            build/stylefs-write/
+            build/stylefs-scope/
+            build/stylefs-ordinary/
+            build/stylefs-peer/
+  lba48-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3 update
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3 install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Actual Q35 diagnostic LBA48 writes and cold reopen
+        run: python3 tools/test_stylefs_lba48_guest_18.py --output build/lba48-guest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-lba48-guest-18
+          path: |
+            build/lba48-guest/**/*.json
+            build/lba48-guest/**/*.log
+            build/lba48-guest/**/*.txt
+            build/lba48-guest/**/*.iso
+            build/lba48-guest/**/*.EFI
+  lba48-block:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3 update
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3 install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Actual owned-root block service 4TiB write and cold reopen
+        run: python3 tools/test_stylefs_lba48_block_19.py --output build/lba48-block
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-lba48-block-19
+          path: |
+            build/lba48-block/**/*.json
+            build/lba48-block/**/*.log
+            build/lba48-block/**/*.iso
+  wide-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3 update
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3 install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Actual wide StyleFS mount, cancellation, high-LBA file and cold reopen
+        run: python3 tools/test_stylefs_wide_guest_20.py --output build/wide-guest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-wide-guest-20
+          path: |
+            build/wide-guest/**/*.json
+            build/wide-guest/**/*.log
+            build/wide-guest/**/*.iso
+            build/wide-guest/**/*.bin
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact source
+        run: |
+          set -euo pipefail
+          mkdir -p build/source
+          git archive --format=tar --prefix="StyleOS-$GITHUB_SHA/" "$GITHUB_SHA" | gzip -n > "build/source/StyleOS-$GITHUB_SHA.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > build/source/git-identities.txt
+          (cd build/source && sha256sum -- *.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: styleos-source-${{ github.sha }}
+          path: build/source/

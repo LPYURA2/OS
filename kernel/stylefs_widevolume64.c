@@ -1,5 +1,6 @@
 #include <styleos/stylefs_widevolume64.h>
 #include "stylefs_checkpoint_common_internal.h"
+#include "stylefs_stream_crc_internal.h"
 static const uint8_t magic[8]={'S','F','6','4','W','V','0','1'};
 struct geometry {uint64_t identity,start[4],length[4],data_start;};
 struct receipt {uint64_t seq,dir,inode;bool valid;};
@@ -298,4 +299,137 @@ enum wv64_status wv64_edit(struct wv64_state *s,struct wv64_workspace *w,struct 
  s->busy=false;
  if(rc!=WV64_OK)return WV64_RECOVERY;
  ++s->sequence;s->dir_epoch=s->dir.epoch;s->inode_epoch=s->inode.table.geometry.epoch;s->ready=true;return WV64_OK;
+}
+
+static bool read_workspace(struct wv64_state *s,struct wv64_workspace *w){
+ return s&&w&&s->nodes&&s->slots<=SIZE_MAX/sizeof *s->nodes&&
+ sep(s,sizeof *s,w,sizeof *w)&&sep(w,sizeof *w,s->block,sizeof *s->block)&&
+ sep(w,sizeof *w,s->nodes,s->slots*sizeof *s->nodes);
+}
+static bool external(struct wv64_state *s,struct wv64_workspace *w,const void *p,size_t n){
+ return sep(p,n,s,sizeof *s)&&sep(p,n,w,sizeof *w)&&sep(p,n,s->block,sizeof *s->block)&&
+ sep(p,n,s->nodes,s->slots*sizeof *s->nodes);
+}
+static enum wv64_status resolve_path(struct wv64_state *s,struct wv64_workspace *w,
+ const uint8_t *path,size_t n,uint64_t *id,uint8_t *kind){
+ enum ns64_status rc=ns64_resolve(&s->dir,&s->proof,path,n,w->reader.page,id,kind);
+ if(rc==NS64_OK)return WV64_OK;
+ if(rc==NS64_MISSING)return WV64_MISSING;
+ if(rc==NS64_IO||rc==NS64_CORRUPT||rc==NS64_STALE)s->ready=false;
+ return rc==NS64_IO?WV64_IO:rc==NS64_CORRUPT?WV64_CORRUPT:rc==NS64_STALE?WV64_LOCKED:WV64_INVALID;
+}
+static enum wv64_status entry_at(struct wv64_state *s,struct wv64_workspace *w,uint64_t pos,struct sd64_record *rec){
+ enum dc64_status rc=dc64_entry_at(&s->dir,&w->reader,s->dir_epoch,pos,rec);
+ if(rc==DC64_OK)return WV64_OK;
+ if(rc==DC64_MISSING)return WV64_MISSING;
+ s->ready=false;return rc==DC64_IO?WV64_IO:WV64_CORRUPT;
+}
+enum wv64_status wv64_list_open(struct wv64_state *s,struct wv64_workspace *w,
+ const uint8_t *path,size_t n,struct wv64_cursor *out){
+ if(!s||!s->ready||s->busy)return WV64_LOCKED;
+ if(!read_workspace(s,w)||!external(s,w,path,n)||!external(s,w,out,sizeof *out)||
+    !sep(out,sizeof *out,path,n))return WV64_INVALID;
+ uint64_t parent;uint8_t kind;
+ enum wv64_status rc=resolve_path(s,w,path,n,&parent,&kind);
+ if(rc!=WV64_OK)return rc;
+ if(kind!=SD64_DIRECTORY)return WV64_INVALID;
+ uint64_t lo=0,hi=s->dir.count;
+ while(lo<hi){
+  uint64_t mid=lo+(hi-lo)/2;struct sd64_record rec;
+  rc=entry_at(s,w,mid,&rec);if(rc!=WV64_OK)return rc;
+  if(rec.key.parent<parent)lo=mid+1;else hi=mid;
+ }
+ *out=(struct wv64_cursor){s->sequence,parent,lo,s->dir.token};return WV64_OK;
+}
+enum wv64_status wv64_list_next(struct wv64_state *s,struct wv64_workspace *w,
+ struct wv64_cursor *cursor,struct sd64_record out[SD64_FANOUT],unsigned *count){
+ if(!s||!s->ready||s->busy)return WV64_LOCKED;
+ if(!read_workspace(s,w)||!external(s,w,cursor,sizeof *cursor)||!external(s,w,out,SD64_FANOUT*sizeof *out)||
+    !external(s,w,count,sizeof *count)||!sep(cursor,sizeof *cursor,out,SD64_FANOUT*sizeof *out)||
+    !sep(cursor,sizeof *cursor,count,sizeof *count)||!sep(out,SD64_FANOUT*sizeof *out,count,sizeof *count))return WV64_INVALID;
+ if(cursor->sequence!=s->sequence||cursor->token!=s->dir.token||cursor->ordinal>s->dir.count)return WV64_LOCKED;
+ struct geometry g;
+ if(!layout(s->block,&s->layout,s->write,&g)){s->ready=false;return WV64_LOCKED;}
+ const struct ns64_node *parent=find(&s->proof,cursor->parent);
+ if(cursor->parent!=NS64_ROOT&&(!parent||parent->kind!=SD64_DIRECTORY))return WV64_INVALID;
+ if(cursor->ordinal==s->dir.count){*count=0;return WV64_OK;}
+ struct sd64_record rec;
+ enum wv64_status rc=entry_at(s,w,cursor->ordinal,&rec);if(rc!=WV64_OK)return rc;
+ if(rec.key.parent<cursor->parent)return WV64_INVALID;
+ unsigned first=(unsigned)(cursor->ordinal%SD64_FANOUT),n=0;
+ uint64_t remain=s->dir.count-cursor->ordinal;
+ unsigned limit=remain<SD64_FANOUT-first?(unsigned)remain:SD64_FANOUT-first;
+ while(n<limit&&w->reader.records[first+n].key.parent==cursor->parent)++n;
+ for(unsigned i=0;i<n;i++)out[i]=w->reader.records[first+i];
+ cursor->ordinal+=n;*count=n;return WV64_OK;
+}
+static enum wv64_status get_map(struct wv64_state *s,struct wv64_workspace *w,
+ const uint8_t *path,size_t n,uint64_t expected,uint64_t revision,struct sfs64_map *m){
+ uint64_t id;uint8_t kind;
+ enum wv64_status rc=resolve_path(s,w,path,n,&id,&kind);
+ if(rc!=WV64_OK)return rc;
+ if(kind!=SD64_FILE)return WV64_INVALID;
+ if(id!=expected)return WV64_CONFLICT;
+ enum it64_status ir=it64_lookup(&s->inode.table,s->inode_epoch,id,w->copy_page,m);
+ if(ir!=IT64_OK){s->ready=false;return ir==IT64_IO?WV64_IO:WV64_CORRUPT;}
+ return m->file.revision==revision?WV64_OK:WV64_CONFLICT;
+}
+/* Existing map/window primitives handle fragmentation and unaligned offsets.
+ * No retry or direct user memory. Caller owns destination scratch. */
+static bool map_read(struct bs_service *b,uint64_t owner,uint64_t token,const struct sfs64_map *m,
+ uint64_t off,uint8_t *out,size_t n){
+ size_t done=0;
+ while(done<n){
+  struct sfs_extent64 e;uint64_t local;size_t take,got;
+  if(!sfs64_map_chunk(m,off+done,n-done,&e,&local,&take)||
+     sfs64_read_window(b,owner,token,e,local,out+done,take,&got)!=BS_OK||got!=take)return false;
+  done+=take;
+ }
+ return true;
+}
+enum wv64_status wv64_read(struct wv64_state *s,struct wv64_workspace *w,const uint8_t *path,size_t n,
+ uint64_t id,uint64_t revision,uint64_t off,uint8_t *out,size_t length,size_t *completed){
+ if(!s||!s->ready||s->busy)return WV64_LOCKED;
+ if(!read_workspace(s,w)||!external(s,w,path,n)||!external(s,w,completed,sizeof *completed)||
+    !external(s,w,out,length)||!sep(out,length,completed,sizeof *completed)||
+    !sep(out,length,path,n)||!sep(completed,sizeof *completed,path,n)||length>SFS64_WINDOW_BYTES)return WV64_INVALID;
+ struct geometry g;
+ if(!layout(s->block,&s->layout,s->write,&g)){s->ready=false;return WV64_LOCKED;}
+ struct sfs64_map m;
+ enum wv64_status rc=get_map(s,w,path,n,id,revision,&m);if(rc!=WV64_OK)return rc;
+ if(off>m.file.bytes)return WV64_INVALID;
+ uint64_t left=m.file.bytes-off;size_t take=left<length?(size_t)left:length;
+ if(!map_read(s->block,s->layout.owner,s->layout.data,&m,off,w->stream.buffer,take)){s->ready=false;return WV64_IO;}
+ for(size_t i=0;i<take;i++)out[i]=w->stream.buffer[i];
+ *completed=take;return WV64_OK;
+}
+struct copy_source {
+ struct wv64_state *s;struct sfs64_map map;
+ uint64_t next;uint32_t checksum;
+ wv64_progress progress;void *context;enum wv64_status error;
+};
+static bool copy_next(void *ctx,uint64_t off,uint8_t *out,size_t n){
+ struct copy_source *c=ctx;
+ if(off!=c->next||off>c->map.file.bytes||n>c->map.file.bytes-off){c->error=WV64_CORRUPT;return false;}
+ if(!map_read(c->s->block,c->s->layout.owner,c->s->layout.data,&c->map,off,out,n)){
+  c->error=WV64_IO;return false;
+ }
+ c->checksum=sfs64_stream_crc_update(c->checksum,out,n);c->next+=n;
+ if(c->next==c->map.file.bytes&&~c->checksum!=c->map.file.checksum){c->error=WV64_CORRUPT;return false;}
+ if(c->progress&&!c->progress(c->context,c->next,c->map.file.bytes)){c->error=WV64_CANCELLED;return false;}
+ return true;
+}
+enum wv64_status wv64_copy(struct wv64_state *s,struct wv64_workspace *w,struct ow64_inventory inv[2],
+ const uint8_t *path,size_t n,uint64_t id,uint64_t revision,const struct sd64_record *dst,wv64_progress progress,void *ctx){
+ if(!s||!s->ready||!s->write||s->busy)return WV64_LOCKED;
+ if(!buffers(s,w,inv)||!external(s,w,path,n)||!external(s,w,dst,sizeof *dst)||!sep(path,n,dst,sizeof *dst))return WV64_INVALID;
+ struct geometry g;
+ if(!layout(s->block,&s->layout,true,&g)){s->ready=false;return WV64_LOCKED;}
+ struct copy_source c={.s=s,.checksum=UINT32_MAX,.progress=progress,.context=ctx,.error=WV64_OK};
+ enum wv64_status rc=get_map(s,w,path,n,id,revision,&c.map);if(rc!=WV64_OK)return rc;
+ /* The callback reads the immutable source, whose map is in a dedicated
+  * page not touched by inode creation. Both retained roots protect data. */
+ rc=wv64_create(s,w,inv,dst,c.map.file.bytes,copy_next,&c);
+ if(c.error==WV64_IO||c.error==WV64_CORRUPT){s->ready=false;return c.error;}
+ return rc;
 }
