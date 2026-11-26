@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 12 wide allocation candidate
+Stage 11 CI 45889398731 3/3 SUCCESS. [Allocator planning](architecture/STYLEFS_WIDE_ALLOC_12.md), [handoff](NEXT_CHAT_STYLEFS_12.md). CI pending; no new mounted format yet.
+
 ## 2026-11-26 — StyleFS 11 wide map candidate
 Stage 10 CI 45888767188 3/3 SUCCESS. [Wide metadata codec](architecture/STYLEFS_WIDE_MAP_11.md), [handoff](NEXT_CHAT_STYLEFS_11.md). Owner format compatibility requirements recorded in STYLEOS_OWNER_REQUIREMENTS.md and POST_KERNEL_ROADMAP.md. Candidate CI pending.
 
