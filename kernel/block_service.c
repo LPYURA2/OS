@@ -148,3 +148,31 @@ enum bs_status bs_write_sector(struct bs_service *s,uint64_t owner,uint64_t toke
     }
     wipe(s);s->busy=false;return r;
 }
+
+enum bs_status bs_write_staged_batch(struct bs_service *s,uint64_t owner,uint64_t token,
+                                      uint64_t sector,const uint8_t *in,size_t n)
+{
+    if(!s||!external(s,in,n)||n>64u*BS_SECTOR_BYTES)return BS_INVALID;
+    uint64_t count=n/BS_SECTOR_BYTES+(n%BS_SECTOR_BYTES!=0);
+    if(!count||count-1>UINT64_MAX-sector)return BS_RANGE;
+    struct bs_device *d,*last;uint64_t lba,end;
+    uint8_t probe[BS_SECTOR_BYTES];
+    enum bs_status r=access(s,owner,token,sector,probe,BS_WRITE,&d,&lba);
+    if(r!=BS_OK)return r;
+    r=access(s,owner,token,sector+count-1,probe,BS_WRITE,&last,&end);
+    if(r!=BS_OK)return r;
+    if(d!=last||end-lba!=count-1)return BS_RANGE;
+    s->busy=true;
+    for(uint64_t i=0;i<count;++i){
+        size_t at=(size_t)i*BS_SECTOR_BYTES;
+        size_t used=n-at<BS_SECTOR_BYTES?n-at:BS_SECTOR_BYTES;
+        wipe(s);copy_bytes(s->staging,in+at,used);
+        if(!d->backend.write(d->backend.context,lba+i,s->staging)){
+            d->recovery=true;r=BS_UNCERTAIN;break;
+        }
+    }
+    if(r==BS_OK&&!d->backend.flush(d->backend.context)){
+        d->recovery=true;r=BS_UNCERTAIN;
+    }
+    wipe(s);s->busy=false;return r;
+}

@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 16 large logical file candidate
+[Durable data batch and full large-file workload](architecture/STYLEFS_LARGE_FILE_16.md), [handoff](NEXT_CHAT_STYLEFS_16.md). 15 host/source PASS, final guest pending at work start. 16 CI pending.
+
 ## 2026-11-26 — StyleFS 15 explicit wide image candidate
 Stage 14 CI 45891245187 3/3 SUCCESS. [Wide image host tool](architecture/STYLEFS_WIDE_IMAGE_15.md), [handoff](NEXT_CHAT_STYLEFS_15.md). Owner clarified independence before app implementation and revised Explorer/installer mockups. CI pending.
 

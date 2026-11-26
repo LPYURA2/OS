@@ -2,6 +2,7 @@
 #define STYLEOS_BLOCK_SERVICE_H
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 /* Trusted, synchronous, single-CPU kernel service. Zero-initialized once,
  * never copied or reset during its lifetime. Not a userspace ABI.
  * The architecture adapter must authenticate device identity, bounds and
@@ -51,4 +52,12 @@ enum bs_status bs_read_sector(struct bs_service *,uint64_t owner,uint64_t token,
                               uint64_t sector,uint8_t[BS_SECTOR_BYTES]);
 enum bs_status bs_write_sector(struct bs_service *,uint64_t owner,uint64_t token,
                                uint64_t sector,const uint8_t[BS_SECTOR_BYTES]);
+/* Explicit opt-in for a backend that supports multiple pending writes.
+ * ONLY unpublished, exclusively allocated data, never live metadata.
+ * At most 64 sectors; last partial sector zero padded. Whole range
+ * validated before I/O. Success means one completed flush; any write or
+ * flush failure is uncertain for the entire batch, no partial success.
+ * Existing bs_write_sector semantics are unchanged. */
+enum bs_status bs_write_staged_batch(struct bs_service *,uint64_t owner,uint64_t token,
+                                      uint64_t sector,const uint8_t *,size_t bytes);
 #endif

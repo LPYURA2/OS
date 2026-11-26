@@ -105,7 +105,7 @@ enum sj_status sfs64_stream_begin(struct sfs64_stream *t,struct sfs64_journal *j
     t->journal=j;t->token=j->token;t->generation=generation;t->received=0;
     t->running_crc=UINT32_MAX;t->active=true;j->writer=t;return SJ_OK;
 }
-enum sj_status sfs64_stream_append(struct sfs64_stream *t,const uint8_t *p,size_t n)
+static enum sj_status append(struct sfs64_stream *t,const uint8_t *p,size_t n,bool batch)
 {
     if(!live(t)){sfs64_stream_cancel(t);return SJ_STALE;}
     struct sfs64_journal *j=t->journal;
@@ -119,8 +119,10 @@ enum sj_status sfs64_stream_append(struct sfs64_stream *t,const uint8_t *p,size_
     while(done<n){
         struct sfs_extent64 e;uint64_t local;size_t count,written=0;
         if(!sfs64_map_chunk(&m,t->received+done,n-done,&e,&local,&count))return fail(t);
-        if(sfs64_stage_window(j->block,j->owner,j->token,e,local,p+done,count,&written)!=BS_OK||
-           written!=count)return fail(t);
+        enum bs_status r=batch?
+            sfs64_stage_batch(j->block,j->owner,j->token,e,local,p+done,count,&written):
+            sfs64_stage_window(j->block,j->owner,j->token,e,local,p+done,count,&written);
+        if(r!=BS_OK||written!=count)return fail(t);
         /* Verify the complete durable sectors, including canonical EOF tail. */
         for(size_t at=0;at<count;at+=512){
             uint8_t check[512];
@@ -134,6 +136,10 @@ enum sj_status sfs64_stream_append(struct sfs64_stream *t,const uint8_t *p,size_
     }
     t->running_crc=crc(t->running_crc,p,n);t->received+=n;return SJ_OK;
 }
+enum sj_status sfs64_stream_append(struct sfs64_stream *t,const uint8_t *p,size_t n)
+{return append(t,p,n,false);}
+enum sj_status sfs64_stream_append_batched(struct sfs64_stream *t,const uint8_t *p,size_t n)
+{return append(t,p,n,true);}
 enum sj_status sfs64_stream_finish(struct sfs64_stream *t)
 {
     if(!live(t)){sfs64_stream_cancel(t);return SJ_STALE;}

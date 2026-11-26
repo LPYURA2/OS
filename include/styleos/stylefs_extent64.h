@@ -27,4 +27,8 @@ enum bs_status sfs64_read_window(struct bs_service *,uint64_t owner,uint64_t tok
     struct sfs_extent64,uint64_t offset,uint8_t *,size_t length,size_t *completed);
 enum bs_status sfs64_stage_window(struct bs_service *,uint64_t owner,uint64_t token,
     struct sfs_extent64,uint64_t offset,const uint8_t *,size_t length,size_t *completed);
+/* Explicit batch-capable backend only. Whole window flush confirmed or
+ * completed=0; caller must still read back and verify before publishing. */
+enum bs_status sfs64_stage_batch(struct bs_service *,uint64_t owner,uint64_t token,
+    struct sfs_extent64,uint64_t offset,const uint8_t *,size_t length,size_t *completed);
 #endif

@@ -105,3 +105,14 @@ enum bs_status sfs64_stage_window(struct bs_service *s,uint64_t owner,uint64_t t
     }
     return BS_OK;
 }
+
+enum bs_status sfs64_stage_batch(struct bs_service *s,uint64_t owner,uint64_t token,
+    struct sfs_extent64 e,uint64_t offset,const uint8_t *in,size_t length,size_t *completed)
+{
+    uint64_t capacity=0;
+    enum bs_status r=preflight(s,owner,token,e,offset,in,length,completed,BS_WRITE,&capacity);
+    if(r!=BS_OK||!length)return r;
+    r=bs_write_staged_batch(s,owner,token,e.first+offset/BS_SECTOR_BYTES,in,length);
+    if(r==BS_OK)*completed=length;
+    return r;
+}

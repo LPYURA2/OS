@@ -26,6 +26,9 @@ enum sj_status sfs64_stream_begin(struct sfs64_stream *,struct sfs64_journal *,
  * padding. On I/O uncertainty invalidate transaction and journal.
  * No file visibility before successful finish; cancellation keeps source. */
 enum sj_status sfs64_stream_append(struct sfs64_stream *,const uint8_t *,size_t);
+/* Only explicitly attested batch-capable data backends. Same readback,
+ * checksum and publication contract as append; legacy path unchanged. */
+enum sj_status sfs64_stream_append_batched(struct sfs64_stream *,const uint8_t *,size_t);
 enum sj_status sfs64_stream_finish(struct sfs64_stream *);
 void sfs64_stream_cancel(struct sfs64_stream *);
 /* Lookup copies file metadata, not an unsafe long-lived map pointer.

@@ -98,7 +98,7 @@ static bool input(const char *path,struct image *d,uint64_t id,uint64_t rev){
     uint64_t size=ok?(uint64_t)st.st_size:0;
     for(uint64_t off=0;ok&&off<size;){
         size_t n=size-off<sizeof buffer?(size_t)(size-off):sizeof buffer;
-        ok=pread(fd,buffer,n,(off_t)off)==(ssize_t)n&&sfs64_stream_append(&stream,buffer,n)==SJ_OK;
+        ok=pread(fd,buffer,n,(off_t)off)==(ssize_t)n&&sfs64_stream_append_batched(&stream,buffer,n)==SJ_OK;
         off+=n;
     }
     if(ok)ok=fstat(fd,&after)==0&&st.st_size==after.st_size&&
