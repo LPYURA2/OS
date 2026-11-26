@@ -1,3 +1,6 @@
+## StyleFS 39 — guest runtime integration correction
+37 CI 7/7 SUCCESS. Stage 38 CI 7/8: unresolved __chkstk and memmove at EFI link. Move listing to attested workspace and add tested overlap-safe runtime move only for diagnostic. [Handoff](NEXT_CHAT_STYLEFS_39.md). CI pending.
+
 ## StyleFS 38 — actual coordinated volume guest candidate
 36 CI 7/7 SUCCESS, 37 pending at start. Separate guarded LBA48 volume diagnostic and independent fixture, [handoff](NEXT_CHAT_STYLEFS_38.md). Main unchanged.
 

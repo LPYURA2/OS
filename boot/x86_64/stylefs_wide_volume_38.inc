@@ -6,6 +6,7 @@ struct s38_workspace {
  struct ns64_node nodes[32];
  struct ow64_extent entries[2][32];
  struct sfs64_run runs[2][32];
+ struct sd64_record listing[SD64_FANOUT];
 };
 static _Alignas(4096) union {
  struct s38_workspace value;
@@ -55,9 +56,9 @@ static _Noreturn void s20_run(void){
  static const uint8_t a[]="/a",b[]="/d/b";
  if(S38.volume.sequence==4){
   if(!s38_verify(a,2,2)||!s38_verify(b,4,3))fail("sfs38-cold-content");
-  struct wv64_cursor cursor;struct sd64_record records[SD64_FANOUT];unsigned count;
+  struct wv64_cursor cursor;unsigned count;
   if(wv64_list_open(&S38.volume,&S38.work,(const uint8_t *)"/d",2,&cursor)!=WV64_OK||
-     wv64_list_next(&S38.volume,&S38.work,&cursor,records,&count)!=WV64_OK||count!=1||records[0].target!=3)fail("sfs38-list");
+     wv64_list_next(&S38.volume,&S38.work,&cursor,S38.listing,&count)!=WV64_OK||count!=1||S38.listing[0].target!=3)fail("sfs38-list");
   s863_shell_guard();s20_end("SFS38 COLD PASS");
  }
  if(S38.volume.sequence!=1||S38.volume.dir.count)s20_end("SFS38 REFUSE volume");
