@@ -114,7 +114,11 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
   *(volatile uint64_t *)(uintptr_t)(l[i].pa+4096)=UINT64_C(0x86110000)+i;
  }
  for(unsigned i=0;i<4;i++){
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+  if(!s865_root_build(base861,cache,arena,l,i,guard,child_tables861[i],(uintptr_t)child_tables861[i],&children861[i]))fail("865-build");
+#else
   if(!s846_build(base861,cache,arena,l,i,guard,child_tables861[i],(uintptr_t)child_tables861[i],&children861[i]))fail("864-build");
+#endif
   arch_puts("STYLEOS S864 ROOT");field("id",i);field("safe",safe);field("child",children861[i].built.root);field("pa",l[i].pa);field("gen",l[i].generation);arch_putc('\n');
  }
  struct user_audit861 prep={cache,p->evidence,guard,arena,l};

@@ -28,6 +28,16 @@ bool s846_build(const struct s842_root *,const struct s842_cache *,
  uint64_t (*tables)[512],uint64_t tables_pa,struct s846_root *);
 bool s846_audit(const struct s842_root *,const struct s842_cache *,
  const struct s844_arena *,const struct s844_lease [S846_ROOT_COUNT],unsigned id,const struct s846_guard *,const struct s846_root *);
+/* Sparse admission: a zero lease denotes a vacant slot. All allocated
+ * arena pages must be represented by live leases. The caller serializes
+ * safe-root operations and separately proves nonoverlap of root tables.
+ * Historical full-set APIs below retain their original contract. */
+#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+bool s865_root_build(const struct s842_root *,const struct s842_cache *,const struct s844_arena *,
+ const struct s844_lease [S846_ROOT_COUNT],unsigned,const struct s846_guard *,uint64_t (*)[512],uint64_t,struct s846_root *);
+bool s865_root_audit(const struct s842_root *,const struct s842_cache *,const struct s844_arena *,
+ const struct s844_lease [S846_ROOT_COUNT],unsigned,const struct s846_guard *,const struct s846_root *);
+#endif
 /* Verify all four detached roots in the wide host profile. */
 #ifdef STYLEOS_TEST_WIDE_ROOTS_864
 bool s846_audit_set(const struct s842_root *,const struct s842_cache *,

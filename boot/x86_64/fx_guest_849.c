@@ -38,7 +38,12 @@ bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
   if(child[i].lease.generation!=leases[i].generation||child[i].lease.pa!=leases[i].pa)return false;
   roots[i]=child[i].built.root;generations[i]=leases[i].generation;
  }
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ if(!s865_fx_open(&bank,&c))return false;
+ for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(!s865_fx_bind(&bank,i,roots[i],generations[i]))return false;
+#else
  if(!s849_init_set(&bank,&c,roots,generations))return false;
+#endif
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   seen[i]=0;
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863

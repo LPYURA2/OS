@@ -87,6 +87,23 @@ int main(void){
   for(unsigned j=160;j<416;j++)C(!out.bytes[j]);
   C(s849_suspend(&b,i,roots[i],gen[i],&out));C(s849_retire(&b,i,roots[i],gen[i]));
  }
+ memset(&b,0,sizeof b);
+ C(s865_fx_open(&b,&caps));N(s865_fx_open(&b,&caps));
+ N(s849_dispatch(&b,2,roots[2],10,&out));
+ C(s865_fx_bind(&b,2,roots[2],10));
+ N(s865_fx_bind(&b,0,roots[2],11));
+ N(s865_fx_bind(&b,0,roots[0],10));
+ C(s849_dispatch(&b,2,roots[2],10,&out));out.bytes[160]=0x5a;
+ N(s865_fx_bind(&b,0,roots[0],11));
+ C(s849_suspend(&b,2,roots[2],10,&out));
+ C(s865_fx_bind(&b,0,roots[0],11));
+ C(s849_retire(&b,0,roots[0],11));
+ N(s865_fx_bind(&b,0,roots[0],11));
+ C(s865_fx_bind(&b,0,roots[0],12));
+ C(s849_dispatch(&b,0,roots[0],12,&out));C(out.bytes[160]==0);
+ C(s849_suspend(&b,0,roots[0],12,&out));C(s849_retire(&b,0,roots[0],12));
+ C(s849_dispatch(&b,2,roots[2],10,&out));C(out.bytes[160]==0x5a);
+ C(s849_suspend(&b,2,roots[2],10,&out));C(s849_retire(&b,2,roots[2],10));
  printf("S864 four FX contexts HOST ONLY: %u checks, %u immutable refusals PASS\n",checks,refusals);
  actual_fx();
 }

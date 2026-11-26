@@ -55,5 +55,28 @@ int main(void){
  for(unsigned i=0;i<4;i++)C(s844_release(&arena,l[i].owner,l[i]));
  C(s844_count(&arena,&used)&&used==0);
  for(unsigned i=0;i<sizeof arena_mem;i++)assert(!arena_mem[i]);
+ /* Independent lifetime: sparse slot 2 remains valid when slot 0 appears,
+  * disappears and is recycled. Hidden/stale arena ownership is refused. */
+ memset(l,0,sizeof l);
+ C(s844_acquire(&arena,S846_OWNER_A+2,3,&l[2]));
+ C(s865_root_build(&safe,&c,&arena,l,2,&g,tables[2],0x200000+3*PG_TABLE_BYTES,&roots[2]));
+ C(s865_root_audit(&safe,&c,&arena,l,2,&g,&roots[2]));
+ C(!s846_audit(&safe,&c,&arena,l,2,&g,&roots[2]));
+ C(s844_acquire(&arena,S846_OWNER_A,3,&l[0]));
+ C(s865_root_audit(&safe,&c,&arena,l,2,&g,&roots[2]));
+ C(s865_root_build(&safe,&c,&arena,l,0,&g,tables[0],0x200000+PG_TABLE_BYTES,&roots[0]));
+ struct s844_lease prior=l[0];l[0]=(struct s844_lease){0};
+ C(!s865_root_audit(&safe,&c,&arena,l,2,&g,&roots[2]));
+ C(s844_release(&arena,prior.owner,prior));
+ C(s865_root_audit(&safe,&c,&arena,l,2,&g,&roots[2]));
+ C(s844_acquire(&arena,S846_OWNER_A,3,&l[0]));
+ C(!s865_root_audit(&safe,&c,&arena,l,0,&g,&roots[0]));
+ C(s865_root_audit(&safe,&c,&arena,l,2,&g,&roots[2]));
+ memset(&roots[0],0,sizeof roots[0]);memset(tables[0],0,sizeof tables[0]);
+ C(s865_root_build(&safe,&c,&arena,l,0,&g,tables[0],0x200000+PG_TABLE_BYTES,&roots[0]));
+ C(!s865_root_audit(&safe,&c,&arena,l,1,&g,&roots[0]));
+ memset(roots,0,sizeof roots);memset(tables,0,sizeof tables);
+ C(s844_release(&arena,l[0].owner,l[0]));C(s844_release(&arena,l[2].owner,l[2]));
+ C(s844_count(&arena,&used)&&!used);
  printf("S864 four detached root contracts HOST ONLY: %u checks PASS\n",checks);
 }

@@ -8,21 +8,23 @@ static bool match(struct s844_lease a,struct s844_lease b){return a.pa==b.pa&&a.
 static bool range(uint64_t x,uint64_t n){return x&&x<LOW&&n<=LOW-x;}
 static bool ptr_range(const void *x,size_t n){return x&&n<=UINTPTR_MAX-(uintptr_t)x;}
 static bool separate(const void *a,size_t n,const void *b,size_t m){return ptr_range(a,n)&&ptr_range(b,m)&&!overlap((uintptr_t)a,n,(uintptr_t)b,m);}
-static bool owner_ok(const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT]){
- unsigned count;
- if(!a||!l||!s844_count(a,&count)||count!=3*S846_ROOT_COUNT)return false;
+static bool owner_ok(const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,bool sparse){
+ unsigned count,live=0;
+ if(!a||!l||id>=S846_ROOT_COUNT||!s844_count(a,&count))return false;
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   struct s844_lease v=l[i];
+  if(!v.generation){if(!sparse||i==id||v.pa||v.owner||v.pages)return false;continue;}
+  ++live;
   if(v.pages!=3||v.owner!=S846_OWNER_A+i||!v.generation||v.pa<a->base||v.pa>a->base+S844_BYTES-3*P||(v.pa%P)||!match(v,a->slots[(v.pa-a->base)/P]))return false;
  }
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)for(unsigned j=0;j<i;j++)
-  if(overlap(l[i].pa,3*P,l[j].pa,3*P))return false;
- return true;
+  if(l[i].generation&&l[j].generation&&overlap(l[i].pa,3*P,l[j].pa,3*P))return false;
+ return count==3*live;
 }
 /* Reconstruct an exact expected plan: omit the ENTIRE arena identity extent,
  * retain all supervisor leaves, and map only the current lease at user VAs. */
-static bool plan(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,uint64_t (*tables)[512],uint64_t pa,struct pg_plan *p){
- if(id>=S846_ROOT_COUNT||!safe||!c||!owner_ok(a,l)||!s842_audit(safe,c)||!tables||((uintptr_t)tables%P)||pa%P||!range(pa,PG_TABLE_BYTES)||!separate(tables,PG_TABLE_BYTES,safe->plan.tables,safe->plan.capacity*P)||overlap(pa,PG_TABLE_BYTES,safe->plan.tables_pa,safe->plan.capacity*P)||overlap(pa,PG_TABLE_BYTES,a->base,S844_BYTES))return false;
+static bool plan(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,uint64_t (*tables)[512],uint64_t pa,struct pg_plan *p,bool sparse){
+ if(id>=S846_ROOT_COUNT||!safe||!c||!owner_ok(a,l,id,sparse)||!s842_audit(safe,c)||!tables||((uintptr_t)tables%P)||pa%P||!range(pa,PG_TABLE_BYTES)||!separate(tables,PG_TABLE_BYTES,safe->plan.tables,safe->plan.capacity*P)||overlap(pa,PG_TABLE_BYTES,safe->plan.tables_pa,safe->plan.capacity*P)||overlap(pa,PG_TABLE_BYTES,a->base,S844_BYTES))return false;
  if(!separate(tables,PG_TABLE_BYTES,safe,sizeof *safe)||!separate(tables,PG_TABLE_BYTES,c,sizeof *c)||!separate(tables,PG_TABLE_BYTES,a,sizeof *a)||!separate(tables,PG_TABLE_BYTES,l,S846_ROOT_COUNT*sizeof *l)||!separate(tables,PG_TABLE_BYTES,(void *)(uintptr_t)a->base,S844_BYTES))return false;
  *p=(struct pg_plan){.arch=PG_X86,.pa_bits=c->bits,.tables=tables,.tables_pa=pa,.capacity=PG_TABLE_PAGES,.probe=safe->plan.probe};
  unsigned removed=0;bool covered=false;
@@ -102,19 +104,19 @@ static bool same_plan(const struct pg_plan *a,const struct pg_plan *b){
  for(size_t i=0;i<a->count;i++)if(a->maps[i].va!=b->maps[i].va||a->maps[i].pa!=b->maps[i].pa||a->maps[i].bytes!=b->maps[i].bytes||a->maps[i].flags!=b->maps[i].flags)return false;
  return true;
 }
-bool s846_audit(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,const struct s846_root *r){
+static bool audit_root(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,const struct s846_root *r,bool sparse){
  struct pg_plan p;
- if(!r||!r->ready||r->built.error!=PG_OK||!r->built.used||r->built.used>PG_TABLE_PAGES||r->built.root!=r->plan.tables_pa||!plan(safe,c,a,l,id,g,r->plan.tables,r->plan.tables_pa,&p)||!same_plan(&p,&r->plan))return false;
+ if(!r||!r->ready||r->built.error!=PG_OK||!r->built.used||r->built.used>PG_TABLE_PAGES||r->built.root!=r->plan.tables_pa||!plan(safe,c,a,l,id,g,r->plan.tables,r->plan.tables_pa,&p,sparse)||!same_plan(&p,&r->plan))return false;
 #ifdef STYLEOS_TEST_WIDE_ROOTS_864
  if(!match(r->lease,l[id]))return false;
 #endif
  uint32_t seen=0;uint64_t leaves=0,n=0;for(size_t i=0;i<p.count;i++)n+=p.maps[i].bytes/P;
  return walk(&p,safe,r->built.used,0,4,0,&seen,&leaves)&&seen==(r->built.used==32?UINT32_MAX:(UINT32_C(1)<<r->built.used)-1)&&leaves==n;
 }
-bool s846_build(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,uint64_t (*tables)[512],uint64_t pa,struct s846_root *out){
+static bool build_root(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,uint64_t (*tables)[512],uint64_t pa,struct s846_root *out,bool sparse){
  if(!out||!safe||!c||!a||!l||!separate(out,sizeof *out,safe,sizeof *safe)||!separate(out,sizeof *out,c,sizeof *c)||!separate(out,sizeof *out,a,sizeof *a)||!separate(out,sizeof *out,l,S846_ROOT_COUNT*sizeof *l)||!separate(out,sizeof *out,tables,PG_TABLE_BYTES)||!separate(out,sizeof *out,safe->plan.tables,safe->plan.capacity*P)||!separate(out,sizeof *out,(void *)(uintptr_t)a->base,S844_BYTES)||(g&&!separate(out,sizeof *out,g,sizeof *g))||out->ready)return false;
  struct s846_root r={0};
- if(!plan(safe,c,a,l,id,g,tables,pa,&r.plan))return false;
+ if(!plan(safe,c,a,l,id,g,tables,pa,&r.plan,sparse))return false;
  r.built=pg_build(&r.plan);if(r.built.error!=PG_OK)return false;
  for(unsigned i=0;i<3;i++){uint64_t *e=leaf(&r.plan,r.built.used,user_va[i],true);if(!e)return false;*e|=4;}
  uint64_t dev[2]={safe->lapic,safe->ioapic};
@@ -122,9 +124,24 @@ bool s846_build(const struct s842_root *safe,const struct s842_cache *c,const st
 #ifdef STYLEOS_TEST_WIDE_ROOTS_864
  r.lease=l[id];
 #endif
- r.ready=true;if(!s846_audit(safe,c,a,l,id,g,&r))return false;
+ r.ready=true;if(!audit_root(safe,c,a,l,id,g,&r,sparse))return false;
  *out=r;return true;
 }
+
+bool s846_audit(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,const struct s846_root *r){
+ return audit_root(safe,c,a,l,id,g,r,false);
+}
+bool s846_build(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,uint64_t (*tables)[512],uint64_t pa,struct s846_root *out){
+ return build_root(safe,c,a,l,id,g,tables,pa,out,false);
+}
+#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+bool s865_root_audit(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,const struct s846_root *r){
+ return audit_root(safe,c,a,l,id,g,r,true);
+}
+bool s865_root_build(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *a,const struct s844_lease l[S846_ROOT_COUNT],unsigned id,const struct s846_guard *g,uint64_t (*tables)[512],uint64_t pa,struct s846_root *out){
+ return build_root(safe,c,a,l,id,g,tables,pa,out,true);
+}
+#endif
 
 #ifndef STYLEOS_TEST_WIDE_ROOTS_864
 bool s846_audit_pair(const struct s842_root *safe,const struct s842_cache *c,const struct s844_arena *arena,const struct s844_lease l[S846_ROOT_COUNT],const struct s846_guard *g,const struct s846_root *a,const struct s846_root *b){
