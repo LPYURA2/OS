@@ -370,7 +370,7 @@ jobs:
 
 
   acceptance-native-completion:
-    if: github.ref_name == 'feature/styleos-kernel-final-acceptance' || github.ref_name == 'feature/styleos-kernel-fault-containment-audit'
+    if: github.ref_name == 'feature/styleos-kernel-final-acceptance' || github.ref_name == 'feature/styleos-kernel-fault-containment-audit' || github.ref_name == 'feature/styleos-kernel-reacceptance'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -398,7 +398,7 @@ jobs:
           if-no-files-found: error
 
   acceptance-base-regression:
-    if: github.ref_name == 'feature/styleos-kernel-final-acceptance' || github.ref_name == 'feature/styleos-kernel-fault-containment-audit'
+    if: github.ref_name == 'feature/styleos-kernel-final-acceptance' || github.ref_name == 'feature/styleos-kernel-fault-containment-audit' || github.ref_name == 'feature/styleos-kernel-reacceptance'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
