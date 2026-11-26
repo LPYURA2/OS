@@ -21,10 +21,16 @@ def verify_lines(lines):
     if not any(x.startswith(TICK) and b' vector=0x0000000000000050 ' in x for x in lines[a:b]):raise ValueError('no progress while pending/cancelled')
     if not any(s<i and key==0x1c for i,key in inputs):raise ValueError('confirmation input missing')
     if any(x.startswith(TICK) for x in lines[s+1:]):raise ValueError('stopped process executed')
+    tag=b'STYLEOS PROCESSES TAB'
+    tabs=[(i,decimal(x,tag,(b'tab',b'valid',b'total',b'bytes',b'flags'))) for i,x in enumerate(lines) if x.startswith(tag+b' ')]
+    if [v for _,v in tabs]!=[(t,1,1,12288,3) for t in (1,2,1,0)] or any(i>=a for i,_ in tabs):raise ValueError('tab data and transition proof')
 def exercise(d,proc,serial,folder,wait):
     def key(name):
         count=sum(x.startswith(EVENT) for x in complete_lines(serial.read_bytes()))
         d.key(name);wait(proc,serial,EVENT,count+1)
+    key('right');d.screen('process-performance')
+    key('right');d.screen('process-details')
+    key('left');key('left');d.screen('process-list')
     key('down');key('delete')
     d.screen('stop-confirmation')
     key('esc');wait_hang_progress(proc,serial)
@@ -33,7 +39,7 @@ def exercise(d,proc,serial,folder,wait):
     lines=complete_lines(serial.read_bytes())
     verify_lines(lines)
     d.screen('stop-completed')
-    data={n:hashlib.sha256((folder/(n+'.ppm')).read_bytes()).hexdigest() for n in ('stop-confirmation','stop-completed')}
+    data={n:hashlib.sha256((folder/(n+'.ppm')).read_bytes()).hexdigest() for n in ('process-performance','process-details','process-list','stop-confirmation','stop-completed')}
     (folder/'process-stop.json').write_text(json.dumps(data,indent=2)+'\n')
 def verify(folder,lines):
     verify_lines(lines)

@@ -168,7 +168,9 @@ static bool visible(int id) { return win[id].open && !win[id].minimized; }
 static struct pa_row process_rows[PA_MAX_ROWS], process_next[PA_MAX_ROWS];
 static struct pa_reply process_reply;
 static bool process_valid, process_refresh, process_was_visible;
-static unsigned process_offset;
+enum { PROCESS_LIST, PROCESS_PERFORMANCE, PROCESS_DETAILS, PROCESS_TAB_COUNT };
+static unsigned process_tab,process_offset;
+static bool process_tab_report;
 static unsigned process_poll;
 static uint32_t process_selected,process_pending;
 static bool process_confirm_drawn,process_dirty;
@@ -192,6 +194,20 @@ static void process_select(uint32_t pid)
     process_selected=process_has_pid(pid)?pid:0;
     process_notice=0;process_dirty=true;
 }
+static void process_switch_tab(unsigned tab)
+{
+    if(tab>=PROCESS_TAB_COUNT||tab==process_tab)return;
+    process_cancel();process_selected=0;process_notice=0;
+    process_tab=tab;process_offset=0;process_dirty=true;process_tab_report=true;
+}
+static uint64_t process_live_bytes(void)
+{
+    uint64_t bytes=0;
+    if(process_valid)
+        for(unsigned i=0;i<process_reply.returned;++i)
+            bytes+=process_rows[i].resident_bytes; /* verified 3 pages per row, at most 32 */
+    return bytes;
+}
 static void process_decimal(char out[24], uint64_t value)
 {
     char rev[24]; unsigned n=0;
@@ -205,7 +221,7 @@ static void process_field(const char *key,uint64_t value)
 }
 static unsigned process_page_size(void)
 {
-    int n=(win[TASKS].box.h-153)/24;
+    int n=(win[TASKS].box.h-180)/24;
     return (unsigned)(n>0?n:1);
 }
 /* UI actions are consumed in the trusted single-CPU shell, outside CPL3.
@@ -213,14 +229,14 @@ static unsigned process_page_size(void)
  * rendered in a previous input batch. Enter/second click cannot auto-arm. */
 static void process_arm(void)
 {
-    if(process_pending||!process_has_pid(process_selected))return;
+    if(process_tab!=PROCESS_LIST||process_pending||!process_has_pid(process_selected))return;
     process_pending=process_selected;process_confirm_drawn=false;
     process_notice=0;process_dirty=true;
     arch_puts("STYLEOS PROCESSES ARM");process_field(" pid=",process_pending);arch_puts("\n");
 }
 static void process_confirm(void)
 {
-    if(!process_pending||!process_confirm_drawn)return;
+    if(process_tab!=PROCESS_LIST||!process_pending||!process_confirm_drawn)return;
     const uint32_t pid=process_pending;
     process_pending=0;process_confirm_drawn=false;process_selected=0;
     enum ps_status status=s865_native_stop_selected(pid);
@@ -255,6 +271,14 @@ static bool process_sample(bool report)
     process_valid=valid;
     if(process_selected&&!process_has_pid(process_selected)){
         process_cancel();process_selected=0;changed=true;
+    }
+    if(process_tab_report){
+        arch_puts("STYLEOS PROCESSES TAB");
+        process_field(" tab=",process_tab);process_field(" valid=",process_valid);
+        process_field(" total=",process_reply.returned);
+        process_field(" bytes=",process_live_bytes());
+        process_field(" flags=",process_reply.measurement_flags);arch_puts("\n");
+        process_tab_report=false;
     }
     if(report){
         arch_puts("STYLEOS PROCESSES SNAPSHOT");
@@ -532,6 +556,11 @@ static bool keyboard(unsigned key, unsigned mods)
     current_file_click.id = -1;
 #ifdef STYLEOS_OWNED_SHELL_865
     if(active()==TASKS&&!menu&&!mods){
+        if(key==0x14b||key==0x14d){
+            process_switch_tab((process_tab+PROCESS_TAB_COUNT+(key==0x14b?PROCESS_TAB_COUNT-1:1))%PROCESS_TAB_COUNT);
+            return true;
+        }
+        if(process_tab!=PROCESS_LIST&&(key==0x153||key==0x1c||key==0x148||key==0x150))return true;
         if(key==0x01&&process_pending){process_cancel();return true;}
         if(key==0x153){process_arm();return true;}
         if(key==0x1c&&process_pending){process_confirm();return true;}
@@ -755,13 +784,20 @@ static void click(int x, int y)
 #ifdef STYLEOS_OWNED_SHELL_865
     if(!menu&&window_at(x,y)==TASKS){
         struct desk_box b=win[TASKS].box;
-        if(y>=b.y+b.h-28&&y<b.y+b.h-4&&x>=b.x+b.w-160&&x<b.x+b.w-10){
+        if(y>=b.y+48&&y<b.y+76&&x>=b.x+10&&x<b.x+b.w-10){
+            int dx=x-b.x;
+            front(TASKS);
+            process_switch_tab(dx<b.w*25/100?PROCESS_LIST:
+                               dx<b.w*70/100?PROCESS_PERFORMANCE:PROCESS_DETAILS);
+            return;
+        }
+        if(process_tab==PROCESS_LIST&&y>=b.y+b.h-28&&y<b.y+b.h-4&&x>=b.x+b.w-160&&x<b.x+b.w-10){
             front(TASKS);
             if(process_pending)process_confirm();else process_arm();
             return;
         }
-        if(y>=b.y+110&&y<b.y+b.h-48){
-            unsigned i=process_offset+(unsigned)(y-b.y-110)/24;
+        if(process_tab==PROCESS_LIST&&y>=b.y+137&&y<b.y+b.h-48){
+            unsigned i=process_offset+(unsigned)(y-b.y-137)/24;
             front(TASKS);
             process_select(i<process_reply.returned&&i<process_offset+process_page_size()?process_rows[i].pid:0);
             return;
@@ -963,40 +999,75 @@ static void draw_window(int id, int top)
         desk_text(b.x + 14, b.y + b.h - 24, r - (modern_shell() ? 77 : 12), notice, MUTED);
     } else if (id == TASKS) {
 #ifdef STYLEOS_OWNED_SHELL_865
-        desk_text(b.x+18,b.y+55,r-15,"Процессы StyleOS",GOLD);
+        const int t1=b.x+b.w*25/100,t2=b.x+b.w*70/100;
+        const int tx[4]={b.x+10,t1,t2,r-10};
+        const char *const tabs[PROCESS_TAB_COUNT]={"Процессы","Производительность","Подробности"};
+        for(unsigned i=0;i<PROCESS_TAB_COUNT;++i){
+            if(i==process_tab)desk_fill(tx[i],b.y+48,tx[i+1]-tx[i],27,0x344154);
+            desk_text(tx[i]+4,b.y+53,tx[i+1]-3,tabs[i],i==process_tab?GOLD:LIGHT);
+        }
+        desk_fill(b.x+10,b.y+76,b.w-20,1,STROKE);
         if(!process_valid){
-            desk_text(b.x+18,b.y+87,r-15,"Снимок недоступен",MUTED);
-        }else if(!process_reply.returned){
-            desk_text(b.x+18,b.y+87,r-15,"Нет зарегистрированных процессов",LIGHT);
+            desk_text(b.x+12,b.y+88,r-10,"Снимок недоступен",MUTED);
+        }else if(process_tab==PROCESS_PERFORMANCE){
+            char buf[24];
+            desk_text(b.x+12,b.y+88,r-12,"Пользовательские процессы",GOLD);
+            process_decimal(buf,process_reply.returned);
+            desk_text(b.x+12,b.y+114,b.x+b.w*70/100,"Зарегистрировано",LIGHT);
+            desk_text(b.x+b.w*70/100,b.y+114,r-12,buf,LIGHT);
+            process_decimal(buf,process_live_bytes()/1024u);
+            desk_text(b.x+12,b.y+138,b.x+b.w*70/100,"Страницы процессов, КиБ",LIGHT);
+            desk_text(b.x+b.w*70/100,b.y+138,r-12,buf,LIGHT);
+            desk_text(b.x+12,b.y+162,r-12,"CPU %: нет измерения времени",MUTED);
+            desk_text(b.x+12,b.y+186,r-12,"RAM системы: нет измерения",MUTED);
+            desk_text(b.x+12,b.y+210,r-12,"Диск / сеть: нет измерения",MUTED);
         }else{
-            const int a=b.x+b.w*35/100,c=b.x+b.w*51/100,
-                      d=b.x+b.w*69/100,e=b.x+b.w*84/100;
-            desk_text(b.x+12,b.y+84,a-3,"Имя",MUTED);
-            desk_text(a,b.y+84,c-3,"PID",MUTED);
-            desk_text(c,b.y+84,d-3,"Статус",MUTED);
-            desk_text(d,b.y+84,e-3,"Тики",MUTED);
-            desk_text(e,b.y+84,r-8,"КиБ",MUTED);
-            unsigned end=process_offset+process_page_size();
-            if(end>process_reply.returned)end=process_reply.returned;
-            for(unsigned i=process_offset;i<end;++i){
-                const struct pa_row *p=&process_rows[i];
-                int y=b.y+110+(int)(i-process_offset)*24;
-                char buf[24];
-                if(p->pid==process_selected)desk_fill(b.x+9,y-2,b.w-18,23,0x344154);
-                desk_text(b.x+12,y,a-3,p->name,LIGHT);
-                process_decimal(buf,p->pid);desk_text(a,y,c-3,buf,LIGHT);
-                desk_text(c,y,d-3,p->state==PR_READY?"Готов":p->state==PR_WAITING?"Ждёт":"Вып.",LIGHT);
-                process_decimal(buf,p->cpu_ticks);desk_text(d,y,e-3,buf,MUTED);
-                process_decimal(buf,p->resident_bytes/1024u);desk_text(e,y,r-8,buf,MUTED);
+            const int a=b.x+b.w*32/100,c=b.x+b.w*47/100,d=b.x+b.w*65/100,e=b.x+b.w*82/100;
+            char nbuf[24];
+            int pos=desk_text(b.x+12,b.y+84,r-12,"Прил. ",MUTED);
+            process_decimal(nbuf,process_reply.applications);pos=desk_text(pos,b.y+84,r-12,nbuf,LIGHT);
+            pos=desk_text(pos,b.y+84,r-12,"  Фон. ",MUTED);
+            process_decimal(nbuf,process_reply.background);pos=desk_text(pos,b.y+84,r-12,nbuf,LIGHT);
+            pos=desk_text(pos,b.y+84,r-12,"  Сист. ",MUTED);
+            process_decimal(nbuf,process_reply.system);desk_text(pos,b.y+84,r-12,nbuf,LIGHT);
+            if(!process_reply.returned){
+                desk_text(b.x+12,b.y+113,r-12,"Нет зарегистрированных процессов",LIGHT);
+            }else{
+                desk_text(b.x+12,b.y+111,a-3,"Имя",MUTED);
+                desk_text(a,b.y+111,c-3,"PID",MUTED);
+                desk_text(c,b.y+111,d-3,process_tab==PROCESS_LIST?"Группа":"PPID",MUTED);
+                desk_text(d,b.y+111,e-3,process_tab==PROCESS_LIST?"Статус":"Окна",MUTED);
+                desk_text(e,b.y+111,r-8,process_tab==PROCESS_LIST?"КиБ":"Тики",MUTED);
+                unsigned end=process_offset+process_page_size();
+                if(end>process_reply.returned)end=process_reply.returned;
+                for(unsigned i=process_offset;i<end;++i){
+                    const struct pa_row *p=&process_rows[i];
+                    int y=b.y+137+(int)(i-process_offset)*24;
+                    char buf[24];
+                    if(process_tab==PROCESS_LIST&&p->pid==process_selected)
+                        desk_fill(b.x+9,y-2,b.w-18,23,0x344154);
+                    desk_text(b.x+12,y,a-3,p->name,LIGHT);
+                    process_decimal(buf,p->pid);desk_text(a,y,c-3,buf,LIGHT);
+                    if(process_tab==PROCESS_LIST){
+                        desk_text(c,y,d-3,p->group==PI_APPLICATIONS?"Прил.":p->group==PI_BACKGROUND?"Фон":"Сист.",LIGHT);
+                        desk_text(d,y,e-3,p->state==PR_READY?"Готов":p->state==PR_WAITING?"Ждёт":"Вып.",LIGHT);
+                        process_decimal(buf,p->resident_bytes/1024u);
+                    }else{
+                        process_decimal(buf,p->parent_pid);desk_text(c,y,d-3,buf,LIGHT);
+                        process_decimal(buf,p->open_windows);desk_text(d,y,e-3,buf,LIGHT);
+                        process_decimal(buf,p->cpu_ticks);
+                    }
+                    desk_text(e,y,r-8,buf,MUTED);
+                }
             }
         }
-        desk_text(b.x+12,b.y+b.h-48,r-10,"CPU %: нет данных; память: страницы",MUTED);
+        desk_text(b.x+12,b.y+b.h-48,r-10,process_tab==PROCESS_DETAILS?"Тики: принятые IRQ, не время CPU":"CPU %: нет данных; память: страницы",MUTED);
         if(process_pending){
             char buf[24];process_decimal(buf,process_pending);
             int after=desk_text(b.x+12,b.y+b.h-25,r-165,"Завершить PID ",GOLD);
             desk_text(after,b.y+b.h-25,r-165,buf,GOLD);
         }else desk_text(b.x+12,b.y+b.h-25,r-165,process_notice?process_notice:"F8 / PgUp / PgDn",MUTED);
-        if(process_pending||process_has_pid(process_selected)){
+        if(process_tab==PROCESS_LIST&&(process_pending||process_has_pid(process_selected))){
             desk_round((struct desk_box){r-160,b.y+b.h-28,150,24},0x76572f);
             desk_text(r-154,b.y+b.h-25,r-12,process_pending?"Подтвердить":"Завершить",LIGHT);
         }
@@ -1225,7 +1296,8 @@ static void restart_shell(void)
     initial_windows();
     for (int i = 0; i < WINDOWS; ++i) win[i].open = opened[i];
 #ifdef STYLEOS_OWNED_SHELL_865
-    process_cancel();process_selected=0;process_notice=0;process_dirty=true;
+    process_cancel();process_selected=0;process_notice=0;process_tab=PROCESS_LIST;
+    process_offset=0;process_tab_report=false;process_dirty=true;
 #endif
     shell_refreshed = true;
     print_pid("STYLEOS SHELL RESTART pid=", new_pid);
