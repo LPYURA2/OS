@@ -104,7 +104,12 @@ static void ata857_hex(const uint16_t *w){static const char hex[]="0123456789abc
 #if defined(STYLEOS_TEST_STORAGE_PIO_RUNTIME_863) || (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/ata_runtime_863.h>
 #include <styleos/storage_runtime_863.h>
-struct pio863 {struct ata857_live *live;struct ata_runtime_863 ata;bool writable;};
+struct pio863 {struct ata857_live *live;struct ata_runtime_863 ata;bool writable;
+#ifdef STYLEOS_OWNED_SHELL_865
+ unsigned read_status_count,read_words,read_busy,read_io_refusals;
+ uint8_t read_status;
+#endif
+};
 static bool pio_reg863(void *ctx,unsigned r,uint8_t v){
  struct pio863 *p=ctx;
  if(!p||!p->live)return false;
@@ -112,8 +117,25 @@ static bool pio_reg863(void *ctx,unsigned r,uint8_t v){
  if(!p->writable||!p->ata.busy||r!=7||(v!=0x30&&v!=0xe7)||!ata857_live_check(p->live))return false;
  __asm__ volatile("outb %0,%1"::"a"(v),"Nd"((uint16_t)0x177):"memory");return true;
 }
-static bool pio_status863(void *ctx,uint8_t *v){struct pio863*p=ctx;return p&&ata857_alt(p->live,v);}
-static bool pio_readword863(void *ctx,uint16_t *v){struct pio863*p=ctx;return p&&ata857_data(p->live,v);}
+static bool pio_status863(void *ctx,uint8_t *v){
+ struct pio863*p=ctx;bool ok=p&&ata857_alt(p->live,v);
+#ifdef STYLEOS_OWNED_SHELL_865
+ if(p&&p->ata.phase==ATA863_READ){
+  if(ok){++p->read_status_count;p->read_status=*v;if(*v&128u)++p->read_busy;}
+  else ++p->read_io_refusals;
+ }
+#endif
+ return ok;
+}
+static bool pio_readword863(void *ctx,uint16_t *v){
+ struct pio863*p=ctx;bool ok=p&&ata857_data(p->live,v);
+#ifdef STYLEOS_OWNED_SHELL_865
+ if(p&&p->ata.phase==ATA863_READ){
+  if(ok)++p->read_words;else ++p->read_io_refusals;
+ }
+#endif
+ return ok;
+}
 static bool pio_writeword863(void *ctx,uint16_t v){
  struct pio863*p=ctx;if(!p||!p->writable||!p->ata.busy||!ata857_live_check(p->live))return false;
  out16(0x170,v);return true;
@@ -137,7 +159,28 @@ static bool pio_observe863(void *ctx,struct storage_obs_863 *o){
  .sectors=4096,.post_ebs=true,.single_cpu=true,.kernel_context=true,.exclusive_pio=true,
  .dma_denied=true,.disposable_data=true,.flush_supported=p->ata.flush_supported};return true;
 }
-static bool pio_read863(void *ctx,uint32_t lba,uint8_t *out){struct pio863*p=ctx;return ata_runtime_read_863(&p->ata,lba,out);}
+static bool pio_read863(void *ctx,uint32_t lba,uint8_t *out){
+ struct pio863*p=ctx;
+#ifdef STYLEOS_OWNED_SHELL_865
+ p->read_status_count=p->read_words=p->read_busy=p->read_io_refusals=0;p->read_status=0;
+#endif
+ bool ok=ata_runtime_read_863(&p->ata,lba,out);
+#ifdef STYLEOS_OWNED_SHELL_865
+ if(!ok){
+  arch_puts("STYLEOS ATA863 READ-DIAG lba=");paging_hex(lba);
+  arch_puts(" polls=");paging_hex(p->read_status_count);
+  arch_puts(" busy=");paging_hex(p->read_busy);
+  arch_puts(" words=");paging_hex(p->read_words);
+  arch_puts(" refused=");paging_hex(p->read_io_refusals);
+  arch_puts(" last-status=");paging_hex(p->read_status);
+  arch_puts(" fault=");paging_hex(p->ata.fault);
+  arch_puts(" phase=");paging_hex(p->ata.phase);
+  arch_puts(" guard-ops=");paging_hex(p->live->ops);
+  arch_putc('\n');
+ }
+#endif
+ return ok;
+}
 static bool pio_write863(void *ctx,uint32_t lba,const uint8_t *in){
  struct pio863*p=ctx;
 #if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
@@ -510,12 +553,18 @@ static void disk_admit863(void){
  uint8_t super[512];
  #ifdef STYLEOS_PROVISIONED_STORAGE_864
  if(!ata_runtime_bind_serial_864(&disk863.s.pio.ata,&pio_ops863,&disk863.s.pio,ATA864_PROVISIONED_SERIAL))fail("864-provisioned-serial");
- if(!ata_runtime_read_863(&disk863.s.pio.ata,4095,super)||!ata864_tag_match(super))fail("864-provisioned-tag");
+ if(!pio_read863(&disk863.s.pio,4095,super))fail("864-provisioned-tag");
+ if(!ata864_tag_match(super)){
+#ifdef STYLEOS_OWNED_SHELL_865
+  arch_puts("STYLEOS ATA863 TAG-DIAG read-completed=yes");arch_putc('\n');
+#endif
+  fail("864-provisioned-tag");
+ }
  arch_puts("STYLEOS S863S PROVISIONED-IDENTITY\n");
 #else
  if(!ata_runtime_bind_863(&disk863.s.pio.ata,&pio_ops863,&disk863.s.pio))fail("863-shell-storage-identify");
 #endif
- if(!ata_runtime_read_863(&disk863.s.pio.ata,0,super))fail("863-shell-storage-identify");
+ if(!pio_read863(&disk863.s.pio,0,super))fail("863-shell-storage-identify");
  static const char magic[]="STYLEOS-DESK-V01";
  for(unsigned i=0;i<512;i++)if(super[i]!=(i<sizeof magic-1?(uint8_t)magic[i]:0))fail("863-shell-storage-signature");
  disk863.s.pio.writable=true;
