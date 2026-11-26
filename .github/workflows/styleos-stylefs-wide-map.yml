@@ -1,0 +1,91 @@
+name: StyleOS StyleFS wide map
+on:
+  push:
+    branches: [feature/styleos-stylefs-wide-map-11]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Block service and existing StyleFS regression (GCC/Clang sanitizers)
+        run: |
+          set -euo pipefail
+          mkdir -p build/stylefs-tests
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_block_service.c kernel/block_service.c -o "build/stylefs-tests/$cc-block"
+            "build/stylefs-tests/$cc-block" | tee "build/stylefs-tests/$cc-block.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_extent64.c kernel/{stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-extent64"
+            "build/stylefs-tests/$cc-extent64" | tee "build/stylefs-tests/$cc-extent64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_map64.c kernel/{stylefs_map64,stylefs_extent64,block_service}.c -o "build/stylefs-tests/$cc-map64"
+            "build/stylefs-tests/$cc-map64" | tee "build/stylefs-tests/$cc-map64.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_storage_runtime_863.c kernel/storage_runtime_863.c -o "build/stylefs-tests/$cc-storage"
+            "build/stylefs-tests/$cc-storage" | tee "build/stylefs-tests/$cc-storage.log"
+            for t in test_ata_diag_857 test_ata_runtime_863 test_ata_read_pacing; do
+              "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude "tests/$t.c" kernel/{ata_diag_857,ata_runtime_863}.c -o "build/stylefs-tests/$cc-$t"
+              "build/stylefs-tests/$cc-$t" | tee "build/stylefs-tests/$cc-$t.log"
+            done
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_volume_service.c kernel/{volume_service,block_service,stylefs}.c -o "build/stylefs-tests/$cc-volume"
+            "build/stylefs-tests/$cc-volume" | tee "build/stylefs-tests/$cc-volume.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tools/stylefs_image.c kernel/stylefs.c -o "build/stylefs-tests/$cc-image"
+            python3 tools/test_stylefs_system_layout.py --tool "build/stylefs-tests/$cc-image" --output "build/stylefs-tests/$cc-layout" | tee "build/stylefs-tests/$cc-layout.log"
+            for t in test_stylefs test_stylefs_v2 test_stylefs_background_copy test_desktop_volume_io; do
+              "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude "tests/$t.c" kernel/stylefs.c kernel/desktop_volume_io.c -o "build/stylefs-tests/$cc-$t"
+              "build/stylefs-tests/$cc-$t" | tee "build/stylefs-tests/$cc-$t.log"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-wide-map-host
+          path: build/stylefs-tests/
+  guest-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Real 32 MiB read-only StyleFS mount and foreign media rejection
+        run: python3 tools/test_stylefs_guest_mount_06.py --output build/stylefs-mount
+      - name: Actual StyleFS v2 writes and cold reopen
+        run: python3 tools/test_stylefs_guest_write_07.py --output build/stylefs-write
+      - name: Desktop scope actual filesystem deny and allowed write
+        run: python3 tools/test_stylefs_desktop_scope_09.py --output build/stylefs-scope
+      - name: Real block service boot, protected writes, cold reopen
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --block-service --output build/stylefs-ordinary
+      - name: Existing process and storage isolation regression
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-forced-stop --block-service --output build/stylefs-peer
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-wide-map-regression
+          path: |
+            build/stylefs-mount/
+            build/stylefs-write/
+            build/stylefs-scope/
+            build/stylefs-ordinary/
+            build/stylefs-peer/
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact source
+        run: |
+          set -euo pipefail
+          mkdir -p build/source
+          git archive --format=tar --prefix="StyleOS-$GITHUB_SHA/" "$GITHUB_SHA" | gzip -n > "build/source/StyleOS-$GITHUB_SHA.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > build/source/git-identities.txt
+          (cd build/source && sha256sum -- *.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: styleos-source-${{ github.sha }}
+          path: build/source/
