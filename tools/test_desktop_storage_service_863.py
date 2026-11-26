@@ -259,18 +259,21 @@ def main():
         map_text=mp.read_text()
         site=bp_site(efi.read_bytes(),map_text)
         forbidden={'s861_bp_return','s863_live_run','s863_request_tasks','s863_shell_pump',
-                   's848_trial','s848_active','s860_reap','s847_enter','s847_dispatch_raw',
-                   's848_dispatch_raw','s848_irq_entry','s847_pf_entry','s847_call_entry',
-                   's865_drain_entry','s865_drain_wait','s865_drain_cli',
-                   's849_guest_init','s849_guest_dispatch','s849_guest_suspend','s849_guest_finish',
-                   's865_fx_retire','s865_fixture_stage','s865_fixture_stage_one','s865_fixture_request_stop','s865_fixture_force_timer'}
+                   's848_trial','s860_reap','s849_guest_init','s865_fx_guest_test_stale',
+                   's865_test_force_timer','s865_test_observe_trap','s865_fixture_source','s865_fixture_observe',
+                   's865_fixture_stage','s865_fixture_stage_one','s865_fixture_request_stop','s865_fixture_force_timer'}
+        required={'s847_enter','s847_dispatch_raw','s848_dispatch_raw','s848_irq_entry',
+                  's865_executor_boot','s865_executor_poll','s865_executor_launch','s865_native_pump','s865_native_launch',
+                  's865_fx_guest_open','s865_fx_guest_bind','s865_retire_terminal'}
         forbidden.update('s848_'+label+'_'+suffix for label in 'abcd' for suffix in ('start','yield','loop_end','fault','exit','end'))
-        present=forbidden.intersection(token for line in map_text.splitlines() for token in line.split())
-        if present:raise ValueError('shell fixture entry still linked: '+','.join(sorted(present)))
+        linked={token for line in map_text.splitlines() for token in line.split()}
+        present=forbidden.intersection(linked)
+        if present or not required<=linked:raise ValueError('native shell link provenance '+str((sorted(present),sorted(required-linked))))
         compiler=json.loads((build/'x86_64/owned-shell-compiler.json').read_text())
         if '-DSTYLEOS_OWNED_SHELL_865=1' not in compiler['flags'] or not compiler['sources'] or set(compiler['sources'])!=set(compiler['source_sha256']):raise ValueError('owned shell compiler manifest')
-        excluded={'boot/x86_64/user_preemption_848.c','boot/x86_64/fx_guest_849.c',
-                  'boot/x86_64/process_trial_847.c','boot/x86_64/native_executor_865.c','arch/x86_64/process_entry_847.S','tests/guest/workload_865.c'}
+        excluded={'boot/x86_64/user_preemption_848.c','tests/guest/workload_865.c'}
+        if '-DSTYLEOS_KERNEL_CAPACITY_32=1' not in compiler['flags'] or '-DSTYLEOS_NATIVE_EXECUTOR_OBSERVERS=1' in compiler['flags']:raise ValueError('native capacity/observer flag')
+        if 'boot/x86_64/native_executor_865.c' not in compiler['sources']:raise ValueError('native executor source')
         if excluded.intersection(compiler['sources']) or any(s.startswith('tests/') for s in compiler['sources']):
             raise ValueError('owned shell linked diagnostic translation units')
         if any((build/'x86_64').glob('external-workload-*')) or (build/'x86_64/external_workload_865.h').exists():
@@ -466,13 +469,15 @@ def main():
         data=trace.read_bytes()
         if args.owned_shell:
             from runtime_mixed_863_verify import row
-            ok,obs=cold_prior(prefix,rc,site['rva'],ref,cold=True,host_quit=True)
+            ok,obs=cold_prior(prefix,rc,site['rva'],ref,cold=True,host_quit=True,capacity=96)
             if not ok:raise ValueError('owned shell root '+str(obs))
             root=obs['active']['root'];events=cold_trace(data.decode('ascii'),obs)
             marker=b'STYLEOS S865 SHELL-ONLY fixture-launch=deny'
             direct=[x for x in lines if x.startswith(b'STYLEOS OWNED BOOT ')]
             ready=[x for x in lines if x.startswith(b'STYLEOS S863 READY ')]
             if len(direct)!=1 or len(ready)!=1 or lines.count(marker)!=1 or not lines.index(direct[0])<gate<lines.index(marker)<lines.index(ready[0]):raise ValueError('owned shell phase')
+            native=[x for x in lines if x.startswith(b'STYLEOS NATIVE RUNTIME READY ')]
+            if len(native)!=1 or tuple(row(native[0],b'STYLEOS NATIVE RUNTIME READY',('slots','pages','root')).values())!=(32,96,root) or not lines.index(native[0])<lines.index(marker):raise ValueError('native runtime boot proof')
             r=row(ready[0],b'STYLEOS S863 READY',('root','dispatches','next-pid','next-window','input','x','y','writes'))
             if (r['root'],r['dispatches'],r['next-pid'],r['next-window'],r['input'])!=(root,0,1,1,3):raise ValueError('owned shell initial state')
             inputs=[x for x in lines if x.startswith(b'STYLEOS S863 EVENT ')]

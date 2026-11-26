@@ -27,6 +27,9 @@
 #define S863_LAUNCH_LIMIT 2u
 #endif
 void s863_shell_guard(void);
+#ifdef STYLEOS_OWNED_SHELL_865
+void s865_native_pump(void);
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
 void s863_shell_pump(void);
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863

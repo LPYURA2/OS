@@ -3,6 +3,12 @@
 #include "native_executor_865.h"
 #include <styleos/fx_guest_849.h>
 #include <styleos/arch.h>
+#ifdef STYLEOS_OWNED_SHELL_865
+#include <styleos/acpi_madt_806.h>
+#include <styleos/user_preempt_848.h>
+#include <styleos/user_session_runtime.h>
+#include <styleos/native_window_channel.h>
+#endif
 #define V 0x50u
 #define BIT 0x10000u
 #define COUNT 5000000u
@@ -237,3 +243,72 @@ void s865_retire_terminal(const struct rt862_selection *t,bool (*audit)(void *),
     pr_find(runtime860->dispatcher.registry,t->pid)||bank862.slots[id].pid||
     runtime860->dispatcher.slots[id].pid||!audit(opaque))fail848("865-terminal-release");
 }
+
+#ifdef STYLEOS_OWNED_SHELL_865
+/* Persistent descriptor/APIC ownership under the already admitted safe
+ * root. Never arm the timer or enable IF while executing the shell. */
+static struct desc848 native_g0,native_i0,native_g,native_d;
+static struct rt858_live native_original;
+extern void s847_bad_entry(void),s848_irq_entry(void),s864_ud_entry(void),s864_gp_entry(void);
+static uint8_t native_in(uint16_t p){uint8_t x;__asm__ volatile("inb %1,%0":"=a"(x):"Nd"(p));return x;}
+static uint64_t native_apic(void){uint32_t a,d;__asm__ volatile("rdmsr":"=a"(a),"=d"(d):"c"(0x1b));return ((uint64_t)d<<32)|a;}
+bool s865_executor_boot(uint64_t safe,uint64_t lapic,bool (*audit)(void *),void *opaque){
+ struct acpi806_topology topo={0};
+ if(!safe||!lapic||active848||runtime860||root848()!=safe||(flags848()&0x200)||
+    !audit||!audit(opaque)||!acpi806_copy_capture(&topo)||topo.enabled_lapics!=1||
+    topo.lapic_physical!=lapic||native_in(0x21)!=0xff||native_in(0xa1)!=0xff)return false;
+ const uint64_t apic=native_apic();
+ if(!(apic&0x800)||(apic&0x400)||(apic&UINT64_C(0xfffff000))!=lapic)return false;
+ native_original=live848();runtime860=rt861_dispatcher(&native_original);
+ if(!runtime860||pr_snapshot(runtime860->dispatcher.registry,0,0,true))return false;
+ lapic848=lapic;
+ uint32_t lvt=rd848(0x320),initial=rd848(0x380),current=rd848(0x390),div=rd848(0x3e0),svr=rd848(0xf0);
+ if(!s848_timer_admit(lvt,initial,current,div,pending848(0x100),pending848(0x200))||rd848(0x320)!=lvt)return false;
+ wr848(0x380,0);
+ if(rd848(0x380)||rd848(0x390)||pending848(0x100)||pending848(0x200))return false;
+ native_g0=(struct desc848){native_original.gdt_limit,native_original.gdt};
+ native_i0=(struct desc848){native_original.idt_limit,native_original.idt};
+ struct s847_selectors sel={0};
+ if(!s847_gdt_append((void *)(uintptr_t)native_g0.base,4096,native_g0.limit,native_original.tr,native_original.cs,&sel))return false;
+ for(unsigned j=0;j<256;j++)gate848(j,s847_bad_entry,native_original.cs,3,0x8e);
+ gate848(V,s848_irq_entry,native_original.cs,1,0x8e);
+ gate848(128,s847_call_entry,native_original.cs,1,0xee);
+ gate848(14,s847_pf_entry,native_original.cs,2,0x8e);
+ gate848(6,s864_ud_entry,native_original.cs,2,0x8e);
+ gate848(13,s864_gp_entry,native_original.cs,2,0x8e);
+ native_g=(struct desc848){sel.limit,native_g0.base};
+ native_d=(struct desc848){sizeof idt848-1,(uintptr_t)idt848};
+ wr848(0x80,0);wr848(0xf0,(svr&~255u)|0x1ffu);wr848(0x320,BIT|V);wr848(0x3e0,3);
+ if(rd848(0x320)!=(BIT|V)||rd848(0x3e0)!=3||rd848(0x80)||rd848(0xf0)!=((svr&~255u)|0x1ffu)||
+    !s865_fx_guest_open(safe)||!rt862_bank_open(&bank862,runtime860,safe,sel.cs,sel.ss))return false;
+ active848=true;
+ return s865_executor_idle()&&audit(opaque);
+}
+bool s865_executor_idle(void){
+ if(!active848||!runtime860||root848()!=bank862.safe||(flags848()&0x200)||
+    receipt860||frame860||cr2862||armed848||rd848(0x320)!=(BIT|V)||
+    rd848(0x380)||rd848(0x390)||pending848(0x100)||pending848(0x200))return false;
+ struct rt858_live live=live848();
+ return rt861_dispatcher(&live)==runtime860;
+}
+void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
+ if(!s865_executor_idle()||!audit||!retire)fail848("native-poll-boundary");
+ if(!pr_snapshot(runtime860->dispatcher.registry,0,0,true))return;
+ if(!audit(opaque))fail848("native-poll-audit");
+ unsigned id;uint32_t pid;
+ enum ps_status status=dpr_dispatch(runtime860,&id,&pid);
+ if(status==PS_EMPTY)return;
+ if(status!=PS_OK||id>=S846_ROOT_COUNT)fail848("native-poll-select");
+ const struct ps_slot *owner=&runtime860->dispatcher.slots[id];
+ const struct rt862_selection ticket={id,runtime860->dispatcher.dispatches,pid,owner->handle,owner->user_root,bank862.safe};
+ struct up_context ctx={0};
+ if(!rt862_bank_enter(&bank862,runtime860,&ticket,bank862.safe,&ctx))fail848("native-poll-context");
+ struct rt865_slice result=run865(&ticket,&ctx,&native_g0,&native_i0,&native_g,&native_d,&native_original,audit,opaque);
+ if(result.kind==RT865_TERMINAL){
+  (void)usr_reconcile((struct usr_runtime *)usr_global());
+  (void)nwc_reconcile((struct nwc_service *)nwc_global());
+  s865_retire_terminal(&ticket,audit,retire,opaque);
+ }
+ if(!s865_executor_idle())fail848("native-poll-return");
+}
+#endif

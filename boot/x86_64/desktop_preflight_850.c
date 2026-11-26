@@ -212,6 +212,9 @@ static bool absent(uint64_t va){struct pg_lookup x;return pg_lookup(&composed.pl
 static uint64_t bytes64(const unsigned char *p){uint64_t v=0;for(unsigned i=0;i<8;i++)v|=(uint64_t)p[i]<<(8*i);return v;}
 #ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
 #include "runtime_roots_861.inc"
+#ifdef STYLEOS_OWNED_SHELL_865
+#include "native_runtime_865.inc"
+#endif
 #endif
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
 static const struct dpr_service *shell_d863;
@@ -581,6 +584,13 @@ bool s863_disk_flush(void){
 #endif
 static void shell_boundary863(void){
  s863_shell_guard();unsigned used;
+#ifdef STYLEOS_OWNED_SHELL_865
+ if(native_ready){
+  if(!s865_executor_idle()||!s844_count(native_arena,&used)||
+     used!=3*pr_snapshot(pr_global(),0,0,true))fail("native-shell-boundary");
+  return;
+ }
+#endif
 #ifdef STYLEOS_TEST_DESKTOP_COLD_863
  unsigned dispatches=0,next=1,generation=1;
 #if defined(STYLEOS_TEST_DESKTOP_COLD_TASKS_863) && !defined(STYLEOS_OWNED_SHELL_865)
@@ -931,6 +941,7 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
 #endif
  #ifdef STYLEOS_OWNED_SHELL_865
+ if(!native_boot(p,cache,guard,allocator858))fail("native-runtime-boot");
  arch_puts("STYLEOS S865 SHELL-ONLY fixture-launch=deny\n");
  #endif
  desktop_v0_run(s);

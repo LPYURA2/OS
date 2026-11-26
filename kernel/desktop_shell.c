@@ -1182,7 +1182,9 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 #ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
         if(captured)s863_shell_observe(&observed863,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),writes863,input_flags,batch863);
 #endif
-#if defined(STYLEOS_TEST_DESKTOP_PUMP_863) && !defined(STYLEOS_OWNED_SHELL_865)
+#ifdef STYLEOS_OWNED_SHELL_865
+        s865_native_pump();
+#elif defined(STYLEOS_TEST_DESKTOP_PUMP_863)
         s863_shell_pump();
 #endif
         for (unsigned i = 0; i < 64; ++i) __asm__ volatile("pause");

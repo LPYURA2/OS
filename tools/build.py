@@ -457,8 +457,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/user_preempt_848.c','boot/x86_64/user_preemption_848.c']
     if integrated_runtime_864:
         common += ['kernel/native_image_slot_865.c']
-    if integrated_runtime_864 and not owned_shell_865:
-        common += ['boot/x86_64/native_executor_865.c','tests/guest/workload_865.c']
+    if integrated_runtime_864:
+        common += ['boot/x86_64/native_executor_865.c']
+        if not owned_shell_865:
+            common += ['tests/guest/workload_865.c']
     if test_process_trial_847 or test_runtime_user_861 or test_runtime_timer_861:
         common += ['kernel/process_entry_847.c','kernel/process_trap_847.c','kernel/user_copy_772.c','arch/x86_64/process_entry_847.S','boot/x86_64/process_trial_847.c']
     if test_user_roots_846:
@@ -650,7 +652,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if integrated_runtime_864:
         flags.append('-DSTYLEOS_INTEGRATED_RUNTIME_864=1')
     if owned_shell_865:
-        flags.append('-DSTYLEOS_OWNED_SHELL_865=1')
+        flags += ['-DSTYLEOS_OWNED_SHELL_865=1','-DSTYLEOS_KERNEL_CAPACITY_32=1']
     if test_desktop_clock_service_863:
         flags.append('-DSTYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863=1')
     if test_desktop_rtc_runtime_863:
@@ -774,14 +776,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         build_external_workload(cc,folder)
         flags += ['-I',str(folder),'-DSTYLEOS_NATIVE_EXECUTOR_OBSERVERS=1']
     if owned_shell_865:
-        # This boot-only profile must not link the batch executor, its
-        # exception entry adapter or its guest FP observer. Common kernel
-        # root, ELF, scheduler and FP primitives remain available.
+        # Link the same authenticated executor and hardware entry as the
+        # integrated test; omit the workload orchestration and all observers.
         excluded = {
             'boot/x86_64/user_preemption_848.c',
-            'boot/x86_64/fx_guest_849.c',
-            'boot/x86_64/process_trial_847.c',
-            'arch/x86_64/process_entry_847.S',
             'tests/guest/workload_865.c',
         }
         sources = [s for s in sources if s not in excluded]

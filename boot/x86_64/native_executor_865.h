@@ -16,6 +16,12 @@ struct rt865_slice {enum rt865_frame_kind kind;enum pr_state state;uint64_t tick
 struct rt865_slice run865(const struct rt862_selection *,const struct up_context *,
  const struct desc848 *,const struct desc848 *,const struct desc848 *,const struct desc848 *,
  const struct rt858_live *,bool (*)(void *),void *);
+#ifdef STYLEOS_OWNED_SHELL_865
+/* Persistent architecture service; no fixed workload or automatic launch. */
+bool s865_executor_boot(uint64_t,uint64_t,bool (*)(void *),void *);
+bool s865_executor_idle(void);
+void s865_executor_poll(bool (*)(void *),bool (*)(void *,unsigned,uint64_t,uint64_t),void *);
+#endif
 /* On refusal caller retains unpublished root/lease; FP binding is revoked. */
 enum ps_status s865_executor_launch(unsigned,const struct s846_root *,const struct s844_arena *,
  const struct s844_lease *,const struct rt865_launch_request *,uint8_t *,size_t,

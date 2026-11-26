@@ -1,0 +1,72 @@
+/* Ordinary native runtime: reuse the same audited detached-root and
+ * hardware execution path without the historical batch driver. Included
+ * only by the owned-root architecture after all root helpers are defined. */
+#include "native_executor_865.h"
+#include <styleos/native_runtime_865.h>
+static struct s846_root native_roots[S846_ROOT_COUNT];
+static struct s844_lease native_leases[S846_ROOT_COUNT];
+static struct s844_arena *native_arena;
+static const struct boot_memory_evidence *native_evidence;
+static struct s846_guard native_guard;
+static struct s842_cache native_cache;
+static bool native_ready;
+static uint8_t native_scratch[8192];
+static void native_wipe(void *p,size_t n){volatile unsigned char *b=p;while(n--)*b++=0;}
+static bool native_audit(void *unused){
+ (void)unused;
+ return native_arena&&native_evidence&&read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(&native_cache)&&
+  rt865_roots_audit_sparse_frozen(base861,&native_cache,&frozen861,native_evidence,native_arena,native_leases,&native_guard,&composed,native_roots);
+}
+static bool native_release(void *unused,unsigned id,uint64_t root,uint64_t generation){
+ (void)unused;
+ if(id>=S846_ROOT_COUNT||!native_audit(0)||native_roots[id].built.root!=root||
+    native_leases[id].generation!=generation||!s844_lease_live(native_arena,native_leases[id]))return false;
+ struct s844_lease lease=native_leases[id];
+ native_wipe(&native_roots[id],sizeof native_roots[id]);
+ native_wipe(child_tables861[id],sizeof child_tables861[id]);
+ if(!s844_release(native_arena,lease.owner,lease))return false;
+ native_wipe(&native_leases[id],sizeof native_leases[id]);
+ return native_audit(0);
+}
+static bool native_boot(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena){
+ if(native_ready||!p||!p->evidence||!cache||!guard||!arena||!base861)return false;
+ native_arena=arena;native_evidence=p->evidence;native_guard=*guard;native_cache=*cache;
+ if(!native_audit(0)||!s865_executor_boot(composed.built.root,base861->lapic,native_audit,0))return false;
+ native_ready=true;
+ arch_puts("STYLEOS NATIVE RUNTIME READY");field("slots",S846_ROOT_COUNT);field("pages",S844_PAGES);field("root",read_cr3());arch_putc('\n');
+ return true;
+}
+enum ps_status s865_native_launch(const struct rt865_launch_request *request,uint32_t *pid){
+ if(!request||!pid)return PS_ARGUMENT;
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
+ if(pr_global()->change_serial>UINT32_MAX-128u)return PS_EXHAUSTED;
+ unsigned id=0;
+ while(id<S846_ROOT_COUNT&&native_leases[id].generation)++id;
+ if(id==S846_ROOT_COUNT)return PS_FULL;
+ if(!s844_acquire(native_arena,S846_OWNER_A+id,3,&native_leases[id]))return PS_FULL;
+ if(!s865_root_build(base861,&native_cache,native_arena,native_leases,id,&native_guard,child_tables861[id],
+    (uintptr_t)child_tables861[id],&native_roots[id])){
+  native_wipe(&native_roots[id],sizeof native_roots[id]);
+  native_wipe(child_tables861[id],sizeof child_tables861[id]);
+  if(!s844_release(native_arena,native_leases[id].owner,native_leases[id]))fail("native-build-rollback");
+  native_wipe(&native_leases[id],sizeof native_leases[id]);
+  if(!native_audit(0))fail("native-build-audit");
+  return PS_EVIDENCE;
+ }
+ struct nte_loaded image={0};uint32_t assigned=0;
+ enum ps_status result=s865_executor_launch(id,&native_roots[id],native_arena,&native_leases[id],request,
+    native_scratch,sizeof native_scratch,native_audit,0,&image,&assigned);
+ if(result!=PS_OK){
+  if(!native_release(0,id,native_roots[id].built.root,native_leases[id].generation))fail("native-launch-rollback");
+  return result;
+ }
+ if(pr_account(pr_global(),assigned,native_leases[id].generation,0,3*4096)!=PR_OK||
+    !s865_executor_idle()||!native_audit(0))fail("native-launch-publish");
+ *pid=assigned;
+ return PS_OK;
+}
+void s865_native_pump(void){
+ if(!native_ready)fail("native-runtime-not-ready");
+ if(!pr_snapshot(pr_global(),0,0,true))return;
+ s865_executor_poll(native_audit,native_release,0);
+}

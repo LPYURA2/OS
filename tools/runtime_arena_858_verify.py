@@ -4,7 +4,8 @@ from runtime_entry_858_verify import verify as prior, POLICY as RUNTIME
 POLICY=b'STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny'
 ARENA_POLICY=b'STYLEOS S844 POLICY bounded-efi-arena=yes candidate-grants=no reclaim=no dma-grants=no production-cr3=deny'
 
-def verify(raw,rc,rva,reference,*,cold=False,host_quit=False):
+def verify(raw,rc,rva,reference,*,cold=False,host_quit=False,capacity=16):
+    if capacity!=16 and not (cold and capacity==96):return False,'unsupported arena capacity'
     try:
         lines=raw.splitlines()
         final=[x for x in lines if x.startswith(b'STYLEOS S858 ARENA')]
@@ -19,7 +20,7 @@ def verify(raw,rc,rva,reference,*,cold=False,host_quit=False):
             return tuple(int(v,16) for v in m.groups())
         a,pages=parse(rec[0],b'STYLEOS S844 RESERVE',('base','pages'))
         base,end,lo,hi,typ,attr=parse(rec[1],b'STYLEOS S844 ADMIT',('base','end','desc-start','desc-end','type','attr'))
-        if not (pages==16 and base==a and end==base+65536 and 0x100000<=lo<=base<end<=hi<=2**64-1 and end<=0x08000000 and not ((base|lo|hi)&4095) and typ==2 and attr&8 and not attr>>63):raise ValueError('EFI receipt')
+        if not (pages==capacity and base==a and end==base+capacity*4096 and 0x100000<=lo<=base<end<=hi<=2**64-1 and end<=0x08000000 and not ((base|lo|hi)&4095) and typ==2 and attr&8 and not attr>>63):raise ValueError('EFI receipt')
         def ranges(tag):
             out=[]
             for line in lines:
@@ -34,11 +35,11 @@ def verify(raw,rc,rva,reference,*,cold=False,host_quit=False):
             if not spans or any(l<end and base<h for l,h in spans):raise ValueError('overlap/missing '+tag)
         root=obs['active']['root']
         if not cold and parse(rec[2],b'STYLEOS S844 LIVE',('root','a','b','reuse','gen-a','gen-b','gen-reuse','used','zero','refusals'))!=(root,base,base+16384,base,1,2,3,0,1,4):raise ValueError('lease lifecycle')
-        if parse(final[0],b'STYLEOS S858 ARENA',('root','base','pages','used','next','zero'))!=(root,base,16,0,1 if cold else 4,1):raise ValueError('final arena')
+        if parse(final[0],b'STYLEOS S858 ARENA',('root','base','pages','used','next','zero'))!=(root,base,capacity,0,1 if cold else 4,1):raise ValueError('final arena')
         def index(tag):return next(i for i,x in enumerate(lines) if x.startswith(tag))
         phase=[lines.index(rec[0]),lines.index(b'STYLEOS x86_64 ExitBootServices OK'),lines.index(rec[1]),index(b'STYLEOS S842 READY '),index(b'STYLEOS S851 POLICY ')]
         if not cold:phase.extend((lines.index(rec[2]),lines.index(ARENA_POLICY)))
         phase.extend((index(b'STYLEOS S858 RUNTIME '),lines.index(RUNTIME),lines.index(final[0]),lines.index(POLICY)))
         if not all(a<b for a,b in zip(phase,phase[1:])):raise ValueError('phase order')
-        obs['arena']={'base':base,'end':end,'pages':16,'used':0,'next':1 if cold else 4,'scrubbed':True,'root':root,'production_grant':False};return True,obs
+        obs['arena']={'base':base,'end':end,'pages':capacity,'used':0,'next':1 if cold else 4,'scrubbed':True,'root':root,'production_grant':False};return True,obs
     except (ValueError,TypeError,KeyError,IndexError,StopIteration) as exc:return False,str(exc)
