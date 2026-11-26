@@ -39,7 +39,7 @@ static enum sv_status fs_result(enum sfs_result r)
     case SFS_STATE:return SV_RECOVERY;case SFS_NAME:return SV_NAME;
     case SFS_NOT_FOUND:return SV_NOT_FOUND;case SFS_EXISTS:return SV_EXISTS;
     case SFS_TYPE:return SV_TYPE;case SFS_FULL:return SV_FULL;
-    case SFS_RANGE:return SV_RANGE;case SFS_NOT_EMPTY:return SV_DENIED;
+    case SFS_RANGE:return SV_RANGE;case SFS_NOT_EMPTY:case SFS_DENIED:return SV_DENIED;
     }
     return SV_IO;
 }
@@ -213,17 +213,6 @@ enum sv_status sv_read_to(struct sv_service *s,struct sv_ref ref,sfs_sink sink,v
 /* Scope checks use the real validated directory graph, not path prefixes
  * or a caller-supplied entry number alone. Bound traversal even if an
  * internal invariant is violated. Raw sv_* operations remain trusted-only. */
-static bool inside(const struct sfs_volume *fs,unsigned root,unsigned id)
-{
-    for(unsigned n=0;n<SFS_ENTRIES;++n){
-        const struct sfs_entry *e=sfs_entry_at(fs,id);
-        if(!e)return false;
-        if(id==root)return true;
-        if(id==SFS_ROOT)return false;
-        id=e->parent;
-    }
-    return false;
-}
 static struct sv_scope *scope_find(struct sv_service *s,uint64_t token)
 {
     if(!token)return 0;
@@ -254,7 +243,7 @@ static enum sv_status scope_entry(struct sv_service *s,uint64_t owner,uint64_t t
     if(r!=SV_OK)return r;
     if(ref.mount!=(*q)->mount)return SV_DENIED;
     if(ref.revision!=(*q)->revision)return SV_STALE;
-    return inside(&(*v)->fs,(*q)->root,ref.index)?SV_OK:SV_DENIED;
+    return sfs_scope_contains(&(*v)->fs,(*q)->root,ref.index)?SV_OK:SV_DENIED;
 }
 enum sv_status sv_scope_grant(struct sv_service *s,uint64_t owner,struct sv_ref profile,unsigned rights,uint64_t *token)
 {
@@ -262,10 +251,7 @@ enum sv_status sv_scope_grant(struct sv_service *s,uint64_t owner,struct sv_ref 
     struct sv_slot *v;const struct sfs_entry *e;
     enum sv_status r=entry(s,profile,&v,&e);
     if(r!=SV_OK)return r;
-    int users=sfs_find(&v->fs,SFS_ROOT,"Users");
-    const struct sfs_entry *u=users<0?0:sfs_entry_at(&v->fs,(unsigned)users);
-    if(!u||u->type!=SFS_DIRECTORY||profile.index==SFS_ROOT||
-       e->type!=SFS_DIRECTORY||e->parent!=(unsigned)users)return SV_DENIED;
+    if(!sfs_scope_profile(&v->fs,profile.index))return SV_DENIED;
     if((rights&SV_SCOPE_WRITE)&&!v->writable)return SV_DENIED;
     unsigned i=0;while(i<SV_SCOPES&&s->scopes[i].token)++i;
     if(i==SV_SCOPES||s->serial==UINT64_MAX)return SV_FULL;

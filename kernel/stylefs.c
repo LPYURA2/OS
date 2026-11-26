@@ -220,6 +220,7 @@ enum sfs_result sfs_mount(struct sfs_volume *v, struct sfs_workspace *w, const s
     if (!v || !w || !source) return SFS_STATE;
     struct sfs_io io = *source;
     v->mounted = false;
+    v->scope_root = 0;
     if (!sfs_capacity_valid(io.sectors) || !io.read) return SFS_SIGNATURE;
     unsigned fmt = io.sectors == SFS_DISK_SECTORS ? 1 : 2;
     if (!io.read(io.context, 0, w->sector)) return SFS_IO;
@@ -286,6 +287,7 @@ enum sfs_result sfs_format(struct sfs_volume *v, struct sfs_workspace *w, const 
     if (!v || !w || !io || !io->read || !io->write || !io->flush || !sfs_capacity_valid(io->sectors))
         return SFS_STATE;
     v->mounted = false;
+    v->scope_root = 0;
     for (uint32_t i = 0; i < io->sectors; ++i) {
         if (!io->read(io->context, i, w->sector)) return SFS_IO;
         if (!zeros(w->sector, SECTOR)) return SFS_SIGNATURE;
@@ -320,6 +322,41 @@ int sfs_find(const struct sfs_volume *v, unsigned parent, const char *name)
     return -1;
 }
 
+bool sfs_scope_contains(const struct sfs_volume *v,unsigned root,unsigned id)
+{
+    for(unsigned n=0;n<SFS_ENTRIES;++n){
+        const struct sfs_entry *e=sfs_entry_at(v,id);
+        if(!e)return false;
+        if(id==root)return true;
+        if(id==SFS_ROOT)return false;
+        id=e->parent;
+    }
+    return false;
+}
+bool sfs_scope_profile(const struct sfs_volume *v,unsigned root)
+{
+    int users=sfs_find(v,SFS_ROOT,"Users");
+    const struct sfs_entry *u=users<0?0:sfs_entry_at(v,(unsigned)users);
+    const struct sfs_entry *e=sfs_entry_at(v,root);
+    return root!=SFS_ROOT&&u&&u->type==SFS_DIRECTORY&&e&&
+           e->type==SFS_DIRECTORY&&e->parent==(unsigned)users;
+}
+bool sfs_scope_bind(struct sfs_volume *v,unsigned root)
+{
+    if(!v||v->scope_root||!sfs_scope_profile(v,root))return false;
+    v->scope_root=root;return true;
+}
+static bool scope_inside(const struct sfs_volume *v,unsigned id)
+{return v&&(!v->scope_root||sfs_scope_contains(v,v->scope_root,id));}
+static bool scope_mutable(const struct sfs_volume *v,unsigned id)
+{return scope_inside(v,id)&&(!v->scope_root||id!=v->scope_root);}
+bool sfs_scope_visible(const struct sfs_volume *v,unsigned id)
+{
+    const struct sfs_entry *e=sfs_entry_at(v,id);
+    if(!e)return false;
+    return !v->scope_root||scope_inside(v,id)||id==SFS_ROOT||
+           (e->parent==SFS_ROOT&&e->type==SFS_DIRECTORY);
+}
 static bool can_write(const struct sfs_volume *v, const struct sfs_workspace *w)
 { return v && w && v->mounted && v->io.write && v->io.flush && v->generation != UINT32_MAX; }
 
@@ -330,6 +367,7 @@ static enum sfs_result prepare_new(struct sfs_volume *v, struct sfs_workspace *w
                                    unsigned parent, const char *name, uint8_t type, unsigned *id)
 {
     if (!can_write(v, w)) return SFS_STATE;
+    if (!scope_inside(v,parent)) return SFS_DENIED;
     if (!name_valid(name, sfs_name_limit(v))) return SFS_NAME;
     const struct sfs_entry *p = sfs_entry_at(v, parent);
     if (!p || p->type != SFS_DIRECTORY) return SFS_TYPE;
@@ -431,6 +469,7 @@ enum sfs_result sfs_create_from(struct sfs_volume *v, struct sfs_workspace *w, u
 
 enum sfs_result sfs_read(const struct sfs_volume *v, unsigned id, uint8_t *data, size_t capacity)
 {
+    if (!scope_inside(v,id)) return SFS_DENIED;
     const struct sfs_entry *e = sfs_entry_at(v, id);
     if (!e) return SFS_NOT_FOUND;
     if (e->type != SFS_FILE) return SFS_TYPE;
@@ -440,6 +479,7 @@ enum sfs_result sfs_read(const struct sfs_volume *v, unsigned id, uint8_t *data,
 
 enum sfs_result sfs_read_to(const struct sfs_volume *v, unsigned id, sfs_sink output, void *ctx)
 {
+    if (!scope_inside(v,id)) return SFS_DENIED;
     const struct sfs_entry *e = sfs_entry_at(v, id);
     if (!e) return SFS_NOT_FOUND;
     if (e->type != SFS_FILE) return SFS_TYPE;
@@ -450,6 +490,7 @@ enum sfs_result sfs_write(struct sfs_volume *v, struct sfs_workspace *w, unsigne
                          const uint8_t *data, size_t size)
 {
     if (!can_write(v, w)) return SFS_STATE;
+    if (!scope_mutable(v,id)) return SFS_DENIED;
     if (size > sfs_file_limit(v) || (size && !data)) return SFS_RANGE;
     const struct sfs_entry *e = sfs_entry_at(v, id);
     if (!e) return SFS_NOT_FOUND;
@@ -463,6 +504,7 @@ enum sfs_result sfs_move(struct sfs_volume *v, struct sfs_workspace *w, unsigned
                         unsigned parent, const char *name)
 {
     if (!can_write(v, w)) return SFS_STATE;
+    if (!scope_mutable(v,id)||!scope_inside(v,parent)) return SFS_DENIED;
     const struct sfs_entry *e = sfs_entry_at(v, id), *p = sfs_entry_at(v, parent);
     if (!e || id == SFS_ROOT) return SFS_NOT_FOUND;
     if (!p || p->type != SFS_DIRECTORY) return SFS_TYPE;
@@ -480,6 +522,7 @@ enum sfs_result sfs_move(struct sfs_volume *v, struct sfs_workspace *w, unsigned
 enum sfs_result sfs_copy(struct sfs_volume *v, struct sfs_workspace *w, unsigned id,
                         unsigned parent, const char *name, unsigned *new_id)
 {
+    if (!scope_inside(v,id)) return SFS_DENIED;
     const struct sfs_entry *e = sfs_entry_at(v, id);
     if (!e) return SFS_NOT_FOUND;
     if (e->type != SFS_FILE) return SFS_TYPE;
@@ -503,6 +546,8 @@ enum sfs_result sfs_copy_job_begin(struct sfs_copy_job *job, struct sfs_volume *
         source->format != 2 || destination->format != 2 ||
         !source->mounted || !destination->mounted || !source->io.read ||
         !w || !can_write(destination, w)) return SFS_STATE;
+    /* The existing cross-volume job has no scope lifetime binding yet. */
+    if (source->scope_root || destination->scope_root) return SFS_DENIED;
     const struct sfs_entry *entry = sfs_entry_at(source, source_id);
     if (!entry) return SFS_NOT_FOUND;
     if (entry->type != SFS_FILE) return SFS_TYPE;
@@ -541,6 +586,7 @@ enum sfs_result sfs_copy_job_step(struct sfs_copy_job *job, unsigned max_sectors
     struct sfs_volume *source = job->source, *destination = job->destination;
     struct sfs_workspace *w = job->workspace;
     if (!source || !destination || !w || !source->mounted || !destination->mounted ||
+        source->scope_root || destination->scope_root ||
         source->generation != job->source_generation ||
         destination->generation != job->destination_generation) {
         sfs_copy_job_cancel(job);
@@ -584,6 +630,7 @@ enum sfs_result sfs_copy_job_step(struct sfs_copy_job *job, unsigned max_sectors
 enum sfs_result sfs_remove(struct sfs_volume *v, struct sfs_workspace *w, unsigned id)
 {
     if (!can_write(v, w)) return SFS_STATE;
+    if (!scope_mutable(v,id)) return SFS_DENIED;
     if (!id || !sfs_entry_at(v, id)) return SFS_NOT_FOUND;
     for (unsigned i = 1; i < slots(v->format); ++i)
         if (v->entries[i].type && v->entries[i].parent == id) return SFS_NOT_EMPTY;
@@ -595,6 +642,6 @@ enum sfs_result sfs_remove(struct sfs_volume *v, struct sfs_workspace *w, unsign
 const char *sfs_result_name(enum sfs_result r)
 {
     static const char *const names[] = {"ok", "io", "signature", "corrupt", "state", "name",
-        "not-found", "exists", "type", "full", "range", "not-empty"};
+        "not-found", "exists", "type", "full", "range", "not-empty", "denied"};
     return (unsigned)r < sizeof(names) / sizeof(*names) ? names[r] : "unknown";
 }

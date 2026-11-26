@@ -1,3 +1,6 @@
+## 2026-11-26 — StyleFS 09 desktop permissions candidate
+08 host and RW/RO guest PASS; final regression pending at work start. [Scoped guest filesystem](architecture/STYLEFS_DESKTOP_PERMISSIONS_09.md), [handoff](NEXT_CHAT_STYLEFS_09.md). CI pending; no login/production ACL claim.
+
 ## 2026-11-26 — StyleFS 08 scoped file service candidate
 Stage 07 writable guest and cold reopen PASS in 45887441791, full regression pending at branch creation. [Scoped file service](architecture/STYLEFS_FILE_SCOPES_08.md), [handoff](NEXT_CHAT_STYLEFS_08.md). No guest permissions claimed yet.
 

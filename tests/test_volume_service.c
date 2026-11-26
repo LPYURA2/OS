@@ -124,6 +124,29 @@ int main(void){
     assert(sv_lookup(&volumes,root,"Users",&users)==SV_OK&&sv_lookup(&volumes,users,"Alice",&alice)==SV_OK);
     assert(sv_scope_grant(&volumes,100,alice,3,&ta)==SV_OK);
     puts("FILE SCOPE PASS: real Users subtrees, owner/rights, protected anchors, peer denial, stale revisions, mutation and revocation");
+    /* Separate kernel-only mounted view policy. Test direct filesystem
+     * operations too, not just the token broker and UI checks. */
+    struct sfs_volume *mounted=0;
+    for(unsigned i=0;i<SV_SLOTS;++i)if(volumes.slots[i].mount==ma)mounted=&volumes.slots[i].fs;
+    assert(mounted&&sfs_scope_bind(mounted,alice.index));
+    assert(!sfs_scope_bind(mounted,bob.index));
+    assert(sfs_scope_visible(mounted,SFS_ROOT)&&sfs_scope_visible(mounted,system.index));
+    assert(!sfs_scope_visible(mounted,bob.index));
+    writes=a.writes;reads=a.reads;
+    assert(sfs_mkdir(mounted,&work,SFS_ROOT,"deny",0)==SFS_DENIED);
+    assert(sfs_create(mounted,&work,bob.index,"deny",message,sizeof message,0)==SFS_DENIED);
+    assert(sfs_move(mounted,&work,alice.index,SFS_ROOT,"deny")==SFS_DENIED);
+    assert(sfs_remove(mounted,&work,alice.index)==SFS_DENIED);
+    assert(sfs_read(mounted,file.index,output,sizeof output)==SFS_DENIED);
+    assert(sfs_copy(mounted,&work,file.index,alice.index,"deny",0)==SFS_DENIED);
+    assert(a.writes==writes&&a.reads==reads);
+    /* Remount is trusted and clears the runtime scope, not the disk tree. */
+    assert(sv_unmount(&volumes,ma)==SV_OK);
+    assert(sv_mount(&volumes,&block,ga,10,OFFSET,N,true,&ma)==SV_OK);
+    assert(sv_root(&volumes,ma,&root)==SV_OK);
+    assert(sv_lookup(&volumes,root,"Users",&users)==SV_OK&&sv_lookup(&volumes,users,"Alice",&alice)==SV_OK);
+    assert(sv_scope_grant(&volumes,100,alice,3,&ta)==SV_OK);
+    puts("DIRECT STYLEFS SCOPE PASS");
     a.fail_flush=true;
     assert(sv_mkdir(&volumes,root,"uncertain",&tmp)==SV_UNCERTAIN);
     writes=a.writes;assert(sv_mkdir(&volumes,root,"retry",&tmp)==SV_RECOVERY&&a.writes==writes);

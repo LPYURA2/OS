@@ -48,6 +48,15 @@ void desk_fs_mount(struct desk_fs *b, uint32_t sectors)
         return;
     }
     enum sfs_result r = sfs_mount(&b->disk, &b->work, &b->mapping.io);
+#ifdef STYLEOS_STYLEFS_DESKTOP_SCOPE
+    if (r == SFS_OK) {
+        int users=sfs_find(&b->disk,SFS_ROOT,"Users");
+        int profile=users<0?-1:sfs_find(&b->disk,(unsigned)users,"TestProfile");
+        if(profile<0||!sfs_scope_bind(&b->disk,(unsigned)profile)){
+            b->disk.mounted=false;r=SFS_DENIED;
+        } else arch_puts("STYLEOS SFS09 SCOPE BOUND\n");
+    }
+#endif
     if (r == SFS_OK) {
         arch_puts("STYLEOS DESKTOP STYLEFS MOUNT\n");
         if (b->disk.format == 2) arch_puts("STYLEOS DESKTOP STYLEFS V2\n");
@@ -76,6 +85,7 @@ static int find_folder(const struct desk_fs *b, const char *name);
 
 static void show(struct desk_fs *b, unsigned id)
 {
+    if (id != COMPUTER && b->disk.scope_root && !sfs_scope_visible(&b->disk,id)) return;
     b->computer = id == COMPUTER;
     if (!b->computer) b->folder = id;
     b->selected = -1;
@@ -105,6 +115,7 @@ static void show(struct desk_fs *b, unsigned id)
 
 static void browse(struct desk_fs *b, unsigned id)
 {
+    if (id != COMPUTER && b->disk.scope_root && !sfs_scope_visible(&b->disk,id)) return;
     if (b->history[b->history_at] == id) { show(b, id); return; }
     if (b->history_at + 1 == SFS_ENTRIES) {
         for (unsigned i = 1; i < SFS_ENTRIES; ++i) b->history[i - 1] = b->history[i];
@@ -203,7 +214,7 @@ static unsigned rows(const struct desk_fs *b, int out[SFS_ENTRIES])
     for (unsigned type = SFS_DIRECTORY; type <= SFS_FILE; ++type)
         for (unsigned id = 1; id < SFS_ENTRIES; ++id) {
             const struct sfs_entry *e = sfs_entry_at(&b->disk, id);
-            if (e && e->parent == b->folder && e->type == type && matches(e->name, b)) out[n++] = (int)id;
+            if (e && sfs_scope_visible(&b->disk,id) && e->parent == b->folder && e->type == type && matches(e->name, b)) out[n++] = (int)id;
         }
     return n;
 }
@@ -294,7 +305,7 @@ static int open_selected(struct desk_fs *b)
 {
     if (b->selected < 0) return DESK_FS_NONE;
     const struct sfs_entry *e = sfs_entry_at(&b->disk, (unsigned)b->selected);
-    if (!e) return DESK_FS_NONE;
+    if (!e || !sfs_scope_visible(&b->disk,(unsigned)b->selected)) return DESK_FS_NONE;
     if (e->type == SFS_DIRECTORY) { browse(b, (unsigned)b->selected); return DESK_FS_NONE; }
 #ifdef STYLEOS_DESKTOP_UPDATE
     if (update_name(e->name)) {
@@ -335,6 +346,7 @@ static void start_name(struct desk_fs *b, unsigned mode)
 static const char *error_text(enum sfs_result r)
 {
     switch (r) {
+    case SFS_DENIED: arch_puts("STYLEOS SFS09 DENIED\n"); return "Доступ запрещён";
     case SFS_NAME: return "Недопустимое имя";
     case SFS_EXISTS: return "Такое имя уже есть";
     case SFS_FULL: return "Нет места для файла или свободных записей";
@@ -513,7 +525,7 @@ int desk_fs_drag_source(const struct desk_fs *b, struct desk_box a, int x, int y
 {
     int id = desk_fs_hit_item(b, a, x, y);
     const struct sfs_entry *e = id < 0 ? 0 : sfs_entry_at(&b->disk, (unsigned)id);
-    return e && e->type == SFS_FILE && e->size && e->size <= DESK_STYLEFS_TEXT_LIMIT && txt_name(e->name) ? id : DESK_FS_NONE;
+    return e && sfs_scope_visible(&b->disk,(unsigned)id) && e->type == SFS_FILE && e->size && e->size <= DESK_STYLEFS_TEXT_LIMIT && txt_name(e->name) ? id : DESK_FS_NONE;
 }
 
 static struct desk_box action_panel(struct desk_box a)

@@ -16,7 +16,7 @@ enum {
 enum sfs_type { SFS_FREE, SFS_DIRECTORY, SFS_FILE };
 enum sfs_result {
     SFS_OK, SFS_IO, SFS_SIGNATURE, SFS_CORRUPT, SFS_STATE, SFS_NAME,
-    SFS_NOT_FOUND, SFS_EXISTS, SFS_TYPE, SFS_FULL, SFS_RANGE, SFS_NOT_EMPTY
+    SFS_NOT_FOUND, SFS_EXISTS, SFS_TYPE, SFS_FULL, SFS_RANGE, SFS_NOT_EMPTY, SFS_DENIED
 };
 
 struct sfs_io {
@@ -41,6 +41,8 @@ struct sfs_volume {
     uint32_t generation;
     unsigned active, format;
     bool mounted;
+    /* Runtime-only restriction, bound by trusted supervisor after mount. */
+    unsigned scope_root;
 };
 
 /* Caller supplies storage for a single synchronous transaction, not a stack
@@ -64,6 +66,13 @@ enum sfs_result sfs_format(struct sfs_volume *, struct sfs_workspace *, const st
 #endif
 const struct sfs_entry *sfs_entry_at(const struct sfs_volume *, unsigned id);
 int sfs_find(const struct sfs_volume *, unsigned parent, const char *name);
+/* Common bounded ancestry policy. Metadata access via entry_at/find remains
+ * trusted-only; scoped views must filter display. Binding is one-way until
+ * a trusted remount. No persistent ACL or user authentication here. */
+bool sfs_scope_contains(const struct sfs_volume *,unsigned root,unsigned id);
+bool sfs_scope_profile(const struct sfs_volume *,unsigned root);
+bool sfs_scope_bind(struct sfs_volume *,unsigned root);
+bool sfs_scope_visible(const struct sfs_volume *,unsigned id);
 enum sfs_result sfs_mkdir(struct sfs_volume *, struct sfs_workspace *, unsigned parent,
                          const char *name, unsigned *id);
 enum sfs_result sfs_create(struct sfs_volume *, struct sfs_workspace *, unsigned parent,
