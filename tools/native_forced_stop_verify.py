@@ -79,6 +79,16 @@ def verify_forced_stop(lines,trace,obs):
     if (restart['old-pid'],restart['old-gen'],restart['pid'],restart['gen'],restart['root'],restart['peer'])!=(1,1,33,33,roots[0],2):raise ValueError('restart identity')
     if [tuple(r.values()) for _,r in refusals]!=[(1,1),(33,33)] or not refusals[0][0]<r0[0]<ai<ri<refusals[1][0]<r1[0]<r2[0]<done[0][0]:raise ValueError('stop and restart ordering')
     if tuple(done[0][1].values())!=(0,len(events)):raise ValueError('empty registry or dispatch accounting')
+    bound=rec(b'STYLEOS NATIVE STOP-OWNERS-BOUND',('pid','window','peer','peer-window','ports'))
+    revoked=rec(b'STYLEOS NATIVE STOP-OWNERS-REVOKED',('pid','window','peer','ports'))
+    rebound=rec(b'STYLEOS NATIVE STOP-OWNERS-REBOUND',('pid','window','old-window','ports'))
+    emptied=rec(b'STYLEOS NATIVE STOP-OWNERS-EMPTY',('pid','window','ports'))
+    if (len(bound),len(revoked),len(rebound),len(emptied))!=(1,2,1,1):raise ValueError('ownership evidence count')
+    bi,b=bound[0];vi,v=revoked[0];wi,w=revoked[1];ni,n=rebound[0];zi,z=emptied[0]
+    if (b['pid'],b['peer'],b['ports'])!=(1,2,2) or not b['window'] or not b['peer-window'] or b['window']==b['peer-window']:raise ValueError('initial ownership')
+    if tuple(v.values())!=(1,b['window'],2,1) or (n['pid'],n['old-window'],n['ports'])!=(33,b['window'],2) or not n['window'] or n['window'] in (b['window'],b['peer-window']):raise ValueError('revoked and fresh ownership')
+    if tuple(w.values())!=(33,n['window'],2,1) or tuple(z.values())!=(2,b['peer-window'],0):raise ValueError('final ownership')
+    if not batches[0][0]<bi<events[0][0] or not r0[0]<vi<ai<ni<ri<r1[0]<wi<r2[0]<zi<done[0][0]:raise ValueError('ownership lifecycle order')
     if any(x.startswith(b'STYLEOS NATIVE EMPTY ') for x in lines):raise ValueError('unexpected empty pump')
     retire_by_gen={r['gen']:(i,r) for i,r in retired}
     if len(retire_by_gen)!=33:raise ValueError('duplicate retirement')
