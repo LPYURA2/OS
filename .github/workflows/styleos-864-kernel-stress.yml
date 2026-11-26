@@ -76,6 +76,8 @@ jobs:
           for cc in gcc clang; do
             "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_TEST_WIDE_SCHEDULER_864 -DSTYLEOS_TEST_RUNTIME_TICK_860 -DSTYLEOS_TEST_RUNTIME_SYSCALL_863 -Iinclude kernel/runtime_bank_862.c tests/test_runtime_wide_864.c kernel/{desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/s864-wide/$cc"
             "build/s864-wide/$cc" | tee "build/s864-wide/$cc.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_KERNEL_CAPACITY_32 -DSTYLEOS_TEST_WIDE_ROOTS_864 -DSTYLEOS_TEST_WIDE_FX_864 -DSTYLEOS_TEST_RUNTIME_IMAGE_ADMISSION_865 -DSTYLEOS_TEST_RUNTIME_TICK_860 -DSTYLEOS_TEST_RUNTIME_SYSCALL_863 -Iinclude tests/test_kernel_capacity_32.c kernel/{physical_arena_844,user_root_846,paging,apic_root_842,cache_policy_800,fx_context_849,native_image_slot_865,native_tea_elf,runtime_bank_862,desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/s864-wide/capacity-$cc"
+            "build/s864-wide/capacity-$cc" | tee "build/s864-wide/capacity-$cc.log"
           done
       - uses: actions/upload-artifact@v4
         if: always()

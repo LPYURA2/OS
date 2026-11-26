@@ -2,7 +2,14 @@
 #define STYLEOS_PHYSICAL_ARENA_844_H
 #include <styleos/boot_memory.h>
 #include <stdbool.h>
+/* The old guest profile stays byte-compatible in layout. The expanded
+ * capacity contract is exercised with actual detached tables and owned
+ * memory on the host, not yet authorized for ordinary guest boot. */
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+#define S844_PAGES 96u
+#else
 #define S844_PAGES 16u
+#endif
 #define S844_BYTES (S844_PAGES*BOOT_MEMORY_PAGE)
 struct s844_lease { uint64_t pa,generation; uint32_t owner,pages; };
 struct s844_arena {

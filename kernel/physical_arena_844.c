@@ -12,17 +12,43 @@ static bool base_ok(uint64_t x){return x>=P&&!(x&(P-1))&&x<=LOW-S844_BYTES;}
 static bool separated(const struct s844_arena *a,uint64_t base){
  struct boot_range r;return object(a,sizeof *a,&r)&&!overlap(r,(struct boot_range){base,base+S844_BYTES});
 }
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+/* Fixed, bounded multiword bitmap; never shift by the allocation size
+ * or by a page index >= word width. Range checks precede all calls. */
+typedef struct { uint32_t word[(S844_PAGES+31u)/32u]; } arena_mask;
+static bool occupied(const arena_mask *m,unsigned page){return (m->word[page/32u]>>(page%32u))&1u;}
+static bool free_span(const arena_mask *m,unsigned first,unsigned pages){
+ for(unsigned j=0;j<pages;j++)if(occupied(m,first+j))return false;
+ return true;
+}
+static void mark_span(arena_mask *m,unsigned first,unsigned pages){
+ for(unsigned j=0;j<pages;j++){unsigned i=first+j;m->word[i/32u]|=UINT32_C(1)<<(i%32u);}
+}
+#endif
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+static bool shape(const struct s844_arena *a,arena_mask *mask){
+#else
 static bool shape(const struct s844_arena *a,uint32_t *mask){
+#endif
  if(!a||((uintptr_t)a%_Alignof(struct s844_arena))||!a->ready||!base_ok(a->base)||!a->next||!separated(a,a->base))return false;
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+ arena_mask used={0};
+#else
  uint32_t used=0;
+#endif
  for(unsigned i=0;i<S844_PAGES;i++){
   const struct s844_lease *s=&a->slots[i];
   if(!s->generation){if(s->pa||s->owner||s->pages)return false;continue;}
   if(s->pa!=a->base+i*P||!s->owner||!s->pages||s->pages>S844_PAGES-i||s->generation>=a->next)return false;
   for(unsigned j=0;j<i;j++)if(a->slots[j].generation==s->generation)return false;
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+  if(!free_span(&used,i,s->pages))return false;
+  mark_span(&used,i,s->pages);
+#else
   uint32_t m=((UINT32_C(1)<<s->pages)-1)<<i;
   if(used&m)return false;
   used|=m;
+#endif
  }
  *mask=used;return true;
 }
@@ -35,32 +61,58 @@ bool s844_init(struct s844_arena *a,uint64_t base){
  *a=(struct s844_arena){.base=base,.next=1,.ready=true};return true;
 }
 bool s844_count(const struct s844_arena *a,unsigned *out){
- uint32_t used;struct boot_range r,m;
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+ arena_mask used;
+#else
+ uint32_t used;
+#endif
+ struct boot_range r,m;
  if(!shape(a,&used)||!object(out,sizeof *out,&r)||((uintptr_t)out%_Alignof(unsigned))||!object(a,sizeof *a,&m)||
  overlap(r,m)||overlap(r,(struct boot_range){a->base,a->base+S844_BYTES}))return false;
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+ unsigned n=0;for(unsigned i=0;i<S844_PAGES;i++)n+=occupied(&used,i);*out=n;return true;
+#else
  unsigned n=0;for(unsigned i=0;i<S844_PAGES;i++)n+=(used>>i)&1u;*out=n;return true;
+#endif
 }
 bool s844_acquire(struct s844_arena *a,uint32_t owner,uint32_t pages,struct s844_lease *out){
- uint32_t used;struct boot_range r,m;
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+ arena_mask used;
+#else
+ uint32_t used;
+#endif
+ struct boot_range r,m;
  if(!shape(a,&used)||!owner||!pages||pages>S844_PAGES||a->next==UINT64_MAX||
  !object(out,sizeof *out,&r)||!object(a,sizeof *a,&m)||((uintptr_t)out%_Alignof(struct s844_lease))||
  overlap(r,m)||overlap(r,(struct boot_range){a->base,a->base+S844_BYTES}))return false;
  for(unsigned i=0;i<=S844_PAGES-pages;i++){
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+  if(!free_span(&used,i,pages))continue;
+#else
   uint32_t bits=((UINT32_C(1)<<pages)-1)<<i;if(used&bits)continue;
+#endif
   struct s844_lease s={a->base+i*P,a->next,owner,pages};
   zero(s.pa,pages);a->slots[i]=s;a->next++;*out=s;return true;
  }
  return false;
 }
 bool s844_lease_live(const struct s844_arena *a,struct s844_lease v){
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+ arena_mask used;
+#else
  uint32_t used;
+#endif
  if(!shape(a,&used)||!v.owner||!v.generation||v.pa<a->base||
     v.pa>=a->base+S844_BYTES||(v.pa&(P-1)))return false;
  const struct s844_lease *s=&a->slots[(v.pa-a->base)/P];
  return s->pa==v.pa&&s->generation==v.generation&&s->owner==v.owner&&s->pages==v.pages;
 }
 bool s844_release(struct s844_arena *a,uint32_t owner,struct s844_lease v){
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+ arena_mask used;
+#else
  uint32_t used;
+#endif
  if(!shape(a,&used)||!owner||owner!=v.owner||!v.generation||
  v.pa<a->base||v.pa>=a->base+S844_BYTES||(v.pa&(P-1)))return false;
  const unsigned i=(unsigned)((v.pa-a->base)/P);

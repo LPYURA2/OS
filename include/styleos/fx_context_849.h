@@ -10,7 +10,12 @@
 struct s849_image { _Alignas(16) uint8_t bytes[S849_BYTES]; };
 struct s849_caps { uint32_t leaf1_ecx,leaf1_edx,mxcsr_mask; uint64_t cr0,cr4; };
 struct s849_slot { struct s849_image image; uint64_t root,generation; bool live; };
-#ifdef STYLEOS_TEST_WIDE_FX_864
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+#ifndef STYLEOS_TEST_WIDE_FX_864
+#error expanded capacity requires generation-bound FP metadata
+#endif
+#define S849_SLOT_COUNT 32u
+#elif defined(STYLEOS_TEST_WIDE_FX_864)
 #define S849_SLOT_COUNT 4u
 #else
 #define S849_SLOT_COUNT 2u

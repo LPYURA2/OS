@@ -7,7 +7,9 @@
 /* Wide contract is currently host-only: the x86 hardware adapter still owns
  * exactly two roots, leases and FP contexts. Never enable this flag in an
  * existing guest image until the full architecture closure is generalized. */
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+enum { PS_MAX_SLOTS = PR_MAX_PROCESSES };
+#elif defined(STYLEOS_TEST_FOUR_GUEST_864)
 enum { PS_MAX_SLOTS = 4 };
 #elif defined(STYLEOS_TEST_WIDE_SCHEDULER_864)
 enum { PS_MAX_SLOTS = PR_MAX_PROCESSES };

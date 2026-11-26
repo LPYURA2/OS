@@ -9,7 +9,12 @@ struct s846_guard { uint64_t pa[3]; };
 #define S846_STACK UINT64_C(0x11000000)
 #define S846_OWNER_A UINT32_C(0x8461)
 #define S846_OWNER_B UINT32_C(0x8462)
-#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+#ifndef STYLEOS_TEST_WIDE_ROOTS_864
+#error expanded capacity requires generation-bound root metadata
+#endif
+#define S846_ROOT_COUNT 32u
+#elif defined(STYLEOS_TEST_WIDE_ROOTS_864)
 #define S846_ROOT_COUNT 4u
 #else
 #define S846_ROOT_COUNT 2u
