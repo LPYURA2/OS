@@ -230,12 +230,12 @@ enum ps_status s865_executor_launch(unsigned id,const struct s846_root *child,
   fail848("865-launch-fp-rollback");
  return result;
 }
-void s865_retire_terminal(const struct rt862_selection *t,bool (*audit)(void *),
+static void retire865_identity(const struct rt862_selection *t,bool (*audit)(void *),
  bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
  if(!t||!audit||!retire||!runtime860||!active848||armed848||receipt860||
     frame860||cr2862||root848()!=t->safe_root||(flags848()&0x200)||
     runtime860->dispatcher.current!=-1||t->safe_root!=bank862.safe||
-    t->dispatch!=runtime860->dispatcher.dispatches||t->slot>=S846_ROOT_COUNT)
+    t->slot>=S846_ROOT_COUNT)
   fail848("865-terminal-boundary");
  const unsigned id=t->slot;
  const struct ps_slot *s=&runtime860->dispatcher.slots[id];
@@ -252,6 +252,13 @@ void s865_retire_terminal(const struct rt862_selection *t,bool (*audit)(void *),
     rt862_bank_release(&bank862,runtime860,t->safe_root,id,t->pid,t->handle,t->child_root)!=PS_OK||
     pr_find(runtime860->dispatcher.registry,t->pid)||bank862.slots[id].pid||
     runtime860->dispatcher.slots[id].pid||!audit(opaque))fail848("865-terminal-release");
+}
+
+void s865_retire_terminal(const struct rt862_selection *t,bool (*audit)(void *),
+ bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
+ if(!t||!runtime860||t->dispatch!=runtime860->dispatcher.dispatches)
+  fail848("865-terminal-ticket");
+ retire865_identity(t,audit,retire,opaque);
 }
 
 #ifdef STYLEOS_OWNED_SHELL_865
@@ -303,6 +310,29 @@ bool s865_executor_idle(void){
     rd848(0x380)||rd848(0x390)||pending848(0x100)||pending848(0x200))return false;
  struct rt858_live live=live848();
  return rt861_dispatcher(&live)==runtime860;
+}
+enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
+ uint64_t child,bool authorized,bool (*audit)(void *),
+ bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
+ if(!authorized||!pid||!generation||id>=S846_ROOT_COUNT||!audit||!retire)
+  return PS_EVIDENCE;
+ if(!s865_executor_idle()||runtime860->dispatcher.current!=-1)return PS_STATE;
+ if(!audit(opaque))return PS_EVIDENCE;
+ const uint64_t safe=root848();
+ enum ps_status status=rt865_bank_stop_ready(&bank862,runtime860,safe,id,pid,
+                                             generation,child,authorized);
+ if(status!=PS_OK)return status;
+ (void)usr_reconcile((struct usr_runtime *)usr_global());
+ (void)nwc_reconcile((struct nwc_service *)nwc_global());
+ /* Cleanup identity only; dispatch zero is not a trap or dispatch ticket. */
+ const struct rt862_selection identity={id,0,pid,generation,child,safe};
+ retire865_identity(&identity,audit,retire,opaque);
+ if(!s865_executor_idle())fail848("865-stop-return");
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+ arch_puts("STYLEOS NATIVE FORCED-STOP");fld848("slot",id);fld848("pid",pid);
+ fld848("gen",generation);fld848("root",child);arch_putc('\n');
+#endif
+ return PS_OK;
 }
 void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
  if(!s865_executor_idle()||!audit||!retire)fail848("native-poll-boundary");

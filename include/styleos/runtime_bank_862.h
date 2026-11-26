@@ -19,6 +19,12 @@ enum ps_status rt862_bank_finish(struct rt862_bank *,struct dpr_service *,const 
 /* Empty bank may reopen after all slots are retired; never reset PID or dispatch counters. */
 bool rt862_bank_open(struct rt862_bank *,struct dpr_service *,uint64_t,uint16_t,uint16_t);
 enum ps_status rt862_bank_admit(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint64_t,uint64_t,const char *,uint32_t *);
+#ifdef STYLEOS_OWNED_SHELL_865
+/* Trusted supervisor only; architecture proves safe CR3, IF=0, live lease
+ * and quiescence. No fabricated dispatch or trap. READY only. */
+enum ps_status rt865_bank_stop_ready(struct rt862_bank *,struct dpr_service *,
+ uint64_t,unsigned,uint32_t,uint64_t,uint64_t,bool);
+#endif
 /* Architecture must first revoke/scrub mappings, lease and FP state. */
 enum ps_status rt862_bank_release(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint32_t,uint64_t,uint64_t);
 #if (defined(STYLEOS_TEST_RUNTIME_SYSCALL_863) || defined(STYLEOS_OWNED_SHELL_865))

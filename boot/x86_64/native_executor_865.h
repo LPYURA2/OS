@@ -20,6 +20,8 @@ struct rt865_slice run865(const struct rt862_selection *,const struct up_context
 /* Persistent architecture service; no fixed workload or automatic launch. */
 bool s865_executor_boot(uint64_t,uint64_t,bool (*)(void *),void *);
 bool s865_executor_idle(void);
+enum ps_status s865_executor_stop(unsigned,uint32_t,uint64_t,uint64_t,bool,
+ bool (*)(void *),bool (*)(void *,unsigned,uint64_t,uint64_t),void *);
 void s865_executor_poll(bool (*)(void *),bool (*)(void *,unsigned,uint64_t,uint64_t),void *);
 #endif
 /* On refusal caller retains unpublished root/lease; FP binding is revoked. */

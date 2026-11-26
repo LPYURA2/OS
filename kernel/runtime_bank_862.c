@@ -137,6 +137,25 @@ enum ps_status rt862_bank_admit(struct rt862_bank *b,struct dpr_service *d,uint6
  b->slots[slot]=(struct rt862_bank_slot){.pid=assigned,.handle=handle,.root=child,.context={.pc=S846_CODE,.sp=S846_STACK+PAGE,.status=2,.cs=b->cs,.ss=b->ss}};
  *pid=assigned;return PS_OK;
 }
+#ifdef STYLEOS_OWNED_SHELL_865
+enum ps_status rt865_bank_stop_ready(struct rt862_bank *b,struct dpr_service *d,
+ uint64_t live,unsigned slot,uint32_t pid,uint64_t handle,uint64_t child,bool authorized){
+ if(!authorized||!layout(b,d,0,0,1,0,0,1)||!binding(b,d)||
+    live!=b->safe||slot>=PS_MAX_SLOTS||!pid||!handle)return PS_EVIDENCE;
+ if(d->dispatcher.current!=-1)return PS_STATE;
+ struct rt862_bank_slot *c=&b->slots[slot];
+ const struct pr_entry *p=pr_find(d->dispatcher.registry,pid);
+ if(!p||c->pid!=pid||c->handle!=handle||c->root!=child)return PS_EVIDENCE;
+ if(p->state!=PR_READY)return PS_STATE;
+ if(d->dispatcher.registry->change_serial>UINT32_MAX-2u)return PS_EXHAUSTED;
+ if(pr_transition(d->dispatcher.registry,pid,handle,PR_EXITED)!=PR_OK)
+  return PS_REGISTRY_ERROR;
+ volatile unsigned char *bytes=(void *)&c->context;
+ for(size_t i=0;i<sizeof c->context;i++)bytes[i]=0;
+ ws_reap_dead_owners(d->windows,d->dispatcher.registry);
+ return PS_OK;
+}
+#endif
 enum ps_status rt862_bank_release(struct rt862_bank *b,struct dpr_service *d,uint64_t live,unsigned slot,uint32_t pid,uint64_t handle,uint64_t child){
  if(!layout(b,d,0,0,1,0,0,1)||!binding(b,d)||live!=b->safe||d->dispatcher.current!=-1||slot>=PS_MAX_SLOTS||!pid)return PS_EVIDENCE;
  struct rt862_bank_slot *c=&b->slots[slot];

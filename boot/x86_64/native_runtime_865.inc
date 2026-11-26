@@ -68,6 +68,20 @@ enum ps_status s865_native_launch(const struct rt865_launch_request *request,uin
 #endif
  return PS_OK;
 }
+enum ps_status s865_native_stop(uint32_t pid,uint64_t generation,bool authorized){
+ if(!authorized||!pid||!generation)return PS_EVIDENCE;
+ if(!native_ready||!s865_executor_idle()||runtime860->dispatcher.current!=-1)
+  return PS_STATE;
+ if(!native_audit(0))return PS_EVIDENCE;
+ unsigned id=0;
+ while(id<S846_ROOT_COUNT&&bank862.slots[id].pid!=pid)++id;
+ if(id==S846_ROOT_COUNT||bank862.slots[id].handle!=generation||
+    native_leases[id].generation!=generation||
+    !s844_lease_live(native_arena,native_leases[id])||
+    bank862.slots[id].root!=native_roots[id].built.root)return PS_EVIDENCE;
+ return s865_executor_stop(id,pid,generation,native_roots[id].built.root,
+                           authorized,native_audit,native_release,0);
+}
 void s865_native_pump(void){
  if(!native_ready)fail("native-runtime-not-ready");
  if(!pr_snapshot(pr_global(),0,0,true))return;
