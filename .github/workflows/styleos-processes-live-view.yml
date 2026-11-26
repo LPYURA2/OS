@@ -1,0 +1,66 @@
+name: StyleOS Processes live view
+on:
+  push:
+    branches: [feature/styleos-processes-live-view-02]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Process snapshot, registry and window regressions
+        run: |
+          set -euo pipefail
+          mkdir -p build/process-tests
+          for cc in gcc clang; do
+            for t in test_process_api test_process_inspector test_desktop_process_runtime test_process_supervisor_snapshot; do
+              "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/$t.c kernel/{process_runtime,process_scheduler,desktop_process_runtime,window_service,process_inspector,process_view,process_api}.c -o "build/process-tests/$cc-$t"
+              "build/process-tests/$cc-$t" | tee "build/process-tests/$cc-$t.log"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-process-live-view-host
+          path: build/process-tests/
+  guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Ordinary ISO regression
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --output build/process-ordinary
+      - name: Real native catalog regression
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --output build/process-native
+      - name: Live hanging native process in F8, then continued IRQ progress
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-hang --process-view --output build/process-live-view
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-process-live-view-guest
+          path: |
+            build/process-ordinary/
+            build/process-native/
+            build/process-live-view/
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exact source
+        run: |
+          mkdir -p build/source
+          git archive --format=tar --prefix="StyleOS-$GITHUB_SHA/" "$GITHUB_SHA" | gzip -n > "build/source/StyleOS-$GITHUB_SHA.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > build/source/git-identities.txt
+          (cd build/source && sha256sum -- *.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: styleos-source-${{ github.sha }}
+          path: build/source/

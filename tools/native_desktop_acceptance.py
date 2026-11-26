@@ -40,6 +40,8 @@ def exercise(d,proc,serial,folder,wait):
     if pf.pixels==after.pixels:raise ValueError('process window not drawn')
     px,py=pf.w//3,(pf.h-54)//6
     pf.check(px+12,py,'e6ad63')
+    from native_process_view_02 import verify_snapshot
+    verify_snapshot(raw(),live=False)
     # F10 is a shell refresh, not a kernel reboot. Track the actual note
     # session and text receipts through the refresh and subsequent input.
     before=procs
@@ -50,6 +52,8 @@ def exercise(d,proc,serial,folder,wait):
     (folder/'extended-desktop.json').write_text(json.dumps({'cursor':mv,'menu':opened,'closed':closed,'processes':procs,'restart':restart,'language':lang,'restored':restored,'frames':{x:hashlib.sha256((folder/(x+'.ppm')).read_bytes()).hexdigest() for x in ('extended-cursor-start','extended-cursor-end','extended-menu','extended-menu-closed','extended-processes','extended-restart')}},indent=2)+'\n')
 
 def verify(folder,lines,root):
+    from native_process_view_02 import verify_snapshot
+    verify_snapshot(lines,live=False)
     data=json.loads((folder/'extended-desktop.json').read_text())
     actual=events(lines)
     for name in ('cursor','menu','closed','processes','restart','language','restored'):

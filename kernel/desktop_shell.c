@@ -8,6 +8,9 @@
 #include <styleos/desktop_sessions.h>
 #include <styleos/desktop_text_app.h>
 #include <styleos/native_desktop_bridge.h>
+#ifdef STYLEOS_OWNED_SHELL_865
+#include <styleos/native_runtime_865.h>
+#endif
 #if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/desktop_process_runtime.h>
 #include <styleos/runtime_entry_858.h>
@@ -159,6 +162,69 @@ static int active(void)
 }
 
 static bool visible(int id) { return win[id].open && !win[id].minimized; }
+#ifdef STYLEOS_OWNED_SHELL_865
+/* Kernel-owned cache, never supplied by a user process. Read only between
+ * native slices; drawing consumes the cached snapshot, not the scheduler. */
+static struct pa_row process_rows[PA_MAX_ROWS], process_next[PA_MAX_ROWS];
+static struct pa_reply process_reply;
+static bool process_valid, process_refresh, process_was_visible;
+static unsigned process_offset;
+static unsigned process_poll;
+static void process_decimal(char out[24], uint64_t value)
+{
+    char rev[24]; unsigned n=0;
+    do { rev[n++]=(char)('0'+value%10u); value/=10u; } while(value);
+    for(unsigned i=0;i<n;++i)out[i]=rev[n-i-1];
+    out[n]=0;
+}
+static void process_field(const char *key,uint64_t value)
+{
+    char buf[24];process_decimal(buf,value);arch_puts(key);arch_puts(buf);
+}
+static unsigned process_page_size(void)
+{
+    int n=(win[TASKS].box.h-153)/24;
+    return (unsigned)(n>0?n:1);
+}
+static bool process_sample(bool report)
+{
+    const struct pa_request q={.version=PA_VERSION,.order=PI_BY_PID};
+    struct pa_reply next={0};
+    enum pa_status st=s865_native_snapshot(&q,process_next,PA_MAX_ROWS,&next);
+    bool valid=st==PA_OK&&next.returned<=PA_MAX_ROWS&&next.total==next.returned&&
+        next.measurement_flags==(PA_MEASURE_CPU_TICKS|PA_MEASURE_MEMORY_BYTES);
+    bool changed=valid!=process_valid;
+    if(valid){
+        if(next.process_serial!=process_reply.process_serial||
+           next.window_generation!=process_reply.window_generation||
+           next.returned!=process_reply.returned)changed=true;
+        for(unsigned i=0;i<next.returned;++i){
+            if(process_next[i].open_windows!=process_rows[i].open_windows||
+               process_next[i].group!=process_rows[i].group)changed=true;
+            process_rows[i]=process_next[i];
+        }
+        process_reply=next;
+        if(process_offset>=next.returned)process_offset=0;
+    }else{
+        process_reply=(struct pa_reply){0};process_offset=0;
+    }
+    process_valid=valid;
+    if(report){
+        arch_puts("STYLEOS PROCESSES SNAPSHOT");
+        process_field(" valid=",valid);process_field(" total=",process_reply.returned);
+        process_field(" flags=",process_reply.measurement_flags);arch_puts("\n");
+        if(valid)for(unsigned i=0;i<process_reply.returned;++i){
+            const struct pa_row *p=&process_rows[i];
+            arch_puts("STYLEOS PROCESSES ROW");
+            process_field(" pid=",p->pid);process_field(" group=",p->group);
+            process_field(" state=",p->state);process_field(" ticks=",p->cpu_ticks);
+            process_field(" bytes=",p->resident_bytes);arch_puts("\n");
+        }
+        arch_puts("STYLEOS PROCESSES END\n");
+    }
+    return changed;
+}
+#endif
 static int window_at(int x, int y)
 {
     for (int i = WINDOWS - 1; i >= 0; --i) {
@@ -220,6 +286,9 @@ static void open_window(int id)
     win[id].open = true;
     win[id].minimized = false;
     front(id);
+#ifdef STYLEOS_OWNED_SHELL_865
+    if(id==TASKS)process_refresh=true;
+#endif
     if (restore) arch_puts("STYLEOS DESKTOP WINDOW RESTORE\n");
     else if (opening) arch_puts("STYLEOS DESKTOP WINDOW OPEN\n");
 }
@@ -426,6 +495,15 @@ static bool keyboard(unsigned key, unsigned mods)
     if (key == 0x40 || key == DESK_KEY_LANGUAGE) { toggle_language(); return true; } /* F6 or Alt+Shift */
     if (key == 0x01 && menu) { menu = false; return true; }
     if (key == 0x15b || key == 0x3e) { menu = !menu; return true; } /* Super or F4 */
+#ifdef STYLEOS_OWNED_SHELL_865
+    if(active()==TASKS&&!menu&&!mods&&(key==0x149||key==0x151)){
+        unsigned step=process_page_size();
+        if(key==0x149)process_offset=process_offset>=step?process_offset-step:0;
+        else if(process_offset+step<process_reply.returned)process_offset+=step;
+        process_refresh=true;
+        return true;
+    }
+#endif
     if (filesystem.mode && active() == FILES && key != 0x3d && !menu) {
         int item = desk_fs_key(&filesystem, win[FILES].box, key, mods,
                                character(key, (mods & DESK_SHIFT) != 0), protected_file_entry());
@@ -799,6 +877,36 @@ static void draw_window(int id, int top)
         }
         desk_text(b.x + 14, b.y + b.h - 24, r - (modern_shell() ? 77 : 12), notice, MUTED);
     } else if (id == TASKS) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        desk_text(b.x+18,b.y+55,r-15,"Процессы StyleOS",GOLD);
+        if(!process_valid){
+            desk_text(b.x+18,b.y+87,r-15,"Снимок недоступен",MUTED);
+        }else if(!process_reply.returned){
+            desk_text(b.x+18,b.y+87,r-15,"Нет зарегистрированных процессов",LIGHT);
+        }else{
+            const int a=b.x+b.w*35/100,c=b.x+b.w*51/100,
+                      d=b.x+b.w*69/100,e=b.x+b.w*84/100;
+            desk_text(b.x+12,b.y+84,a-3,"Имя",MUTED);
+            desk_text(a,b.y+84,c-3,"PID",MUTED);
+            desk_text(c,b.y+84,d-3,"Статус",MUTED);
+            desk_text(d,b.y+84,e-3,"Тики",MUTED);
+            desk_text(e,b.y+84,r-8,"КиБ",MUTED);
+            unsigned end=process_offset+process_page_size();
+            if(end>process_reply.returned)end=process_reply.returned;
+            for(unsigned i=process_offset;i<end;++i){
+                const struct pa_row *p=&process_rows[i];
+                int y=b.y+110+(int)(i-process_offset)*24;
+                char buf[24];
+                desk_text(b.x+12,y,a-3,p->name,LIGHT);
+                process_decimal(buf,p->pid);desk_text(a,y,c-3,buf,LIGHT);
+                desk_text(c,y,d-3,p->state==PR_READY?"Готов":p->state==PR_WAITING?"Ждёт":"Вып.",LIGHT);
+                process_decimal(buf,p->cpu_ticks);desk_text(d,y,e-3,buf,MUTED);
+                process_decimal(buf,p->resident_bytes/1024u);desk_text(e,y,r-8,buf,MUTED);
+            }
+        }
+        desk_text(b.x+12,b.y+b.h-48,r-10,"CPU %: нет данных; память: страницы",MUTED);
+        desk_text(b.x+12,b.y+b.h-25,r-10,"F8: обновить  PgUp/PgDn: список",MUTED);
+#else
         const struct desk_sessions *sessions = desk_sessions_global();
         desk_text(b.x + 18, b.y + 55, r - 15, "Процессы StyleOS", GOLD);
         desk_text(b.x + 18, b.y + 87, b.x + 251, "Оболочка", LIGHT);
@@ -824,6 +932,7 @@ static void draw_window(int id, int top)
             desk_text(b.x + 257, y, r - 15, pid_text, MUTED);
         }
         desk_text(b.x + 18, b.y + b.h - 27, r - 15, "F10: обновить оболочку, сохранить приложения", MUTED);
+#endif
     } else {
 #ifdef STYLEOS_DESKTOP_UPDATE
         desk_text(b.x + 18, b.y + 60, r - 15, "StyleOS Desktop v0.7", LIGHT);
@@ -1156,7 +1265,19 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
         struct desk_damage damage = {0};
         unsigned native_changes = ndb_track(nwc_global(), &native_view,
                                             width, work_area().h, &damage);
-        if (captured || clock || imported || shell_refreshed || native_changes) {
+        bool process_changed=false;
+#ifdef STYLEOS_OWNED_SHELL_865
+        const bool process_shown=visible(TASKS);
+        bool periodic=false;
+        if(++process_poll==128u){process_poll=0;periodic=true;}
+        if(process_shown&&(process_refresh||!process_was_visible||
+            (periodic&&(!process_valid||pr_global()->change_serial!=process_reply.process_serial)))){
+            process_changed=process_sample(process_refresh)||process_refresh||!process_was_visible;
+            if(process_changed)desk_damage_add(&damage,win[TASKS].box);
+        }
+        process_refresh=false;process_was_visible=process_shown;
+#endif
+        if (captured || clock || imported || shell_refreshed || native_changes || process_changed) {
             if (shell_refreshed) { damage.all = true; shell_refreshed = false; }
             bool cursor_only = false;
             if (captured) {
@@ -1167,7 +1288,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                     desk_damage_add(&damage, (struct desk_box){old.x, old.y, CURSOR_W, CURSOR_H});
                     desk_damage_add(&damage, (struct desk_box){next.x, next.y, CURSOR_W, CURSOR_H});
                 }
-            } else desk_damage_add(&damage, (struct desk_box){width - 96, panel_box().y + 14, 96, 24});
+            } else if(!process_changed||clock) desk_damage_add(&damage, (struct desk_box){width - 96, panel_box().y + 14, 96, 24});
             if (imported && visible(FILES)) {
                 desk_damage_add(&damage, win[FILES].box);
                 cursor_only = false;

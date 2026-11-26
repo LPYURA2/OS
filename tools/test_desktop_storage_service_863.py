@@ -215,7 +215,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--extended-desktop',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
@@ -230,6 +230,7 @@ def main():
     if args.native_hang and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe):p.error('hang requires separate catalog')
     if args.native_forced_stop and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe or args.native_hang):p.error('forced stop requires separate native catalog')
     if args.extended_desktop and (not args.owned_shell or args.native_catalog):p.error('extended desktop requires ordinary no-catalog ISO')
+    if args.process_view and not (args.owned_shell and args.native_hang):p.error('process view requires native hang profile')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base)
@@ -444,6 +445,9 @@ def main():
                         elif args.native_hang:wait_hang_progress(proc,serial)
                         else:wait_native_empty(proc,serial,30 if args.native_fault_probe else 600 if args.native_timer_load else 180)
                     d.screen('after-denied-fixture')
+                    if args.process_view:
+                        from native_process_view_02 import exercise as process_view
+                        process_view(d,proc,serial,folder,wait)
                     if args.extended_desktop:
                         from native_desktop_acceptance import exercise as extended
                         extended(d,proc,serial,folder,wait)
@@ -566,12 +570,15 @@ def main():
             r=row(ready[0],b'STYLEOS S863 READY',('root','dispatches','next-pid','next-window','input','x','y','writes'))
             if (r['root'],r['dispatches'],r['next-pid'],r['next-window'],r['input'])!=(root,0,1,1,3):raise ValueError('owned shell initial state')
             inputs=[x for x in lines if x.startswith(b'STYLEOS S863 EVENT ')]
-            keys=(0x58,0x40) if args.extended_desktop else (0x43,0x58,0x40)
+            keys=(0x58,0x40) if args.extended_desktop else (0x42,0x58,0x40) if args.process_view else (0x43,0x58,0x40)
             if len(inputs)<len(keys) or any(b' key=0x'+f'{key:016x}'.encode()+b' ' not in x for key,x in zip(keys,inputs[-len(keys):])):raise ValueError('owned shell F9/F12/F6 input proof')
             if args.extended_desktop:
                 if sum(b' key=0x0000000000000043 ' in x for x in inputs)!=1:raise ValueError('extended F9 input proof')
                 from native_desktop_acceptance import verify as verify_extended
                 verify_extended(folder,lines,root)
+            if args.process_view:
+                from native_process_view_02 import verify
+                verify(folder,lines,root,live=True)
             denied=(b'STYLEOS S863B REQUEST ',b'STYLEOS S863L BEGIN ',b'STYLEOS S863P SLICE ',b'STYLEOS S864 BATCH-',b'STYLEOS S863 EXIT ')
             if not args.native_catalog:denied+=(b'STYLEOS S848 ',b'STYLEOS NATIVE ADMIT ',b'STYLEOS NATIVE EVENT ')
             if any(x.startswith(denied) for x in lines):raise ValueError('fixture or unsolicited process in owned shell')
