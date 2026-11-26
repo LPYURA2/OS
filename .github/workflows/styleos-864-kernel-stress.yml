@@ -385,7 +385,7 @@ jobs:
         if: always()
         with:
           name: styleos-kfa-base-regression
-          path: build/kfa-base-regression/logs/
+          path: build/kfa-base-regression/test-results/
           if-no-files-found: error
 
   entry-classification-contract:
