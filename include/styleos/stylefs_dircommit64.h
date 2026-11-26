@@ -50,4 +50,16 @@ struct dc64_edit {
 enum dc64_status dc64_apply(struct dc64_state *,struct dc64_workspace *writer,
                            struct dc64_workspace *reader,uint64_t epoch,
                            const struct dc64_edit *);
+
+/* Up to 32 independent edits applied in one durable snapshot publication.
+ * All edits refer to the same immutable epoch. Existing destinations are
+ * refused even if deleted by the batch; dependent edits/swaps not supported.
+ * No heap, bounded trusted workspace, preflight before disk writes.
+ * Cancel callback is optional, trusted, nonreentrant; true requests stop.
+ * Cancellation before publication never changes current directory. */
+enum { DC64_BATCH_MAX=32 };
+typedef bool (*dc64_cancel)(void *);
+enum dc64_status dc64_apply_batch(struct dc64_state *,struct dc64_workspace *writer,
+ struct dc64_workspace *reader,uint64_t epoch,const struct dc64_edit *,unsigned count,
+ dc64_cancel,void *);
 #endif

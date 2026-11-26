@@ -1,3 +1,6 @@
+## StyleFS 24 — bounded atomic batch edits candidate
+22 CI 7/7; 23 host PASS, guest regression apt HTTP 403, other checks pending at start. New batch directory API and write-amplification test. [Handoff](NEXT_CHAT_STYLEFS_24.md). [Legal release gate](LEGAL_RELEASE_GATE.md) preserved.
+
 ## StyleFS 23 — directory operations and legal release gate
 22 host PASS, other regressions pending at start. New ordinal read and atomic insert/delete/rename candidate, [handoff](NEXT_CHAT_STYLEFS_23.md). Owner legal release requirement [gate](LEGAL_RELEASE_GATE.md).
 

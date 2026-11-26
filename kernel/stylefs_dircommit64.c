@@ -272,3 +272,90 @@ enum dc64_status dc64_apply(struct dc64_state *s,struct dc64_workspace *writer,
  if(rc==DC64_CANCELLED&&a.error!=DC64_OK){s->valid=false;return a.error;}
  return rc;
 }
+
+struct batch_source {
+ struct dc64_state *s;struct dc64_workspace *w;
+ const struct dc64_edit *edits;
+ uint64_t epoch,source,output,page;
+ uint64_t removed[DC64_BATCH_MAX],positions[DC64_BATCH_MAX];
+ unsigned additions[DC64_BATCH_MAX],nr,na,ri,ai;
+ bool cached;
+ enum dc64_status error;
+ dc64_cancel cancel;void *context;
+};
+static const struct sd64_key *new_key(const struct dc64_edit *e){
+ return e->op==DC64_RENAME?&e->destination:&e->entry.key;
+}
+static bool batch_next(void *ctx,uint64_t index,struct sd64_record *out){
+ struct batch_source *a=ctx;
+ if(index!=a->output||!a->s->valid||a->s->epoch!=a->epoch){a->error=DC64_STALE;return false;}
+ if(a->cancel&&a->cancel(a->context))return false;
+ while(a->ri<a->nr&&a->removed[a->ri]==a->source){++a->source;++a->ri;}
+ if(a->ai<a->na&&a->positions[a->ai]<=a->source){
+  const struct dc64_edit *e=&a->edits[a->additions[a->ai++]];
+  *out=e->entry;out->key=*new_key(e);++a->output;return true;
+ }
+ if(a->source>=a->s->count){a->error=DC64_CORRUPT;return false;}
+ uint64_t page=a->source/SD64_FANOUT;
+ if(!a->cached||a->page!=page){
+  struct sd64_record check;
+  a->error=dc64_entry_at(a->s,a->w,a->epoch,a->source,&check);
+  if(a->error!=DC64_OK)return false;
+  a->page=page;a->cached=true;
+ }
+ *out=a->w->records[a->source%SD64_FANOUT];
+ ++a->source;++a->output;return true;
+}
+enum dc64_status dc64_apply_batch(struct dc64_state *s,struct dc64_workspace *writer,
+ struct dc64_workspace *reader,uint64_t epoch,const struct dc64_edit *edits,unsigned n,
+ dc64_cancel cancel,void *context){
+ if(!n||n>DC64_BATCH_MAX)return DC64_INVALID;
+ size_t bytes=n*sizeof *edits;
+ if(!separate(s,sizeof *s,writer,sizeof *writer)||!separate(s,sizeof *s,reader,sizeof *reader)||
+    !separate(writer,sizeof *writer,reader,sizeof *reader)||!separate(s,sizeof *s,edits,bytes)||
+    !separate(writer,sizeof *writer,edits,bytes)||!separate(reader,sizeof *reader,edits,bytes)||
+    !s->valid||s->active>1||!separate(s,sizeof *s,s->block,sizeof *s->block)||
+    !separate(writer,sizeof *writer,s->block,sizeof *s->block)||
+    !separate(reader,sizeof *reader,s->block,sizeof *s->block)||
+    !separate(edits,bytes,s->block,sizeof *s->block))return DC64_INVALID;
+ if(epoch!=s->epoch)return DC64_STALE;
+ if(!grant(s->block,s->owner,s->token,s->sectors,true))return DC64_INVALID;
+ struct batch_source a={.s=s,.w=reader,.edits=edits,.epoch=epoch,.cancel=cancel,.context=context};
+ for(unsigned i=0;i<n;i++){
+  const struct dc64_edit *e=edits+i;
+  if((e->op!=DC64_INSERT&&e->op!=DC64_DELETE&&e->op!=DC64_RENAME)||
+     !sd64_key_valid(&e->entry.key)||!e->entry.target||
+     (e->entry.kind!=SD64_FILE&&e->entry.kind!=SD64_DIRECTORY)||
+     (e->op==DC64_RENAME&&!sd64_key_valid(&e->destination)))return DC64_INVALID;
+  if(cancel&&cancel(context))return DC64_CANCELLED;
+  uint64_t pos;struct sd64_record found;bool exists;
+  enum dc64_status rc=lower_bound(s,reader,epoch,&e->entry.key,&pos,&found,&exists);
+  if(rc!=DC64_OK)return rc;
+  if(e->op==DC64_INSERT){if(exists)return DC64_CONFLICT;}
+  else{
+   if(!exists)return DC64_MISSING;
+   if(found.target!=e->entry.target||found.kind!=e->entry.kind)return DC64_STALE;
+   if(e->op==DC64_RENAME&&sd64_compare(&e->entry.key,&e->destination)==0)return DC64_INVALID;
+   unsigned j=0;while(j<a.nr&&a.removed[j]<pos)++j;
+   if(j<a.nr&&a.removed[j]==pos)return DC64_CONFLICT;
+   for(unsigned k=a.nr;k>j;k--)a.removed[k]=a.removed[k-1];
+   a.removed[j]=pos;++a.nr;
+  }
+  if(e->op==DC64_DELETE)continue;
+  const struct sd64_key *k=new_key(e);
+  if(e->op==DC64_RENAME){
+   rc=lower_bound(s,reader,epoch,k,&pos,&found,&exists);
+   if(rc!=DC64_OK)return rc;
+   if(exists)return DC64_CONFLICT;
+  }
+  unsigned j=0;while(j<a.na&&sd64_compare(new_key(edits+a.additions[j]),k)<0)++j;
+  if(j<a.na&&sd64_compare(new_key(edits+a.additions[j]),k)==0)return DC64_CONFLICT;
+  for(unsigned m=a.na;m>j;m--){a.additions[m]=a.additions[m-1];a.positions[m]=a.positions[m-1];}
+  a.additions[j]=i;a.positions[j]=pos;++a.na;
+ }
+ if(a.nr>s->count||a.na>UINT64_MAX-(s->count-a.nr))return DC64_FULL;
+ if(cancel&&cancel(context))return DC64_CANCELLED;
+ enum dc64_status rc=dc64_publish(s,writer,s->count-a.nr+a.na,batch_next,&a);
+ if(rc==DC64_CANCELLED&&a.error!=DC64_OK){s->valid=false;return a.error;}
+ return rc;
+}
