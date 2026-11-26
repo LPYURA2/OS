@@ -3,6 +3,7 @@
 Actual guest exit33 is a test-only F12 checkpoint, not a production shutdown.
 No synthetic trace, storage grant or general native task admission.
 """
+from uart_receipts import complete_lines
 import argparse,gzip,hashlib,json,re,shutil,subprocess,sys,time
 from pathlib import Path
 from runtime_recycle_862_verify import verify as prior,trace_check,recycle_site
@@ -67,7 +68,7 @@ def verify(raw,rc,site,ref):
 def wait(proc,serial,tag,n=1,seconds=100):
     deadline=time.monotonic()+seconds
     while time.monotonic()<deadline:
-        if serial.exists() and sum(x.startswith(tag) for x in serial.read_bytes().splitlines())>=n:return
+        if serial.exists() and sum(x.startswith(tag) for x in complete_lines(serial.read_bytes()))>=n:return
         if proc.poll() is not None:break
         time.sleep(.03)
     raise RuntimeError('missing '+repr(tag))

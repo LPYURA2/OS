@@ -1,4 +1,5 @@
 """Extra ordinary ISO UI checks, entirely on host. No kernel test module."""
+from uart_receipts import complete_lines
 import hashlib,json
 from test_desktop_v0 import Frame
 from runtime_mixed_863_verify import row
@@ -12,7 +13,7 @@ def events(raw):
             for x in raw if x.startswith(EVENT)]
 
 def exercise(d,proc,serial,folder,wait):
-    def raw():return serial.read_bytes().splitlines()
+    def raw():return complete_lines(serial.read_bytes())
     def key(name,code):
         before=len(events(raw()))
         d.key(name);wait(proc,serial,EVENT,before+1)

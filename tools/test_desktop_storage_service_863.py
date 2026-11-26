@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Real shell note store, disposable guarded PIO overlay, two distinct boots."""
+from uart_receipts import complete_lines
 import argparse,copy,hashlib,json,re,shutil,struct,subprocess,sys
 from pathlib import Path
 from make_desktop_data import provision
@@ -402,13 +403,13 @@ def main():
                     # Bind the screenshot to the subsequent real input/render
                     # receipt rather than assuming UART completion means paint.
                     marker=b'STYLEOS DESKTOP DOCUMENT '+(b'SAVE' if write else b'OPEN')
-                    before=serial.read_bytes().splitlines()
+                    before=complete_lines(serial.read_bytes())
                     if before.count(marker)!=1:raise ValueError('document marker count')
                     offset=before.index(marker)
                     tag=b'STYLEOS S863 EVENT '
                     count=sum(x.startswith(tag) for x in before[:offset])
                     wait(proc,serial,tag,count+1)
-                    receipts=[x for x in serial.read_bytes().splitlines()[offset+1:] if x.startswith(tag)]
+                    receipts=[x for x in complete_lines(serial.read_bytes())[offset+1:] if x.startswith(tag)]
                     if not receipts:raise ValueError('missing post-document render receipt')
                     fields=dict(part.split(b'=',1) for part in receipts[0].split()[3:])
                     # The save scenario uses Notes; reopening a file via
@@ -421,7 +422,7 @@ def main():
                     else:
                         if int(fields[b'active'],16)!=1 or int(fields[b'note-session'],16)!=0:
                             raise ValueError('post-open editor state')
-                        opened=[x for x in serial.read_bytes().splitlines()[offset+1:] if x.startswith(b'STYLEOS S863S OPENED ')]
+                        opened=[x for x in complete_lines(serial.read_bytes())[offset+1:] if x.startswith(b'STYLEOS S863S OPENED ')]
                         if len(opened)!=1:raise ValueError('post-open disk evidence')
                         from runtime_mixed_863_verify import row
                         receipt=row(opened[0],b'STYLEOS S863S OPENED',('root','slot','bytes','hash'))
@@ -431,7 +432,7 @@ def main():
                 d.screen('note')
                 if args.owned_shell:
                     tag=b'STYLEOS S863 EVENT '
-                    count=sum(x.startswith(tag) for x in serial.read_bytes().splitlines())
+                    count=sum(x.startswith(tag) for x in complete_lines(serial.read_bytes()))
                     d.key('f9');wait(proc,serial,tag,count+1)
                     if args.native_catalog:
                         from native_catalog_865_verify import wait_native_empty,wait_hang_progress
@@ -474,7 +475,7 @@ def main():
                 d.call('cont')
                 if args.provisioned:
                     tag=b'STYLEOS S863 EVENT '
-                    def event_count():return sum(x.startswith(tag) for x in serial.read_bytes().splitlines())
+                    def event_count():return sum(x.startswith(tag) for x in complete_lines(serial.read_bytes()))
                     n=event_count();d.key('f12');wait(proc,serial,tag,n+1)
                     n=event_count();d.key('f6');wait(proc,serial,tag,n+1)
                     if args.native_hang:

@@ -1,7 +1,7 @@
 name: StyleOS audit repeatability on two host CPUs
 on:
   push:
-    branches: [feature/styleos-kernel-audit-repeatability, feature/styleos-kernel-storage-read-diagnostics, feature/styleos-kernel-ata-read-pacing, feature/styleos-kernel-final-storage-recheck]
+    branches: [feature/styleos-kernel-audit-repeatability, feature/styleos-kernel-storage-read-diagnostics, feature/styleos-kernel-ata-read-pacing, feature/styleos-kernel-final-storage-recheck, feature/styleos-kernel-uart-receipt-recheck]
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Complete UART receipt boundary regression
+        run: python3 tools/test_uart_receipts.py
       - name: Native and legacy ATA host tests with sanitizers
         run: |
           set -euo pipefail
