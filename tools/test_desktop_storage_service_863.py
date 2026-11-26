@@ -243,7 +243,7 @@ def main():
         with (out/'compile.log').open('w') as f:subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',*build_args,'--output',str(build)],stdout=f,stderr=subprocess.STDOUT,check=True)
     boot=build/'x86_64/styleos.img';boot_sha=sha(boot.read_bytes())
     efi=build/'x86_64/BOOTX64.EFI';mp=build/'x86_64/kernel.map';site=None if args.four else bp_site(efi.read_bytes(),mp.read_text()) if cold and not tasks else recycle_site(efi.read_bytes(),mp,mixed=mixed)
-    if args.integrated:
+    if args.integrated and not args.owned_shell:
         # The integrated hardware-preemptive path has no cooperative fallback.
         # Bind actual linked entry symbols, not the source profile name alone.
         symbols={token for line in mp.read_text().splitlines() for token in line.split()}
@@ -258,13 +258,26 @@ def main():
         # Bind the real boot BP and demand absence of the child INT3 label.
         map_text=mp.read_text()
         site=bp_site(efi.read_bytes(),map_text)
-        forbidden={'s861_bp_return','s863_live_run','s863_request_tasks','s863_shell_pump'}
+        forbidden={'s861_bp_return','s863_live_run','s863_request_tasks','s863_shell_pump',
+                   's848_trial','s848_active','s860_reap','s847_enter','s847_dispatch_raw',
+                   's848_dispatch_raw','s848_irq_entry','s847_pf_entry','s847_call_entry',
+                   's865_drain_entry','s865_drain_wait','s865_drain_cli',
+                   's849_guest_init','s849_guest_dispatch','s849_guest_suspend','s849_guest_finish',
+                   's865_fx_retire','s865_fixture_stage','s865_fixture_request_stop','s865_fixture_force_timer'}
+        forbidden.update('s848_'+label+'_'+suffix for label in 'abcd' for suffix in ('start','yield','loop_end','fault','exit','end'))
         present=forbidden.intersection(token for line in map_text.splitlines() for token in line.split())
         if present:raise ValueError('shell fixture entry still linked: '+','.join(sorted(present)))
         compiler=json.loads((build/'x86_64/owned-shell-compiler.json').read_text())
         if '-DSTYLEOS_OWNED_SHELL_865=1' not in compiler['flags'] or not compiler['sources'] or set(compiler['sources'])!=set(compiler['source_sha256']):raise ValueError('owned shell compiler manifest')
+        excluded={'boot/x86_64/user_preemption_848.c','boot/x86_64/fx_guest_849.c',
+                  'boot/x86_64/process_trial_847.c','arch/x86_64/process_entry_847.S','tests/guest/workload_865.c'}
+        if excluded.intersection(compiler['sources']) or any(s.startswith('tests/') for s in compiler['sources']):
+            raise ValueError('owned shell linked diagnostic translation units')
+        if any((build/'x86_64').glob('external-workload-*')) or (build/'x86_64/external_workload_865.h').exists():
+            raise ValueError('owned shell generated fixture payload')
         for rel,digest in compiler['source_sha256'].items():
             if sha((ROOT/rel).read_bytes())!=digest:raise ValueError('owned shell source mismatch '+rel)
+        (out/'entry-separation.json').write_text(json.dumps({'absent':sorted(forbidden),'excluded_sources':sorted(excluded),'external_fixture_generated':False},indent=2)+'\n')
     elif args.four:
         from runtime_mixed_863_verify import loop_site
         site=loop_site(efi.read_bytes(),mp,four=True,external=args.integrated)
