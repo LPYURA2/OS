@@ -16,7 +16,10 @@ static struct s844_lease leases[N];
 static struct s846_root roots[N];
 static struct s842_root base;
 static struct s842_cache cache={.pat=0x0007040600070406,.cap=1,.def=0x806,.count=1,.bits=48,.pairs={{0x80000000,0xffff80000800}}};
-static struct rt862_bank bank;
+static struct rt862_bank bank,initial_bank,initial_before;
+static struct dpr_service initial_service;
+static struct pr_table initial_registry;
+static struct ws_service initial_windows;
 static struct dpr_service service;
 static struct pr_table registry;
 static struct ws_service windows;
@@ -99,7 +102,22 @@ int main(void){
  OK(s842_build(&plan,&map,&cache,0xfee00000,0xfec00000,&base));
  pr_init(&registry);ws_init(&windows);
  OK(dpr_start(&service,&registry,&windows,safe())==DPR_OK);
+ NO(rt862_bank_open(&bank,&service,safe(),0x58,0x63));
+ OK(!memcmp(&bank,&initial_bank,sizeof bank));
  OK(rt862_bank_open(&bank,&service,safe(),0x5b,0x63));
+ pr_init(&initial_registry);ws_init(&initial_windows);
+ OK(dpr_start(&initial_service,&initial_registry,&initial_windows,safe())==DPR_OK);
+ initial_bank.slots[0].handle=123;initial_before=initial_bank;
+ for(unsigned i=0;i<N;i++){
+  uint32_t pid;
+  NO(rt862_bank_init(&initial_bank,&initial_service,safe(),0x5b,0x63));
+  OK(!memcmp(&initial_bank,&initial_before,sizeof initial_bank));
+  OK(dpr_admit(&initial_service,i,i+1,child(i),0,"initial",&pid)==PS_OK);
+ }
+ NO(rt862_bank_init(&initial_bank,&initial_service,safe(),0x5b,0x5b));
+ OK(!memcmp(&initial_bank,&initial_before,sizeof initial_bank));
+ OK(rt862_bank_init(&initial_bank,&initial_service,safe(),0x5b,0x63));
+ for(unsigned i=0;i<N;i++)OK(initial_bank.slots[i].pid==i+1&&initial_bank.slots[i].root==child(i)&&initial_bank.slots[i].context.pc==S846_CODE);
  struct s849_caps caps={.leaf1_edx=1u|(1u<<24)|(1u<<25)|(1u<<26),.cr0=0x23,.cr4=0x600,.mxcsr_mask=0xffbf};
  OK(s865_fx_open(&fx,&caps));
  elf[0]=127;elf[1]='E';elf[2]='L';elf[3]='F';elf[4]=2;elf[5]=1;elf[6]=1;

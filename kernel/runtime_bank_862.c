@@ -44,12 +44,51 @@ static bool ticket(const struct rt862_bank *b,const struct dpr_service *d,const 
  if(!binding(b,d)||live!=b->safe||t->safe_root!=live||t->slot>=PS_MAX_SLOTS||d->dispatcher.current!=(int)t->slot||!t->dispatch||t->dispatch!=d->dispatcher.dispatches)return false;
  const struct rt862_bank_slot *c=&b->slots[t->slot];return c->pid&&t->pid==c->pid&&t->handle==c->handle&&t->child_root==c->root;
 }
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+/* Validate the entire initial dispatcher view before writing the bank. The
+ * expanded context bank is too large for a temporary on the firmware stack.
+ * No static scratch, compiler stack-probe stub or partial publication. */
+static bool initial_view(const struct dpr_service *d,uint64_t live,uint16_t cs,uint16_t ss,bool populated){
+ const struct ps_dispatcher *s=&d->dispatcher;
+ if(!root(live)||live!=s->safe_root||(cs&7)!=3||(ss&7)!=3||cs<11||ss<11||cs==ss||s->current!=-1||s->next>=PS_MAX_SLOTS)return false;
+ for(unsigned i=0;i<PS_MAX_SLOTS;i++){
+  const struct ps_slot *slot=&s->slots[i];
+  if(!populated){if(slot->pid||slot->handle||slot->user_root)return false;continue;}
+  const struct pr_entry *entry=pr_find(s->registry,slot->pid);
+  if(!slot->pid||!slot->handle||!root(slot->user_root)||slot->user_root==live||!entry||
+     entry->type!=PR_NATIVE_USER||entry->state!=PR_READY||entry->scheduler_handle!=slot->handle||entry->page_root!=slot->user_root)return false;
+  for(unsigned j=0;j<i;j++)if(s->slots[j].pid==slot->pid||s->slots[j].handle==slot->handle||s->slots[j].user_root==slot->user_root)return false;
+ }
+ unsigned seen[PS_MAX_SLOTS]={0};
+ for(unsigned i=0;i<PR_MAX_PROCESSES;i++){
+  const struct pr_entry *entry=&s->registry->processes[i];if(entry->state==PR_UNUSED)continue;
+  if(!populated||!entry->pid)return false;
+  unsigned j=0;while(j<PS_MAX_SLOTS&&s->slots[j].pid!=entry->pid)++j;
+  if(j==PS_MAX_SLOTS||++seen[j]!=1)return false;
+ }
+ if(populated)for(unsigned i=0;i<PS_MAX_SLOTS;i++)if(seen[i]!=1)return false;
+ return true;
+}
+static void publish_initial(struct rt862_bank *b,const struct dpr_service *d,uint64_t live,uint16_t cs,uint16_t ss,bool populated){
+ volatile unsigned char *bytes=(void *)b;for(size_t i=0;i<sizeof *b;i++)bytes[i]=0;
+ b->safe=live;b->cs=cs;b->ss=ss;
+ if(populated)for(unsigned i=0;i<PS_MAX_SLOTS;i++){
+  const struct ps_slot *slot=&d->dispatcher.slots[i];
+  b->slots[i]=(struct rt862_bank_slot){.pid=slot->pid,.handle=slot->handle,.root=slot->user_root,.context={.pc=S846_CODE,.sp=S846_STACK+PAGE,.status=2,.cs=cs,.ss=ss}};
+ }
+}
+#endif
 bool rt862_bank_init(struct rt862_bank *b,struct dpr_service *d,uint64_t live,uint16_t cs,uint16_t ss){
  if(!layout(b,d,0,0,1,0,0,1)||b->safe||d->dispatcher.current!=-1||d->dispatcher.dispatches||live!=d->dispatcher.safe_root)return false;
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+ if(!initial_view(d,live,cs,ss,true))return false;
+ publish_initial(b,d,live,cs,ss,true);return true;
+#else
  struct rt862_bank v={.safe=live,.cs=cs,.ss=ss};
  for(unsigned i=0;i<PS_MAX_SLOTS;i++){const struct ps_slot *s=&d->dispatcher.slots[i];const struct pr_entry *p=pr_find(d->dispatcher.registry,s->pid);if(!p||p->state!=PR_READY)return false;v.slots[i]=(struct rt862_bank_slot){.pid=s->pid,.handle=s->handle,.root=s->user_root,.context={.pc=S846_CODE,.sp=S846_STACK+PAGE,.status=2,.cs=cs,.ss=ss}};}
  if(!binding(&v,d))return false;
  *b=v;return true;
+#endif
 }
 bool rt862_bank_enter(const struct rt862_bank *b,const struct dpr_service *d,const struct rt862_selection *t,uint64_t live,struct up_context *out){
  if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),out,sizeof *out,_Alignof(struct up_context))||!ticket(b,d,t,live))return false;
@@ -77,9 +116,14 @@ enum ps_status rt862_bank_finish(struct rt862_bank *b,struct dpr_service *d,cons
 
 bool rt862_bank_open(struct rt862_bank *b,struct dpr_service *d,uint64_t live,uint16_t cs,uint16_t ss){
  if(!layout(b,d,0,0,1,0,0,1)||!zero(b,sizeof *b)||d->dispatcher.current!=-1||live!=d->dispatcher.safe_root||ws_snapshot(d->windows,0,0))return false;
+#ifdef STYLEOS_KERNEL_CAPACITY_32
+ if(!initial_view(d,live,cs,ss,false))return false;
+ publish_initial(b,d,live,cs,ss,false);return true;
+#else
  struct rt862_bank v={.safe=live,.cs=cs,.ss=ss};
  if(!binding(&v,d))return false;
  *b=v;return true;
+#endif
 }
 enum ps_status rt862_bank_admit(struct rt862_bank *b,struct dpr_service *d,uint64_t live,unsigned slot,uint64_t handle,uint64_t child,const char *name,uint32_t *pid){
  if(!layout(b,d,pid,sizeof *pid,_Alignof(uint32_t),0,0,1)||!name||!binding(b,d)||live!=b->safe||d->dispatcher.current!=-1||slot>=PS_MAX_SLOTS||!handle||!root(child)||child==live)return PS_EVIDENCE;
