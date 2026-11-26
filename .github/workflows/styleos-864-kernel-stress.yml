@@ -1,7 +1,7 @@
 name: StyleOS 864 preliminary restricted kernel endurance
 on:
   push:
-    branches: [feature/styleos-kernel-stress-864, feature/styleos-kernel-integration-864-final]
+    branches: [feature/styleos-kernel-stress-864, feature/styleos-kernel-integration-864-final, feature/styleos-kernel-final-acceptance]
   workflow_dispatch:
 permissions:
   contents: read
@@ -352,6 +352,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
       - name: Owned-root shell without test keyboard workload, real save and reboot
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --output build/s865-owned-shell
+      - name: Reproduce the exact ordinary EFI, IMG and ISO from another clean output
+        run: |
+          set -euo pipefail
+          python3 tools/build.py --arch x86_64 --native-kernel --output build/s865-native-repro
+          python3 tools/native_kernel_repro.py --first build/s865-owned-shell/build/x86_64 --second build/s865-native-repro/x86_64 --sha "$GITHUB_SHA" --output build/s865-owned-shell/reproducibility.json
       - name: Ordinary executor with 32 external ELF processes, real CPL3 and independent trace
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --output build/s865-native-catalog
       - uses: actions/upload-artifact@v4
@@ -363,6 +368,25 @@ jobs:
             build/s865-native-catalog/
           if-no-files-found: warn
 
+
+  acceptance-base-regression:
+    if: github.ref_name == 'feature/styleos-kernel-final-acceptance'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install both architecture guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-system-arm qemu-utils ovmf dosfstools mtools xorriso
+      - name: Mandatory baseline host, reproducibility and real x86-64 and ARM64 guest checks
+        run: python3 tools/test.py --all --output build/kfa-base-regression
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-kfa-base-regression
+          path: build/kfa-base-regression/logs/
+          if-no-files-found: error
 
   entry-classification-contract:
     runs-on: ubuntu-24.04
