@@ -55,6 +55,7 @@ _Static_assert(sizeof(struct idt_gate_790)==16u,"x86 IDT gate width");
 _Static_assert(sizeof(struct desc_ptr)==10u,"descriptor pointer width");
 _Static_assert(sizeof(struct igp785_tables)==4u*PAGE,"exact table pages");
 
+#ifndef STYLEOS_OWNED_SHELL_865
 struct state790 {
     uint64_t old_cr3, new_cr3;
     uint64_t boot_stack_start, boot_stack_end;
@@ -67,6 +68,7 @@ struct state790 {
     uint64_t image_start,image_end;
 };
 static struct state790 attested;
+#endif
 
 static uint64_t cr3(void) { uint64_t n; __asm__ volatile("mov %%cr3,%0":"=r"(n));return n; }
 static uint64_t cr0(void) { uint64_t n; __asm__ volatile("mov %%cr0,%0":"=r"(n));return n; }
@@ -109,6 +111,7 @@ __attribute__((noreturn)) static void stop_vm(unsigned status) {
 __attribute__((noreturn)) static void fail(const char *why) {
     arch_puts("STYLEOS S790 FAIL ");arch_puts(why);arch_putc('\n');stop_vm(0x11u);
 }
+#ifndef STYLEOS_OWNED_SHELL_865
 extern void s790_after_int3(void);
 __attribute__((noreturn,noinline,used,naked)) static void s790_int3(void) {
     __asm__ volatile("int3\n.globl s790_after_int3\ns790_after_int3:\nud2\n");
@@ -123,12 +126,14 @@ __attribute__((noreturn,noinline,used,naked)) static void s790_isr3(void) {
 __attribute__((noreturn,noinline,used,naked)) static void s790_isr_df(void) {
     __asm__ volatile("cli\nmovq %rsp,%rcx\nandq $-16,%rsp\nsubq $32,%rsp\ncall s790_on_df\nud2\n");
 }
+#endif
 static uint64_t read64(const void *source) {
     const unsigned char *p=(const unsigned char*)source;
     uint64_t v=0;
     for(unsigned i=0;i<8;++i) v|=(uint64_t)p[i]<<(8u*i);
     return v;
 }
+#ifndef STYLEOS_OWNED_SHELL_865
 /* #BP enters on IST1. A guard write triggers hardware #PF, but its gate
  * is marked not-present; CPU must deliver #DF on the independent IST3. */
 extern void s790_guard_fault_ip(void);
@@ -231,6 +236,8 @@ __attribute__((noreturn,noinline,used)) void s790_on_df(uint64_t cpu_rsp) {
     stop_vm(0x10u);
 }
 
+#endif
+
 __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
     if(!p || !p->evidence || !p->evidence->map || !p->old_root ||
        cr3()!=p->old_root || current_tr()!=0 || (rflags()&(1u<<9u)) ||
@@ -298,8 +305,13 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
         .loaded_image=(const void*)(uintptr_t)e->live.image.start,
         .owned_tables=owned_low_tables,
         .owned_tables_pa=(uint64_t)(uintptr_t)owned_low_tables,
+#ifdef STYLEOS_OWNED_SHELL_865
+        .required_exec=(uint64_t)(uintptr_t)&irq807_unexpected,
+        .required_write=(uint64_t)(uintptr_t)&owned_low,
+#else
         .required_exec=(uint64_t)(uintptr_t)&s790_on_df,
         .required_write=(uint64_t)(uintptr_t)&attested,
+#endif
         .required_rsp=inherited_rsp};
     if(!s790_prepare_owned_low(&low_request,&owned_low) ||
        !s790_audit_owned_low(&owned_low,low_request.required_exec,
@@ -377,6 +389,7 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
      * PRESENT to force the nested exception classification. The existing
      * firmware IDT gates for other vectors are otherwise inherited. */
     unsigned char *idt=frames[IGP785_NEW_IDT];
+#ifndef STYLEOS_OWNED_SHELL_865
     const unsigned char *inherited=(const unsigned char*)(uintptr_t)old_idtr.base;
     for(size_t i=0;i<PAGE;++i)idt[i]=inherited[i];
     struct idt_gate_790 *gate=(struct idt_gate_790*)(void*)(idt+3u*16u);
@@ -398,6 +411,10 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
        read64(tss+36u)!=stage.ist1_top || read64(tss+4u)!=stage.rsp0_top ||
        read64(tss+44u)!=ist2_top || read64(tss+52u)!=ist3_top)
         fail("df-idt-gate");
+#else
+    if(read64(tss+36u)!=stage.ist1_top || read64(tss+4u)!=stage.rsp0_top ||
+       read64(tss+44u)!=ist2_top || read64(tss+52u)!=ist3_top)fail("ist-stack-descriptors");
+#endif
 #ifdef STYLEOS_TEST_APIC_ROOT_842
     /* No inherited handler may be reached under the detached root. Use
      * guarded IST3 for unexpected vectors, including transition faults. */
@@ -419,6 +436,7 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
 #endif
 );
 #endif
+#ifndef STYLEOS_OWNED_SHELL_865
     attested=(struct state790){p->old_root,plan.new_root_pa,
         e->live.stack.start,e->live.stack.end,inherited_rsp,
         q.pages[IGP785_NEW_IDT],q.pages[IGP785_GDT],cs,desc.tss_selector,IST_MARKER,
@@ -475,5 +493,6 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
 #else
     s790_int3();
 #endif
+#endif /* historical terminal fault trial */
 }
 #endif

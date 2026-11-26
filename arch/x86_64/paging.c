@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "styleos/arch.h"
 #include "styleos/paging.h"
 #ifdef STYLEOS_TEST_FRAME_GRANTS
@@ -610,6 +611,8 @@ enum pg_error arch_paging_inventory_inherited(struct pg_experiment *x)
     arch_puts(" active=0 no-cr3-switch=1\n");
     return PG_OK;
 }
+#endif /* legacy inherited diagnostic census */
+#if defined(STYLEOS_TEST_FRAME_GRANTS) || defined(STYLEOS_OWNED_SHELL_865)
 /* Only while the inherited root is actually active: the old page-table
  * walker assumes firmware's identity physical RAM reads are valid. */
 enum pg_error arch_paging_attest_image_writable(struct pg_experiment *x,

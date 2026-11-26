@@ -542,10 +542,11 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         flags.append('-DSTYLEOS_TEST_PAGING=1')
     if test_paging_fault:
         flags.append('-DSTYLEOS_TEST_PAGING_FAULT=1')
-    if test_paging_roundtrip or test_frame_grants:
-        flags.append('-DSTYLEOS_TEST_PAGING_ROUNDTRIP=1')
-    if test_frame_grants:
-        flags.append('-DSTYLEOS_TEST_FRAME_GRANTS=1')
+    if not owned_shell_865:
+        if test_paging_roundtrip or test_frame_grants:
+            flags.append('-DSTYLEOS_TEST_PAGING_ROUNDTRIP=1')
+        if test_frame_grants:
+            flags.append('-DSTYLEOS_TEST_FRAME_GRANTS=1')
     if test_tss_ltr:
         flags.append('-DSTYLEOS_TEST_TSS_LTR_784=1')
     if test_ist_hw:
@@ -791,6 +792,11 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         excluded = {
             'boot/x86_64/user_preemption_848.c',
             'tests/guest/workload_865.c',
+            'kernel/frame_grant_experiment.c',
+            'kernel/kernel_mapping_inventory.c',
+            'kernel/kernel_dependency_inventory.c',
+            'kernel/descriptor_state_781.c',
+            'kernel/desktop_grant_bridge.c',
         }
         sources = [s for s in sources if s not in excluded]
         expected_tests = {'tests/guest/native_catalog_865.c'} if native_catalog_sha256 is not None else set()

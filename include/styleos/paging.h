@@ -71,6 +71,8 @@ enum pg_error arch_paging_activate(struct pg_experiment *);
 /* Actual inherited CR3 walk; image-owned, WB, present, writable identity only.
  * No guest-owned page mapping or general physical-memory allocator. */
 enum pg_error arch_paging_inventory_inherited(struct pg_experiment *);
+#endif
+#if defined(STYLEOS_TEST_FRAME_GRANTS) || defined(STYLEOS_OWNED_SHELL_865)
 enum pg_error arch_paging_attest_image_writable(struct pg_experiment *,
                                                 uint64_t va, uint64_t bytes);
 #endif

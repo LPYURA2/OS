@@ -40,6 +40,7 @@ static struct boot_range extent(const void *p, size_t size)
     if (bm_extent((uint64_t)(uintptr_t)p, size, &r)) paging_fail("extent");
     return r;
 }
+#ifndef STYLEOS_OWNED_SHELL_865
 static void map_line(const char *kind, uint64_t va, uint64_t pa,
                      uint64_t bytes, unsigned flags)
 {
@@ -64,6 +65,8 @@ static void verify(struct pg_experiment *s, int print)
     if (pg_lookup(&s->plan, PG_PROBE, &absent) != PG_RANGE)
         paging_fail("probe absence not proved");
 }
+
+#endif
 
 void paging_experiment(const struct boot_memory_evidence *e)
 {
@@ -109,6 +112,7 @@ void paging_experiment(const struct boot_memory_evidence *e)
     if(arch_paging_finish_owned_prepare_864(s)!=PG_OK)paging_fail("owned boot inherited proof");
     s790_terminal_trial(s);
 #endif
+#ifndef STYLEOS_OWNED_SHELL_865
     for (size_t i = 0; i < s->plan.count; ++i) {
         struct pg_mapping *m = &s->plan.maps[i];
         map_line("MAP", m->va, m->pa, m->bytes, m->flags);
@@ -151,4 +155,5 @@ void paging_experiment(const struct boot_memory_evidence *e)
 #else
     arch_puts("STYLEOS PAGING PASS\n");
 #endif
+#endif /* legacy temporary translation experiment */
 }

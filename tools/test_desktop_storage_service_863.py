@@ -277,7 +277,14 @@ def main():
         if present or not required<=linked:raise ValueError('native shell link provenance '+str((sorted(present),sorted(required-linked))))
         compiler=json.loads((build/'x86_64/owned-shell-compiler.json').read_text())
         if '-DSTYLEOS_OWNED_SHELL_865=1' not in compiler['flags'] or not compiler['sources'] or set(compiler['sources'])!=set(compiler['source_sha256']):raise ValueError('owned shell compiler manifest')
-        excluded={'boot/x86_64/user_preemption_848.c','boot/x86_64/process_trial_847.c','tests/guest/workload_865.c'}
+        excluded={'boot/x86_64/user_preemption_848.c','boot/x86_64/process_trial_847.c','tests/guest/workload_865.c',
+                  'kernel/frame_grant_experiment.c','kernel/kernel_mapping_inventory.c',
+                  'kernel/kernel_dependency_inventory.c','kernel/descriptor_state_781.c','kernel/desktop_grant_bridge.c'}
+        forbidden_paging={'fg_experiment_run','styleos_grant_tables','styleos_grant_users','arch_paging_inventory_inherited','arch_paging_restore',
+                          's790_after_int3','s790_on_int3','s790_on_df','s790_guard_fault_ip','s790_int3','s790_isr3','s790_isr_df'}
+        if forbidden_paging & linked:raise ValueError('linked historical paging or fault experiment '+str(sorted(forbidden_paging & linked)))
+        if {'-DSTYLEOS_TEST_PAGING_ROUNDTRIP=1','-DSTYLEOS_TEST_FRAME_GRANTS=1'} & set(compiler['flags']):
+            raise ValueError('historical paging flags in ordinary image')
         test_sources={'tests/guest/native_catalog_865.c'} if args.native_catalog else set()
         expected_profile='native-catalog-acceptance' if args.native_catalog else 'owned-shell-candidate'
         if compiler.get('profile')!=expected_profile or set(compiler.get('test_sources',[]))!=test_sources:
