@@ -1,0 +1,44 @@
+name: StyleOS ordinary native process error regression
+on:
+  push:
+    branches: [feature/styleos-kernel-process-error-review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ordinary-errors:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Actual bank and scheduler, GCC and Clang sanitized host receipts
+        run: |
+          set -euo pipefail
+          mkdir -p build/native-api-errors
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_KERNEL_CAPACITY_32 -DSTYLEOS_OWNED_SHELL_865 -DSTYLEOS_INTEGRATED_RUNTIME_864 -Iinclude tests/test_native_api_errors.c kernel/{runtime_bank_862,desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/native-api-errors/$cc"
+            "build/native-api-errors/$cc" | tee "build/native-api-errors/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-api-errors
+          path: build/native-api-errors/
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact tracked sources
+        run: |
+          mkdir -p build/source
+          git archive --format=tar --prefix="StyleOS-$GITHUB_SHA/" "$GITHUB_SHA" | gzip -n > "build/source/StyleOS-$GITHUB_SHA.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > build/source/git-identities.txt
+          (cd build/source && sha256sum -- *.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: styleos-source-${{ github.sha }}
+          path: build/source/
+          if-no-files-found: error
