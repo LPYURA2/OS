@@ -710,7 +710,19 @@ __attribute__((noinline)) void s863_shell_pump(void){
 #else
  const unsigned end_dispatch=20;
 #endif
+#ifdef STYLEOS_INTEGRATED_RUNTIME_864
+ /* Terminal dispatch now releases its own pages immediately. Distinguish
+  * the last actual dispatch (empty queue, not yet finalized) from the
+  * subsequent no-dispatch finalization. Never accept a stalled live task. */
+ if(after<before||after-before>1||!s844_count(live_arena863,&used)||
+    after>end_dispatch||used!=3*pr_snapshot(pr_global(),0,0,true)||
+    used!=3*ws_snapshot(ws_global(),0,0)||
+    (done?(after!=before||after!=end_dispatch||used!=0):
+          (after!=before+1||((after==end_dispatch)!=(used==0)))))
+  fail("865-pump-result");
+#else
  if(after<before||after-before>1||!s844_count(live_arena863,&used)||(done!=(after==end_dispatch&&used==0))||(!done&&after==before&&used!=0))fail("863-pump-result");
+#endif
  arch_puts("STYLEOS S863P SLICE");field("n",++pump_calls863);field("before",before);field("after",after);field("used",used);field("processes",pr_snapshot(pr_global(),0,0,true));field("windows",ws_snapshot(ws_global(),0,0));field("done",done);arch_putc('\n');
 #ifndef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
  if(pump_calls863==1){pump_gate863=1;arch_puts("STYLEOS S863P WAIT\n");}
