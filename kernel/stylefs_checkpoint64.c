@@ -1,4 +1,5 @@
 #include <styleos/stylefs_checkpoint64.h>
+#include "stylefs_recovery_internal.h"
 static const uint8_t magic[8]={'S','F','6','4','C','P','0','1'};
 struct layout {uint64_t identity,receipt,dir,data,ds,fs,start;};
 struct receipt {uint64_t seq,epoch,gen;bool valid;};
@@ -146,4 +147,80 @@ enum cp64_status cp64_current(struct bs_service *b,const struct cp64_layout *l,s
  if(check.epoch!=x[last].epoch||check.generation!=x[last].gen)return CP64_STALE;
  *out=(struct cp64_result){x[last].seq,check.epoch,check.generation,false};
  return CP64_OK;
+}
+
+static enum cp64_status dir_status(enum dc64_status rc){
+ return rc==DC64_OK?CP64_OK:rc==DC64_IO?CP64_IO:rc==DC64_INVALID?CP64_INVALID:CP64_CORRUPT;
+}
+static enum cp64_status data_status(enum sj_status rc){
+ return rc==SJ_OK?CP64_OK:rc==SJ_IO?CP64_IO:rc==SJ_STALE?CP64_STALE:CP64_CORRUPT;
+}
+static enum cp64_status validate_pair(struct dc64_state *d,struct sfs64_journal *j,
+ struct ns64_proof *p,struct ns64_node *nodes,size_t slots,struct dc64_workspace *w,struct fb64_view *v){
+ enum ns64_status nr=ns64_validate(d,w,nodes,slots,p);
+ if(nr!=NS64_OK)return nr==NS64_IO?CP64_IO:nr==NS64_FULL?CP64_FULL:nr==NS64_STALE?CP64_STALE:CP64_CORRUPT;
+ return fb64_bind(v,d,p,j)==FB64_OK?CP64_OK:CP64_CORRUPT;
+}
+static enum cp64_status erase_header(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t sector){
+ uint8_t clear[512]={0},check[512];
+ if(bs_write_sector(b,owner,token,sector,clear)!=BS_OK||
+    bs_read_sector(b,owner,token,sector,check)!=BS_OK||!zero(check,512))return CP64_UNCERTAIN;
+ return CP64_OK;
+}
+static enum cp64_status reconcile_inner(struct bs_service *b,const struct cp64_layout *l,const struct layout *g,
+ struct dc64_state *d,struct sfs64_journal *j,struct ns64_proof *p,struct ns64_node *nodes,size_t slots,
+ struct dc64_workspace *w,struct fb64_view *v,struct cp64_result *out){
+ struct receipt x[2]={0};
+ for(unsigned i=0;i<2;i++){
+  uint8_t raw[512];
+  if(bs_read_sector(b,l->owner,l->receipt,i,raw)!=BS_OK)return CP64_IO;
+  x[i]=decode(raw,g,i);
+  /* Could be a damaged acknowledged receipt: never guess writable rollback. */
+  if(!x[i].valid&&!zero(raw,512))return CP64_CORRUPT;
+ }
+ if(!x[0].valid&&!x[1].valid)return CP64_CORRUPT;
+ unsigned last=x[1].valid&&(!x[0].valid||x[1].seq>x[0].seq)?1:0;
+ struct receipt wanted=x[last],prior=x[last^1u];
+ if(prior.valid&&(wanted.seq<=prior.seq||wanted.seq-prior.seq!=1||
+    wanted.epoch<prior.epoch||wanted.epoch-prior.epoch>1||
+    wanted.gen<prior.gen||wanted.gen-prior.gen>1))return CP64_CORRUPT;
+ int dd=-1,jd=-1;
+ enum cp64_status rc=dir_status(dc64_repair_select(d,b,l->owner,l->dir,l->dir_sectors,wanted.epoch,w,&dd));
+ if(rc!=CP64_OK)return rc;
+ rc=data_status(sfs64_journal_mount(j,b,l->owner,l->data,l->data_sectors,l->data_start));
+ if(rc!=CP64_OK)return rc;
+ uint64_t latest=j->generation[j->active];
+ if(latest<wanted.gen||latest-wanted.gen>1)return CP64_CORRUPT;
+ if(latest>wanted.gen){
+  jd=(int)j->active;
+  if(j->generation[j->active^1u]!=wanted.gen)return CP64_CORRUPT;
+  j->active^=1u;
+ }
+ rc=validate_pair(d,j,p,nodes,slots,w,v);
+ if(rc!=CP64_OK)return rc;
+ /* Exact checkpoint is proven; invalidate only strictly newer headers.
+  * Never touch retained data or checkpoint receipt sectors. */
+ v->valid=false;p->valid=false;d->valid=false;j->valid=false;
+ if(dd>=0){rc=erase_header(b,l->owner,l->dir,(uint64_t)dd);if(rc!=CP64_OK)return rc;}
+ if(jd>=0){rc=erase_header(b,l->owner,l->data,1+(uint64_t)jd*(1+SFS64_BANK_SECTORS));if(rc!=CP64_OK)return rc;}
+ rc=dir_status(dc64_mount(d,b,l->owner,l->dir,l->dir_sectors,w));if(rc!=CP64_OK)return rc;
+ rc=data_status(sfs64_journal_mount(j,b,l->owner,l->data,l->data_sectors,l->data_start));if(rc!=CP64_OK)return rc;
+ rc=validate_pair(d,j,p,nodes,slots,w,v);if(rc!=CP64_OK)return rc;
+ struct cp64_result result;
+ rc=cp64_current(b,l,v,&result);if(rc!=CP64_OK)return rc;
+ if(result.sequence!=wanted.seq||result.epoch!=wanted.epoch||result.generation!=wanted.gen)return CP64_CORRUPT;
+ *out=result;return CP64_OK;
+}
+enum cp64_status cp64_reconcile(struct bs_service *b,const struct cp64_layout *l,
+ struct dc64_state *d,struct sfs64_journal *j,struct ns64_proof *p,struct ns64_node *nodes,size_t slots,
+ struct dc64_workspace *w,struct fb64_view *v,struct cp64_result *out){
+ struct layout g;
+ if(!slots||slots>SIZE_MAX/sizeof *nodes||!geometry(b,l,true,&g))return CP64_INVALID;
+ const void *ptr[]={b,l,d,j,p,nodes,w,v,out};
+ const size_t sizes[]={sizeof *b,sizeof *l,sizeof *d,sizeof *j,sizeof *p,slots*sizeof *nodes,sizeof *w,sizeof *v,sizeof *out};
+ for(unsigned i=0;i<9;i++)for(unsigned k=0;k<i;k++)if(!sep(ptr[i],sizes[i],ptr[k],sizes[k]))return CP64_INVALID;
+ v->valid=false;p->valid=false;d->valid=false;j->valid=false;
+ enum cp64_status rc=reconcile_inner(b,l,&g,d,j,p,nodes,slots,w,v,out);
+ if(rc!=CP64_OK){v->valid=false;p->valid=false;d->valid=false;j->valid=false;}
+ return rc;
 }

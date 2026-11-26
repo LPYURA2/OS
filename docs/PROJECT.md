@@ -1,3 +1,6 @@
+## StyleFS 29 — explicit writable reconciliation candidate
+28 CI 7/7 SUCCESS. New recovery of uncheckpointed metadata using retained exact receipt; no data writes. [Handoff](NEXT_CHAT_STYLEFS_29.md). Legal gate preserved.
+
 ## StyleFS 28 — coordinated creation candidate
 26 and 27 full CI PASS. New checkpoint-last creation wrapper and uncertainty lock, [handoff](NEXT_CHAT_STYLEFS_28.md). Legal gate preserved.
 

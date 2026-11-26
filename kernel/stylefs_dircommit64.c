@@ -1,4 +1,5 @@
 #include <styleos/stylefs_dircommit64.h>
+#include "stylefs_recovery_internal.h"
 static const uint8_t magic[8]={'S','F','6','4','D','C','M','1'};
 struct plan {uint64_t pages[SD64_MAX_LEVEL+1],items[SD64_MAX_LEVEL+1],offset[SD64_MAX_LEVEL+1],total;unsigned height;};
 static void zero(uint8_t *p,size_t n){for(size_t i=0;i<n;i++)p[i]=0;}
@@ -119,13 +120,13 @@ enum dc64_status dc64_mount(struct dc64_state *s,struct bs_service *b,uint64_t o
  }
  return s->valid?DC64_OK:DC64_CORRUPT;
 }
-enum dc64_status dc64_mount_epoch(struct dc64_state *s,struct bs_service *b,uint64_t owner,
- uint64_t token,uint64_t n,uint64_t wanted,struct dc64_workspace *w){
+static enum dc64_status mount_epoch_internal(struct dc64_state *s,struct bs_service *b,uint64_t owner,
+ uint64_t token,uint64_t n,uint64_t wanted,struct dc64_workspace *w,bool repair){
  if(!separate(s,sizeof *s,w,sizeof *w)||!separate(s,sizeof *s,b,sizeof *b)||
     !separate(w,sizeof *w,b,sizeof *b))return DC64_INVALID;
  *s=(struct dc64_state){0};
  if(!wanted||!grant(b,owner,token,n,false))return DC64_INVALID;
- for(unsigned i=0;i<BS_GRANTS;i++)if(b->grants[i].token==token&&(b->grants[i].rights&BS_WRITE))return DC64_INVALID;
+ for(unsigned i=0;i<BS_GRANTS;i++)if(!repair&&b->grants[i].token==token&&(b->grants[i].rights&BS_WRITE))return DC64_INVALID;
  s->block=b;s->owner=owner;s->token=token;s->sectors=n;
  for(unsigned bank=0;bank<2;bank++){
   uint8_t h[512];uint64_t epoch,count;struct plan p;
@@ -138,6 +139,24 @@ enum dc64_status dc64_mount_epoch(struct dc64_state *s,struct bs_service *b,uint
   select_bank(s,bank,epoch,count,&p);
  }
  return s->valid?DC64_OK:DC64_CORRUPT;
+}
+enum dc64_status dc64_mount_epoch(struct dc64_state *s,struct bs_service *b,uint64_t owner,
+ uint64_t token,uint64_t n,uint64_t wanted,struct dc64_workspace *w){
+ return mount_epoch_internal(s,b,owner,token,n,wanted,w,false);
+}
+/* Private reconciliation helper. Caller must hold serialized write grants
+ * and MUST NOT expose this older state for arbitrary writes. */
+enum dc64_status dc64_repair_select(struct dc64_state *s,struct bs_service *b,uint64_t owner,
+ uint64_t token,uint64_t n,uint64_t wanted,struct dc64_workspace *w,int *discard){
+ if(!grant(b,owner,token,n,true)||!discard)return DC64_INVALID;
+ enum dc64_status rc=dc64_mount(s,b,owner,token,n,w);
+ if(rc!=DC64_OK)return rc;
+ if(s->epoch<wanted||s->epoch-wanted>1){s->valid=false;return DC64_CORRUPT;}
+ int candidate=s->epoch==wanted?-1:(int)s->active;
+ rc=mount_epoch_internal(s,b,owner,token,n,wanted,w,true);
+ if(rc!=DC64_OK)return rc;
+ if(candidate==(int)s->active){s->valid=false;return DC64_CORRUPT;}
+ *discard=candidate;return DC64_OK;
 }
 #ifdef STYLEFS_HOST_FORMAT
 enum dc64_status dc64_provision(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t n){

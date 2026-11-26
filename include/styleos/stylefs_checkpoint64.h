@@ -24,4 +24,14 @@ enum cp64_status cp64_recover(struct bs_service *,const struct cp64_layout *,
 /* Read newest structurally valid receipt; require current pair to match.
  * No initial checkpoint, adoption, or rollback on mismatch. */
 enum cp64_status cp64_current(struct bs_service *,const struct cp64_layout *,struct fb64_view *,struct cp64_result *);
+
+/* Explicit writable reconciliation under exclusive trusted supervision.
+ * Requires newest receipt intact (all nonblank receipt sectors valid).
+ * Validate exact retained checkpoint before clearing only newer uncommitted
+ * bank headers. No content writes or adoption of incomplete transactions.
+ * An interrupted repair is retryable after reattachment; no fallback to a
+ * lower receipt for write access. On failure view is not usable. */
+enum cp64_status cp64_reconcile(struct bs_service *,const struct cp64_layout *,
+ struct dc64_state *,struct sfs64_journal *,struct ns64_proof *,struct ns64_node *,size_t slots,
+ struct dc64_workspace *,struct fb64_view *,struct cp64_result *);
 #endif
