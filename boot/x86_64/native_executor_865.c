@@ -260,6 +260,7 @@ void s865_retire_terminal(const struct rt862_selection *t,bool (*audit)(void *),
 static struct desc848 native_g0,native_i0,native_g,native_d;
 static struct rt858_live native_original;
 extern void s847_bad_entry(void),s848_irq_entry(void),s864_ud_entry(void),s864_gp_entry(void);
+extern void s865_de_entry(void),s865_db_entry(void);
 static uint8_t native_in(uint16_t p){uint8_t x;__asm__ volatile("inb %1,%0":"=a"(x):"Nd"(p));return x;}
 static uint64_t native_apic(void){uint32_t a,d;__asm__ volatile("rdmsr":"=a"(a),"=d"(d):"c"(0x1b));return ((uint64_t)d<<32)|a;}
 bool s865_executor_boot(uint64_t safe,uint64_t lapic,bool (*audit)(void *),void *opaque){
@@ -284,6 +285,8 @@ bool s865_executor_boot(uint64_t safe,uint64_t lapic,bool (*audit)(void *),void 
  gate848(V,s848_irq_entry,native_original.cs,1,0x8e);
  gate848(128,s847_call_entry,native_original.cs,1,0xee);
  gate848(14,s847_pf_entry,native_original.cs,2,0x8e);
+ gate848(0,s865_de_entry,native_original.cs,2,0x8e);
+ gate848(1,s865_db_entry,native_original.cs,2,0x8e);
  gate848(6,s864_ud_entry,native_original.cs,2,0x8e);
  gate848(13,s864_gp_entry,native_original.cs,2,0x8e);
  native_g=(struct desc848){sel.limit,native_g0.base};

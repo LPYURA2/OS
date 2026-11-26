@@ -51,5 +51,20 @@ int main(void){
   f.error=1;CHECK(rt865_classify_native_frame(&f,va,0,0x2000,0x1000,0x5b,0x63,armed)==RT865_INVALID);f.error=0;
   CHECK(rt865_classify_native_frame(&f,va,0,0x2000,0x1000,0x5b,0x63,!armed)==RT865_INVALID);
  }
+ /* Four independently reproduced fault classes, terminal only. */
+ for(unsigned i=0;i<4;i++){
+  f.vector=(unsigned[]){0,1,14,13}[i];f.error=(unsigned[]){0,0,0x15,0x40a}[i];
+  f.rip=i==2?S846_STACK:S846_CODE+16;f.rsp=S846_STACK+4096;f.rflags=i==1?0x302:0x202;
+  uint64_t cr2=i==2?S846_STACK:0;
+  CHECK(check(f,FAULT_VA,cr2,false)==RT865_INVALID);
+  CHECK(rt865_classify_native_frame(&f,FAULT_VA,cr2,0x2000,0x1000,0x5b,0x63,false)==RT865_USER_FAULT);
+  CHECK(rt865_classify_native_frame(&f,VA,cr2,0x2000,0x1000,0x5b,0x63,false)==RT865_INVALID);
+  CHECK(rt865_classify_native_frame(&f,FAULT_VA,cr2,0x2000,0x2000,0x5b,0x63,false)==RT865_INVALID);
+  CHECK(rt865_classify_native_frame(&f,FAULT_VA,cr2,0x2000,0x1000,0x5b,0x63,true)==RT865_INVALID);
+  f.error|=8;CHECK(rt865_classify_native_frame(&f,FAULT_VA,cr2,0x2000,0x1000,0x5b,0x63,false)==(i==3?RT865_USER_FAULT:RT865_INVALID));
+  f.error=1;CHECK(rt865_classify_native_frame(&f,FAULT_VA,cr2,0x2000,0x1000,0x5b,0x63,false)==RT865_INVALID);
+  f.error=(unsigned[]){0,0,0x15,0x40a}[i];f.cs=0x38;
+  CHECK(rt865_classify_native_frame(&f,FAULT_VA,cr2,0x2000,0x1000,0x5b,0x63,false)==RT865_INVALID);f.cs=0x5b;
+ }
  printf("S865 host frame classifier PASS: %u checks (not hardware evidence)\n",n);
 }

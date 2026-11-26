@@ -59,8 +59,24 @@ enum rt865_frame_kind rt865_classify_native_frame(const struct s847_raw *f,uint6
  uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed)
 {
  enum rt865_frame_kind kind=rt865_classify_frame(f,va,cr2,child,safe,cs,ss,armed);
- if(kind!=RT865_INVALID||!region(f,sizeof *f,_Alignof(struct s847_raw))||
-    (f->rsp>S846_STACK&&f->rsp<=S846_STACK+P))return kind;
+ if(kind!=RT865_INVALID||!region(f,sizeof *f,_Alignof(struct s847_raw)))return kind;
+#if defined(STYLEOS_OWNED_SHELL_865) || defined(STYLEOS_TEST_RUNTIME_ENTRY_CLASSIFIER_865)
+ /* These additional CPU exceptions are terminal only. User RIP, RSP and
+  * arithmetic/debug flags are not evidence of kernel corruption. Root,
+  * selectors, IST, IF and vector-specific hardware error remain mandatory. */
+ if(!armed&&child&&child<LOW&&!(child&(P-1))&&safe&&safe<LOW&&!(safe&(P-1))&&child!=safe&&
+    (cs&7)==3&&(ss&7)==3&&cs>=11&&ss>=11&&cs!=ss&&f->cs==cs&&f->ss==ss&&
+    (f->rflags&0x202)==0x202&&!(f->rflags&~UINT64_C(0x254fd7))&&
+    va==S846_IST+4*P-16-sizeof *f){
+  if(!cr2&&!f->error&&(f->vector==0||f->vector==1))return RT865_USER_FAULT;
+  /* IDT-selector error from a denied software INT, not an external IRQ. */
+  if(!cr2&&f->vector==13&&(f->error&7)==2&&f->error<=0x7fa)return RT865_USER_FAULT;
+  /* Instruction-fetch PF (including NX). Never recover a reserved-bit or
+   * supervisor fault by classifying it as an ordinary user exception. */
+  if(f->vector==14&&(f->error&0x14)==0x14&&!(f->error&~UINT64_C(0x15)))return RT865_USER_FAULT;
+ }
+#endif
+ if(f->rsp>S846_STACK&&f->rsp<=S846_STACK+P)return kind;
  /* Only RSP is user-controlled and out of range. Check every other field,
   * including exact IST, selectors, roots, flags and vector/error evidence.
   * The temporary copy is never published or used for IRET. */

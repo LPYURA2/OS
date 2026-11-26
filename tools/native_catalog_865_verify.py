@@ -127,7 +127,7 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=
     if sorted((x['id'],x['root'],x['gen']) for x in retired)!=[(i,roots[i],i+1) for i in range(32)]:raise ValueError('per-owner retirement')
     # Independent hardware trace: match every user event, never accept
     # software receipts alone. Kernel drain records are independently bound.
-    headers=list(HEADER.finditer(trace));result=[];started=False;index=0
+    headers=list(HEADER.finditer(trace));result=[];started=False;index=0;denied_int=None;denied_count=0
     drains=records(b'STYLEOS S865 TIMER-DRAIN',('id','safe','pc','vector'));drain_index=0
     for j,m in enumerate(headers):
         block=trace[m.start():headers[j+1].start() if j+1<len(headers) else len(trace)]
@@ -146,6 +146,14 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=
                 if int(m[7],16)!=obs['bp']['rip']-1:raise ValueError('native breakpoint site')
                 started=True;continue
         vec,err,soft,cpl,cs,rip,pc,ss,sp=map(lambda x:int(x,16),m.groups()[1:])
+        if denied_int is not None:
+            if (vec,err,soft,cpl,cs,rip,pc,ss,sp,cr3)!=(13,0x40a,0,3,0x5b,0x1000000d,0x1000000d,0x63,0x11001000,roots[0]) or int(m[1])!=denied_int+1:
+                raise ValueError('denied INT must immediately cause matching GP')
+            denied_int=None
+        elif fault_probe=='forbidden-int' and vec==0x81:
+            if (err,soft,cpl,cs,rip,pc,ss,sp,cr3)!=(0,1,3,0x5b,0x1000000d,0x1000000d,0x63,0x11001000,roots[0]) or denied_count:
+                raise ValueError('unexpected software INT attempt')
+            denied_int=int(m[1]);denied_count+=1;continue
         if cpl==0:
             if drain_index>=len(drains):raise ValueError('unaccounted kernel interrupt')
             dr=drains[drain_index];drain_index+=1
@@ -156,6 +164,8 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=
         actual_pc=ev['rip']-2*(ev['vector']==128)
         if (vec,err,soft,cpl,cs,rip,pc,ss,sp,cr3)!=(ev['vector'],ev['error'],int(ev['vector']==128),3,0x5b,actual_pc,actual_pc,0x63,ev['sp'],ev['root']):raise ValueError('native raw CPU mismatch')
         if one(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')!=ev['flags'] or one(r'\bRAX=([0-9a-fA-F]+)\b')!=ev['rax'] or one(r'\bR12=([0-9a-fA-F]+)\b')!=(0 if ev['vector']==0x50 and ev['rip']==0x10000000 else ev['slot']+1):raise ValueError('native raw registers')
+        if fault_probe=='execute-nx' and ev['slot']==0 and vec==14 and one(r'\bCR2=([0-9a-fA-F]+)\b')!=0x11000000:raise ValueError('NX fault address')
         result.append((int(m[1]),ev))
+    if denied_int is not None or denied_count!=int(fault_probe=='forbidden-int'):raise ValueError('missing denied INT evidence')
     if not started or index!=len(events) or drain_index!=len(drains):raise ValueError('native CPU count')
     return result

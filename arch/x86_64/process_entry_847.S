@@ -74,6 +74,17 @@ s864_gp_entry:
     pushq $13
     jmp .Ltrap847
 #endif
+#ifdef STYLEOS_OWNED_SHELL_865
+.globl s865_de_entry,s865_db_entry
+s865_de_entry:
+    pushq $0
+    pushq $0
+    jmp .Ltrap847
+s865_db_entry:
+    pushq $0
+    pushq $1
+    jmp .Ltrap847
+#endif
 .globl s847_call_entry
 s847_call_entry:
     pushq $0
