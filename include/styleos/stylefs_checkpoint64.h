@@ -20,4 +20,8 @@ enum cp64_status cp64_save(struct bs_service *,const struct cp64_layout *,struct
 enum cp64_status cp64_recover(struct bs_service *,const struct cp64_layout *,
  struct dc64_state *,struct sfs64_journal *,struct ns64_proof *,struct ns64_node *,size_t slots,
  struct dc64_workspace *,struct fb64_view *,struct cp64_result *);
+
+/* Read newest structurally valid receipt; require current pair to match.
+ * No initial checkpoint, adoption, or rollback on mismatch. */
+enum cp64_status cp64_current(struct bs_service *,const struct cp64_layout *,struct fb64_view *,struct cp64_result *);
 #endif

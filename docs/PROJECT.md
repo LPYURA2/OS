@@ -1,3 +1,6 @@
+## StyleFS 28 — coordinated creation candidate
+26 and 27 full CI PASS. New checkpoint-last creation wrapper and uncertainty lock, [handoff](NEXT_CHAT_STYLEFS_28.md). Legal gate preserved.
+
 ## StyleFS 27 — exact pair checkpoint candidate
 26 host PASS; new explicit checkpoint receipts and read-only exact recovery, CI pending. [Handoff](NEXT_CHAT_STYLEFS_27.md). [Legal gate](LEGAL_RELEASE_GATE.md) preserved.
 

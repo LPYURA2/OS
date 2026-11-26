@@ -123,3 +123,27 @@ enum cp64_status cp64_recover(struct bs_service *b,const struct cp64_layout *l,
  }
  v->valid=false;p->valid=false;d->valid=false;j->valid=false;return CP64_CORRUPT;
 }
+
+enum cp64_status cp64_current(struct bs_service *b,const struct cp64_layout *l,struct fb64_view *v,struct cp64_result *out){
+ struct layout g;
+ if(!v||!v->valid||!out||!geometry(b,l,true,&g)||!v->directory||!v->data||!v->proof||
+    v->directory->block!=b||v->data->block!=b||v->dir_token!=l->dir||v->data_token!=l->data||
+    v->directory->token!=l->dir||v->data->token!=l->data||v->data->data_start!=l->data_start||
+    v->directory->owner!=l->owner||v->data->owner!=l->owner||
+    !v->directory->valid||!v->data->valid||v->data->active>1||
+    v->epoch!=v->directory->epoch||v->generation!=v->data->generation[v->data->active])return CP64_STALE;
+ struct fb64_view check;
+ if(!sep(out,sizeof *out,b,sizeof *b)||!sep(out,sizeof *out,l,sizeof *l)||
+    !sep(out,sizeof *out,v,sizeof *v)||!sep(out,sizeof *out,v->directory,sizeof *v->directory)||
+    !sep(out,sizeof *out,v->data,sizeof *v->data)||!sep(out,sizeof *out,v->proof,sizeof *v->proof)||
+    fb64_bind(&check,v->directory,v->proof,v->data)!=FB64_OK||
+    !sep(out,sizeof *out,check.proof->nodes,(size_t)check.proof->count*sizeof *check.proof->nodes))return CP64_INVALID;
+ struct receipt x[2];bool blank;
+ enum cp64_status rc=read_receipts(b,l,&g,x,&blank);
+ if(rc!=CP64_OK)return rc;
+ if(!x[0].valid&&!x[1].valid)return CP64_CORRUPT;
+ unsigned last=x[1].valid&&(!x[0].valid||x[1].seq>x[0].seq)?1:0;
+ if(check.epoch!=x[last].epoch||check.generation!=x[last].gen)return CP64_STALE;
+ *out=(struct cp64_result){x[last].seq,check.epoch,check.generation,false};
+ return CP64_OK;
+}
