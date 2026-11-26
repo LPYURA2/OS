@@ -407,7 +407,7 @@ def main():
                     count=sum(x.startswith(tag) for x in serial.read_bytes().splitlines())
                     d.key('f9');wait(proc,serial,tag,count+1)
                     if args.native_catalog:
-                        wait(proc,serial,b'STYLEOS NATIVE EMPTY',timeout=180)
+                        wait(proc,serial,b'STYLEOS NATIVE EMPTY',seconds=180)
                     d.screen('after-denied-fixture')
                 elif tasks:
                     d.key('f9')

@@ -44,8 +44,12 @@ def verify_catalog(lines,trace,obs):
     for event in events:
         i=event['slot']
         if not 0<=i<32 or event['pid']!=i+1 or event['root']!=roots[i] or event['sp']!=0x11001000 or event['flags']&0x202!=0x202 or event['error']:raise ValueError('native event identity')
+        expected_state=1 if event['vector']==0x50 or event['vector']==128 and event['rax']==1 else 4 if event['vector']==128 and event['rax']==2 else 5 if event['vector']==6 else -1
+        if event['state']!=expected_state:raise ValueError('native lifecycle state')
         per[i].append(event)
+    if [x['slot'] for x in events[:32]]!=list(range(32)):raise ValueError('first round fairness')
     for i,seq in enumerate(per):
+        if seq[-1]['state'] not in (4,5) or any(x['state']!=1 for x in seq[:-1]):raise ValueError('terminal lifecycle')
         actual=[(x['vector'],x['rip'],x['rax']) for x in seq if x['vector']!=0x50]
         expected=[(128,0x1000000d,1),(6,0x1000000d,0) if i%8==7 else (128,0x10000014,2)]
         if actual!=expected:raise ValueError('native yield/terminal '+str((i,actual)))
