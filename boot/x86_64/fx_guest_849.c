@@ -13,7 +13,9 @@ extern const unsigned s862_loop_budget[S846_ROOT_COUNT];
 static uint64_t cr3_849(void){uint64_t x;__asm__ volatile("mov %%cr3,%0":"=r"(x));return x;}
 static uint64_t flags849(void){uint64_t x;__asm__ volatile("pushfq;popq %0":"=r"(x));return x;}
 static uint32_t u32(const uint8_t *b){return (uint32_t)b[0]|((uint32_t)b[1]<<8)|((uint32_t)b[2]<<16)|((uint32_t)b[3]<<24);}
+#if !defined(STYLEOS_OWNED_SHELL_865) || defined(STYLEOS_NATIVE_PINNED_CATALOG)
 static uint64_t u64(const uint8_t *b){return u32(b)|((uint64_t)u32(b+4)<<32);}
+#endif
 static void field(const char *k,uint64_t x){arch_putc(' ');arch_puts(k);arch_puts("=0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(x>>(unsigned)i)&15]);}
 static bool mapped(const struct s846_root *r,const void *v,size_t n){uint64_t x=(uintptr_t)v;for(size_t i=0;i<r->plan.count;i++){const struct pg_mapping *m=&r->plan.maps[i];if(m->va==m->pa&&m->flags==PG_WRITE&&x>=m->va&&x-m->va<m->bytes&&n<=m->bytes-(x-m->va))return true;}return false;}
 static void scrub(void *p,size_t n){volatile uint8_t *b=p;while(n--)*b++=0;}
@@ -146,6 +148,7 @@ bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
  __asm__ volatile("fxsave64 %0":"=m"(kernel_check)::"memory");
  if(!s849_arch_equal(&s849_kernel_image,&kernel_check,bank.mxcsr_mask))return false;
  scrub(&kernel_check,sizeof kernel_check);
+#if !defined(STYLEOS_OWNED_SHELL_865) || defined(STYLEOS_NATIVE_PINNED_CATALOG)
  const uint8_t *p=s849_user_capture.bytes;
  uint64_t x14=u64(p+160+14*16),x15=u64(p+160+15*16),st0=u64(p+32);
  uint32_t exp=(uint32_t)p[40]|((uint32_t)p[41]<<8);
@@ -163,6 +166,9 @@ bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
     u32(p+24)!=(id?0x3f80u:0x1f80u))return false;
 #endif
  ++seen[id];arch_puts("STYLEOS S849 CAPTURE");field("id",id);field("root",root);field("n",seen[id]);field("xmm14",x14);field("xmm15",x15);field("mxcsr",u32(p+24));field("st0",st0);field("exp",exp);field("kernel-restored",1);field("terminal",terminal);arch_putc('\n');
+#else
+ (void)terminal;
+#endif
  scrub(&s849_user_capture,sizeof s849_user_capture);scrub(&s849_user_restore,sizeof s849_user_restore);s849_live=0;
  /* Retirement happens later under the safe root. */
  return true;
@@ -171,7 +177,9 @@ bool s849_guest_suspend(unsigned id,uint64_t root,bool terminal){
 bool s865_fx_retire(unsigned id,uint64_t root,uint64_t generation,uint64_t safe){
  if(!safe849||safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live||
     id>=S846_ROOT_COUNT||!s849_retire(&bank,id,root,generation)||!allzero(&bank.slot[id],sizeof bank.slot[id]))return false;
+#if !defined(STYLEOS_OWNED_SHELL_865) || defined(STYLEOS_NATIVE_PINNED_CATALOG)
  arch_puts("STYLEOS S865 FX-RETIRE");field("id",id);field("root",root);field("gen",generation);arch_putc('\n');
+#endif
  return true;
 }
 #endif

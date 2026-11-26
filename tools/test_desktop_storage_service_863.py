@@ -277,17 +277,23 @@ def main():
         if present or not required<=linked:raise ValueError('native shell link provenance '+str((sorted(present),sorted(required-linked))))
         compiler=json.loads((build/'x86_64/owned-shell-compiler.json').read_text())
         if '-DSTYLEOS_OWNED_SHELL_865=1' not in compiler['flags'] or not compiler['sources'] or set(compiler['sources'])!=set(compiler['source_sha256']):raise ValueError('owned shell compiler manifest')
-        excluded={'boot/x86_64/user_preemption_848.c','tests/guest/workload_865.c'}
+        excluded={'boot/x86_64/user_preemption_848.c','boot/x86_64/process_trial_847.c','tests/guest/workload_865.c'}
+        test_sources={'tests/guest/native_catalog_865.c'} if args.native_catalog else set()
+        expected_profile='native-catalog-acceptance' if args.native_catalog else 'owned-shell-candidate'
+        if compiler.get('profile')!=expected_profile or set(compiler.get('test_sources',[]))!=test_sources:
+            raise ValueError('native profile identity')
+        if ('s865_native_catalog_request' in linked)!=args.native_catalog:raise ValueError('catalog entry leaked or missing')
+        if (build/'x86_64/native_catalog_digest.h').exists()!=args.native_catalog:raise ValueError('catalog digest leaked or missing')
         if '-DSTYLEOS_KERNEL_CAPACITY_32=1' not in compiler['flags'] or '-DSTYLEOS_NATIVE_EXECUTOR_OBSERVERS=1' in compiler['flags']:raise ValueError('native capacity/observer flag')
         if ('-DSTYLEOS_NATIVE_PINNED_CATALOG=1' in compiler['flags'])!=args.native_catalog:raise ValueError('catalog policy flag')
         if 'boot/x86_64/native_executor_865.c' not in compiler['sources']:raise ValueError('native executor source')
-        if excluded.intersection(compiler['sources']) or any(s.startswith('tests/') for s in compiler['sources']):
+        if excluded.intersection(compiler['sources']) or {s for s in compiler['sources'] if s.startswith('tests/')}!=test_sources:
             raise ValueError('owned shell linked diagnostic translation units')
         if any((build/'x86_64').glob('external-workload-*')) or (build/'x86_64/external_workload_865.h').exists():
             raise ValueError('owned shell generated fixture payload')
         for rel,digest in compiler['source_sha256'].items():
             if sha((ROOT/rel).read_bytes())!=digest:raise ValueError('owned shell source mismatch '+rel)
-        (out/'entry-separation.json').write_text(json.dumps({'absent':sorted(forbidden),'excluded_sources':sorted(excluded),'external_fixture_generated':False},indent=2)+'\n')
+        (out/'entry-separation.json').write_text(json.dumps({'absent':sorted(forbidden),'excluded_sources':sorted(excluded),'external_fixture_generated':False,'profile':expected_profile,'test_sources':sorted(test_sources)},indent=2)+'\n')
     elif args.four:
         from runtime_mixed_863_verify import loop_site
         site=loop_site(efi.read_bytes(),mp,four=True,external=args.integrated)

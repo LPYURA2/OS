@@ -183,7 +183,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   .frame_va=frame860,.vector=pending860.vector,.isr=pending860.vector==V,
   .eoi=pending860.vector==V,.safe_flags=flags848(),.frame=pending860};
  if(rt863_bank_event(&bank862,runtime860,ticket,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
-#ifdef STYLEOS_OWNED_SHELL_865
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
  arch_puts("STYLEOS NATIVE EVENT");fld848("slot",id);fld848("pid",ticket->pid);fld848("root",ticket->child_root);
  fld848("vector",pending860.vector);fld848("error",pending860.error);fld848("rip",pending860.rip);
  fld848("sp",pending860.rsp);fld848("flags",pending860.rflags);fld848("rax",pending860.gpr[0]);fld848("state",state);arch_putc('\n');
@@ -317,3 +317,14 @@ void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uin
  if(!s865_executor_idle())fail848("native-poll-return");
 }
 #endif
+
+/* Native trap entry, no historical cooperative fallback. */
+bool s848_active(void);
+unsigned s848_dispatch_raw(struct s847_raw *,uint64_t,uint64_t);
+unsigned s847_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root)
+{
+ if(s848_active())return s848_dispatch_raw(f,cr2,root);
+ __asm__ volatile("cli":::"memory");
+ arch_puts("STYLEOS RUNTIME FAIL unexpected inactive trap\n");
+ arch_halt();
+}

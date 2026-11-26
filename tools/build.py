@@ -464,7 +464,9 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         if not owned_shell_865:
             common += ['tests/guest/workload_865.c']
     if test_process_trial_847 or test_runtime_user_861 or test_runtime_timer_861:
-        common += ['kernel/process_entry_847.c','kernel/process_trap_847.c','kernel/user_copy_772.c','arch/x86_64/process_entry_847.S','boot/x86_64/process_trial_847.c']
+        common += ['kernel/process_entry_847.c','kernel/process_trap_847.c','kernel/user_copy_772.c','arch/x86_64/process_entry_847.S']
+        if not integrated_runtime_864:
+            common += ['boot/x86_64/process_trial_847.c']
     if test_user_roots_846:
         common += ['kernel/user_root_846.c','boot/x86_64/user_root_846.c']
     if test_task_stacks_845:
@@ -782,6 +784,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         if len(digest)!=32 or not any(digest):raise ValueError('native catalog digest')
         (folder/'native_catalog_digest.h').write_text('static const unsigned char native_catalog_digest[32] = {'+','.join(str(x) for x in digest)+'};\n')
         flags += ['-DSTYLEOS_NATIVE_PINNED_CATALOG=1','-I',str(folder)]
+        sources += ['tests/guest/native_catalog_865.c']
     if owned_shell_865:
         # Link the same authenticated executor and hardware entry as the
         # integrated test; omit the workload orchestration and all observers.
@@ -790,11 +793,14 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
             'tests/guest/workload_865.c',
         }
         sources = [s for s in sources if s not in excluded]
-        if any(s.startswith('tests/') for s in sources):
-            raise ValueError('test translation unit in owned shell')
+        expected_tests = {'tests/guest/native_catalog_865.c'} if native_catalog_sha256 is not None else set()
+        if {s for s in sources if s.startswith('tests/')} != expected_tests:
+            raise ValueError('unexpected test translation unit in owned shell')
         # Actual compiler arguments and translation-unit bytes, not inferred profile names.
         (folder / 'owned-shell-compiler.json').write_text(json.dumps({
             'flags': flags, 'sources': sources,
+            'profile': 'native-catalog-acceptance' if native_catalog_sha256 is not None else 'owned-shell-candidate',
+            'test_sources': sorted(expected_tests),
             'source_sha256': {rel: hashlib.sha256((ROOT / rel).read_bytes()).hexdigest() for rel in sources}
         },indent=2)+'\n')
     for rel in sources:
