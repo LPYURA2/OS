@@ -1,3 +1,6 @@
+## StyleFS 26 — ordered durable file binding candidate
+25 host PASS, full regression pending. [Handoff](NEXT_CHAT_STYLEFS_26.md). File data before namespace publication, orphan retention, cross-journal consistency check. Legal gate unchanged.
+
 ## StyleFS 25 — namespace integrity candidate
 24 CI pending at start; new checked graph/path service and mutation gate, [handoff](NEXT_CHAT_STYLEFS_25.md). [Legal gate](LEGAL_RELEASE_GATE.md) unchanged.
 
