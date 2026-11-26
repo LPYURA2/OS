@@ -9,7 +9,7 @@
  * existing guest image until the full architecture closure is generalized. */
 #ifdef STYLEOS_KERNEL_CAPACITY_32
 enum { PS_MAX_SLOTS = PR_MAX_PROCESSES };
-#elif defined(STYLEOS_TEST_FOUR_GUEST_864)
+#elif (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
 enum { PS_MAX_SLOTS = 4 };
 #elif defined(STYLEOS_TEST_WIDE_SCHEDULER_864)
 enum { PS_MAX_SLOTS = PR_MAX_PROCESSES };

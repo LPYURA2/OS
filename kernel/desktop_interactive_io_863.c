@@ -2,10 +2,10 @@
  * The real PS/2 adapter is linked separately and admitted by S863. */
 #include <styleos/desktop_v0.h>
 #include <styleos/arch.h>
-#ifndef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if !(defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #error diagnostic profile only
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 extern bool s863_shell_clock(unsigned *,unsigned *);
 bool desk_clock(unsigned *h,unsigned *m){return s863_shell_clock(h,m);}
 #else
@@ -24,7 +24,7 @@ uint64_t desk_pointer_clock(void){return 0;}
 bool desk_pointer_near(uint64_t a,uint64_t b){(void)a;(void)b;return false;}
 #endif
 void desk_reboot(void){arch_puts("STYLEOS S863 RESET DENIED\n");}
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 extern uint32_t s863_disk_probe(void);
 extern bool s863_disk_read(uint32_t,uint8_t[512]),s863_disk_write(uint32_t,const uint8_t[512]),s863_disk_flush(void);
 uint32_t desk_ata_probe(void){return s863_disk_probe();}

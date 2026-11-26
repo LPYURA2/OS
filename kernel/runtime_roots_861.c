@@ -23,7 +23,7 @@ static bool cross(const struct s844_arena *arena,const struct s850_desktop_root 
  return true;
 }
 
-#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+#if (defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
 /* Validate every currently allocated page and every published root, without
  * requiring unrelated slots to exist. Vacant slots have zero metadata.
  * The trusted architecture owns the safe root and serializes changes. */
@@ -68,7 +68,7 @@ bool rt864_roots_audit_set(const struct s842_root *base,const struct s850_gop_re
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)set[i]=&roots[i];
  return cross(arena,desktop,set,S846_ROOT_COUNT);
 }
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
 bool rt865_roots_audit_sparse_frozen(const struct s842_root *base,const struct s842_cache *cache,const struct s850_gop_plan *proof,const struct boot_memory_evidence *e,const struct s844_arena *arena,const struct s844_lease leases[S846_ROOT_COUNT],const struct s846_guard *guard,const struct s850_desktop_root *desktop,const struct s846_root roots[S846_ROOT_COUNT]){
  return base&&cache&&proof&&e&&arena&&leases&&guard&&desktop&&roots&&
   s850_desktop_audit_frozen_861(base,cache,proof,e,guard,desktop)&&sparse(base,cache,arena,leases,guard,desktop,roots);
@@ -94,7 +94,7 @@ bool rt861_roots_audit(const struct s842_root *base,const struct s850_gop_reques
  return cross(arena,desktop,(const struct s846_root *const[]){a,b},2);
 }
 
-#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+#if (defined(STYLEOS_TEST_RUNTIME_ROOTS_861) || defined(STYLEOS_OWNED_SHELL_865))
 bool rt861_roots_audit_frozen(const struct s842_root *base,const struct s842_cache *cache,const struct s850_gop_plan *proof,const struct boot_memory_evidence *e,const struct s844_arena *arena,const struct s844_lease leases[2],const struct s846_guard *guard,const struct s850_desktop_root *desktop,const struct s846_root *a,const struct s846_root *b){
  return base&&cache&&proof&&e&&arena&&leases&&guard&&desktop&&a&&b&&
   s850_desktop_audit_frozen_861(base,cache,proof,e,guard,desktop)&&s846_audit_pair(base,cache,arena,leases,guard,a,b)&&cross(arena,desktop,(const struct s846_root *const[]){a,b},2);

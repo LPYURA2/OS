@@ -75,7 +75,7 @@ const struct dpr_service *dpr_global_state(void)
     return boot_service.started ? &boot_service : 0;
 }
 
-#ifdef STYLEOS_TEST_RUNTIME_TICK_860
+#if (defined(STYLEOS_TEST_RUNTIME_TICK_860) || defined(STYLEOS_OWNED_SHELL_865))
 struct dpr_service *dpr_tick_global_860(void)
 { return boot_service.started ? &boot_service : 0; }
 #endif

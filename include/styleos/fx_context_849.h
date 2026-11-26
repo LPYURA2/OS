@@ -11,11 +11,11 @@ struct s849_image { _Alignas(16) uint8_t bytes[S849_BYTES]; };
 struct s849_caps { uint32_t leaf1_ecx,leaf1_edx,mxcsr_mask; uint64_t cr0,cr4; };
 struct s849_slot { struct s849_image image; uint64_t root,generation; bool live; };
 #ifdef STYLEOS_KERNEL_CAPACITY_32
-#ifndef STYLEOS_TEST_WIDE_FX_864
+#if !(defined(STYLEOS_TEST_WIDE_FX_864) || defined(STYLEOS_OWNED_SHELL_865))
 #error expanded capacity requires generation-bound FP metadata
 #endif
 #define S849_SLOT_COUNT 32u
-#elif defined(STYLEOS_TEST_WIDE_FX_864)
+#elif (defined(STYLEOS_TEST_WIDE_FX_864) || defined(STYLEOS_OWNED_SHELL_865))
 #define S849_SLOT_COUNT 4u
 #else
 #define S849_SLOT_COUNT 2u
@@ -27,7 +27,7 @@ bool s849_admit(const struct s849_caps *,uint32_t *);
 bool s849_image_valid(const struct s849_image *,uint32_t);
 /* Compare defined architectural state, not reserved bytes or inactive x87 payloads. */
 bool s849_arch_equal(const struct s849_image *,const struct s849_image *,uint32_t);
-#ifdef STYLEOS_TEST_WIDE_FX_864
+#if (defined(STYLEOS_TEST_WIDE_FX_864) || defined(STYLEOS_OWNED_SHELL_865))
 /* Open an empty bank and admit one audited root at a time. Generations
  * must strictly increase across slot reuse within this bank lifetime. */
 bool s865_fx_open(struct s849_bank *,const struct s849_caps *);

@@ -5,7 +5,7 @@
 static struct boot_range reserved844;
 static bool admitted844;
 static struct s844_arena arena844;
-#if defined(STYLEOS_TEST_TASK_STACKS_845) || defined(STYLEOS_TEST_USER_ROOTS_846) || defined(STYLEOS_TEST_RUNTIME_ARENA_858)
+#if defined(STYLEOS_TEST_TASK_STACKS_845) || defined(STYLEOS_TEST_USER_ROOTS_846) || (defined(STYLEOS_TEST_RUNTIME_ARENA_858) || defined(STYLEOS_OWNED_SHELL_865))
 /* Query is read-only before own CR3. Return the allocator only after the
  * existing live test has completed and the reserved area is empty. */
 bool s845_extent(struct boot_range *out){
@@ -18,6 +18,7 @@ struct s844_arena *s845_arena(void){
 }
 #endif
 static void fld(const char *key,uint64_t v){arch_putc(' ');arch_puts(key);arch_putc('=');arch_puts("0x");for(int i=60;i>=0;i-=4)arch_putc("0123456789abcdef"[(v>>(unsigned)i)&15]);}
+#ifndef STYLEOS_OWNED_SHELL_865
 static _Noreturn void fail(const char *s){arch_puts("STYLEOS S844 FAIL ");arch_puts(s);arch_putc('\n');
 #if defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_PROVISIONED_STORAGE_864)
  __asm__ volatile("cli":::"memory");
@@ -25,6 +26,7 @@ static _Noreturn void fail(const char *s){arch_puts("STYLEOS S844 FAIL ");arch_p
  __asm__ volatile("cli;outl %0,%1"::"a"(0x24u),"Nd"((uint16_t)0xf4));
 #endif
 arch_halt();}
+#endif
 typedef EFI_STATUS (EFIAPI *alloc_pages844)(uint32_t,uint32_t,UINTN,uint64_t *);
 EFI_STATUS s844_reserve(struct efi_boot_services *bs){
  if(!bs||!bs->allocate_pages||reserved844.start)return EFI_INVALID_PARAMETER;
@@ -53,12 +55,14 @@ static void fill(struct s844_lease v,unsigned char byte){
  volatile unsigned char *p=(volatile unsigned char *)(uintptr_t)v.pa;
  for(size_t i=0;i<(size_t)v.pages*BOOT_MEMORY_PAGE;i++)p[i]=byte;
 }
+#ifndef STYLEOS_OWNED_SHELL_865
 static bool matches(struct s844_lease v,unsigned char byte){
  const volatile unsigned char *p=(const volatile unsigned char *)(uintptr_t)v.pa;
  for(size_t i=0;i<(size_t)v.pages*BOOT_MEMORY_PAGE;i++)if(p[i]!=byte)return false;
  return true;
 }
-#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+#endif
+#if (defined(STYLEOS_TEST_DESKTOP_COLD_863) || defined(STYLEOS_OWNED_SHELL_865))
 /* The caller already audited the entire reserved range under the live root.
  * Cold startup initializes metadata and scrubs RAM without fake leases. */
 bool s844_runtime_start(uint64_t expected_root){
@@ -74,6 +78,7 @@ bool s844_runtime_start(uint64_t expected_root){
 #endif
 /* Called only after S842 full detached-root audit and guarded transition.
  * No inherited translation is used to read or write the allocated pages. */
+#ifndef STYLEOS_OWNED_SHELL_865
 void s844_guest_run(uint64_t expected_root){
  uint64_t cr3;__asm__ volatile("mov %%cr3,%0":"=r"(cr3));
  if(!admitted844||cr3!=expected_root||!s844_init(&arena844,reserved844.start))fail("admission");
@@ -95,3 +100,5 @@ void s844_guest_run(uint64_t expected_root){
  fld("used",count);fld("zero",1);fld("refusals",4);arch_putc('\n');
  arch_puts("STYLEOS S844 POLICY bounded-efi-arena=yes candidate-grants=no reclaim=no dma-grants=no production-cr3=deny\n");
 }
+
+#endif

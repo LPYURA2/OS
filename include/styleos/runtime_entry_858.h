@@ -33,7 +33,7 @@ bool rt858_validate(const struct rt858_expected *,const struct rt858_live *);
  * IRQ activation, allocator transfer, or device I/O. */
 bool rt858_start(const struct rt858_expected *,const struct rt858_live *);
 bool rt858_ready(uint64_t root);
-#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
+#if (defined(STYLEOS_TEST_RUNTIME_JOIN_861) || defined(STYLEOS_OWNED_SHELL_865))
 /* Experimental safe-boundary accessor; no new dispatcher, no boot reset.
  * Caller supplies a trusted live CPU snapshot after restoring original state.
  * Not hardware proof, general scheduler admission, or a user ABI. */

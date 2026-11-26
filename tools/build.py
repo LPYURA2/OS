@@ -805,6 +805,14 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         expected_tests = {'tests/guest/native_catalog_865.c'} if native_catalog_sha256 is not None else set()
         if {s for s in sources if s.startswith('tests/')} != expected_tests:
             raise ValueError('unexpected test translation unit in owned shell')
+        from native_kernel_profile import SOURCES, HISTORICAL_FLAGS
+        observed={x for x in flags if x.startswith('-DSTYLEOS_TEST_')}
+        if observed != HISTORICAL_FLAGS:
+            raise ValueError('unexpected historical feature selection: '+str(sorted(observed ^ HISTORICAL_FLAGS)))
+        flags=[x for x in flags if x not in HISTORICAL_FLAGS]
+        if set(sources)!=set(SOURCES)|expected_tests:
+            raise ValueError('ordinary source closure changed: '+str(sorted(set(sources) ^ (set(SOURCES)|expected_tests))))
+        sources=list(SOURCES)+sorted(expected_tests)
         # Actual compiler arguments and translation-unit bytes, not inferred profile names.
         (folder / 'owned-shell-compiler.json').write_text(json.dumps({
             'flags': flags, 'sources': sources,
@@ -1113,7 +1121,7 @@ def main():
                           help='Dedicated x86-64 UEFI image: framebuffer proof only')
     negative.add_argument('--desktop-owned-root-preview', action='store_true',
                           help='Restricted Q35/TCG cold owned-root preview, no writable data disk or test-exit key')
-    negative.add_argument('--desktop-owned-shell-865', action='store_true',
+    negative.add_argument('--native-kernel','--desktop-owned-shell-865', dest='desktop_owned_shell_865', action='store_true',
                           help='Restricted owned-root shell, fixture workload unavailable from UI')
     negative.add_argument('--desktop-integrated-864', action='store_true',
                           help='Restricted Q35/TCG integrated owned-root Desktop with provisioned disk and repeatable native workload; not a general hardware build')

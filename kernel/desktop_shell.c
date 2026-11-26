@@ -8,7 +8,7 @@
 #include <styleos/desktop_sessions.h>
 #include <styleos/desktop_text_app.h>
 #include <styleos/native_desktop_bridge.h>
-#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
+#if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/desktop_process_runtime.h>
 #include <styleos/runtime_entry_858.h>
 static void desktop_kernel_boundary864(void){
@@ -17,7 +17,7 @@ static void desktop_kernel_boundary864(void){
  }
 }
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/desktop_interactive_863.h>
 #endif
 
@@ -66,7 +66,7 @@ static struct desk_editor_draft *current_draft(void)
     return active() == NOTE_WINDOW ? &desk_sessions_global()->notes :
                                      &desk_sessions_global()->editor;
 }
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
 static size_t note_length863(void){return desk_sessions_global()->notes.length;}
 static uint64_t note_hash863(void){
     const struct desk_editor_draft *n=&desk_sessions_global()->notes;
@@ -78,7 +78,7 @@ static uint64_t note_hash863(void){
 static bool note_dirty863(void){return desk_sessions_global()->notes.dirty;}
 static unsigned note_session863(void){return desk_sessions_pid(desk_sessions_global(),DESK_SESSION_NOTES);}
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 extern void s863_storage_document(bool,unsigned,const char *,size_t);
 #endif
 #define document (current_draft()->document)
@@ -267,7 +267,7 @@ static void open_document(unsigned slot)
     scroll = 0;
     notice = "Открыто с диска";
     arch_puts("STYLEOS DESKTOP DOCUMENT OPEN\n");
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
     s863_storage_document(false,(unsigned)document,content,length);
 #endif
 }
@@ -296,7 +296,7 @@ static void save(void)
     dirty = false;
     notice = "Сохранено на диске";
     arch_puts("STYLEOS DESKTOP DOCUMENT SAVE\n");
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
     s863_storage_document(true,(unsigned)document,content,length);
 #endif
 }
@@ -998,7 +998,7 @@ static void initial_windows(void)
  * file-system and open app sessions are never reinitialized on F10. */
 static void restart_shell(void)
 {
-#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
+#if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     desktop_kernel_boundary864();
 #endif
     struct desk_sessions *sessions = desk_sessions_global();
@@ -1023,7 +1023,7 @@ static void restart_shell(void)
     for (int i = 0; i < WINDOWS; ++i) win[i].open = opened[i];
     shell_refreshed = true;
     print_pid("STYLEOS SHELL RESTART pid=", new_pid);
-#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
+#if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     desktop_kernel_boundary864();
 #endif
     arch_puts("STYLEOS DESKTOP SHELL RESTART\n");
@@ -1042,7 +1042,7 @@ static bool update_clock(void)
     return change;
 }
 
-#ifdef STYLEOS_TEST_DESKTOP_FRAME_852
+#if (defined(STYLEOS_TEST_DESKTOP_FRAME_852) || defined(STYLEOS_OWNED_SHELL_865))
 /* Reuse the real shell renderer and initial window geometry. This diagnostic
  * does not enter the event loop, probe devices, mount storage or create PIDs. */
 size_t desk_first_frame_852(const struct desktop_surface *surface)
@@ -1076,11 +1076,11 @@ size_t desk_cursor_853(const struct desk_event *event)
 
 _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 {
-#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
+#if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     desktop_kernel_boundary864();
     arch_puts("STYLEOS DESKTOP RUNTIME BOUNDARY PASS\n");
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     s863_shell_guard();
 #endif
     width = (int)surface->width;
@@ -1115,21 +1115,21 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     size_t painted = desk_present(&(struct desk_damage){.all = true}, draw);
     if ((input_flags & 3) == 3 && painted) desk_update_mark_ready();
 #else
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     size_t initial_writes863=desk_present(&(struct desk_damage){.all = true}, draw);
 #else
     (void)desk_present(&(struct desk_damage){.all = true}, draw);
 #endif
 #endif
     arch_puts("STYLEOS DESKTOP READY\n");
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     s863_shell_observe(0,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),initial_writes863,input_flags,0);
 #endif
     unsigned tick = 0;
     bool cursor_proven = false;
     for (;;) {
         struct desk_event e;
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
         s863_shell_guard();
         struct desk_event observed863={0};size_t writes863=0;unsigned batch863=0;
 #endif
@@ -1137,7 +1137,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
         bool captured = false, editor = false, clock = false;
         for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i) {
             if (!captured) { take_visual(&old); captured = true; }
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
             observed863=e;batch863++;
 #endif
             if (e.mouse) editor |= mouse(&e) &&
@@ -1146,7 +1146,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                            (active() == NOTES || active() == NOTE_WINDOW);
         }
         if (++tick == 20000) { tick = 0; clock = update_clock(); }
-#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863)
+#if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
         if(captured||clock)desktop_kernel_boundary864();
 #endif
         bool imported = false;
@@ -1173,7 +1173,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                 cursor_only = false;
             }
             size_t writes = desk_present(&damage, draw);
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
             writes863=writes;
 #endif
             if (!cursor_proven && cursor_only && writes && writes <= 2u * CURSOR_W * CURSOR_H) {
@@ -1181,7 +1181,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
                 cursor_proven = true;
             }
         }
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
         if(captured)s863_shell_observe(&observed863,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),writes863,input_flags,batch863);
 #endif
 #ifdef STYLEOS_OWNED_SHELL_865

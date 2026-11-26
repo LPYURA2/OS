@@ -8,16 +8,16 @@
 #include <styleos/tss_ist_stage_782.h>
 #include <styleos/paging.h>
 #include <styleos/arch.h>
-#ifdef STYLEOS_TEST_APIC_ROOT_842
+#if (defined(STYLEOS_TEST_APIC_ROOT_842) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/apic_pe_842.h>
 _Noreturn void irq842_terminal(const struct boot_info *,uint64_t,uint64_t);
 void irq807_unexpected(void);
 static struct s842_root apic842;
 static struct s842_cache cache842;
-#ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
+#if (defined(STYLEOS_TEST_DESKTOP_PREFLIGHT_850) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/desktop_root_850.h>
 _Noreturn void s850_preflight(const struct s842_root *,const struct s842_cache *,struct pg_experiment *,const struct s846_guard *,uint64_t,uint64_t,uint64_t,uint64_t
-#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+#if (defined(STYLEOS_TEST_DESKTOP_SWITCH_851) || defined(STYLEOS_OWNED_SHELL_865))
 ,uint16_t,uint16_t
 #endif
 );
@@ -30,7 +30,7 @@ bool s843_admit(const struct s842_root *,struct pg_experiment *,uint64_t,uint64_
 #endif
 #endif
 
-#ifdef STYLEOS_TEST_OWNED_LOW_790
+#if (defined(STYLEOS_TEST_OWNED_LOW_790) || defined(STYLEOS_OWNED_SHELL_865))
 #define PAGE 4096u
 _Alignas(PAGE) static uint64_t owned_low_tables[PG_TABLE_PAGES][512];
 static struct s790_low_result owned_low;
@@ -76,7 +76,7 @@ static uint64_t cr4(void) { uint64_t n; __asm__ volatile("mov %%cr4,%0":"=r"(n))
 static uint64_t rflags(void) { uint64_t n; __asm__ volatile("pushfq;popq %0":"=r"(n));return n; }
 static uint16_t current_cs(void) { uint16_t n; __asm__ volatile("mov %%cs,%0":"=r"(n));return n; }
 static uint16_t current_tr(void) { uint16_t n; __asm__ volatile("str %0":"=r"(n));return n; }
-#ifdef STYLEOS_TEST_APIC_ROOT_842
+#if (defined(STYLEOS_TEST_APIC_ROOT_842) || defined(STYLEOS_OWNED_SHELL_865))
 static uint64_t msr842(uint32_t n){uint32_t a,d;__asm__ volatile("rdmsr":"=a"(a),"=d"(d):"c"(n));return ((uint64_t)d<<32)|a;}
 static void cp842(uint32_t leaf,uint32_t *a,uint32_t *d){
  uint32_t b,c;__asm__ volatile("cpuid":"=a"(*a),"=b"(b),"=c"(c),"=d"(*d):"a"(leaf),"c"(0));(void)b;(void)c;
@@ -317,7 +317,7 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
        !s790_audit_owned_low(&owned_low,low_request.required_exec,
              low_request.required_write,low_request.required_rsp))
         fail("cannot-stage-owned-pe-low-hierarchy");
-#ifdef STYLEOS_TEST_APIC_ROOT_842
+#if (defined(STYLEOS_TEST_APIC_ROOT_842) || defined(STYLEOS_OWNED_SHELL_865))
     const struct boot_info *boot842=(const struct boot_info *)(uintptr_t)e->live.handoff.start;
     struct acpi806_topology topo842={0};
 #ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
@@ -345,7 +345,7 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
     if(!s843_admit(&apic842,p,plan.new_root_pa,IGP785_IST_ALIAS))fail("s843-task-admission");
 #endif
     for(size_t i=0;i<512u;++i)if(i!=128u)t->pml4[i]=0;
-#ifdef STYLEOS_TEST_APIC_ROOT_842
+#if (defined(STYLEOS_TEST_APIC_ROOT_842) || defined(STYLEOS_OWNED_SHELL_865))
     t->pml4[0]=apic842.plan.tables[0][0];
 #else
     t->pml4[0]=owned_low.new_low_slot;
@@ -415,7 +415,7 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
     if(read64(tss+36u)!=stage.ist1_top || read64(tss+4u)!=stage.rsp0_top ||
        read64(tss+44u)!=ist2_top || read64(tss+52u)!=ist3_top)fail("ist-stack-descriptors");
 #endif
-#ifdef STYLEOS_TEST_APIC_ROOT_842
+#if (defined(STYLEOS_TEST_APIC_ROOT_842) || defined(STYLEOS_OWNED_SHELL_865))
     /* No inherited handler may be reached under the detached root. Use
      * guarded IST3 for unexpected vectors, including transition faults. */
     uintptr_t unexpected=(uintptr_t)&irq807_unexpected;
@@ -428,10 +428,10 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
     field(" uc-index=",apic842.uc_index);field(" pat=",cache842.pat);
     field(" ist=",IGP785_IST_ALIAS);arch_putc('\n');
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
+#if (defined(STYLEOS_TEST_DESKTOP_PREFLIGHT_850) || defined(STYLEOS_OWNED_SHELL_865))
     const struct s846_guard g850={{q.pages[IGP785_IST1],ist2_pa,ist3_pa}};
     s850_preflight(&apic842,&cache842,p,&g850,q.pages[IGP785_GDT],q.pages[IGP785_NEW_IDT],q.pages[IGP785_TSS],q.pages[IGP785_RSP0]
-#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+#if (defined(STYLEOS_TEST_DESKTOP_SWITCH_851) || defined(STYLEOS_OWNED_SHELL_865))
 ,desc.new_gdt_limit,desc.tss_selector
 #endif
 );
@@ -483,7 +483,7 @@ __attribute__((noreturn)) void s790_terminal_trial(struct pg_experiment *p) {
         fail("alias-physical-store");
     /* INT3 → IST1 → absent guard #PF → absent #PF gate → #DF IST3.
      * Any return instead triggers UD2; no emulated PASS is possible. */
-#ifdef STYLEOS_TEST_APIC_ROOT_842
+#if (defined(STYLEOS_TEST_APIC_ROOT_842) || defined(STYLEOS_OWNED_SHELL_865))
     if(!s842_audit(&apic842,&cache842)||!cache_unchanged842(&cache842)||
        ((t->pml4[0]^apic842.plan.tables[0][0])&~UINT64_C(0x20))||
        (t->pml4[128]&~UINT64_C(0x20))!=(q.pages[IGP785_NEW_PDPT]|3u))

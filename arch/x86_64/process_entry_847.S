@@ -29,7 +29,7 @@ s847_enter:
     xorq %rax,%rax
     movw %ss,%ax
     movw %ax,s847_kernel_ss(%rip)
-#ifdef STYLEOS_TEST_FX_CONTEXT_849
+#if (defined(STYLEOS_TEST_FX_CONTEXT_849) || defined(STYLEOS_OWNED_SHELL_865))
     cmpq $0,s849_live(%rip)
     je .Lfxenter_done849
     cmpq $1,s849_live(%rip)
@@ -64,7 +64,7 @@ s847_enter:
 s847_pf_entry:
     pushq $14
     jmp .Ltrap847
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
 .globl s864_ud_entry,s864_gp_entry
 s864_ud_entry:
     pushq $0
@@ -78,7 +78,7 @@ s864_gp_entry:
 s847_call_entry:
     pushq $0
     pushq $128
-#ifdef STYLEOS_TEST_USER_PREEMPT_848
+#if (defined(STYLEOS_TEST_USER_PREEMPT_848) || defined(STYLEOS_OWNED_SHELL_865))
     jmp .Ltrap847
 .globl s848_irq_entry
 s848_irq_entry:
@@ -156,7 +156,7 @@ s865_drain_entry:
     movq %cr3,%r8
     cmpq s847_child_root(%rip),%r8
     jne .Lbad847
-#ifdef STYLEOS_TEST_FX_CONTEXT_849
+#if (defined(STYLEOS_TEST_FX_CONTEXT_849) || defined(STYLEOS_OWNED_SHELL_865))
     cmpq $0,s849_live(%rip)
     je .Lfxtrap_done849
     cmpq $1,s849_live(%rip)

@@ -14,7 +14,7 @@ uint64_t dpr_arch_safe_root(void)
     return cr3 & ~UINT64_C(4095);
 }
 
-#if defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_RUNTIME_ENTRY_858)
+#if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_RUNTIME_ENTRY_858) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/runtime_entry_858.h>
 struct rt864_desc {uint16_t limit;uint64_t base;} __attribute__((packed));
 /* One privileged observation path for boot, dispatch and shell safe points.

@@ -56,7 +56,7 @@ bool s865_fx_guest_test_stale(unsigned id,uint64_t root,uint64_t old){
 }
 #endif
 #else /* historical batch-only FP profiles */
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
 bool s849_guest_init(const struct s846_root child[S846_ROOT_COUNT],const struct s844_lease leases[S846_ROOT_COUNT],uint64_t safe){
 #else
 bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
@@ -70,7 +70,7 @@ bool s849_guest_init(const struct s846_root child[2],uint64_t safe){
  if(!s849_admit(&c,&mask))return false;
  __asm__ volatile("fxsave64 %0":"=m"(s849_kernel_image)::"memory");
  c.mxcsr_mask=u32(s849_kernel_image.bytes+28);
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
  uint64_t roots[S846_ROOT_COUNT],generations[S846_ROOT_COUNT];
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   if(child[i].lease.generation!=leases[i].generation||child[i].lease.pa!=leases[i].pa)return false;
@@ -131,7 +131,7 @@ bool s849_guest_bind_leases(const struct s844_lease leases[2],bool reused){
 }
 #define FX_GEN(i) bank.slot[i].generation
 #else
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
 #define FX_GEN(i) bank.slot[i].generation
 #else
 #define FX_GEN(i) 1
@@ -183,8 +183,9 @@ bool s865_fx_retire(unsigned id,uint64_t root,uint64_t generation,uint64_t safe)
  return true;
 }
 #endif
+#ifndef STYLEOS_OWNED_SHELL_865
 bool s849_guest_finish(uint64_t safe){
-#if defined(STYLEOS_TEST_FOUR_GUEST_864) && !defined(STYLEOS_INTEGRATED_RUNTIME_864)
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865)) && !defined(STYLEOS_INTEGRATED_RUNTIME_864)
  for(unsigned i=0;i<S846_ROOT_COUNT;i++)if(seen[i]!=s862_loop_budget[i]+2)return false;
 #endif
  if(safe!=safe849||cr3_849()!=safe||(flags849()&0x200)||s849_live
@@ -211,3 +212,5 @@ bool s849_guest_finish(uint64_t safe){
  if(!allzero(&s849_kernel_image,sizeof s849_kernel_image)||!allzero(&bank,sizeof bank)||!allzero(&s849_user_capture,sizeof s849_user_capture)||!allzero(&s849_user_restore,sizeof s849_user_restore)||!allzero(&kernel_check,sizeof kernel_check))return false;
  arch_puts("STYLEOS S849 CLEAN slots-zero=yes kernel-copy-zero=yes\n");return true;
 }
+
+#endif

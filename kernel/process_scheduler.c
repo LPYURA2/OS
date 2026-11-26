@@ -106,7 +106,7 @@ enum ps_status ps_reap(struct ps_dispatcher *d, unsigned slot, uint64_t handle)
     return PS_OK;
 }
 
-#ifdef STYLEOS_TEST_RUNTIME_TICK_860
+#if (defined(STYLEOS_TEST_RUNTIME_TICK_860) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/runtime_tick_860.h>
 enum ps_status ps_tick_860(struct ps_dispatcher *d,const struct rt860_tick *t)
 {

@@ -21,7 +21,7 @@ bool rt862_bank_open(struct rt862_bank *,struct dpr_service *,uint64_t,uint16_t,
 enum ps_status rt862_bank_admit(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint64_t,uint64_t,const char *,uint32_t *);
 /* Architecture must first revoke/scrub mappings, lease and FP state. */
 enum ps_status rt862_bank_release(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint32_t,uint64_t,uint64_t);
-#ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
+#if (defined(STYLEOS_TEST_RUNTIME_SYSCALL_863) || defined(STYLEOS_OWNED_SHELL_865))
 /* Admission from a trusted loader's already audited initial context.
  * Fixed S846 address bounds; no user pointer, loader or mapping authority.
  * The scheduler is quiescent. Validate before publishing PID or context.

@@ -35,7 +35,7 @@ void acpi821_terminal(const struct boot_info *);
 void acpi823_terminal(const struct boot_info *);
 _Noreturn void pci816_terminal(const struct boot_info *);
 #endif
-#ifdef STYLEOS_TEST_PAGING
+#if (defined(STYLEOS_TEST_PAGING) || defined(STYLEOS_OWNED_SHELL_865))
 #include "styleos/paging.h"
 #endif
 
@@ -112,7 +112,7 @@ _Noreturn void kernel_main(const struct boot_info *info)
     pci816_terminal(info);
 #endif
 #endif
-#ifdef STYLEOS_TEST_PAGING
+#if (defined(STYLEOS_TEST_PAGING) || defined(STYLEOS_OWNED_SHELL_865))
     paging_experiment(evidence);
 #endif
 #ifdef STYLEOS_TEST_BOOTPOOL

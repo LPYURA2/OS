@@ -8,7 +8,7 @@ bool s865_fx_guest_bind(unsigned,const struct s846_root *,const struct s844_leas
 #ifdef STYLEOS_NATIVE_EXECUTOR_OBSERVERS
 bool s865_fx_guest_test_stale(unsigned,uint64_t,uint64_t);
 #endif
-#elif defined(STYLEOS_TEST_FOUR_GUEST_864)
+#elif (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
 bool s849_guest_init(const struct s846_root child[S846_ROOT_COUNT],const struct s844_lease leases[S846_ROOT_COUNT],uint64_t safe);
 #else
 bool s849_guest_init(const struct s846_root child[2],uint64_t safe);

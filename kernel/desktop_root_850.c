@@ -111,7 +111,7 @@ bool s850_desktop_build_guarded(const struct s842_root *base,const struct s850_g
 bool s850_desktop_build(const struct s842_root *b,const struct s850_gop_request *r,uint64_t (*t)[512],uint64_t pa,struct s850_desktop_root *o){return s850_desktop_build_guarded(b,r,0,t,pa,o);}
 bool s850_desktop_audit(const struct s842_root *b,const struct s850_gop_request *r,const struct s850_desktop_root *o){return s850_desktop_audit_guarded(b,r,0,o);}
 
-#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+#if (defined(STYLEOS_TEST_RUNTIME_ROOTS_861) || defined(STYLEOS_OWNED_SHELL_865))
 bool s850_desktop_audit_frozen_861(const struct s842_root *base,const struct s842_cache *cache,const struct s850_gop_plan *proof,const struct boot_memory_evidence *e,const struct s846_guard *guard,const struct s850_desktop_root *r){
  return base&&cache&&proof&&e&&guard&&r&&s842_audit(base,cache)&&audit(base,proof,guard,e,r);
 }

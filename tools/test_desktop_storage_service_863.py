@@ -285,8 +285,13 @@ def main():
                           's790_after_int3','s790_on_int3','s790_on_df','s790_guard_fault_ip','s790_int3','s790_isr3','s790_isr_df',
                           'arch_paging_activate','irq807_handler','irq807_terminal','irq842_terminal'}
         if forbidden_paging & linked:raise ValueError('linked historical paging or fault experiment '+str(sorted(forbidden_paging & linked)))
-        if {'-DSTYLEOS_TEST_PAGING_ROUNDTRIP=1','-DSTYLEOS_TEST_FRAME_GRANTS=1'} & set(compiler['flags']):
-            raise ValueError('historical paging flags in ordinary image')
+        from native_kernel_profile import SOURCES
+        if any(flag.startswith('-DSTYLEOS_TEST_') for flag in compiler['flags']):
+            raise ValueError('diagnostic compiler flag in ordinary kernel')
+        if compiler['sources']!=list(SOURCES)+sorted(test_sources):
+            raise ValueError('ordinary source manifest mismatch')
+        if {'s844_guest_run','s849_guest_finish'} & linked:
+            raise ValueError('historical arena/FP workload in ordinary kernel')
         test_sources={'tests/guest/native_catalog_865.c'} if args.native_catalog else set()
         expected_profile='native-catalog-acceptance' if args.native_catalog else 'owned-shell-candidate'
         if compiler.get('profile')!=expected_profile or set(compiler.get('test_sources',[]))!=test_sources:

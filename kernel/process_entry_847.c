@@ -21,7 +21,7 @@ bool s847_decode(const struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root
  uint64_t ist;
  if(f->vector==128){if(f->error)return false;ist=S846_IST;}
  else if(f->vector==14){if(!(f->error&4)||(f->error&~UINT64_C(7))||cr2>=LOW)return false;ist=S846_IST+3*P;}
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
  /* Only zero-error-code GP and UD in the currently admitted user ABI.
   * CR2 is meaningful only for PF; the trusted adapter supplies zero
   * for the other vectors. Both exceptions use the guarded fault IST. */

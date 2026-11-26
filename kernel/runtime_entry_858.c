@@ -7,7 +7,7 @@ static unsigned phase, bootstrap_phase;
 static uint64_t bootstrap_root;
 static uint64_t active_root;
 static struct rt858_expected started_contract;
-#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
+#if (defined(STYLEOS_TEST_RUNTIME_JOIN_861) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/runtime_tick_860.h>
 #endif
 static bool page(uint64_t v){return v && !(v&4095u) && v<BIT(47);}
@@ -142,7 +142,7 @@ bool rt864_shell_checkpoint(const struct rt858_live *v){
   * owned-root authority; a failed owned contract cannot fall back here. */
  return rt864_shell_boundary(v->root&~UINT64_C(4095),0);
 }
-#ifdef STYLEOS_TEST_RUNTIME_JOIN_861
+#if (defined(STYLEOS_TEST_RUNTIME_JOIN_861) || defined(STYLEOS_OWNED_SHELL_865))
 /* The owned-root adapter additionally requires its original descriptor and
  * stack contract. The common software boundary does not replace that proof. */
 struct dpr_service *rt861_dispatcher(const struct rt858_live *live){

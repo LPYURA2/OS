@@ -148,7 +148,7 @@ size_t pr_snapshot(const struct pr_table *t, struct pr_entry *out,
     return count;
 }
 
-#ifdef STYLEOS_TEST_RUNTIME_TICK_860
+#if (defined(STYLEOS_TEST_RUNTIME_TICK_860) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/runtime_tick_860.h>
 enum pr_status pr_tick_860(struct pr_table *t,uint32_t pid,uint64_t handle,uint64_t root)
 {

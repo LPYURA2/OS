@@ -147,7 +147,7 @@ enum ps_status rt862_bank_release(struct rt862_bank *b,struct dpr_service *d,uin
  return PS_OK;
 }
 
-#ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
+#if (defined(STYLEOS_TEST_RUNTIME_SYSCALL_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/user_copy_772.h>
 enum ps_status rt863_bank_admit_initial(struct rt862_bank *b,struct dpr_service *d,
  uint64_t live,unsigned slot,uint64_t handle,uint64_t child,const char *name,
@@ -173,7 +173,7 @@ enum ps_status rt863_bank_admit_initial(struct rt862_bank *b,struct dpr_service 
 }
 
 #if defined(STYLEOS_INTEGRATED_RUNTIME_864) || defined(STYLEOS_TEST_RUNTIME_IMAGE_ADMISSION_865)
-#ifndef STYLEOS_TEST_WIDE_ROOTS_864
+#if !(defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
 #error verified image admission requires lease-bound root metadata
 #endif
 enum ps_status rt865_bank_admit_image(struct rt862_bank *b,struct dpr_service *d,
@@ -318,7 +318,7 @@ enum ps_status rt863_coop_commit(struct rt862_bank *b,struct dpr_service *d,
 }
 #endif
 
-#ifdef STYLEOS_TEST_RUNTIME_SYSCALL_863
+#if (defined(STYLEOS_TEST_RUNTIME_SYSCALL_863) || defined(STYLEOS_OWNED_SHELL_865))
 /* Unified supervisor receipt, after the architecture has authenticated the
  * real trap, suspended FP, restored the safe root/stack and retired the IRQ.
  * A software receipt cannot itself prove any of those hardware facts. */
@@ -332,7 +332,7 @@ enum ps_status rt863_bank_event(struct rt862_bank *b,struct dpr_service *d,
   return rt862_bank_tick(b,d,t,live,r);
  }
  if(r->isr||r->eoi||(r->vector!=128&&r->vector!=14
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
      &&r->vector!=6&&r->vector!=13
 #endif
      )||(r->vector!=14&&cr2))return PS_EVIDENCE;

@@ -1,7 +1,7 @@
 #include "exit_boot.h"
 #include <styleos/arch.h>
 #include <styleos/boot_memory.h>
-#if defined(STYLEOS_TEST_DESKTOP_PREFLIGHT_850) || defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801) || defined(STYLEOS_TEST_CACHE_803) || defined(STYLEOS_TEST_CACHE_804)
+#if (defined(STYLEOS_TEST_DESKTOP_PREFLIGHT_850) || defined(STYLEOS_OWNED_SHELL_865)) || defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801) || defined(STYLEOS_TEST_CACHE_803) || defined(STYLEOS_TEST_CACHE_804)
 #include "desktop_display.h"
 #endif
 
@@ -49,7 +49,7 @@ _Noreturn void iommu810_terminal(const struct boot_info *);
 #ifdef STYLEOS_TEST_VTD_809
 _Noreturn void vtd809_terminal(const struct boot_info *);
 #endif
-#if defined(STYLEOS_TEST_IRQ_DELIVERY_807) || defined(STYLEOS_TEST_APIC_ROOT_842)
+#if defined(STYLEOS_TEST_IRQ_DELIVERY_807) || (defined(STYLEOS_TEST_APIC_ROOT_842) || defined(STYLEOS_OWNED_SHELL_865))
 void acpi806_capture(const struct efi_system_table *);
 _Noreturn void irq807_terminal(const struct boot_info *);
 #endif
@@ -104,7 +104,7 @@ EFI_STATUS desk_update_boot(EFI_HANDLE, struct efi_boot_services *,
                             const struct efi_loaded_image *, struct efi_guid *);
 #endif
 
-#if defined(STYLEOS_TEST_PHYSICAL_ARENA_844) || defined(STYLEOS_TEST_RUNTIME_ARENA_858)
+#if defined(STYLEOS_TEST_PHYSICAL_ARENA_844) || (defined(STYLEOS_TEST_RUNTIME_ARENA_858) || defined(STYLEOS_OWNED_SHELL_865))
 EFI_STATUS s844_reserve(struct efi_boot_services *);
 #endif
 static struct boot_range loaded_image;
@@ -169,10 +169,10 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
     status = desk_update_boot(image, table->boot_services, loaded, &loaded_image_guid);
     if (status != EFI_SUCCESS) return status;
 #endif
-#if defined(STYLEOS_TEST_DESKTOP_PREFLIGHT_850) || defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801) || defined(STYLEOS_TEST_CACHE_803) || defined(STYLEOS_TEST_CACHE_804)
+#if (defined(STYLEOS_TEST_DESKTOP_PREFLIGHT_850) || defined(STYLEOS_OWNED_SHELL_865)) || defined(STYLEOS_TEST_DESKTOP_DISPLAY) || defined(STYLEOS_DESKTOP_V0) || defined(STYLEOS_TEST_HW_PROBE_793) || defined(STYLEOS_TEST_PCI_PROBE_794) || defined(STYLEOS_TEST_PCI_APERTURE_795) || defined(STYLEOS_TEST_PCI_TOPOLOGY_796) || defined(STYLEOS_TEST_PCI_RANGE_799) || defined(STYLEOS_TEST_CACHE_800) || defined(STYLEOS_TEST_CACHE_801) || defined(STYLEOS_TEST_CACHE_803) || defined(STYLEOS_TEST_CACHE_804)
     desktop_capture_uefi_mode(table->boot_services);
 #endif
-#if defined(STYLEOS_TEST_ACPI_MADT_806) || defined(STYLEOS_TEST_IRQ_DELIVERY_807) || defined(STYLEOS_TEST_APIC_ROOT_842)
+#if defined(STYLEOS_TEST_ACPI_MADT_806) || defined(STYLEOS_TEST_IRQ_DELIVERY_807) || (defined(STYLEOS_TEST_APIC_ROOT_842) || defined(STYLEOS_OWNED_SHELL_865))
     acpi806_capture(table);
 #endif
 #if defined(STYLEOS_TEST_DMAR_808) || defined(STYLEOS_TEST_VTD_809)
@@ -199,7 +199,7 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE image, struct efi_system_table *table)
 #ifdef STYLEOS_TEST_PCI_REQUESTER_811
     pci811_capture(table);
 #endif
-#if defined(STYLEOS_TEST_PHYSICAL_ARENA_844) || defined(STYLEOS_TEST_RUNTIME_ARENA_858)
+#if defined(STYLEOS_TEST_PHYSICAL_ARENA_844) || (defined(STYLEOS_TEST_RUNTIME_ARENA_858) || defined(STYLEOS_OWNED_SHELL_865))
     status=s844_reserve(table->boot_services);
     if(status!=EFI_SUCCESS){arch_puts("STYLEOS S844 FAIL EFI reserve\n");arch_halt();}
 #endif

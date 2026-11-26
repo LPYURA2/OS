@@ -40,7 +40,7 @@ static bool bank_ok(const struct s849_bank *b){
   if(b->slot[i].live&&b->slot[j].live&&b->slot[i].root==b->slot[j].root)return false;
  return b->active<0||b->slot[b->active].live;
 }
-#ifdef STYLEOS_TEST_WIDE_FX_864
+#if (defined(STYLEOS_TEST_WIDE_FX_864) || defined(STYLEOS_OWNED_SHELL_865))
 bool s865_fx_open(struct s849_bank *b,const struct s849_caps *c){
  uint32_t mask;
  if(!region(b,sizeof *b,_Alignof(struct s849_bank))||!region(c,sizeof *c,_Alignof(struct s849_caps))||

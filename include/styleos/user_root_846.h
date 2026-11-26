@@ -10,11 +10,11 @@ struct s846_guard { uint64_t pa[3]; };
 #define S846_OWNER_A UINT32_C(0x8461)
 #define S846_OWNER_B UINT32_C(0x8462)
 #ifdef STYLEOS_KERNEL_CAPACITY_32
-#ifndef STYLEOS_TEST_WIDE_ROOTS_864
+#if !(defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
 #error expanded capacity requires generation-bound root metadata
 #endif
 #define S846_ROOT_COUNT 32u
-#elif defined(STYLEOS_TEST_WIDE_ROOTS_864)
+#elif (defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
 #define S846_ROOT_COUNT 4u
 #else
 #define S846_ROOT_COUNT 2u
@@ -24,7 +24,7 @@ struct s846_guard { uint64_t pa[3]; };
  * admitted the scratch table storage and serialized against allocation.
  * This module never activates a root or executes user instructions. */
 struct s846_root { struct pg_plan plan; struct pg_result built; bool ready;
-#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+#if (defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
  struct s844_lease lease;
 #endif
 };
@@ -37,14 +37,14 @@ bool s846_audit(const struct s842_root *,const struct s842_cache *,
  * arena pages must be represented by live leases. The caller serializes
  * safe-root operations and separately proves nonoverlap of root tables.
  * Historical full-set APIs below retain their original contract. */
-#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+#if (defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
 bool s865_root_build(const struct s842_root *,const struct s842_cache *,const struct s844_arena *,
  const struct s844_lease [S846_ROOT_COUNT],unsigned,const struct s846_guard *,uint64_t (*)[512],uint64_t,struct s846_root *);
 bool s865_root_audit(const struct s842_root *,const struct s842_cache *,const struct s844_arena *,
  const struct s844_lease [S846_ROOT_COUNT],unsigned,const struct s846_guard *,const struct s846_root *);
 #endif
 /* Verify all four detached roots in the wide host profile. */
-#ifdef STYLEOS_TEST_WIDE_ROOTS_864
+#if (defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
 bool s846_audit_set(const struct s842_root *,const struct s842_cache *,
  const struct s844_arena *,const struct s844_lease [S846_ROOT_COUNT],
  const struct s846_guard *,const struct s846_root [S846_ROOT_COUNT]);

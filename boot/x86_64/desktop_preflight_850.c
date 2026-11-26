@@ -6,29 +6,29 @@
 #ifdef STYLEOS_TEST_RUNTIME_IRQ_859
 #include <styleos/runtime_irq_859.h>
 #endif
-#ifdef STYLEOS_TEST_RUNTIME_ARENA_858
+#if (defined(STYLEOS_TEST_RUNTIME_ARENA_858) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/physical_arena_844.h>
 bool s845_extent(struct boot_range *);
 struct s844_arena *s845_arena(void);
 void s844_guest_run(uint64_t);
-#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+#if (defined(STYLEOS_TEST_DESKTOP_COLD_863) || defined(STYLEOS_OWNED_SHELL_865))
 bool s844_runtime_start(uint64_t);
 #define S863_INITIAL_ARENA_NEXT 1u
 #else
 #define S863_INITIAL_ARENA_NEXT 4u
 #endif
 #endif
-#ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
+#if (defined(STYLEOS_TEST_RUNTIME_ENTRY_858) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/runtime_entry_858.h>
 #include <styleos/desktop_process_runtime.h>
 #include <styleos/user_session_runtime.h>
 #include <styleos/native_window_channel.h>
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_FRAME_852
+#if (defined(STYLEOS_TEST_DESKTOP_FRAME_852) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/desktop_v0.h>
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/desktop_interactive_863.h>
-#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
+#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || (defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/rtc_runtime_863.h>
 #ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
 #include <styleos/pointer_clock_863.h>
@@ -47,7 +47,7 @@ static struct rtc_x86_854 rtc854;
 #include <styleos/pit_x86_855.h>
 static struct pit_x86_855 pit855;
 #endif
-#if defined(STYLEOS_TEST_STORAGE_BUSMASTER_857) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
+#if defined(STYLEOS_TEST_STORAGE_BUSMASTER_857) || (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/busmaster_857.h>
 #endif
 static _Alignas(4096) uint64_t tables[PG_TABLE_PAGES][512];
@@ -63,7 +63,7 @@ static uint32_t cfg(unsigned dev,unsigned fn,unsigned off){out32(0xcf8,cfgaddr(d
 static void cfgwrite(unsigned dev,unsigned fn,unsigned off,uint32_t v){out32(0xcf8,cfgaddr(dev,fn,off));out32(0xcfc,v);}
 static uint16_t cmd(unsigned dev,unsigned fn){out32(0xcf8,cfgaddr(dev,fn,4));return in16(0xcfc);}
 static void cmdwrite(unsigned dev,unsigned fn,uint16_t v){out32(0xcf8,cfgaddr(dev,fn,4));out16(0xcfc,v);}
-#if defined(STYLEOS_TEST_STORAGE_ATA_READ_857) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
+#if defined(STYLEOS_TEST_STORAGE_ATA_READ_857) || (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/ata_diag_857.h>
 struct ata857_live {uint64_t root;unsigned ops;uint32_t bar4,command_status;};
 static bool ata857_live_check(struct ata857_live *x){
@@ -72,7 +72,7 @@ static bool ata857_live_check(struct ata857_live *x){
  ++x->ops;
  const uint32_t bar=x->bar4?x->bar4:UINT32_C(0x60e1);
  if(bar!=UINT32_C(0x60e1)
-#if defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) && defined(STYLEOS_TEST_FOUR_GUEST_864)
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865)) && (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
     &&bar!=UINT32_C(0x6061)
 #endif
     )return false;
@@ -101,7 +101,7 @@ static bool ata857_write(void *ctx,unsigned reg,uint8_t v){
 static const struct ata857_ops ata857_io={ata857_alt,ata857_write,ata857_data};
 static void ata857_hex(const uint16_t *w){static const char hex[]="0123456789abcdef";for(unsigned i=0;i<ATA857_WORDS;i++){for(unsigned b=0;b<2;b++){unsigned v=(w[i]>>(8*b))&255u;arch_putc(hex[v>>4]);arch_putc(hex[v&15]);}}}
 #endif
-#if defined(STYLEOS_TEST_STORAGE_PIO_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
+#if defined(STYLEOS_TEST_STORAGE_PIO_RUNTIME_863) || (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 #include <styleos/ata_runtime_863.h>
 #include <styleos/storage_runtime_863.h>
 struct pio863 {struct ata857_live *live;struct ata_runtime_863 ata;bool writable;};
@@ -140,7 +140,7 @@ static bool pio_observe863(void *ctx,struct storage_obs_863 *o){
 static bool pio_read863(void *ctx,uint32_t lba,uint8_t *out){struct pio863*p=ctx;return ata_runtime_read_863(&p->ata,lba,out);}
 static bool pio_write863(void *ctx,uint32_t lba,const uint8_t *in){
  struct pio863*p=ctx;
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  /* Four legacy note slots, two nine-sector banks per slot; never LBA 0. */
  return p->writable&&lba>=1&&lba<=72&&ata_runtime_write_863(&p->ata,lba,in);
 #else
@@ -185,7 +185,7 @@ static bool capture(const struct desktop_surface *s,struct pci794_bar *out,uint3
  out32(0xcf8,old);if(in32(0xcf8)!=old||!ok)return false;
  *out=bar;*mask=size_mask;*dev_out=dev;*fn_out=fn;*command_out=before;return true;
 }
-#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+#if (defined(STYLEOS_TEST_DESKTOP_SWITCH_851) || defined(STYLEOS_OWNED_SHELL_865))
 /* Terminal QEMU-only experiment. Transition IDT has no IST dependency and
  * uses the common CPL0 stack until the new TSS is loaded. It never returns
  * from an unexpected exception, and does not claim general NMI/DF recovery. */
@@ -213,13 +213,13 @@ static bool same_cache(const struct s842_cache *c){if(read_msr(0x277)!=c->pat||r
 static bool identity(uint64_t va,unsigned rights){struct pg_lookup x;return pg_lookup(&composed.plan,va,&x)==PG_OK&&x.pa==va&&x.flags==rights;}
 static bool absent(uint64_t va){struct pg_lookup x;return pg_lookup(&composed.plan,va,&x)==PG_RANGE;}
 static uint64_t bytes64(const unsigned char *p){uint64_t v=0;for(unsigned i=0;i<8;i++)v|=(uint64_t)p[i]<<(8*i);return v;}
-#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+#if (defined(STYLEOS_TEST_RUNTIME_ROOTS_861) || defined(STYLEOS_OWNED_SHELL_865))
 #include "runtime_roots_861.inc"
 #ifdef STYLEOS_OWNED_SHELL_865
 #include "native_runtime_865.inc"
 #endif
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
 static const struct dpr_service *shell_d863;
 static struct s842_cache shell_cache863;
 static uint64_t shell_root863;
@@ -236,7 +236,7 @@ static uint64_t pump_arena_base863;
 #ifdef STYLEOS_TEST_DESKTOP_COLD_TASKS_863
 static bool task_requested863;
 static unsigned task_batches863;
-#if defined(STYLEOS_TEST_RUNTIME_MIXED_863) && defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) && !defined(STYLEOS_INTEGRATED_RUNTIME_864)
+#if defined(STYLEOS_TEST_RUNTIME_MIXED_863) && (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865)) && !defined(STYLEOS_INTEGRATED_RUNTIME_864)
 /* Only the explicit S864 mixed cold-storage fixture. No new disk authority. */
 #define S864_INTERLEAVE 1
 static unsigned io_gate864;
@@ -273,7 +273,7 @@ static bool shell_fixture863(void){
 void s863_shell_guard(void){
  if(!shell_root863||read_cr3()!=shell_root863||(flags()&0x200)||dpr_global_state()!=shell_d863)fail("863-shell-root");
 }
-#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
+#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || (defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 /* Only this opt-in Q35/TCG diagnostic owns CMOS. The runner fixes one vCPU;
  * APs are not started. No other CMOS backend is linked. As in S854 we
  * establish a NEW masked-NMI index shadow, never infer inherited port 70.
@@ -410,7 +410,7 @@ static void rtc_sample863(void)
  field("minute",t.min);field("second",t.sec);field("shadow",rtc_runtime863.owner.shadow);arch_putc('\n');
 }
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 /* Only admitted Q35 fixture. Leave caller outputs unchanged on refusal. */
 bool s863_shell_clock(unsigned *hour,unsigned *minute){
  static bool displayed;
@@ -440,7 +440,7 @@ bool s863_shell_clock(unsigned *hour,unsigned *minute){
 }
 #endif
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 static _Alignas(4096) union {
  struct {struct ata857_live live;struct pio863 pio;struct storage_runtime_863 store;bool ready;} s;
  unsigned char page[4096];
@@ -452,7 +452,7 @@ static struct bm857_snapshot disk_snapshot863(uint32_t pinned){
  struct bm857_snapshot v={.root=read_cr3(),.id=cfg(5,0,0),.class_revision=cfg(5,0,8),.command_status=cfg(5,0,4),.bar4=cfg(5,0,0x20)};
  out32(0xcf8,old);
  if(in32(0xcf8)!=old||v.id!=0x70108086u||v.class_revision!=0x01018000u||(v.bar4!=0x60e1u
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
     &&v.bar4!=0x6061u
 #endif
     )||(pinned&&v.bar4!=pinned))fail("863-shell-storage-pci");
@@ -552,7 +552,7 @@ void s863_storage_document(bool saved,unsigned slot,const char *data,size_t byte
   if(!saved||slot!=1||bytes!=1||data[0]!='a'||live_phase863!=1||task_batches863||
      shell_d863->dispatcher.dispatches!=1||shell_d863->dispatcher.current!=-1||
      !s844_count(live_arena863,&used)||used!=3*S863_TASKS_PER_BATCH||
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
      pr_snapshot(pr_global(),0,0,true)!=4||ws_snapshot(ws_global(),0,0)!=4||
 #else
      pr_snapshot(pr_global(),0,0,true)!=1||ws_snapshot(ws_global(),0,0)!=1||
@@ -594,7 +594,7 @@ static void shell_boundary863(void){
   return;
  }
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+#if (defined(STYLEOS_TEST_DESKTOP_COLD_863) || defined(STYLEOS_OWNED_SHELL_865))
  unsigned dispatches=0,next=1,generation=1;
 #if defined(STYLEOS_TEST_DESKTOP_COLD_TASKS_863) && !defined(STYLEOS_OWNED_SHELL_865)
  if(live_phase863==2){dispatches=S863_DISPATCHES_PER_BATCH*task_batches863;next=1+S863_TASKS_PER_BATCH*task_batches863;generation=1+S863_TASKS_PER_BATCH*task_batches863;}
@@ -607,7 +607,7 @@ static void shell_boundary863(void){
  if(live_phase863==1){
   struct rt858_live v=capture861();
   if(rt861_dispatcher(&v)!=shell_d863||!same_cache(&shell_cache863)||
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
      nwc_port_count(nwc_global())!=ws_snapshot(ws_global(),0,0)
 #else
      nwc_port_count(nwc_global())
@@ -675,7 +675,7 @@ bool s863_request_tasks(void){
  s863_shell_guard();
  shell_boundary863();
  bool accept=live_phase863!=1&&!task_requested863&&task_batches863<S863_LAUNCH_LIMIT;
- #if defined(STYLEOS_TEST_FOUR_GUEST_864) && (defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_INTEGRATED_RUNTIME_864))
+ #if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865)) && (defined(STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW) || defined(STYLEOS_INTEGRATED_RUNTIME_864))
  /* Reserve sufficient registry serial space before admitting an entire
   * four-context batch. Never begin a workload that can exhaust it mid-flight. */
  accept=accept&&pr_global()->change_serial<=UINT32_MAX-128u;
@@ -745,7 +745,7 @@ __attribute__((noinline)) void s863_shell_pump(void){
   const struct pr_entry *waiting=pr_find(pr_global(),1);
   if(io_gate864||done||after!=1||used!=3*S863_TASKS_PER_BATCH||!waiting||waiting->state!=PR_READY||
      waiting->cpu_ticks||shell_d863->dispatcher.current!=-1||
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
      pr_snapshot(pr_global(),0,0,true)!=4||ws_snapshot(ws_global(),0,0)!=4)
 #else
      pr_snapshot(pr_global(),0,0,true)!=1||ws_snapshot(ws_global(),0,0)!=1)
@@ -861,20 +861,20 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #else
  arch_puts("STYLEOS S851 POLICY own-root=yes descriptors-live=yes ist-mapped=yes firmware-return=no probes=absent\n");
 #endif
-#ifdef STYLEOS_TEST_RUNTIME_ARENA_858
+#if (defined(STYLEOS_TEST_RUNTIME_ARENA_858) || defined(STYLEOS_OWNED_SHELL_865))
  /* Reuse the existing EFI reservation and full S842/S850 tree audits.
   * This checks the live owned root before touching any external pages. */
  struct boot_range arena858;
  if(!s845_extent(&arena858)||arena858.end!=arena858.start+S844_BYTES||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-context");
  for(uint64_t a=arena858.start;a<arena858.end;a+=4096)if(!identity(a,PG_WRITE))fail("858-arena-map");
-#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+#if (defined(STYLEOS_TEST_DESKTOP_COLD_863) || defined(STYLEOS_OWNED_SHELL_865))
  if(!s844_runtime_start(target))fail("863-cold-arena");
 #else
  s844_guest_run(target);
 #endif
  if(!s845_arena()||s845_arena()->base!=arena858.start||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-live");
 #endif
-#ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
+#if (defined(STYLEOS_TEST_RUNTIME_ENTRY_858) || defined(STYLEOS_OWNED_SHELL_865))
  /* Initial service bootstrap only, after hardware proof. No legacy device
   * initialization, tasks, IRQ enabling or production-root authorization. */
  struct rt858_expected expected858={p->old_root,target,gdt,idt,p->evidence->live.stack.start,p->evidence->live.stack.end,limit,selector,cs};
@@ -884,7 +884,7 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(!identity((uintptr_t)rt858_start,PG_EXEC)||!same_cache(cache)||!rt858_start(&expected858,&live858)||!rt858_ready(target)||read_cr3()!=target||(flags()&0x200))fail("858-runtime-entry");
  arch_puts("STYLEOS S858 RUNTIME");field("root",read_cr3());field("old",p->old_root);field("gdt",live858.gdt);field("idt",live858.idt);field("tr",live858.tr);field("cs",live858.cs);field("rsp",live858.rsp);field("cr0",live858.cr0);field("cr4",live858.cr4);field("efer",live858.efer);field("flags",live858.rflags);field("gdt-limit",live858.gdt_limit);field("idt-limit",live858.idt_limit);field("safe-root",dpr_global_state()->dispatcher.safe_root);field("processes",pr_snapshot(pr_global(),0,0,true));field("windows",ws_snapshot(ws_global(),0,0));field("session-next",usr_global()->next_session);field("selected",usr_global()->selected_session);field("ports",nwc_port_count(nwc_global()));arch_putc('\n');
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_FRAME_852
+#if (defined(STYLEOS_TEST_DESKTOP_FRAME_852) || defined(STYLEOS_OWNED_SHELL_865))
  /* Bound the diagnostic workload to the admitted standard VGA mode. */
  if(s->width!=1280||s->height!=800||s->stride!=1280||s->format!=DESKTOP_BGR_BYTES||
     s->bytes!=UINT64_C(4096000)||composed.gop.mapping.bytes<s->bytes||
@@ -901,21 +901,21 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  if(read_cr3()!=target||flags()&0x200||!same_cache(cache))fail("852-frame-readback");
  arch_puts("STYLEOS S852 FRAME");field("root",target);field("width",s->width);field("height",s->height);field("writes",writes);field("fnv",hash);field("first",fb[0]);field("last",fb[writes-1]);arch_putc('\n');
  arch_puts("STYLEOS S852 POLICY first-frame=yes input=no storage=no app-admission=no production-cr3=deny\n");
-#ifdef STYLEOS_TEST_RUNTIME_ENTRY_858
+#if (defined(STYLEOS_TEST_RUNTIME_ENTRY_858) || defined(STYLEOS_OWNED_SHELL_865))
  if(!rt858_ready(read_cr3())||(flags()&0x200)||!same_cache(cache))fail("858-runtime-frame");
  arch_puts("STYLEOS S858 POLICY runtime-services=yes empty-registry=yes frame=yes irq=no app-admission=no storage=no production-cr3=deny\n");
-#ifdef STYLEOS_TEST_RUNTIME_ARENA_858
+#if (defined(STYLEOS_TEST_RUNTIME_ARENA_858) || defined(STYLEOS_OWNED_SHELL_865))
  struct s844_arena *allocator858=s845_arena();unsigned used858;
  if(!allocator858||allocator858->base!=arena858.start||allocator858->next!=S863_INITIAL_ARENA_NEXT||!s844_count(allocator858,&used858)||used858||read_cr3()!=target||(flags()&0x200)||!same_cache(cache))fail("858-arena-after");
  for(uint64_t a=arena858.start;a<arena858.end;a+=4096)if(!identity(a,PG_WRITE))fail("858-arena-after-map");
  for(uint64_t a=arena858.start;a<arena858.end;a++)if(*(volatile const unsigned char *)(uintptr_t)a)fail("858-arena-after-zero");
  arch_puts("STYLEOS S858 ARENA");field("root",target);field("base",arena858.start);field("pages",S844_PAGES);field("used",used858);field("next",allocator858->next);field("zero",1);arch_putc('\n');
  arch_puts("STYLEOS S858 ARENA-POLICY bounded-efi=yes runtime-services=yes frame=yes reclaim=no irq=no dma-grant=no production-cr3=deny\n");
-#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
-#if !defined(STYLEOS_TEST_DESKTOP_LIVE_863) && !defined(STYLEOS_TEST_DESKTOP_COLD_863)
+#if (defined(STYLEOS_TEST_RUNTIME_ROOTS_861) || defined(STYLEOS_OWNED_SHELL_865))
+#if !defined(STYLEOS_TEST_DESKTOP_LIVE_863) && !(defined(STYLEOS_TEST_DESKTOP_COLD_863) || defined(STYLEOS_OWNED_SHELL_865))
  guest861(p,cache,guard,allocator858,s,hash);
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
  /* Existing shell only after two actual lifecycle rounds on this same root.
   * Storage/clock/reset are explicitly denied. No new task ABI or DMA grant. */
  if(!shell_fixture863()||!identity((uintptr_t)desktop_v0_run,PG_EXEC)||!identity((uintptr_t)desk_input_init,PG_EXEC)||!identity((uintptr_t)desk_input_next,PG_EXEC))fail("863-shell-admission");
@@ -930,24 +930,24 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #endif
 #endif
  shell_boundary863();
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  disk_admit863();
 #endif
-#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
+#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || (defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  rtc_admit863();
 #endif
-#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+#if (defined(STYLEOS_TEST_DESKTOP_COLD_863) || defined(STYLEOS_OWNED_SHELL_865))
  arch_puts("STYLEOS S863B COLD");field("root",target);field("dispatches",shell_d863->dispatcher.dispatches);field("arena-next",allocator858->next);
  field("processes",pr_snapshot(pr_global(),0,0,true));field("windows",ws_snapshot(ws_global(),0,0));arch_putc('\n');
 #endif
  arch_puts("STYLEOS S863 ADMIT");field("root",target);field("lpc",0x29188086);field("dispatches",shell_d863->dispatcher.dispatches);arch_putc('\n');
 #ifdef STYLEOS_TEST_DESKTOP_AUTONOMOUS_863
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
-#elif defined(STYLEOS_TEST_DESKTOP_COLD_863)
+#elif (defined(STYLEOS_TEST_DESKTOP_COLD_863) || defined(STYLEOS_OWNED_SHELL_865))
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=legacy-fixture clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
-#elif defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863)
+#elif (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=legacy-fixture clock=no reset=no dma-grant=no production-cr3=deny\n");
-#elif defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
+#elif (defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=rtc-service reset=no dma-grant=no production-cr3=deny\n");
 #else
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
@@ -1205,15 +1205,15 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 
 extern bool s850_read_inherited_entry(void *,uint64_t,uint16_t,uint64_t *);
 _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cache *cache,struct pg_experiment *p,const struct s846_guard *guard,uint64_t gdt,uint64_t idt,uint64_t tss,uint64_t rsp0
-#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+#if (defined(STYLEOS_TEST_DESKTOP_SWITCH_851) || defined(STYLEOS_OWNED_SHELL_865))
 ,uint16_t gdt_limit,uint16_t tss_selector
 #endif
 ){
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
  if(flags()&0x200)fail("863-platform-context");
 #endif
  if(!p||!p->evidence||!guard||read_cr3()!=p->old_root||(flags()&0x200)||arch_paging_attest_image_writable(p,(uintptr_t)tables,sizeof tables)!=PG_OK)fail("context-storage");
-#ifdef STYLEOS_TEST_DESKTOP_INTERACTIVE_863
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
  if(!shell_fixture863())fail("863-platform");
 #ifdef STYLEOS_DESKTOP_OWNED_ROOT_PREVIEW
  if(!preview_single_cpu863())fail("863-platform-cpu");
@@ -1227,7 +1227,7 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
  if(!capture(surface,&bar,&mask,&dev,&fn,&command))fail("vga-bar");
  struct s850_gop_request req={boot,p->evidence,surface,&bar,mask,0,cache,p->old_root,s850_read_inherited_entry,p};
  if(!s850_desktop_build_guarded(base,&req,guard,tables,(uintptr_t)tables,&composed)||!s850_desktop_audit_guarded(base,&req,guard,&composed))fail("tree");
-#ifdef STYLEOS_TEST_RUNTIME_ROOTS_861
+#if (defined(STYLEOS_TEST_RUNTIME_ROOTS_861) || defined(STYLEOS_OWNED_SHELL_865))
  if(!preflight861(p,base,&req))fail("861-preflight");
 #endif
  const uint64_t desc[]={gdt,idt,tss,rsp0};
@@ -1235,12 +1235,12 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
   struct pg_lookup x;
   if(arch_paging_attest_image_writable(p,desc[i],4096)!=PG_OK||pg_lookup(&composed.plan,desc[i],&x)!=PG_OK||x.pa!=desc[i]||x.flags!=PG_WRITE)fail("descriptor-closure");
  }
-#ifdef STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863
+#if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  if(disk_preflight863||arch_paging_attest_image_writable(p,(uintptr_t)&disk863,sizeof disk863)!=PG_OK||
     !identity((uintptr_t)&disk863,PG_WRITE)||!identity((uintptr_t)&disk863+4095,PG_WRITE))fail("863-shell-storage-page");
  disk_preflight863=true;
 #endif
-#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863)
+#if defined(STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863) || (defined(STYLEOS_TEST_DESKTOP_CLOCK_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  /* The old walker is legal ONLY here, with the inherited CR3 active.
   * The detached plan has already passed the guarded-tree audit. */
  if(rtc_preflight863||
@@ -1262,7 +1262,7 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
  arch_puts("STYLEOS S850 ROOT");field("inherited",p->old_root);field("live",read_cr3());field("detached",composed.built.root);field("source",base->built.root);field("used",composed.built.used);field("pages",composed.gop.pages);field("pat-index",composed.gop.pat_index);field("cache-bits",composed.gop.cache_bits);field("pat",cache->pat);arch_putc('\n');
  arch_puts("STYLEOS S850 DESCRIPTORS");field("gdt",gdt);field("idt",idt);field("tss",tss);field("rsp0",rsp0);field("ist1",guard->pa[0]);field("ist2",guard->pa[1]);field("ist3",guard->pa[2]);arch_putc('\n');
  arch_puts("STYLEOS S850 POLICY bar-restored=yes detached-audited=yes descriptors-staged=yes desktop-root-active=no framebuffer-write=no production-cr3=deny\n");
-#ifdef STYLEOS_TEST_DESKTOP_SWITCH_851
+#if (defined(STYLEOS_TEST_DESKTOP_SWITCH_851) || defined(STYLEOS_OWNED_SHELL_865))
  s851_switch(p,cache,guard,surface,gdt,idt,tss,rsp0,gdt_limit,tss_selector);
 #else
  out32(0xf4,0x10);arch_halt();

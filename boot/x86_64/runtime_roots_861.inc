@@ -23,7 +23,7 @@ static bool boundary861(const struct dpr_service *d,const struct s842_cache *cac
   d->dispatcher.dispatches<=S863_DISPATCHES_PER_BATCH*S863_LAUNCH_LIMIT&&!pr_snapshot(pr_global(),0,0,true)&&!ws_snapshot(ws_global(),0,0))||
 #endif
  ((d->dispatcher.dispatches==
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
  26 || d->dispatcher.dispatches==52 || d->dispatcher.dispatches==78 || d->dispatcher.dispatches==104
 #elif defined(STYLEOS_TEST_RUNTIME_MIXED_863)
  12
@@ -72,7 +72,7 @@ static bool user_audit861(void *opaque){
  const struct user_audit861 *a=opaque;
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
  return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt865_roots_audit_sparse_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,children861);
-#elif defined(STYLEOS_TEST_FOUR_GUEST_864)
+#elif (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
  return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt864_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,children861);
 #else
  return read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(a->cache)&&rt861_roots_audit_frozen(base861,a->cache,&frozen861,a->e,a->arena,a->leases,a->guard,&composed,&children861[0],&children861[1]);
@@ -113,7 +113,7 @@ extern void s863_coop_reap(uint64_t,const struct s844_lease [2]);
 #endif
 #endif
 #endif
-#ifdef STYLEOS_TEST_FOUR_GUEST_864
+#if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
 static bool
 #else
@@ -219,7 +219,7 @@ guest861(struct pg_experiment *p,const struct s842_cache *cache,const struct s84
 #ifdef STYLEOS_TEST_DESKTOP_PUMP_863
 static __attribute__((noinline)) bool
 #else
-#ifdef STYLEOS_TEST_DESKTOP_COLD_863
+#if (defined(STYLEOS_TEST_DESKTOP_COLD_863) || defined(STYLEOS_OWNED_SHELL_865))
 static __attribute__((unused)) void
 #else
 static void

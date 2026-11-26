@@ -645,7 +645,7 @@ enum pg_error arch_paging_attest_image_writable(struct pg_experiment *x,
     if(x->result.error!=PG_OK||!x->result.root||x->result.root==s->cr3)return PG_PLATFORM;
     return PG_OK;
 }
-#ifdef STYLEOS_TEST_DESKTOP_PREFLIGHT_850
+#if (defined(STYLEOS_TEST_DESKTOP_PREFLIGHT_850) || defined(STYLEOS_OWNED_SHELL_865))
 /* Same-boot inherited walker, restricted to the already validated old root.
  * Trusts OVMF's low identity table-read contract, not arbitrary memory. */
 bool s850_read_inherited_entry(void *ctx,uint64_t pa,uint16_t slot,uint64_t *out){
