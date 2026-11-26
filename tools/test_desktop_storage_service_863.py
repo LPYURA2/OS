@@ -279,9 +279,11 @@ def main():
         if '-DSTYLEOS_OWNED_SHELL_865=1' not in compiler['flags'] or not compiler['sources'] or set(compiler['sources'])!=set(compiler['source_sha256']):raise ValueError('owned shell compiler manifest')
         excluded={'boot/x86_64/user_preemption_848.c','boot/x86_64/process_trial_847.c','tests/guest/workload_865.c',
                   'kernel/frame_grant_experiment.c','kernel/kernel_mapping_inventory.c',
-                  'kernel/kernel_dependency_inventory.c','kernel/descriptor_state_781.c','kernel/desktop_grant_bridge.c'}
+                  'kernel/kernel_dependency_inventory.c','kernel/descriptor_state_781.c','kernel/desktop_grant_bridge.c',
+                  'kernel/kernel_closure_audit.c','boot/x86_64/irq_delivery_807.c'}
         forbidden_paging={'fg_experiment_run','styleos_grant_tables','styleos_grant_users','arch_paging_inventory_inherited','arch_paging_restore',
-                          's790_after_int3','s790_on_int3','s790_on_df','s790_guard_fault_ip','s790_int3','s790_isr3','s790_isr_df'}
+                          's790_after_int3','s790_on_int3','s790_on_df','s790_guard_fault_ip','s790_int3','s790_isr3','s790_isr_df',
+                          'arch_paging_activate','irq807_handler','irq807_terminal','irq842_terminal'}
         if forbidden_paging & linked:raise ValueError('linked historical paging or fault experiment '+str(sorted(forbidden_paging & linked)))
         if {'-DSTYLEOS_TEST_PAGING_ROUNDTRIP=1','-DSTYLEOS_TEST_FRAME_GRANTS=1'} & set(compiler['flags']):
             raise ValueError('historical paging flags in ordinary image')
@@ -293,7 +295,7 @@ def main():
         if (build/'x86_64/native_catalog_digest.h').exists()!=args.native_catalog:raise ValueError('catalog digest leaked or missing')
         if '-DSTYLEOS_KERNEL_CAPACITY_32=1' not in compiler['flags'] or '-DSTYLEOS_NATIVE_EXECUTOR_OBSERVERS=1' in compiler['flags']:raise ValueError('native capacity/observer flag')
         if ('-DSTYLEOS_NATIVE_PINNED_CATALOG=1' in compiler['flags'])!=args.native_catalog:raise ValueError('catalog policy flag')
-        if 'boot/x86_64/native_executor_865.c' not in compiler['sources']:raise ValueError('native executor source')
+        if not {'boot/x86_64/native_executor_865.c','arch/x86_64/boot_failstop.S'}<=set(compiler['sources']):raise ValueError('native executor/failstop source')
         if excluded.intersection(compiler['sources']) or {s for s in compiler['sources'] if s.startswith('tests/')}!=test_sources:
             raise ValueError('owned shell linked diagnostic translation units')
         if any((build/'x86_64').glob('external-workload-*')) or (build/'x86_64/external_workload_865.h').exists():

@@ -66,7 +66,9 @@ enum pg_error arch_paging_prepare(struct pg_experiment *);
 #ifdef STYLEOS_PROVISIONED_STORAGE_864
 enum pg_error arch_paging_finish_owned_prepare_864(struct pg_experiment *);
 #endif
+#ifndef STYLEOS_OWNED_SHELL_865
 enum pg_error arch_paging_activate(struct pg_experiment *);
+#endif
 #ifdef STYLEOS_TEST_FRAME_GRANTS
 /* Actual inherited CR3 walk; image-owned, WB, present, writable identity only.
  * No guest-owned page mapping or general physical-memory allocator. */

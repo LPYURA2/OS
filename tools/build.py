@@ -797,8 +797,11 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
             'kernel/kernel_dependency_inventory.c',
             'kernel/descriptor_state_781.c',
             'kernel/desktop_grant_bridge.c',
+            'kernel/kernel_closure_audit.c',
+            'boot/x86_64/irq_delivery_807.c',
         }
         sources = [s for s in sources if s not in excluded]
+        sources += ['arch/x86_64/boot_failstop.S']
         expected_tests = {'tests/guest/native_catalog_865.c'} if native_catalog_sha256 is not None else set()
         if {s for s in sources if s.startswith('tests/')} != expected_tests:
             raise ValueError('unexpected test translation unit in owned shell')

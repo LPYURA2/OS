@@ -71,6 +71,7 @@ static void read_descriptors(struct x86_state *s)
     __asm__ volatile("sidt %0" : "=m"(s->idtr));
     __asm__ volatile("mov %%cs, %0" : "=r"(s->cs));
 }
+#ifndef STYLEOS_OWNED_SHELL_865
 static void switch_root(uint64_t root, uint64_t cr0, uint64_t cr4)
 {
     /* PCIDE=0 was required. Clearing PGE invalidates global translations;
@@ -82,6 +83,7 @@ static void switch_root(uint64_t root, uint64_t cr0, uint64_t cr4)
                      :: "r"(no_global), "r"(write_protected), "r"(root),
                         "r"(cr4) : "memory");
 }
+#endif
 #else
 /* Host tests exercise only the pure mode, descriptor and old-walk checks.
  * These stubs cannot activate a host translation root. */
@@ -93,8 +95,10 @@ static uint64_t read_msr(uint32_t n) { (void)n; return 0; }
 static void cpuid(uint32_t n, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d)
 { (void)n; *a = *b = *c = *d = 0; }
 static void read_descriptors(struct x86_state *s) { (void)s; }
+#ifndef STYLEOS_OWNED_SHELL_865
 static void switch_root(uint64_t r, uint64_t c0, uint64_t c4)
 { (void)r; (void)c0; (void)c4; }
+#endif
 #endif
 
 static int inside(uint64_t start, uint64_t bytes, struct boot_range range)
@@ -423,6 +427,7 @@ enum pg_error arch_paging_finish_owned_prepare_864(struct pg_experiment *x)
 }
 #endif
 
+#ifndef STYLEOS_OWNED_SHELL_865
 enum pg_error arch_paging_activate(struct pg_experiment *x)
 {
     struct x86_state *s = &saved;
@@ -465,6 +470,8 @@ enum pg_error arch_paging_activate(struct pg_experiment *x)
     arch_putc('\n');
     return PG_OK;
 }
+
+#endif /* historical RWX activation */
 
 #ifdef STYLEOS_TEST_FRAME_GRANTS
 /* Read-only hardware inventory on the *restored inherited* CR3. This walks
