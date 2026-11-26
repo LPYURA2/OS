@@ -4,7 +4,17 @@ import hashlib,re,struct,time
 from irq_trace_accept_859 import HEADER
 from runtime_mixed_863_verify import row
 
-def provision_catalog(path,*,timer_load=False,bad_rsp=False):
+# One bad process and 31 independently admitted peers per boot.
+# Payloads start after the known-good yield at offset 13.
+FAULT_PROBES={
+    'divide':(b'\x31\xc9\xf7\xf1',0,0x1000000f,0,0),
+    'execute-nx':(b'\xb8\x00\x00\x00\x11\xff\xe0',14,0x11000000,0x15,0x11000000),
+    'single-step':(b'\x9c\x48\x81\x0c\x24\x00\x01\x00\x00\x9d\x90\x0f\x0b',1,0x10000018,0,0),
+    'forbidden-int':(b'\xcd\x81',13,0x1000000d,0x40a,0),
+}
+
+def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None):
+    if fault_probe and (timer_load or bad_rsp or fault_probe not in FAULT_PROBES):raise ValueError('separate fault probe')
     if timer_load and bad_rsp:raise ValueError("separate audit workload")
     catalog=bytearray(2048)
     struct.pack_into('<8sII',catalog,0,b'STYLNAT1',1,32)
@@ -17,7 +27,9 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False):
             # All 32 residents must suffer real LAPIC preemption before yield.
             if timer_load:code+=b'\xb9'+struct.pack('<I',100_000_000)+b'\xff\xc9\x75\xfc'
             code+=b'\xb8\x01\x00\x00\x00\xcd\x80'
-            if bad_rsp and i<3:
+            if fault_probe and i==0:
+                code+=FAULT_PROBES[fault_probe][0]+b'\x0f\x0b'
+            elif bad_rsp and i<3:
                 # After one normal yield, set an invalid RSP, then exercise
                 # UD, INT80 and real timer separately. No forced interrupt.
                 code+=b'\xbc'+struct.pack('<I',0x12000000)
@@ -44,7 +56,7 @@ def wait_native_empty(proc,serial,seconds):
         time.sleep(.03)
     raise RuntimeError('native completion timeout')
 
-def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False):
+def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False,fault_probe=None):
     root=obs['active']['root']
     def records(tag,keys):
         return [row(x,tag,keys) for x in lines if x.startswith(tag+b' ')]
@@ -75,9 +87,10 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False):
     for event in events:
         i=event['slot']
         malformed=bad_rsp and i in (0,1,2) and event['sp']==0x12000000
-        if not 0<=i<32 or event['pid']!=i+1 or event['root']!=roots[i] or event['sp']!=(0x12000000 if malformed else 0x11001000) or event['flags']&0x202!=0x202 or event['error']:raise ValueError('native event identity')
+        probe_fault=bool(fault_probe and i==0 and event['vector']==FAULT_PROBES[fault_probe][1])
+        if not 0<=i<32 or event['pid']!=i+1 or event['root']!=roots[i] or event['sp']!=(0x12000000 if malformed else 0x11001000) or event['flags']&0x202!=0x202 or event['error']!=(FAULT_PROBES[fault_probe][3] if probe_fault else 0):raise ValueError('native event identity')
         expected_state=1 if event['vector']==0x50 or event['vector']==128 and event['rax']==1 else 4 if event['vector']==128 and event['rax']==2 else 5 if event['vector']==6 else -1
-        if malformed:expected_state=5
+        if malformed or probe_fault:expected_state=5
         if event['state']!=expected_state:raise ValueError('native lifecycle state')
         per[i].append(event)
     if [x['slot'] for x in events[:32]]!=list(range(32)):raise ValueError('first round fairness')
@@ -99,7 +112,14 @@ def verify_catalog(lines,trace,obs,*,timer_load=False,bad_rsp=False):
             if i==1:expected.append((128,0x10000014,0))
             terminal=seq[-1]
             if (terminal['vector'],terminal['rip'],terminal['rax'],terminal['sp'],terminal['state'])!=((6,128,0x50)[i],(0x10000012,0x10000014,0x10000012)[i],0,0x12000000,5):raise ValueError('malformed RSP terminal evidence')
+        if fault_probe and i==0:
+            _,vector,rip,error,rax=FAULT_PROBES[fault_probe]
+            expected=[(128,0x1000000d,1),(vector,rip,rax)]
+            if seq[-1]['error']!=error or seq[-1]['state']!=5:raise ValueError('probe terminal evidence')
         if actual!=expected:raise ValueError('native yield/terminal '+str((i,actual)))
+    if fault_probe:
+        fault_index=next(j for j,x in enumerate(events) if x['slot']==0 and x['state']==5)
+        if not any(x['slot']!=0 and x['state']==4 for x in events[fault_index+1:]):raise ValueError('no peer exit after probe fault')
     if bad_rsp:
         bad_index=max(j for j,x in enumerate(events) if x['slot']<3 and x['state']==5)
         if not any(x['slot']>=3 and x['state']==4 for x in events[bad_index+1:]):raise ValueError('no surviving process after malformed RSP')
