@@ -65,6 +65,7 @@ enum ps_status s865_native_launch(const struct rt865_launch_request *request,uin
  *pid=assigned;
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  arch_puts("STYLEOS NATIVE ADMIT");field("slot",id);field("pid",assigned);field("gen",native_leases[id].generation);field("root",native_roots[id].built.root);field("entry",image.entry);arch_putc('\n');
+ arch_puts("STYLEOS NATIVE LEASE");field("pid",assigned);field("gen",native_leases[id].generation);field("pa",native_leases[id].pa);field("pages",native_leases[id].pages);arch_putc('\n');
 #endif
  return PS_OK;
 }

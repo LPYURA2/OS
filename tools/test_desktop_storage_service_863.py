@@ -214,7 +214,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--extended-desktop',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--extended-desktop',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
@@ -227,6 +227,7 @@ def main():
     if args.native_bad_rsp and (not args.native_catalog or args.native_timer_load):p.error('malformed RSP requires separate catalog')
     if args.native_fault_probe and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp):p.error('fault probe requires separate catalog')
     if args.native_hang and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe):p.error('hang requires separate catalog')
+    if args.native_forced_stop and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe or args.native_hang):p.error('forced stop requires separate native catalog')
     if args.extended_desktop and (not args.owned_shell or args.native_catalog):p.error('extended desktop requires ordinary no-catalog ISO')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
@@ -237,7 +238,7 @@ def main():
     catalog_digest=None
     if args.native_catalog:
         from native_catalog_865_verify import provision_catalog
-        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang)
+        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,forced_stop=args.native_forced_stop)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and img and code and vars):raise RuntimeError('real QEMU mandatory')
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
@@ -434,7 +435,12 @@ def main():
                     d.key('f9');wait(proc,serial,tag,count+1)
                     if args.native_catalog:
                         from native_catalog_865_verify import wait_native_empty,wait_hang_progress
-                        if args.native_hang:wait_hang_progress(proc,serial)
+                        if args.native_forced_stop:
+                            from native_forced_stop_verify import wait_stop_ready,wait_restart_ready
+                            wait_stop_ready(proc,serial)
+                            d.key('f9');wait_restart_ready(proc,serial)
+                            d.key('f9');wait(proc,serial,b'STYLEOS NATIVE STOP-DONE ',1)
+                        elif args.native_hang:wait_hang_progress(proc,serial)
                         else:wait_native_empty(proc,serial,30 if args.native_fault_probe else 600 if args.native_timer_load else 180)
                     d.screen('after-denied-fixture')
                     if args.extended_desktop:
@@ -540,7 +546,11 @@ def main():
             if live_reg(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')&0x200:raise ValueError('ordinary shell IF')
             if args.native_catalog:
                 from native_catalog_865_verify import verify_catalog
-                events=verify_catalog(lines,data.decode('ascii'),obs,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang)
+                if args.native_forced_stop:
+                    from native_forced_stop_verify import verify_forced_stop
+                    events=verify_forced_stop(lines,data.decode('ascii'),obs)
+                else:
+                    events=verify_catalog(lines,data.decode('ascii'),obs,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang)
                 if stats['rd_operations']<4+32*9:raise ValueError('native catalog actual disk reads')
             else:
                 events=[]
@@ -626,6 +636,6 @@ def main():
     check('after-write');second=run('second',False);check('after-reboot')
     foreign=run('foreign-identity',False,True) if args.provisioned else None
     if args.provisioned:check('after-foreign-refusal')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=args.extended_desktop,native_timer_load=args.native_timer_load,native_bad_rsp=args.native_bad_rsp,native_fault_probe=args.native_fault_probe,native_hang=args.native_hang,integrated_runtime=args.integrated,owned_shell=args.owned_shell,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=args.extended_desktop,native_timer_load=args.native_timer_load,native_bad_rsp=args.native_bad_rsp,native_fault_probe=args.native_fault_probe,native_hang=args.native_hang,native_forced_stop=args.native_forced_stop,integrated_runtime=args.integrated,owned_shell=args.owned_shell,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()

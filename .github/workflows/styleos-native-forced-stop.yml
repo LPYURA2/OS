@@ -1,7 +1,7 @@
 name: StyleOS native forced stop candidate
 on:
   push:
-    branches: [feature/styleos-kernel-forced-stop]
+    branches: [feature/styleos-kernel-forced-stop, feature/styleos-kernel-forced-stop-guest]
   workflow_dispatch:
 permissions:
   contents: read
@@ -62,3 +62,24 @@ jobs:
           name: styleos-source-${{ github.sha }}
           path: build/source/
           if-no-files-found: error
+  forced-stop-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install real guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Check verifier syntax and exact QEMU version
+        run: |
+          python3 -m py_compile tools/native_forced_stop_verify.py tools/native_catalog_865_verify.py tools/test_desktop_storage_service_863.py
+          qemu-system-x86_64 --version | head -n1 | grep '^QEMU emulator version 8\.2\.2 '
+      - name: Real forced stop, fresh PID and resource reuse with a live peer
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-forced-stop --output build/native-forced-stop
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-forced-stop-guest
+          path: build/native-forced-stop/
+          if-no-files-found: warn

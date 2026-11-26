@@ -13,7 +13,8 @@ FAULT_PROBES={
     'forbidden-int':(b'\xcd\x81',13,0x1000000d,0x40a,0),
 }
 
-def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False):
+def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False):
+    if forced_stop and (timer_load or bad_rsp or fault_probe or hang_load):raise ValueError('separate forced stop workload')
     if hang_load and (timer_load or bad_rsp or fault_probe):raise ValueError('separate infinite-loop workload')
     if fault_probe and (timer_load or bad_rsp or fault_probe not in FAULT_PROBES):raise ValueError('separate fault probe')
     if timer_load and bad_rsp:raise ValueError("separate audit workload")
@@ -28,7 +29,7 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
             # All 32 residents must suffer real LAPIC preemption before yield.
             if timer_load:code+=b'\xb9'+struct.pack('<I',100_000_000)+b'\xff\xc9\x75\xfc'
             code+=b'\xb8\x01\x00\x00\x00\xcd\x80'
-            if hang_load and i==0:
+            if (hang_load and i==0) or (forced_stop and i<2):
                 # Valid user context, no syscall/fault/exit after yield.
                 code+=b'\xeb\xfe'
             elif fault_probe and i==0:
@@ -44,7 +45,7 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
             struct.pack_into('<HHIQQQIHHHHHH',blob,16,2,62,1,0x10000000,64,0,0,64,56,1,0,0,0)
             struct.pack_into('<IIQQQQQQ',blob,64,1,5,4096,0x10000000,0,len(code),4096,4096)
             lba=3072+16*i
-            struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),f'app{i:02}'.encode())
+            struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),(b'stop00' if forced_stop and i==0 else f'app{i:02}'.encode()))
             disk.seek(lba*512);disk.write(blob.ljust(8192,b'\0'))
         disk.seek(3000*512);disk.write(catalog)
     return hashlib.sha256(catalog).hexdigest()
