@@ -13,3 +13,6 @@
 ## Отдельная оптимизация курсора (решение владельца 24.11.2026)
 
 После комплексной приёмки ядра изменить только механизм курсора: исследовать независимый слой и аппаратный cursor plane, сохранить программный fallback для GOP. Не менять внешний вид или поведение остального Desktop, окон, панели и приложений. Измерить latency, jitter и объём перерисовки; проверить hover, drag, clipping, переключение режимов и регрессии. Отдельная ветка, без изменения принятых refs.
+
+## Sequencing confirmed by owner 26.11.2026
+Discuss optimization and system requirements after kernel acceptance. Do not expand current VM yet. After full filesystem, processes and independent applications stages, separately discuss expansion of VirtualBox CPU, RAM, video RAM and disk parameters; actual VirtualBox support requires distinct validation. Do not change approved UI or lower safety checks for compatibility.

@@ -4,14 +4,18 @@ import hashlib,re,struct
 from irq_trace_accept_859 import HEADER
 from runtime_mixed_863_verify import row
 
-def provision_catalog(path):
+def provision_catalog(path,*,timer_load=False):
     catalog=bytearray(2048)
     struct.pack_into('<8sII',catalog,0,b'STYLNAT1',1,32)
     with path.open('r+b') as disk:
         for i in range(32):
             # r12 identifies independent executable bytes. Yield then exit;
             # every eighth image deliberately raises UD after yielding.
-            code=b'\x41\xbc'+struct.pack('<I',i+1)+b'\xb8\x01\x00\x00\x00\xcd\x80'
+            code=b'\x41\xbc'+struct.pack('<I',i+1)
+            # A finite external CPU-bound loop, no forced timer or test hook.
+            # All 32 residents must suffer real LAPIC preemption before yield.
+            if timer_load:code+=b'\xb9'+struct.pack('<I',100_000_000)+b'\xff\xc9\x75\xfc'
+            code+=b'\xb8\x01\x00\x00\x00\xcd\x80'
             code+=b'\x0f\x0b' if i%8==7 else b'\xb8\x02\x00\x00\x00\xcd\x80\x0f\x0b'
             blob=bytearray(4096)+code
             blob[:7]=b'\x7fELF\x02\x01\x01'
@@ -23,7 +27,7 @@ def provision_catalog(path):
         disk.seek(3000*512);disk.write(catalog)
     return hashlib.sha256(catalog).hexdigest()
 
-def verify_catalog(lines,trace,obs):
+def verify_catalog(lines,trace,obs,*,timer_load=False):
     root=obs['active']['root']
     def records(tag,keys):
         return [row(x,tag,keys) for x in lines if x.startswith(tag+b' ')]
@@ -49,9 +53,17 @@ def verify_catalog(lines,trace,obs):
         per[i].append(event)
     if [x['slot'] for x in events[:32]]!=list(range(32)):raise ValueError('first round fairness')
     for i,seq in enumerate(per):
+        if not seq:raise ValueError('missing native execution')
+        if timer_load:
+            first_yield=next((j for j,x in enumerate(seq) if x['vector']==128 and x['rax']==1),None)
+            if first_yield is None or first_yield<1 or not all(x['vector']==0x50 for x in seq[:first_yield]):
+                raise ValueError('no actual preemption before yield for slot '+str(i))
+            if any(x['vector']==0x50 and x['rip']-0x10000000 not in (0,6,11,13,15,20,22,27,29) for x in seq):
+                raise ValueError('timer outside external instruction boundary')
         if seq[-1]['state'] not in (4,5) or any(x['state']!=1 for x in seq[:-1]):raise ValueError('terminal lifecycle')
         actual=[(x['vector'],x['rip'],x['rax']) for x in seq if x['vector']!=0x50]
-        expected=[(128,0x1000000d,1),(6,0x1000000d,0) if i%8==7 else (128,0x10000014,2)]
+        off=9 if timer_load else 0
+        expected=[(128,0x1000000d+off,1),(6,0x1000000d+off,0) if i%8==7 else (128,0x10000014+off,2)]
         if actual!=expected:raise ValueError('native yield/terminal '+str((i,actual)))
     retired=records(b'STYLEOS S865 FX-RETIRE',('id','root','gen'))
     if sorted((x['id'],x['root'],x['gen']) for x in retired)!=[(i,roots[i],i+1) for i in range(32)]:raise ValueError('per-owner retirement')
@@ -85,7 +97,7 @@ def verify_catalog(lines,trace,obs):
         ev=events[index];index+=1
         actual_pc=ev['rip']-2*(ev['vector']==128)
         if (vec,err,soft,cpl,cs,rip,pc,ss,sp,cr3)!=(ev['vector'],ev['error'],int(ev['vector']==128),3,0x5b,actual_pc,actual_pc,0x63,ev['sp'],ev['root']):raise ValueError('native raw CPU mismatch')
-        if one(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')!=ev['flags'] or one(r'\bRAX=([0-9a-fA-F]+)\b')!=ev['rax'] or one(r'\bR12=([0-9a-fA-F]+)\b')!=ev['slot']+1:raise ValueError('native raw registers')
+        if one(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')!=ev['flags'] or one(r'\bRAX=([0-9a-fA-F]+)\b')!=ev['rax'] or one(r'\bR12=([0-9a-fA-F]+)\b')!=(0 if ev['vector']==0x50 and ev['rip']==0x10000000 else ev['slot']+1):raise ValueError('native raw registers')
         result.append((int(m[1]),ev))
     if not started or index!=len(events) or drain_index!=len(drains):raise ValueError('native CPU count')
     return result

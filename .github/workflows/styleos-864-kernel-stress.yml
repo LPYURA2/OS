@@ -369,6 +369,30 @@ jobs:
           if-no-files-found: warn
 
 
+  acceptance-native-completion:
+    if: github.ref_name == 'feature/styleos-kernel-final-acceptance'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install optical guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: KFA-05 actual LAPIC preemption of every one of 32 external processes
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-timer-load --output build/kfa-native-timer
+      - name: KFA-10 extended actual ordinary ISO shell regression
+        if: always()
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --output build/kfa-native-desktop
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-kfa-native-completion
+          path: |
+            build/kfa-native-timer/
+            build/kfa-native-desktop/
+          if-no-files-found: error
+
   acceptance-base-regression:
     if: github.ref_name == 'feature/styleos-kernel-final-acceptance'
     runs-on: ubuntu-24.04

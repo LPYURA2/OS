@@ -214,7 +214,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--extended-desktop',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
@@ -223,6 +223,8 @@ def main():
     if args.integrated and not args.provisioned:p.error('--integrated requires --provisioned')
     if args.owned_shell and not (args.integrated and args.four):p.error('--owned-shell requires integrated four-profile boot contract')
     if args.native_catalog and not args.owned_shell:p.error('native catalog requires owned shell')
+    if args.native_timer_load and not args.native_catalog:p.error('timer load requires external catalog')
+    if args.extended_desktop and (not args.owned_shell or args.native_catalog):p.error('extended desktop requires ordinary no-catalog ISO')
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     build=out/'build';base=out/'legacy.raw';top=out/'data.qcow2'
     provision(base)
@@ -232,7 +234,7 @@ def main():
     catalog_digest=None
     if args.native_catalog:
         from native_catalog_865_verify import provision_catalog
-        catalog_digest=provision_catalog(base)
+        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and img and code and vars):raise RuntimeError('real QEMU mandatory')
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
@@ -428,8 +430,11 @@ def main():
                     count=sum(x.startswith(tag) for x in serial.read_bytes().splitlines())
                     d.key('f9');wait(proc,serial,tag,count+1)
                     if args.native_catalog:
-                        wait(proc,serial,b'STYLEOS NATIVE EMPTY',seconds=180)
+                        wait(proc,serial,b'STYLEOS NATIVE EMPTY',seconds=600 if args.native_timer_load else 180)
                     d.screen('after-denied-fixture')
+                    if args.extended_desktop:
+                        from native_desktop_acceptance import exercise as extended
+                        extended(d,proc,serial,folder,wait)
                 elif tasks:
                     d.key('f9')
                     if mixed and write and not args.integrated:
@@ -517,7 +522,7 @@ def main():
             if live_reg(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')&0x200:raise ValueError('ordinary shell IF')
             if args.native_catalog:
                 from native_catalog_865_verify import verify_catalog
-                events=verify_catalog(lines,data.decode('ascii'),obs)
+                events=verify_catalog(lines,data.decode('ascii'),obs,timer_load=args.native_timer_load)
                 if stats['rd_operations']<4+32*9:raise ValueError('native catalog actual disk reads')
             else:
                 events=[]
@@ -532,7 +537,12 @@ def main():
             r=row(ready[0],b'STYLEOS S863 READY',('root','dispatches','next-pid','next-window','input','x','y','writes'))
             if (r['root'],r['dispatches'],r['next-pid'],r['next-window'],r['input'])!=(root,0,1,1,3):raise ValueError('owned shell initial state')
             inputs=[x for x in lines if x.startswith(b'STYLEOS S863 EVENT ')]
-            if len(inputs)<3 or any(b' key=0x'+f'{key:016x}'.encode()+b' ' not in x for key,x in zip((0x43,0x58,0x40),inputs[-3:])):raise ValueError('owned shell F9/F12/F6 input proof')
+            keys=(0x58,0x40) if args.extended_desktop else (0x43,0x58,0x40)
+            if len(inputs)<len(keys) or any(b' key=0x'+f'{key:016x}'.encode()+b' ' not in x for key,x in zip(keys,inputs[-len(keys):])):raise ValueError('owned shell F9/F12/F6 input proof')
+            if args.extended_desktop:
+                if sum(b' key=0x0000000000000043 ' in x for x in inputs)!=1:raise ValueError('extended F9 input proof')
+                from native_desktop_acceptance import verify as verify_extended
+                verify_extended(folder,lines,root)
             denied=(b'STYLEOS S863B REQUEST ',b'STYLEOS S863L BEGIN ',b'STYLEOS S863P SLICE ',b'STYLEOS S864 BATCH-',b'STYLEOS S863 EXIT ')
             if not args.native_catalog:denied+=(b'STYLEOS S848 ',b'STYLEOS NATIVE ADMIT ',b'STYLEOS NATIVE EVENT ')
             if any(x.startswith(denied) for x in lines):raise ValueError('fixture or unsolicited process in owned shell')
@@ -598,6 +608,6 @@ def main():
     check('after-write');second=run('second',False);check('after-reboot')
     foreign=run('foreign-identity',False,True) if args.provisioned else None
     if args.provisioned:check('after-foreign-refusal')
-    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=False,integrated_runtime=args.integrated,owned_shell=args.owned_shell,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
+    (out/'results.json').write_text(json.dumps(dict(status='PASS',diagnostic_only=True,cold_owned_root=cold,cold_task_fixture=tasks,mixed_task_fixture=mixed,four_task_fixture=args.four,ordinary_desktop_verified=args.extended_desktop,native_timer_load=args.native_timer_load,integrated_runtime=args.integrated,owned_shell=args.owned_shell,provisioned_boot=args.provisioned,foreign_identity=foreign,boot_format='iso' if args.iso else 'raw',iso_sha256=iso_sha,iso_media=media,first=first,second=second,base_sha256=sha(original),media_sha256=sha(expected),boot_sha256=boot_sha,efi_sha256=sha(efi.read_bytes()),map_sha256=sha(mp.read_bytes())),indent=2))
     print('S863 shell note PIO PASS: real save, separate boot reopen, exact media, zero reboot writes')
 if __name__=='__main__':main()
