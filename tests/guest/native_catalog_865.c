@@ -48,7 +48,7 @@ static bool owned_zero(const struct stop_owned *r){
  return clear_bytes(r->owner,sizeof *r->owner)&&clear_bytes(r->window,sizeof *r->window)&&
         clear_bytes(r->port,sizeof *r->port);
 }
-static bool input_probe,focus_probe;
+static bool input_probe,focus_probe,frame_probe;
 static bool grant_owned(uint32_t pid,uint64_t gen,uint32_t *win){
  const struct pr_entry *p=pr_find(pr_global(),pid);
  struct usr_runtime *s=sessions();struct nwc_service *c=channels();
@@ -87,7 +87,8 @@ static bool revoked(uint32_t pid,uint64_t gen,uint64_t root,uint32_t win,const s
  return owned_zero(r)&&!ws_find(ws_global(),win)&&
         usr_processes(sessions(),pid,0,0,&total)==USR_DENIED&&
         nwc_receive(channels(),pid,gen,root,win,&event)==NWC_MISSING&&
-        nwc_visible_tile(channels(),win,&tile)==NWC_MISSING;
+        nwc_visible_tile(channels(),win,&tile)==NWC_MISSING&&
+        !nwc_visible_frame(channels(),win);
 }
 bool s863_disk_read(uint32_t,uint8_t[512]);
 static bool catalog_read(void *unused,uint32_t lba,uint8_t out[512]){
@@ -145,8 +146,19 @@ static bool stop_step(void){
  struct stop_owned target_owned,peer_owned;
  if(!owned_refs(stop_pid,stop_window,&target_owned)||!owned_refs(peer_pid,peer_window,&peer_owned)||
     target_owned.port->length!=1||!target_owned.port->has_tile||
-    peer_owned.port->length!=1||!peer_owned.port->has_tile||
+    peer_owned.port->length!=1||(!frame_probe&&!peer_owned.port->has_tile)||
     nwc_port_count(channels())!=2||usr_visible_windows(sessions(),0,0)!=2)return stop_fail();
+ if(frame_probe){
+  const struct nwc_frame *frame=nwc_visible_frame(channels(),peer_window);
+  if(!frame||peer_owned.port->has_tile||frame->window_id!=peer_window||
+     frame->generation!=3||frame->count!=2||
+     frame->rect[0].x||frame->rect[0].y||frame->rect[0].w!=160||
+     frame->rect[0].h!=120||frame->rect[0].rgb!=0x234567||
+     frame->rect[1].x!=20||frame->rect[1].y!=30||
+     frame->rect[1].w!=50||frame->rect[1].h!=40||
+     frame->rect[1].rgb!=0x89abcd||
+     !nwc_frame_valid(peer_owned.port,peer_owned.window))return stop_fail();
+ }
  if(focus_probe){
   const struct nwc_event *ev=&peer_owned.port->events[peer_owned.port->head];
   if(peer_owned.port->next_sequence!=7||ev->sequence!=6||ev->kind!=NWC_KEY||
@@ -223,7 +235,9 @@ bool s865_native_catalog_request(void){
  bool forced=valid&&count==32&&nc_equal(catalog+16+40,marker,8);
  static const uint8_t input_marker[8]={'i','n','p','u','t','1',0,0};
  static const uint8_t focus_marker[8]={'f','o','c','u','s','1',0,0};
- focus_probe=forced&&nc_equal(catalog+16+NC_RECORD+40,focus_marker,8);
+ static const uint8_t frame_marker[8]={'f','r','a','m','e','1',0,0};
+ frame_probe=forced&&nc_equal(catalog+16+NC_RECORD+40,frame_marker,8);
+ focus_probe=frame_probe||(forced&&nc_equal(catalog+16+NC_RECORD+40,focus_marker,8));
  input_probe=focus_probe||(forced&&nc_equal(catalog+16+NC_RECORD+40,input_marker,8));
  if(valid)for(unsigned j=0;j<count;j++){
   const uint8_t *r=catalog+16+j*NC_RECORD;

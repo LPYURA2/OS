@@ -185,7 +185,7 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                 blob=payload
                 package_rows.append(dict(pid_expected=i+1,package=tea.name,package_sha256=hashlib.sha256(tea.read_bytes()).hexdigest(),manifest=manifest))
             lba=3072+16*i
-            struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),(b'stop00' if forced_stop and i==0 else b'focus1' if window_focus and i==1 else b'input1' if window_input and i==1 else f'app{i:02}'.encode()))
+            struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),(b'stop00' if forced_stop and i==0 else b'frame1' if window_frame and i==1 else b'focus1' if window_focus and i==1 else b'input1' if window_input and i==1 else f'app{i:02}'.encode()))
             disk.seek(lba*512);disk.write(blob.ljust(8192,b'\0'))
         disk.seek(3000*512);disk.write(catalog)
     if packages is not None:
