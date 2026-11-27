@@ -122,8 +122,28 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
             else:
                 raise RuntimeError("no guest receipt")
             if live and receipt=="SFS39 MOUNT PASS":
-                d.move(20,0)
-                d.wait_uart("SFS39 INPUT READ PASS", timeout=40)
+                # Desktop.move expects initialized absolute coordinates.
+                # Desktop.wait_uart prefixes markers with STYLEOS DESKTOP.
+                # Use relative QMP input and exact complete serial receipts.
+                require(b"SFS39 DESKTOP READ PASS" in uart.read_bytes().splitlines(),
+                        "initial mounted read missing")
+                require(b"SFS39 INPUT READ PASS" not in uart.read_bytes().splitlines(),
+                        "unexpected pre-input read")
+                d.call("input-send-event",events=[{"type":"rel","data":{"axis":"x","value":20}}])
+                deadline=time.monotonic()+40
+                while time.monotonic()<deadline and proc.poll() is None:
+                    lines=uart.read_bytes().splitlines(keepends=True)
+                    failures=[x for x in lines if b" FAIL " in x and x.endswith(b"\n")]
+                    require(not failures,"guest fail-stop: "+repr(failures))
+                    events=[dict(part.split(b"=",1) for part in x.split()[3:] if b"=" in part)
+                            for x in lines if x.startswith(b"STYLEOS S863 EVENT ") and x.endswith(b"\n")]
+                    if (b"SFS39 INPUT READ PASS\n" in lines and
+                            any(int(e.get(b"mouse",b"0"),16)==1 and int(e.get(b"dx",b"0"),16)==20
+                                for e in events)):
+                        break
+                    time.sleep(.05)
+                else:
+                    raise RuntimeError("no exact post-input filesystem and mouse receipts")
             d.call("stop")
             o, final = snapshot("final")
             verify_ready(o)
