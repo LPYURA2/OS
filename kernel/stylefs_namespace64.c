@@ -152,6 +152,11 @@ static enum dc64_status graph_collect(struct dc64_state *s,struct dc64_edit_work
  if(rc!=DC64_OK){s->valid=false;return rc;}
  if(live.epoch!=s->epoch||live.active!=s->active||live.count!=s->count){s->valid=false;return DC64_INVALID;}
  *s=live;
+ return dc64_hierarchy_selected(s,w,a,cap);
+}
+enum dc64_status dc64_hierarchy_selected(struct dc64_state *s,struct dc64_edit_workspace *w,struct dc64_node *a,size_t cap){
+ if(!graph_workspace(s,w,a,cap))return DC64_INVALID;
+ enum dc64_status rc;
  if(s->count>cap)return DC64_FULL;
  for(uint64_t i=0;i<s->count;){
   unsigned n=0;rc=leaf(s,w,i/SD64_FANOUT,&n);

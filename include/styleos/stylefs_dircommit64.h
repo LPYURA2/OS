@@ -21,6 +21,10 @@ typedef bool (*dc64_next)(void *,uint64_t,struct sd64_record *);
  * deterministic child layout. Read failure is not evidence of corruption. */
 enum dc64_status dc64_mount(struct dc64_state *,struct bs_service *,uint64_t owner,
                              uint64_t token,uint64_t sectors,struct dc64_workspace *);
+/* Select one exact retained epoch, never silently select a different one.
+ * Used only by the read-only paired snapshot selector. */
+enum dc64_status dc64_mount_epoch(struct dc64_state *,struct bs_service *,uint64_t owner,
+                                   uint64_t token,uint64_t sectors,struct dc64_workspace *,uint64_t epoch);
 /* Blank header initialization only; never erase or autoformat on mount. */
 #ifdef STYLEFS_HOST_FORMAT
 enum dc64_status dc64_provision(struct bs_service *,uint64_t owner,uint64_t token,uint64_t sectors);
@@ -65,6 +69,9 @@ enum dc64_status dc64_apply(struct dc64_state *,struct dc64_edit_workspace *,
 enum { DC64_PATH_MAX=64 };
 struct dc64_node {uint64_t id,parent;uint8_t kind;};
 struct dc64_path_part {uint16_t length;uint8_t name[SD64_NAME];};
+/* Validate an already selected immutable snapshot, without selecting latest. */
+enum dc64_status dc64_hierarchy_selected(struct dc64_state *,struct dc64_edit_workspace *,
+                                         struct dc64_node *,size_t capacity);
 enum dc64_status dc64_hierarchy_check(struct dc64_state *,struct dc64_edit_workspace *,
                                       struct dc64_node *,size_t capacity);
 enum dc64_status dc64_hierarchy_apply(struct dc64_state *,struct dc64_edit_workspace *,

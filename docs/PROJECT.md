@@ -485,3 +485,8 @@ Stage 22 CI 7/7 SUCCESS. See [continuation](NEXT_CHAT_STYLEFS_23.md). No product
 ## StyleFS 24 — checked hierarchy candidate
 
 Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary boot or main changes.
+
+
+## StyleFS 25 — paired snapshot visibility candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_25.md). Separate receipt; no production claim or main change.

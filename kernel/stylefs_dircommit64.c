@@ -100,8 +100,8 @@ static void select_bank(struct dc64_state *s,unsigned bank,uint64_t epoch,uint64
  s->active=bank;s->epoch=epoch;s->count=count;s->valid=true;
  s->root=(struct sd64_root){p->total?location(start,p,p->height,0):0,epoch,start,p->total*SD64_SECTORS,p->height};
 }
-enum dc64_status dc64_mount(struct dc64_state *s,struct bs_service *b,uint64_t owner,
-                             uint64_t token,uint64_t n,struct dc64_workspace *w){
+static enum dc64_status mount_epoch(struct dc64_state *s,struct bs_service *b,uint64_t owner,
+                             uint64_t token,uint64_t n,struct dc64_workspace *w,uint64_t wanted){
  if(!separate(s,sizeof *s,w,sizeof *w)||!separate(s,sizeof *s,b,sizeof *b)||
     !separate(w,sizeof *w,b,sizeof *b))return DC64_INVALID;
  *s=(struct dc64_state){0};
@@ -111,6 +111,7 @@ enum dc64_status dc64_mount(struct dc64_state *s,struct bs_service *b,uint64_t o
   uint8_t h[512];uint64_t epoch,count;struct plan p;
   if(bs_read_sector(b,owner,token,bank,h)!=BS_OK){s->valid=false;return DC64_IO;}
   if(!decode_header(h,n,bank,&epoch,&count)||!plan(count,bank_size(n)/8,&p))continue;
+  if(wanted&&epoch!=wanted)continue;
   enum dc64_status rc=validate(s,w,bank,epoch,&p);
   if(rc==DC64_IO){s->valid=false;return rc;}
   if(rc!=DC64_OK)continue;
@@ -118,6 +119,15 @@ enum dc64_status dc64_mount(struct dc64_state *s,struct bs_service *b,uint64_t o
   if(!s->valid||epoch>s->epoch)select_bank(s,bank,epoch,count,&p);
  }
  return s->valid?DC64_OK:DC64_CORRUPT;
+}
+enum dc64_status dc64_mount(struct dc64_state *s,struct bs_service *b,uint64_t owner,
+                             uint64_t token,uint64_t n,struct dc64_workspace *w){
+ return mount_epoch(s,b,owner,token,n,w,0);
+}
+enum dc64_status dc64_mount_epoch(struct dc64_state *s,struct bs_service *b,uint64_t owner,
+                             uint64_t token,uint64_t n,struct dc64_workspace *w,uint64_t epoch){
+ if(!epoch)return DC64_INVALID;
+ return mount_epoch(s,b,owner,token,n,w,epoch);
 }
 #ifdef STYLEFS_HOST_FORMAT
 enum dc64_status dc64_provision(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t n){
