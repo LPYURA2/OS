@@ -71,6 +71,8 @@ static struct ndb_input native_input;
 #endif
 static void native_plot(void *unused,int x,int y,uint32_t rgb)
 { (void)unused;desk_fill(x,y,1,1,rgb); }
+static void native_fill(void *unused,int x,int y,int w,int h,uint32_t rgb)
+{ (void)unused;desk_fill(x,y,w,h,rgb); }
 
 /* Editor and Notes are separate app sessions. Their buffers live outside the
  * compositor; rendering either window never switches the other app's draft. */
@@ -1270,7 +1272,7 @@ static void draw(void)
         if (visible(order[i]) && desk_clip_visible(win[order[i]].box)) draw_window(order[i], top);
 
     /* Only authenticated kernel-owned tiles, never direct user pointers. */
-    (void)ndb_paint(nwc_global(),width,work_area().h,native_plot,0);
+    (void)ndb_paint_rects(nwc_global(),width,work_area().h,native_plot,native_fill,0);
 
     struct desk_box panel = panel_box(), start = start_box();
     desk_fill(panel.x, panel.y, panel.w, panel.h, PANEL);

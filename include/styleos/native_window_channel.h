@@ -32,6 +32,15 @@ struct nwc_tile {
     uint16_t width, height;
     uint32_t pixel[NWC_TILE_PIXELS];
 };
+/* Bounded retained opaque frame. First rectangle covers the entire
+ * window, subsequent rectangles overlay it. No app-controlled pointers. */
+enum { NWC_FRAME_RECTS=32 };
+struct nwc_rect { uint32_t x,y,w,h,rgb; };
+_Static_assert(sizeof(struct nwc_rect)==20,"rectangle wire extent");
+struct nwc_frame {
+    uint32_t window_id,generation,count;
+    struct nwc_rect rect[NWC_FRAME_RECTS];
+};
 struct nwc_port {
     uint32_t window_id, owner_pid, session_id;
     uint64_t scheduler_handle, user_root;
@@ -40,6 +49,7 @@ struct nwc_port {
     unsigned head, length;
     struct nwc_tile tile;
     bool has_tile;
+    struct nwc_frame frame;
 };
 struct nwc_service {
     const struct pr_table *registry;
@@ -90,6 +100,14 @@ enum nwc_status nwc_publish_tile(struct nwc_service *,uint32_t pid,uint64_t hand
  * or kernel pointers: version, sequence, window, kind, code, modifiers,
  * down, size (8 u32), then 32 bytes. Failed calls do not consume input. */
 #define NWC_CALL_INPUT UINT64_C(0x102)
+/* RAX=0x103, RBX=window (0 unique), RCX=private data VA,
+ * RDX=count 1..32; five little-endian u32 per rectangle. Atomic replacement. */
+#define NWC_CALL_FRAME UINT64_C(0x103)
+enum nwc_status nwc_publish_frame(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+                                  uint64_t,const struct nwc_rect *,unsigned);
+/* Serialized trusted compositor only, alias invalid after mutation. */
+const struct nwc_frame *nwc_visible_frame(const struct nwc_service *,uint32_t);
+bool nwc_frame_valid(const struct nwc_port *,const struct ws_window *);
 #define NWC_INPUT_BYTES 64u
 enum nwc_status nwc_receive_wire(struct nwc_service *,uint32_t,uint64_t,uint64_t,
                                   uint64_t window,uint8_t out[NWC_INPUT_BYTES]);

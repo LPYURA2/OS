@@ -16,6 +16,8 @@ struct ndb_tracker {
     unsigned count;
 };
 typedef void (*ndb_pixel_plot)(void *opaque, int x, int y, uint32_t rgb);
+typedef void (*ndb_rect_plot)(void *,int,int,int,int,uint32_t);
+unsigned ndb_paint_rects(const struct nwc_service *,int,int,ndb_pixel_plot,ndb_rect_plot,void *);
 
 /* Invalidate old and new clipped regions after a tile, selection, lock,
  * close, fault, move or minimize. The caller redraws the complete scene in

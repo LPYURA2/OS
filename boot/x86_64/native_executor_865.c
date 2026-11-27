@@ -192,7 +192,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
 #ifdef STYLEOS_OWNED_SHELL_865
  /* Only after actual CPL3 trap, safe-root return, scheduler commit and
   * full mapping audit. Never accept caller-supplied PID/root/generation. */
- if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT)){
+ if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
@@ -209,6 +209,15 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
    fld848("rgb",pending860.gpr[2]);fld848("status",pixel);arch_putc('\n');
 #endif
+  }else if(pending860.gpr[0]==NWC_CALL_FRAME){
+   uint64_t count=pending860.gpr[3];
+   struct nwc_rect rect[NWC_FRAME_RECTS]={0};
+   if(count&&count<=NWC_FRAME_RECTS&&s865_native_copy_data(id,ticket->pid,ticket->handle,
+      ticket->child_root,pending860.gpr[2],rect,(size_t)count*sizeof rect[0]))
+    pixel=nwc_publish_frame((struct nwc_service *)nwc_global(),ticket->pid,ticket->handle,
+      ticket->child_root,pending860.gpr[1],rect,(unsigned)count);
+   volatile unsigned char *wipe=(void *)rect;
+   for(size_t j=0;j<sizeof rect;++j)wipe[j]=0;
   }else if(pending860.gpr[0]==NWC_CALL_INPUT){
    uint8_t wire[NWC_INPUT_BYTES]={0};
    volatile uint8_t *dst=0;

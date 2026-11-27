@@ -207,12 +207,14 @@ enum nwc_status nwc_publish_tile(struct nwc_service *s,uint32_t pid,
     struct nwc_port *p=mut_port(s,win);
     if(!p)return NWC_MISSING;
     if(!authentic(p,pid,handle,root) || !selected(s,p))return NWC_DENIED;
-    if(p->has_tile && p->tile.generation==UINT32_MAX)return NWC_OVERFLOW;
+    uint32_t prior=p->frame.count?p->frame.generation:p->has_tile?p->tile.generation:0;
+    if(prior==UINT32_MAX)return NWC_OVERFLOW;
     /* Use an all-zero fresh tile. A smaller update cannot expose old pixels. */
     struct nwc_tile tile={0};
     tile.window_id=win;tile.width=(uint16_t)w;tile.height=(uint16_t)h;
-    tile.generation=p->has_tile?p->tile.generation+1u:1u;
+    tile.generation=prior+1u;
     for(size_t i=0;i<(size_t)w*h;++i)tile.pixel[i]=pixels[i]&UINT32_C(0x00ffffff);
+    zero(&p->frame,sizeof p->frame);
     p->tile=tile;p->has_tile=true;
     return NWC_OK;
 }
@@ -235,6 +237,62 @@ enum nwc_status nwc_publish_pixel(struct nwc_service *s,uint32_t pid,uint64_t ha
     if(rgb>UINT32_C(0x00ffffff))return NWC_INVALID;
     uint32_t pixel=(uint32_t)rgb;
     return nwc_publish_block(s,pid,handle,root,window,&pixel,1,1);
+}
+static bool frame_rects(const struct nwc_rect *r,unsigned n,const struct ws_window *w)
+{
+    if(!r||!n||n>NWC_FRAME_RECTS||!w||w->bounds.width<=0||w->bounds.height<=0||
+       w->bounds.width>8192||w->bounds.height>8192)return false;
+    unsigned width=(unsigned)w->bounds.width,height=(unsigned)w->bounds.height;
+    if(r[0].x||r[0].y||r[0].w!=width||r[0].h!=height)return false;
+    for(unsigned i=0;i<n;++i){
+        const struct nwc_rect *q=&r[i];
+        if(!q->w||!q->h||q->x>=width||q->y>=height||q->w>width-q->x||
+           q->h>height-q->y||q->rgb>0xffffffu)return false;
+    }
+    return true;
+}
+bool nwc_frame_valid(const struct nwc_port *p,const struct ws_window *w)
+{
+    if(!p||!w)return false;
+    const struct nwc_frame *f=&p->frame;
+    if(!f->count){
+        const unsigned char *b=(const void *)f;
+        for(size_t i=0;i<sizeof *f;++i)if(b[i])return false;
+        return true;
+    }
+    if(p->has_tile||!f->generation||f->window_id!=p->window_id||
+       !frame_rects(f->rect,f->count,w))return false;
+    const unsigned char *unused=(const void *)&f->rect[f->count];
+    for(size_t i=0;i<(NWC_FRAME_RECTS-f->count)*sizeof f->rect[0];++i)
+        if(unused[i])return false;
+    return true;
+}
+enum nwc_status nwc_publish_frame(struct nwc_service *s,uint32_t pid,uint64_t handle,
+                                  uint64_t root,uint64_t window,const struct nwc_rect *rect,unsigned count)
+{
+    if(!rect||!count||count>NWC_FRAME_RECTS)return NWC_INVALID;
+    uint32_t win=0;
+    enum nwc_status status=resolve_port(s,pid,handle,root,window,&win);
+    if(status!=NWC_OK)return status;
+    struct nwc_port *p=mut_port(s,win);
+    if(!p)return NWC_MISSING;
+    if(!authentic(p,pid,handle,root)||!selected(s,p))return NWC_DENIED;
+    if(!frame_rects(rect,count,ws_find(s->windows,win)))return NWC_INVALID;
+    uint32_t prior=p->frame.count?p->frame.generation:p->has_tile?p->tile.generation:0;
+    if(prior==UINT32_MAX)return NWC_OVERFLOW;
+    struct nwc_frame next={0};
+    next.window_id=win;next.generation=prior+1;next.count=count;
+    for(unsigned i=0;i<count;++i)next.rect[i]=rect[i];
+    zero(&p->tile,sizeof p->tile);p->has_tile=false;p->frame=next;
+    return NWC_OK;
+}
+const struct nwc_frame *nwc_visible_frame(const struct nwc_service *s,uint32_t win)
+{
+    if(!consistent(s))return 0;
+    const struct nwc_port *p=find_port(s,win);
+    if(!p||!selected(s,p)||!p->frame.count||
+       !nwc_frame_valid(p,ws_find(s->windows,win)))return 0;
+    return &p->frame;
 }
 enum nwc_status nwc_visible_tile(const struct nwc_service *s,uint32_t win,
                                  struct nwc_tile *out)

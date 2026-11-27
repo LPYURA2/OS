@@ -20,6 +20,18 @@ static struct desk_box clipped(const struct ws_bounds *bounds,
     out.x=left;out.y=top;out.w=right-left;out.h=bottom-top;
     return out;
 }
+static struct desk_box frame_clip(const struct ws_bounds *b,const struct nwc_rect *q,int width,int height)
+{
+    struct desk_box out={0};
+    int x=b->x+(int)q->x,y=b->y+(int)q->y;
+    int right=x+(int)q->w,bottom=y+(int)q->h;
+    if(x<0)x=0;
+    if(y<0)y=0;
+    if(right>width)right=width;
+    if(bottom>height)bottom=height;
+    if(right>x&&bottom>y)out=(struct desk_box){x,y,right-x,bottom-y};
+    return out;
+}
 static bool same(struct ndb_seen a,struct ndb_seen b)
 {
     return a.window_id==b.window_id && a.generation==b.generation &&
@@ -33,11 +45,20 @@ static unsigned snapshot(const struct nwc_service *ipc,int width,int height,
     for(unsigned i=0;i<WS_MAX_WINDOWS && count<NWC_PORTS;++i){
         const struct ws_window *window=&ipc->windows->windows[i];
         if(!window->id || window->role!=WS_APP_WINDOW)continue;
-        struct nwc_tile tile;
-        if(nwc_visible_tile(ipc,window->id,&tile)!=NWC_OK)continue;
-        struct desk_box rect=clipped(&window->bounds,&tile,width,height);
+        const struct nwc_frame *frame=nwc_visible_frame(ipc,window->id);
+        struct desk_box rect;
+        uint32_t generation;
+        if(frame){
+            rect=frame_clip(&window->bounds,&frame->rect[0],width,height);
+            generation=frame->generation;
+        }else{
+            struct nwc_tile tile;
+            if(nwc_visible_tile(ipc,window->id,&tile)!=NWC_OK)continue;
+            rect=clipped(&window->bounds,&tile,width,height);
+            generation=tile.generation;
+        }
         if(!rect.w)continue;
-        out[count++]=(struct ndb_seen){window->id,tile.generation,rect};
+        out[count++]=(struct ndb_seen){window->id,generation,rect};
     }
     return count;
 }
@@ -68,14 +89,27 @@ unsigned ndb_track(const struct nwc_service *ipc,struct ndb_tracker *tracker,
     tracker->count=count;
     return changes;
 }
-unsigned ndb_paint(const struct nwc_service *ipc,int width,int height,
-                   ndb_pixel_plot plot,void *opaque)
+unsigned ndb_paint_rects(const struct nwc_service *ipc,int width,int height,
+                   ndb_pixel_plot plot,ndb_rect_plot fill,void *opaque)
 {
     if(!ipc || !ipc->ready || !ipc->windows || !plot || width<=0 || height<=0)return 0;
     unsigned painted=0;
     for(unsigned i=0;i<WS_MAX_WINDOWS;++i){
         const struct ws_window *window=&ipc->windows->windows[i];
         if(!window->id || window->role!=WS_APP_WINDOW)continue;
+        const struct nwc_frame *frame=nwc_visible_frame(ipc,window->id);
+        if(frame){
+            for(unsigned j=0;j<frame->count;++j){
+                struct desk_box r=frame_clip(&window->bounds,&frame->rect[j],width,height);
+                if(!r.w)continue;
+                if(fill)fill(opaque,r.x,r.y,r.w,r.h,frame->rect[j].rgb);
+                else for(int y=r.y;y<r.y+r.h;++y)
+                    for(int x=r.x;x<r.x+r.w;++x)plot(opaque,x,y,frame->rect[j].rgb);
+                unsigned n=(unsigned)r.w*(unsigned)r.h;
+                painted=n>UINT32_MAX-painted?UINT32_MAX:painted+n;
+            }
+            continue;
+        }
         struct nwc_tile tile;
         if(nwc_visible_tile(ipc,window->id,&tile)!=NWC_OK)continue;
         struct desk_box r=clipped(&window->bounds,&tile,width,height);
@@ -84,12 +118,17 @@ unsigned ndb_paint(const struct nwc_service *ipc,int width,int height,
                 unsigned src=(unsigned)(y-window->bounds.y)*tile.width+
                              (unsigned)(x-window->bounds.x);
                 plot(opaque,x,y,tile.pixel[src]&UINT32_C(0x00ffffff));
-                ++painted;
+                if(painted<UINT32_MAX)++painted;
             }
     }
     return painted;
 }
 
+unsigned ndb_paint(const struct nwc_service *ipc,int width,int height,
+                   ndb_pixel_plot plot,void *opaque)
+{
+    return ndb_paint_rects(ipc,width,height,plot,0,opaque);
+}
 /* Reuse snapshot instead of a second, inconsistent definition of the
  * visible region. Later painted entries are in front. */
 uint32_t ndb_hit(const struct nwc_service *ipc,int width,int height,int x,int y)
