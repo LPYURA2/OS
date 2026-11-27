@@ -1,3 +1,10 @@
+## Deep Drop 72 — текст между независимыми приложениями
+
+База — проверенный Deep Drop 71, коммит `4fa9d9b3b6b5e717605c1dd18bf2540cef3e9525`.
+Этап 72 подключает ограниченную передачу текста к оконной очереди, реальному CPL3
+и настольному ISO x86-64. [Точка продолжения](NEXT_CHAT_DEEP_DROP_72.md) ·
+[Контракт и проверка](architecture/DEEP_DROP_72.md)
+
 ## 2026-11-26 — StyleFS 22 durable directory snapshots candidate
 20.1 and 21 full CI 7/7 SUCCESS. [Handoff](NEXT_CHAT_STYLEFS_22.md). Two-bank directory snapshot writer, bounded workspace and full-tree validation, interruption testing pending. No ordinary boot changes.
 

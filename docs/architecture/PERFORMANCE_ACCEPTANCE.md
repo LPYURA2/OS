@@ -22,3 +22,16 @@ Owner clarification: timer-driven preemptive multitasking already exists and has
 
 ## Measured pre-wait baseline (2026-11-27)
 CI 46053092483, artifact 15225059320 (128 MiB QEMU 8.2.2 TCG, single CPU, live-volume profile). 100/100 launch/close cycles: launch-to-input median 274.40 ms, p95 286.19 ms; close-to-release median 90.28 ms, p95 92.31 ms. Actual 2372 empty input requests over 10.0884 host seconds, 235.12/s. QEMU process CPU 100.05% before/after, 100.10% with one app; these are host process measurements, not guest CPU. No total RAM or minimum-spec conclusion. Preserve raw artifact for paired comparison after wait implementation.
+
+
+## Deep Drop 72
+
+The x86-64 text broker and gesture state occupy 1200 fixed bytes including the
+1024-byte payload. There is one slot, no heap or extra payload-sized kernel stack
+copy. Notifications consume an existing window queue entry and wake a parked
+recipient. An idle broker skips its TSC read and endpoint scans. The optional
+external source is checked with one 512-byte header read on explicit F7 on legacy
+provisioned media. No disk I/O is required by transfer or retirement.
+The Deep Drop guest check records private page identities, exact bytes, process
+retirement and disk write counters. Total guest RAM, idle CPU and Beta memory
+acceptance still require separate measurements on the target configuration.

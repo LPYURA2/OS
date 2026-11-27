@@ -1,7 +1,7 @@
-name: StyleOS native application acceptance 70
+name: StyleOS native apps and Deep Drop acceptance
 on:
   push:
-    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71]
+    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72]
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,8 @@ jobs:
           for cc in gcc clang; do
             "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_deep_drop.c kernel/{deep_drop,process_runtime,window_service,user_session_runtime,native_window_channel}.c -o "build/deep-drop/$cc"
             "build/deep-drop/$cc" | tee "build/deep-drop/$cc.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_deep_drop_ipc.c kernel/{deep_drop,deep_drop_ipc,process_runtime,window_service,user_session_runtime,native_window_channel}.c -o "build/deep-drop/ipc-$cc"
+            "build/deep-drop/ipc-$cc" | tee "build/deep-drop/ipc-$cc.log"
           done
       - uses: actions/upload-artifact@v4
         if: always()
@@ -168,6 +170,28 @@ jobs:
           sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
       - name: Ordinary ISO without diagnostic catalog
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --output build/ordinary-shell
+      - name: Deep Drop between real CPL3 clients on the same ordinary ISO
+        run: python3 tools/test_deep_drop_guest.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-guest
+      - name: Package the verified boot ISO
+        run: |
+          mkdir -p build/verified-iso
+          cp build/ordinary-shell/build/x86_64/StyleOS-owned-shell-865.iso build/verified-iso/StyleOS-Deep-Drop-72.iso
+          cd build/verified-iso && sha256sum *.iso > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: styleos-deep-drop-72-iso
+          path: build/verified-iso/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-deep-drop-72-guest
+          path: |
+            build/deep-drop-guest/*.log
+            build/deep-drop-guest/*.json
+            build/deep-drop-guest/*.ppm
+            build/deep-drop-guest/Deep-Drop-clients.raw
+            build/ordinary-shell/build/x86_64/Drop-*.tea
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -68,6 +68,8 @@ static bool russian, shell_refreshed;
 static struct ndb_tracker native_view;
 #ifdef STYLEOS_OWNED_SHELL_865
 static struct ndb_input native_input;
+static bool native_drag_armed;
+static int native_press_x,native_press_y;
 #endif
 static void native_plot(void *unused,int x,int y,uint32_t rgb)
 { (void)unused;desk_fill(x,y,1,1,rgb); }
@@ -676,6 +678,7 @@ static bool keyboard(unsigned key, unsigned mods)
         (void)s865_shell_submit_command(0x30b);return false;
     }
 #endif
+    if(key==0x01u)native_drag_armed=false;
     /* Global shell shortcuts retain precedence; selecting a legacy window
      * clears native keyboard focus. The driver currently emits key presses. */
     const bool system_key=(key>=0x3bu&&key<=0x44u)||key==0x57u||key==0x58u||
@@ -1453,9 +1456,20 @@ static bool mouse(const struct desk_event *event)
     bool down = (event->buttons & 1) != 0;
     bool pressed = down && !mouse_down;
 #ifdef STYLEOS_OWNED_SHELL_865
+    const bool blocked=menu||drag>=0||transfer.id>=0;
+    const bool released=!down&&mouse_down;
+    const uint32_t source=native_input.capture;
+    if(pressed){native_press_x=mx;native_press_y=my;native_drag_armed=!blocked;}
+    if(blocked)native_drag_armed=false;
     if(ndb_route_pointer((struct nwc_service *)nwc_global(),&native_input,
                          width,work_area().h,mx,my,event->buttons,event->modifiers,
-                         pressed,!down&&mouse_down,menu||drag>=0||transfer.id>=0)){
+                         pressed,released,blocked)){
+        if(released && native_drag_armed && native_input.focus==source &&
+           (mx-native_press_x>5||native_press_x-mx>5||my-native_press_y>5||native_press_y-my>5)){
+            uint32_t target=ndb_hit_top(nwc_global(),width,work_area().h,native_input.raised,mx,my);
+            if(target && target!=source)native_drop_gesture(source,target);
+        }
+        if(released)native_drag_armed=false;
         mouse_down=down;
         current_file_click.id=-1;last_file_click.at=0;
         return false;
@@ -1578,6 +1592,7 @@ static void restart_shell(void)
     shell_refreshed = true;
 #ifdef STYLEOS_OWNED_SHELL_865
     native_input=(struct ndb_input){0};
+    native_drag_armed=false;
 #endif
     print_pid("STYLEOS SHELL RESTART pid=", new_pid);
 #if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
@@ -1780,6 +1795,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     native_view=(struct ndb_tracker){0};
 #ifdef STYLEOS_OWNED_SHELL_865
     native_input=(struct ndb_input){0};
+    native_drag_armed=false;
 #endif
     desk_sessions_init(desk_sessions_global());
     desk_draw_init(surface);

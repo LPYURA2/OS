@@ -81,6 +81,8 @@ bool s865_native_shell_probe_available(void);
  * On failure leave kernel destination unchanged. Destination is trusted
  * separate kernel scratch, not caller controlled. */
 bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,size_t);
+/* Trusted compositor release between two visible native windows. */
+void native_drop_gesture(uint32_t source_window,uint32_t target_window);
 /* Trusted, serialized safe-root continuation only. Result is a kernel-only
  * alias of the exact admitted private data span; never return to CPL3.
  * Valid until the next scheduling/admission/release boundary. */

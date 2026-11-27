@@ -498,18 +498,43 @@ bool s69_use_tea_file(const struct po64_row *,const struct nts_pin *,ntsfs_consu
 #if defined(STYLEOS_PROVISIONED_STORAGE_864) && !defined(STYLEOS_LIVE_VOLUME_39) && !defined(STYLEOS_STYLEFS_MOUNT_RO) && !defined(STYLEOS_STYLEFS_MOUNT_RW) && !defined(STYLEOS_STYLEFS_DESKTOP_SCOPE) && !defined(STYLEOS_LBA48_BLOCK_19) && !defined(STYLEOS_WIDE_GUEST_20) && !defined(STYLEOS_PAGED_GUEST_34)
 bool s863_disk_read(uint32_t,uint8_t[512]);
 static uint8_t sample69_disk_package[NTP_MAX_PACKAGE];
-static bool sample69_read_peer(const struct sample69_entry *a){
+#include "deep_drop_pins.h"
+/* Optional external acceptance media. Both user programs are loaded through
+ * the normal pinned package loader. No executable bytes are compiled in. */
+#define DROP72_PIN(role) {drop72_##role##_pkg_hash,drop72_##role##_elf_hash, \
+ drop72_##role##_manifest,sizeof drop72_##role##_manifest,drop72_##role##_bytes}
+static const struct sample69_entry drop72_catalog[]={
+ {0,drop72_source_bytes,DROP72_PIN(source),"Drop-source",{80,80,160,120}},
+ {0,drop72_target_bytes,DROP72_PIN(target),"Drop-target",{280,80,160,120}}
+};
+#undef DROP72_PIN
+static enum ps_status sample_disk_launch(unsigned index,struct s865_window_launch *out){
+ const uint32_t lba=index?3000u:2960u;
+ const struct sample69_entry *app=&drop72_catalog[index];
  uint8_t sector[512];uint32_t bytes=0;
- if(!s863_disk_read(3000u,sector)||
-    ntp_disk_header(sector,a->pin.package_sha,&bytes)!=NTP_OK||
-    bytes!=a->bytes||bytes>NTP_MAX_PACKAGE)return false;
- for(uint32_t i=0;i<(bytes+511u)/512u;++i){
-  if(!s863_disk_read(3001u+i,sector))return false;
-  size_t at=(size_t)i*512u,remaining=bytes-at;
-  size_t count=remaining<512u?remaining:512u;
-  for(size_t j=0;j<count;++j)sample69_disk_package[at+j]=sector[j];
+ bool header=s863_disk_read(lba,sector);
+ if(!header || ntp_disk_header(sector,app->pin.package_sha,&bytes)!=NTP_OK){
+  app=&sample69_catalog[index];
+  if(app->package)return s865_native_launch_tea(app->package,app->bytes,&app->pin,
+      sample69_session,app->name,app->bounds,out);
+  if(!header||ntp_disk_header(sector,app->pin.package_sha,&bytes)!=NTP_OK)return PS_EVIDENCE;
  }
- return true;
+ if(bytes!=app->bytes||bytes>NTP_MAX_PACKAGE)return PS_EVIDENCE;
+ enum ps_status result=PS_EVIDENCE;
+ for(uint32_t offset=0;offset<bytes;offset+=512u){
+  if(!s863_disk_read(lba+1u+offset/512u,sector))goto done;
+  uint32_t count=bytes-offset<512u?bytes-offset:512u;
+  for(uint32_t j=0;j<count;++j)sample69_disk_package[offset+j]=sector[j];
+ }
+ result=s865_native_launch_tea(sample69_disk_package,bytes,&app->pin,sample69_session,
+                               app->name,app->bounds,out);
+ if(result==PS_OK){
+  arch_puts(app==&drop72_catalog[index]?"STYLEOS DD72 DISK":"STYLEOS TEA69 DISK");
+  field("bytes",bytes);field("sectors",1u+(bytes+511u)/512u);arch_putc('\n');
+ }
+done:
+ native_wipe(sample69_disk_package,bytes);
+ return result;
 }
 #endif
 static bool sample69_session_ready(void){
@@ -582,24 +607,14 @@ bool s865_launch_native_sample(void){
  unsigned index=0;
  while(index<SAMPLE69_COUNT&&sample69_live[index].pid)++index;
  if(index==SAMPLE69_COUNT||!sample69_session_ready())return false;
- const struct sample69_entry *a=&sample69_catalog[index];
  struct s865_window_launch out={0};
  enum ps_status status=PS_EVIDENCE;
+#if defined(STYLEOS_PROVISIONED_STORAGE_864) && !defined(STYLEOS_LIVE_VOLUME_39) && !defined(STYLEOS_STYLEFS_MOUNT_RO) && !defined(STYLEOS_STYLEFS_MOUNT_RW) && !defined(STYLEOS_STYLEFS_DESKTOP_SCOPE) && !defined(STYLEOS_LBA48_BLOCK_19) && !defined(STYLEOS_WIDE_GUEST_20) && !defined(STYLEOS_PAGED_GUEST_34)
+ status=sample_disk_launch(index,&out);
+#else
+ const struct sample69_entry *a=&sample69_catalog[index];
  if(a->package)status=s865_native_launch_tea(a->package,a->bytes,&a->pin,sample69_session,
     a->name,a->bounds,&out);
-#if defined(STYLEOS_PROVISIONED_STORAGE_864) && !defined(STYLEOS_LIVE_VOLUME_39) && !defined(STYLEOS_STYLEFS_MOUNT_RO) && !defined(STYLEOS_STYLEFS_MOUNT_RW) && !defined(STYLEOS_STYLEFS_DESKTOP_SCOPE) && !defined(STYLEOS_LBA48_BLOCK_19) && !defined(STYLEOS_WIDE_GUEST_20) && !defined(STYLEOS_PAGED_GUEST_34)
- else{
-  if(sample69_read_peer(a)){
-   status=s865_native_launch_tea(sample69_disk_package,a->bytes,&a->pin,sample69_session,
-     a->name,a->bounds,&out);
-   if(status==PS_OK){
-    arch_puts("STYLEOS TEA69 DISK");field("bytes",a->bytes);
-    field("sectors",1u+(a->bytes+511u)/512u);arch_putc('\n');
-   }
-  }
-  volatile uint8_t *wipe=sample69_disk_package;
-  for(size_t i=0;i<sizeof sample69_disk_package;++i)wipe[i]=0;
- }
 #endif
  if(status!=PS_OK)return false;
  return sample69_publish(index,out);

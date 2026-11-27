@@ -530,7 +530,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if test_storage_pio_runtime_863 or test_desktop_storage_service_863:
         sources += ["kernel/ata_runtime_863.c", "kernel/storage_runtime_863.c"]
     if owned_shell_865:
-        sources += ["kernel/block_service.c"]
+        sources += ["kernel/block_service.c", "kernel/deep_drop.c", "kernel/deep_drop_ipc.c",
+                    "boot/x86_64/native_deep_drop.c"]
     if test_storage_ata_read_857 or test_desktop_storage_service_863:
         sources += ["kernel/ata_diag_857.c"]
     if desktop_owned_root_preview:
@@ -836,6 +837,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         build_shell_controller(folder)
         from build_native_sample_69 import build as build_native_sample
         build_native_sample(folder)
+        from build_deep_drop_clients import build as build_drop_clients
+        build_drop_clients(folder)
         flags += ['-I',str(folder)]
     if owned_shell_865:
         # Link the same authenticated executor and hardware entry as the

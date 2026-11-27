@@ -8,6 +8,7 @@ static struct {uint64_t generation,window;} input_wait70[PS_MAX_SLOTS];
 #include <styleos/fx_guest_849.h>
 #include <styleos/arch.h>
 #ifdef STYLEOS_OWNED_SHELL_865
+#include "native_deep_drop.h"
 #include <styleos/acpi_madt_806.h>
 #include <styleos/user_preempt_848.h>
 #include <styleos/user_session_runtime.h>
@@ -217,7 +218,9 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   arch_puts("STYLEOS NATIVE SHELL-CALL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
   fld848("root",ticket->child_root);fld848("op",op);fld848("reply",reply);arch_putc('\n');
  }
- if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME)){
+ const uint64_t operation=pending860.gpr[0];
+ const bool drop=operation>=DD_CALL_OFFER && operation<=DD_CALL_CANCEL;
+ if(kind==RT865_SYSCALL && (drop||pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
@@ -226,7 +229,15 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
      runtime860->dispatcher.current!=-1||root848()!=safe||(flags848()&0x200))
    fail848("865-pixel-owner");
   enum nwc_status pixel=NWC_INVALID;
-  if(pending860.gpr[0]==NWC_CALL_PIXEL){
+  if(drop){
+   uint64_t result=0;
+   enum dd_status status=native_drop_call(ticket,(unsigned)operation,pending860.gpr[1],
+                                          pending860.gpr[2],pending860.gpr[3],&result);
+   slot->context.gpr[0]=status;slot->context.gpr[3]=result;
+   arch_puts("STYLEOS DD72 CALL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+   fld848("root",ticket->child_root);fld848("op",operation);fld848("id",pending860.gpr[1]);
+   fld848("status",status);fld848("result",result);arch_putc('\n');
+  }else if(pending860.gpr[0]==NWC_CALL_PIXEL){
    pixel=nwc_publish_pixel((struct nwc_service *)nwc_global(),
     ticket->pid,ticket->handle,ticket->child_root,pending860.gpr[1],pending860.gpr[2]);
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
@@ -319,7 +330,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    volatile uint32_t *wipe_pixels=pixels;
    for(size_t j=0;j<NWC_TILE_PIXELS;++j)wipe_pixels[j]=0;
   }
-  slot->context.gpr[0]=(uint64_t)pixel;
+  if(!drop)slot->context.gpr[0]=(uint64_t)pixel;
  }
 #endif
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
@@ -465,6 +476,7 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
  if(status!=PS_OK)return status;
  (void)usr_reconcile((struct usr_runtime *)usr_global());
  (void)nwc_reconcile((struct nwc_service *)nwc_global());
+ native_drop_reconcile();
  /* Cleanup identity only; dispatch zero is not a trap or dispatch ticket. */
  const struct rt862_selection identity={id,0,pid,generation,child,safe};
  retire865_identity(&identity,audit,retire,opaque);
@@ -487,6 +499,7 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
 }
 void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
  if(!s865_executor_idle()||!audit||!retire)fail848("native-poll-boundary");
+ native_drop_reconcile();
  if(!pr_snapshot(runtime860->dispatcher.registry,0,0,true))return;
  if(!audit(opaque))fail848("native-poll-audit");
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
@@ -520,6 +533,7 @@ void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uin
  if(result.kind==RT865_TERMINAL){
   (void)usr_reconcile((struct usr_runtime *)usr_global());
   (void)nwc_reconcile((struct nwc_service *)nwc_global());
+  native_drop_reconcile();
   s865_retire_terminal(&ticket,audit,retire,opaque);
  }
  if(!s865_executor_idle())fail848("native-poll-return");

@@ -132,6 +132,24 @@ enum nwc_status nwc_send_text(struct nwc_service *s,uint32_t win,
     for(size_t i=0;i<len;++i)ev.bytes[i]=src[i];
     return enqueue(s,win,&ev);
 }
+bool nwc_drop_event_valid(const struct nwc_event *event)
+{
+    if (!event || event->kind != NWC_DEEP_DROP || event->size != 8 ||
+        (event->code != DD_REQUEST_TEXT && event->code != DD_TEXT_OFFER) ||
+        event->down || event->modifiers) return false;
+    uint8_t nonzero = 0;
+    for (unsigned i = 0; i < 8; ++i) nonzero |= event->bytes[i];
+    for (unsigned i = 8; i < NWC_TEXT_BYTES; ++i)
+        if (event->bytes[i]) return false;
+    return nonzero != 0;
+}
+enum nwc_status nwc_send_drop(struct nwc_service *s,uint32_t win,uint32_t code,uint64_t id)
+{
+    struct nwc_event event = {.kind=NWC_DEEP_DROP, .code=code, .size=8};
+    for (unsigned i = 0; i < 8; ++i) event.bytes[i] = (uint8_t)(id >> (8*i));
+    if (!win || !nwc_drop_event_valid(&event)) return NWC_INVALID;
+    return enqueue(s,win,&event);
+}
 enum nwc_status nwc_receive(struct nwc_service *s,uint32_t pid,uint64_t handle,
                             uint64_t root,uint32_t win,struct nwc_event *out)
 {

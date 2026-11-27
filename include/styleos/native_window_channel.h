@@ -1,6 +1,7 @@
 #ifndef STYLEOS_NATIVE_WINDOW_CHANNEL_H
 #define STYLEOS_NATIVE_WINDOW_CHANNEL_H
 
+#include <styleos/deep_drop_abi.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -17,7 +18,7 @@ enum { NWC_PORTS = 8, NWC_EVENTS = 4, NWC_TEXT_BYTES = 32,
 enum nwc_status { NWC_OK = 0, NWC_INVALID, NWC_NOT_READY,
                   NWC_DENIED, NWC_MISSING, NWC_FULL, NWC_EMPTY,
                   NWC_STALE, NWC_OVERFLOW };
-enum nwc_event_kind { NWC_KEY = 1, NWC_TEXT = 2, NWC_POINTER = 3 };
+enum nwc_event_kind { NWC_KEY = 1, NWC_TEXT = 2, NWC_POINTER = 3, NWC_DEEP_DROP = DD_EVENT_KIND };
 struct nwc_event {
     uint32_t sequence, window_id;
     enum nwc_event_kind kind;
@@ -71,6 +72,9 @@ enum nwc_status nwc_send_key(struct nwc_service *,uint32_t window_id,
                              uint32_t keycode,uint32_t modifiers,bool pressed);
 enum nwc_status nwc_send_text(struct nwc_service *,uint32_t window_id,
                               const uint8_t *kernel_copy,size_t size);
+/* Queue only the capability id. The runtime audits the complete record. */
+enum nwc_status nwc_send_drop(struct nwc_service *,uint32_t window,uint32_t code,uint64_t id);
+bool nwc_drop_event_valid(const struct nwc_event *);
 /* Trusted pointer producer: code = button mask, down = primary button,
  * size = 8, payload = two little-endian signed 32-bit window-relative
  * coordinates (may be outside the window during capture). */

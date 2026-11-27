@@ -128,6 +128,8 @@ bool rt864_services_boundary(uint64_t live_root){
    if(e->kind==NWC_POINTER){
     if(e->size!=8||(e->code&~7u)||(e->modifiers&~15u)||e->down!=((e->code&1u)!=0))return false;
     for(unsigned k=8;k<NWC_TEXT_BYTES;++k)if(e->bytes[k])return false;
+   }else if(e->kind==NWC_DEEP_DROP){
+    if(!nwc_drop_event_valid(e))return false;
    }else if(e->kind!=NWC_KEY&&e->kind!=NWC_TEXT)return false;
   }
   if(!nwc_frame_valid(q,w))return false;
