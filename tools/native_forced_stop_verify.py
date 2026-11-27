@@ -83,17 +83,24 @@ def verify_shell_boundary(lines,roots,loop=0x1000000d,focus=False,frame=False):
     fields=('root','n','batch','mouse','key','dx','dy','buttons','modifiers','x','y','active','ru','restarts','text','text-hash','text-dirty','note-session','writes')
     inputs=records(lines,b'STYLEOS S863 EVENT',fields)
     f10=[(i,e) for i,e in inputs if e['key']==0x44 and not e['mouse']]
-    if len(f10)!=1 or not at<f10[0][0]<first_stop:raise ValueError('actual F10 event missing')
-    earlier=[e for i,e in inputs if i<at]
-    if not earlier or f10[0][1]['restarts']!=earlier[-1]['restarts']+1:raise ValueError('shell refresh counter')
-    if any(f10[0][1][k]!=earlier[-1][k] for k in ('text','text-hash','text-dirty','note-session')):
+    if len(f10)!=1:raise ValueError('actual F10 event missing')
+    fi,fe=f10[0]
+    earlier=[e for i,e in inputs if i<min(at,fi)]
+    if not earlier:raise ValueError('missing pre-refresh state')
+    if frame:
+        later=[e for i,e in inputs if i>at]
+        if not fi<at<first_stop or fe['restarts']!=earlier[-1]['restarts'] or not later or later[0]['restarts']!=fe['restarts']+1:
+            raise ValueError('controller deferred refresh counter')
+    elif not at<fi<first_stop or fe['restarts']!=earlier[-1]['restarts']+1:
+        raise ValueError('legacy refresh counter')
+    if any(fe[k]!=earlier[-1][k] for k in ('text','text-hash','text-dirty','note-session')):
         raise ValueError('shell document continuity')
     if frame:
         begin=records(lines,b'STYLEOS NATIVE SHELL-GAP-BEGIN',('dispatches',))
         end=records(lines,b'STYLEOS NATIVE SHELL-GAP-END',('dispatches',))
         if len(begin)!=1 or len(end)!=1:raise ValueError('supervisor gap evidence')
         lo,start=begin[0];hi,last=end[0]
-        if not f10[0][0]<lo<hi<first_stop or last['dispatches']-start['dispatches']!=16:
+        if not f10[0][0]<lo<hi<at<first_stop or last['dispatches']-start['dispatches']!=16:
             raise ValueError('supervisor gap dispatch count/order')
         gap=records(lines[lo+1:hi],EVENT,EKEY)
         if len(gap)!=16 or any(e['pid'] not in (1,2) or e['vector']!=0x50 or e['state']!=1 for _,e in gap):
@@ -224,8 +231,10 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
         else:
             actual=[(e['vector'],e['rip'],e['rax'],e['state']) for e in seq]
             if window_frame and pid in (3,33,34):
-                expected=[(128,0x1000000d,1,1),(128,0x10000014,0x104,1),
-                          (6,0x10000020,1,5) if pid==33 else (128,0x10000020,2,4)]
+                expected=[(128,0x1000000d,1,1),(128,0x10000014,0x105,1)]
+                if pid==33:expected.append((6,0x10000042,0x100000044,5))
+                elif pid==34:expected.extend([(128,0x10000036,0x106,1),(128,0x10000042,2,4)])
+                else:expected.append((128,0x10000042,2,4))
             else:expected=[(128,0x1000000d,1,1),(6,0x1000000d,0,5) if a['slot']%8==7 else (128,0x10000014,2,4)]
             if actual!=expected or end>=r0[0]:raise ValueError('peer completion')
     last_normal=max(retire_by_gen[k][0] for k in range(3,33))
@@ -275,6 +284,9 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
         if window_input and e['vector']==128 and e['rax']==0x102:
             want=0x12000fe0 if e['rip']==0x1000007e else 0x12000100
             if one(r'\bRBX=([0-9a-fA-F]+)\b')!=0 or one(r'\bRCX=([0-9a-fA-F]+)\b')!=want or one(r'\bRDX=([0-9a-fA-F]+)\b')!=64:raise ValueError('raw input arguments')
+        if window_frame and e['vector']==128 and e['rax']==0x106:
+            if e['pid']!=34 or one(r'\bRBX=([0-9a-fA-F]+)\b')!=2 or one(r'\bRCX=([0-9a-fA-F]+)\b')!=1 or one(r'\bRDX=([0-9a-fA-F]+)\b')!=0:
+                raise ValueError('raw controller decision')
         if window_frame and e['vector']==128 and e['rax']==0x103:
             want=0x12000ff0 if e['rip']==0x10000000+FRAME_RETURNS[0] else 0x12000200
             if e['pid']!=2 or one(r'\bRBX=([0-9a-fA-F]+)\b')!=0 or one(r'\bRCX=([0-9a-fA-F]+)\b')!=want or one(r'\bRDX=([0-9a-fA-F]+)\b')!=2:raise ValueError('raw frame arguments')
@@ -345,18 +357,25 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
     if window_frame:
         controllers=rec(b'STYLEOS NATIVE SHELL-CONTROLLER',('pid','gen','root','epoch'))
         completed=rec(b'STYLEOS NATIVE SHELL-CONTROLLER-RETIRED',('pid','epoch','resident'))
-        calls=rec(b'STYLEOS NATIVE SHELL-CALL',('pid','gen','root','epoch'))
-        redraw=rec(b'STYLEOS NATIVE SHELL-REDRAW',('epoch',))
+        calls=rec(b'STYLEOS NATIVE SHELL-CALL',('pid','gen','root','op','reply'))
+        submitted=rec(b'STYLEOS NATIVE SHELL-SUBMIT',('key',))
+        applied=rec(b'STYLEOS NATIVE SHELL-APPLY',('epoch',))
         if [tuple(x.values()) for _,x in controllers]!=[(33,33,roots[2],1),(34,34,roots[2],2)] or [tuple(x.values()) for _,x in completed]!=[(33,1,2),(34,2,2)]:
             raise ValueError('controller lifecycle evidence')
-        if [tuple(x.values()) for _,x in calls]!=[(3,3,roots[2],0),(33,33,roots[2],1),(34,34,roots[2],2)] or len(redraw)!=1 or redraw[0][1]['epoch']!=2:
-            raise ValueError('controller authorization and redraw')
-        syscalls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x104]
-        if len(syscalls)!=3 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(calls,syscalls)):
+        want=[(3,3,roots[2],0x105,0),(33,33,roots[2],0x105,0x100000044),
+              (34,34,roots[2],0x105,0x200000044),(34,34,roots[2],0x106,2)]
+        if [tuple(x.values()) for _,x in calls]!=want or len(submitted)!=1 or submitted[0][1]['key']!=0x44 or len(applied)!=1 or applied[0][1]['epoch']!=2:
+            raise ValueError('controller authorization, retained input, approval')
+        syscalls=[(i,e) for i,e in events if e['vector']==128 and e['rax'] in (0x105,0x106)]
+        if len(syscalls)!=4 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(calls,syscalls)):
             raise ValueError('controller receipt not adjacent to actual trap')
         gap=rec(b'STYLEOS NATIVE SHELL-GAP-END',('dispatches',))
-        if len(gap)!=1 or not gap[0][0]<controllers[0][0]<per[33][0][0]<retire_by_gen[33][0]<completed[0][0]<controllers[1][0]<per[34][0][0]<retire_by_gen[34][0]<completed[1][0]<redraw[0][0]<r0[0]:
+        if len(gap)!=1 or not gap[0][0]<controllers[0][0]<per[33][0][0]<retire_by_gen[33][0]<completed[0][0]<controllers[1][0]<per[34][0][0]<retire_by_gen[34][0]<completed[1][0]<applied[0][0]<r0[0]:
             raise ValueError('fault then fresh controller launch and redraw ordering')
+        marks=[i for i,x in enumerate(lines) if x==b'STYLEOS DESKTOP SHELL RESTART']
+        f10=[i for i,e in inputs if e['key']==0x44 and not e['mouse']]
+        if len(marks)!=1 or len(f10)!=1 or not submitted[0][0]<f10[0]<gap[0][0]<applied[0][0]<marks[0]<r0[0]:
+            raise ValueError('actual input then controller approval then UI restart')
         for pid in (1,2):
             if not any(controllers[0][0]<i<completed[1][0] and e['vector']==0x50 for i,e in per[pid]):
                 raise ValueError('application stopped during controller recovery')

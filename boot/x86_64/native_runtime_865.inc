@@ -228,7 +228,8 @@ enum pa_status s865_native_snapshot(const struct pa_request *q,struct pa_row *ro
  return r;
 }
 static struct { uint32_t pid;uint64_t gen,root,epoch; } shell_controller;
-static uint64_t shell_epoch,shell_redraw;
+static uint64_t shell_epoch,shell_redraw,shell_refresh_commit;
+static bool shell_refresh_pending;
 static void shell_controller_reconcile(void){
  if(shell_controller.pid){
   const struct pr_entry *e=pr_find(pr_global(),shell_controller.pid);
@@ -242,7 +243,7 @@ enum ps_status s865_shell_controller_launch(const struct rt865_launch_request *r
  if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
  shell_controller_reconcile();
  if(shell_controller.pid)return PS_STATE;
- if(shell_epoch==UINT64_MAX)return PS_EXHAUSTED;
+ if(shell_epoch==UINT32_MAX)return PS_EXHAUSTED;
  uint32_t pid=0;
  enum ps_status status=s865_native_launch(request,&pid);
  if(status!=PS_OK)return status;
@@ -257,12 +258,52 @@ enum ps_status s865_shell_controller_launch(const struct rt865_launch_request *r
 #endif
  return PS_OK;
 }
-uint64_t s865_shell_controller_request(uint32_t pid,uint64_t gen,uint64_t root){
+static bool shell_controller_auth(uint32_t pid,uint64_t gen,uint64_t root){
  if(!pid||!gen||!root||pid!=shell_controller.pid||gen!=shell_controller.gen||
-    root!=shell_controller.root||!shell_controller.epoch||!native_audit(0))return 0;
+    root!=shell_controller.root||!shell_controller.epoch||!native_audit(0))return false;
  const struct pr_entry *e=pr_find(pr_global(),pid);
- if(!e||e->state!=PR_READY||e->scheduler_handle!=gen||e->page_root!=root)return 0;
+ return e&&e->state==PR_READY&&e->scheduler_handle==gen&&e->page_root==root;
+}
+uint64_t s865_shell_controller_request(uint32_t pid,uint64_t gen,uint64_t root){
+ if(!shell_controller_auth(pid,gen,root))return 0;
  shell_redraw=shell_controller.epoch;return shell_redraw;
+}
+bool s865_shell_submit_refresh(void){
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
+ shell_controller_reconcile();
+ if(!shell_controller.pid){
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+  if(!s865_native_shell_probe_available())return false;
+#else
+  return false;
+#endif
+ }
+ if(!shell_refresh_pending&&!shell_refresh_commit){
+  shell_refresh_pending=true;
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+  arch_puts("STYLEOS NATIVE SHELL-SUBMIT");field("key",0x44);arch_putc('\n');
+#endif
+ }
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+ if(!shell_controller.pid)s865_native_request_shell_gap();
+#endif
+ return true;
+}
+uint64_t s865_shell_controller_event(uint32_t pid,uint64_t gen,uint64_t root){
+ if(!shell_controller_auth(pid,gen,root)||!shell_refresh_pending)return 0;
+ return (shell_controller.epoch<<32)|UINT64_C(0x44);
+}
+uint64_t s865_shell_controller_decide(uint32_t pid,uint64_t gen,uint64_t root,uint64_t epoch,uint64_t action){
+ if(!shell_controller_auth(pid,gen,root)||!shell_refresh_pending||shell_refresh_commit||
+    epoch!=shell_controller.epoch||action!=1)return 0;
+ shell_refresh_commit=epoch;shell_refresh_pending=false;return epoch;
+}
+uint64_t s865_shell_take_refresh(void){
+ uint64_t epoch=shell_refresh_commit;shell_refresh_commit=0;
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+ if(epoch){arch_puts("STYLEOS NATIVE SHELL-APPLY");field("epoch",epoch);arch_putc('\n');}
+#endif
+ return epoch;
 }
 uint64_t s865_shell_take_redraw(void){
  uint64_t epoch=shell_redraw;shell_redraw=0;

@@ -148,6 +148,9 @@ static enum ps_status launch_record(const uint8_t *r,uint32_t *pid,uint32_t *win
 /* Run the same externally pinned executable twice, with actual user
  * fault then fresh launch. The initial ordinary admission of record 2
  * attempts the same syscall without controller authority. */
+bool s865_native_shell_probe_available(void){
+ return frame_probe&&stop_phase==1&&pr_snapshot(pr_global(),0,0,true)==2;
+}
 bool s865_native_probe_shell_controller(void){
  if(!frame_probe)return true;
  unsigned count=0;

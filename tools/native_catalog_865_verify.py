@@ -159,10 +159,17 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                     code+=b'\xbb\x00\x00\x00\x00\xb9'+struct.pack('<I',0xb10000+i+1)+b'\xb8\x00\x01\x00\x00\xcd\x80\x85\xc0\x75\x04\x31\xc0\xeb\xfe\x0f\x0b'
                 else:code+=b'\xeb\xfe'
             elif window_frame and i==2:
-                # Ordinary launch is refused (epoch 0); trusted controller
-                # instance 1 faults at 0x20, instance 2 exits cleanly.
-                code+=b'\xb8\x04\x01\x00\x00\xcd\x80\x83\xf8\x01\x74\x07\xb8\x02\x00\x00\x00\xcd\x80\x0f\x0b'
-                assert len(code)==0x22
+                # Read a real queued key. Ordinary caller gets zero and exits.
+                # Epoch 1 faults before approval. Epoch 2 sees the same key,
+                # decides refresh, checks the committed epoch, then exits.
+                code+=b'\xb8\x05\x01\x00\x00\xcd\x80'
+                assert len(code)==0x14
+                code+=b'\x48\x85\xc0\x74\x22\x48\x89\xc3\x48\xc1\xeb\x20'
+                code+=b'\x83\xf8\x44\x75\x1d\x83\xfb\x01\x74\x18'
+                code+=b'\xb9\x01\x00\x00\x00\xb8\x06\x01\x00\x00\xcd\x80'
+                assert len(code)==0x36
+                code+=b'\x83\xf8\x02\x75\x07\xb8\x02\x00\x00\x00\xcd\x80\x0f\x0b'
+                assert len(code)==0x44
             elif fault_probe and i==0:
                 code+=FAULT_PROBES[fault_probe][0]+b'\x0f\x0b'
             elif bad_rsp and i<3:

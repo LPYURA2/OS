@@ -25,6 +25,14 @@ bool s865_native_probe_window_rollback(const struct rt865_launch_request *,uint3
  * Return 0 from the controller syscall on refusal, nonzero instance epoch
  * on success. Controller exit/fault does not revoke application ownership. */
 #define S865_CALL_SHELL_REDRAW 0x104u
+#define S865_CALL_SHELL_EVENT 0x105u
+#define S865_CALL_SHELL_DECIDE 0x106u
+/* Trusted input submits F10 once; controller reads epoch/key and commits
+ * an exact epoch-bound decision. Pending input survives uncommitted death. */
+bool s865_shell_submit_refresh(void);
+uint64_t s865_shell_controller_event(uint32_t,uint64_t,uint64_t);
+uint64_t s865_shell_controller_decide(uint32_t,uint64_t,uint64_t,uint64_t,uint64_t);
+uint64_t s865_shell_take_refresh(void);
 enum ps_status s865_shell_controller_launch(const struct rt865_launch_request *,uint32_t *);
 uint64_t s865_shell_controller_request(uint32_t,uint64_t,uint64_t);
 uint64_t s865_shell_take_redraw(void);
@@ -36,6 +44,7 @@ _Noreturn void s865_native_supervise(void (*shell_step)(void *),void *);
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
 void s865_native_request_shell_gap(void);
 bool s865_native_probe_shell_controller(void);
+bool s865_native_shell_probe_available(void);
 #endif
 /* Trusted trap continuation on safe root, with exact READY caller identity.
  * Copy only from the admitted private data page, never dereference user VA.

@@ -192,7 +192,8 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
 #ifdef STYLEOS_OWNED_SHELL_865
  /* Only after actual CPL3 trap, safe-root return, scheduler commit and
   * full mapping audit. Never accept caller-supplied PID/root/generation. */
- if(kind==RT865_SYSCALL && pending860.gpr[0]==S865_CALL_SHELL_REDRAW){
+ if(kind==RT865_SYSCALL && (pending860.gpr[0]==S865_CALL_SHELL_REDRAW||
+     pending860.gpr[0]==S865_CALL_SHELL_EVENT||pending860.gpr[0]==S865_CALL_SHELL_DECIDE)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
@@ -200,13 +201,18 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
      slot->handle!=ticket->handle||slot->root!=ticket->child_root||
      runtime860->dispatcher.current!=-1||root848()!=safe||(flags848()&0x200))
    fail848("865-shell-controller-owner");
-  uint64_t epoch=0;
-  if(!pending860.gpr[1]&&!pending860.gpr[2]&&!pending860.gpr[3])
-   epoch=s865_shell_controller_request(ticket->pid,ticket->handle,ticket->child_root);
-  slot->context.gpr[0]=epoch;
+  uint64_t reply=0,op=pending860.gpr[0];
+  if(op==S865_CALL_SHELL_DECIDE){
+   if(!pending860.gpr[3])reply=s865_shell_controller_decide(ticket->pid,ticket->handle,
+    ticket->child_root,pending860.gpr[1],pending860.gpr[2]);
+  }else if(!pending860.gpr[1]&&!pending860.gpr[2]&&!pending860.gpr[3]){
+   if(op==S865_CALL_SHELL_EVENT)reply=s865_shell_controller_event(ticket->pid,ticket->handle,ticket->child_root);
+   else reply=s865_shell_controller_request(ticket->pid,ticket->handle,ticket->child_root);
+  }
+  slot->context.gpr[0]=reply;
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
   arch_puts("STYLEOS NATIVE SHELL-CALL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
-  fld848("root",ticket->child_root);fld848("epoch",epoch);arch_putc('\n');
+  fld848("root",ticket->child_root);fld848("op",op);fld848("reply",reply);arch_putc('\n');
 #endif
  }
  if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME)){

@@ -702,7 +702,16 @@ static bool keyboard(unsigned key, unsigned mods)
 #elif defined(STYLEOS_TEST_DESKTOP_COLD_TASKS_863) && !defined(STYLEOS_OWNED_SHELL_865)
     if (key == 0x43 && !mods) { (void)s863_request_tasks(); return false; }
 #endif
-    if (key == 0x44) { restart_shell(); return true; } /* F10, preserve app state and PIDs */
+    if (key == 0x44) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(s865_shell_submit_refresh())return false;
+#endif
+        restart_shell();
+#if defined(STYLEOS_OWNED_SHELL_865) && defined(STYLEOS_NATIVE_PINNED_CATALOG)
+        s865_native_request_shell_gap();
+#endif
+        return true;
+    } /* F10, preserve app state and PIDs */
     if (key == 0x42) { open_window(TASKS); return true; } /* F8 processes */
     if (key == 0x3f) { open_window(NOTE_WINDOW); return true; } /* F5 Notes */
     if (key == 0x01 && transfer.id >= 0) { transfer.id = -1; transfer.lifted = false; return true; }
@@ -1456,9 +1465,6 @@ static void restart_shell(void)
     desktop_kernel_boundary864();
 #endif
     arch_puts("STYLEOS DESKTOP SHELL RESTART\n");
-#if defined(STYLEOS_OWNED_SHELL_865) && defined(STYLEOS_NATIVE_PINNED_CATALOG)
-    s865_native_request_shell_gap();
-#endif
 }
 
 static bool update_clock(void)
@@ -1513,6 +1519,7 @@ static void desktop_shell_step(void *opaque)
 {
     struct shell_cycle *cycle=opaque;
 #ifdef STYLEOS_OWNED_SHELL_865
+    if(s865_shell_take_refresh())restart_shell();
     if(s865_shell_take_redraw())shell_refreshed=true;
 #endif
     struct desk_event e;
