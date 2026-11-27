@@ -10,6 +10,13 @@
  * Current native ABI: one code page, one data page, one stack page. */
 #ifdef STYLEOS_OWNED_SHELL_865
 enum ps_status s865_native_launch(const struct rt865_launch_request *,uint32_t *);
+/* Trusted immutable, pre-authorized ELF only. No caller from CPL3 or
+ * arbitrary file execution. Exact digest originates in supervisor policy.
+ * Stages, maps, audits and admits under safe CR3; no window/session grant.
+ * Caller keeps source storage stable and outside the native arena/tables.
+ * On refusal output unchanged and all newly acquired resources revoked. */
+enum ps_status s875_native_launch_image(const uint8_t *,size_t,const uint8_t[32],
+ unsigned stack_pages,const char *name,uint32_t *pid);
 /* Trusted, serialized windowed launch on the safe root. Source and session
  * must already be authorized by the supervisor. No user dispatch before
  * process, session, window and channel are established. Outputs unchanged

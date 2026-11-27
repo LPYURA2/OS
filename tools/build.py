@@ -476,6 +476,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         common += ['kernel/user_preempt_848.c','boot/x86_64/user_preemption_848.c']
     if integrated_runtime_864:
         common += ['kernel/native_image_slot_865.c']
+    if owned_shell_865:
+        common += ['kernel/native_app_image_75.c']
     if integrated_runtime_864:
         common += ['boot/x86_64/native_executor_865.c']
         if not owned_shell_865:

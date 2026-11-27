@@ -378,6 +378,31 @@ enum ps_status s865_executor_launch(unsigned id,const struct s846_root *child,
   fail848("865-launch-fp-rollback");
  return result;
 }
+#ifdef STYLEOS_OWNED_SHELL_865
+enum ps_status s875_executor_admit(unsigned id,const struct s846_root *child,
+ const struct s844_arena *arena,const struct s844_lease *lease,const struct nai75_layout *image,
+ const char *name,bool (*audit)(void *),void *opaque,uint32_t *pid){
+ if(!s865_executor_idle()||runtime860->dispatcher.current!=-1||
+    id>=S846_ROOT_COUNT||id>=PS_MAX_SLOTS||bank862.slots[id].pid||
+    !child||!arena||!lease||!image||!name||!pid||!audit||
+    !s844_lease_live(arena,*lease)||!audit(opaque))return PS_EVIDENCE;
+ if(!image->stack_pages||image->stack_pages>NAI75_STACK_PAGES)return PS_EVIDENCE;
+ struct rt858_live live=live848();
+ if(rt861_dispatcher(&live)!=runtime860||
+    !child_writable(child,lapic848,4096)||
+    !child_writable(child,live.gdt,4096)||
+    !child_writable(child,(uintptr_t)idt848,sizeof idt848)||
+    !s865_fx_guest_bind(id,child,lease,bank862.safe))return PS_EVIDENCE;
+ const struct up_context initial={.pc=image->entry,
+    .sp=S846_STACK+(uint64_t)image->stack_pages*4096u,
+    .status=2,.cs=bank862.cs,.ss=bank862.ss};
+ enum ps_status status=rt875_bank_admit_image(&bank862,runtime860,bank862.safe,id,
+     child,lease,image,name,&initial,pid);
+ if(status!=PS_OK&&!s865_fx_retire(id,child->built.root,lease->generation,bank862.safe))
+    fail848("875-launch-fp-rollback");
+ return status;
+}
+#endif
 static void retire865_identity(const struct rt862_selection *t,bool (*audit)(void *),
  bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
  if(!t||!audit||!retire||!runtime860||!active848||armed848||receipt860||

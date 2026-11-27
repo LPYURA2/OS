@@ -61,6 +61,7 @@ SOURCES = (
     "boot/x86_64/fx_guest_849.c",
     "kernel/user_preempt_848.c",
     "kernel/native_image_slot_865.c",
+    "kernel/native_app_image_75.c",
     "boot/x86_64/native_executor_865.c",
     "kernel/process_entry_847.c",
     "kernel/process_trap_847.c",

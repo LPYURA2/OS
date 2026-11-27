@@ -13,9 +13,27 @@ static struct s842_cache native_cache;
 static bool native_ready;
 static uint8_t native_scratch[8192];
 static void native_wipe(void *p,size_t n){volatile unsigned char *b=p;while(n--)*b++=0;}
+static bool native_extent_binding(void){
+ /* A detached lease may precede admission, and an already terminal
+  * bank slot may outlive its wiped root until synchronous bank release.
+  * Every coexisting bank/lease identity must agree, not just page count. */
+ for(unsigned i=0;i<S846_ROOT_COUNT;++i){
+  const struct rt862_bank_slot *slot=&bank862.slots[i];
+  if(!slot->pid)continue;
+  if(!native_leases[i].generation){
+   const struct pr_entry *p=pr_find(pr_global(),slot->pid);
+   if(!p||(p->state!=PR_EXITED&&p->state!=PR_FAULTED))return false;
+   continue;
+  }
+  struct s846_extent e=rt862_extent(&bank862,i),n=native_extents[i];
+  if(slot->handle!=native_leases[i].generation||slot->root!=native_roots[i].built.root||
+     e.code!=n.code||e.data!=n.data||e.stack!=n.stack)return false;
+ }
+ return true;
+}
 static bool native_audit(void *unused){
  (void)unused;
- return native_arena&&native_evidence&&read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(&native_cache)&&
+ return native_extent_binding()&&native_arena&&native_evidence&&read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(&native_cache)&&
   rt875_roots_audit_sparse_frozen(base861,&native_cache,&frozen861,native_evidence,native_arena,native_leases,native_extents,&native_guard,&composed,native_roots);
 }
 volatile uint8_t *s865_native_data_span(unsigned id,uint32_t pid,uint64_t gen,uint64_t root,
@@ -99,6 +117,61 @@ enum ps_status s865_native_launch(const struct rt865_launch_request *request,uin
  arch_puts("STYLEOS NATIVE ADMIT");field("slot",id);field("pid",assigned);field("gen",native_leases[id].generation);field("root",native_roots[id].built.root);field("entry",image.entry);arch_putc('\n');
  arch_puts("STYLEOS NATIVE LEASE");field("pid",assigned);field("gen",native_leases[id].generation);field("pa",native_leases[id].pa);field("pages",native_leases[id].pages);arch_putc('\n');
 #endif
+ return PS_OK;
+}
+/* Common detached allocation rollback. No process has been published and
+ * no FP binding remains. The arena release scrubs every acquired page. */
+static void native_discard_image(unsigned id){
+ native_wipe(&native_roots[id],sizeof native_roots[id]);
+ native_wipe(child_tables861[id],sizeof child_tables861[id]);
+ if(!s844_release(native_arena,native_leases[id].owner,native_leases[id]))
+    fail("875-image-discard");
+ native_wipe(&native_leases[id],sizeof native_leases[id]);
+ native_wipe(&native_extents[id],sizeof native_extents[id]);
+ if(!native_audit(0))fail("875-image-discard-audit");
+}
+enum ps_status s875_native_launch_image(const uint8_t *elf,size_t bytes,const uint8_t hash[32],
+ unsigned stack,const char *name,uint32_t *pid){
+ if(!elf||!hash||!name||!pid||(uintptr_t)pid%_Alignof(uint32_t))return PS_ARGUMENT;
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
+ if(pr_global()->change_serial>UINT32_MAX-128u)return PS_EXHAUSTED;
+ /* Copy the bounded name before any allocation. Source and output are
+  * trusted supervisor objects, not user pointers. Reject arena aliasing
+  * before zero-on-acquire can change even a vacant source span. */
+ char label[PR_LABEL_BYTES]={0};
+ unsigned n=0;for(;n<sizeof label&&name[n];++n)label[n]=name[n];
+ if(!n||n==sizeof label)return PS_ARGUMENT;
+ const uintptr_t start=(uintptr_t)elf,hp=(uintptr_t)hash,op=(uintptr_t)pid;
+ const uint64_t lo=native_arena->base,hi=lo+S844_BYTES;
+ if(!bytes||bytes>NAI75_MAX_ELF||bytes>UINTPTR_MAX-start||32u>UINTPTR_MAX-hp||
+    sizeof *pid>UINTPTR_MAX-op||
+    (start<hi&&lo<start+bytes)||(hp<hi&&lo<hp+32u)||(op<hi&&lo<op+sizeof *pid)||
+    (op<start+bytes&&start<op+sizeof *pid)||(op<hp+32u&&hp<op+sizeof *pid))
+    return PS_ARGUMENT;
+ struct nai75_layout plan={0},staged={0};
+ if(nai75_inspect(elf,bytes,hash,stack,&plan)!=NTE_OK)return PS_EVIDENCE;
+ unsigned id=0;while(id<S846_ROOT_COUNT&&native_leases[id].generation)++id;
+ if(id==S846_ROOT_COUNT)return PS_FULL;
+ if(!s844_acquire(native_arena,S846_OWNER_A+id,plan.total_pages,&native_leases[id]))
+    return PS_FULL;
+ native_extents[id]=(struct s846_extent){plan.code_pages,plan.data_pages,plan.stack_pages};
+ if(nai75_stage(native_arena,native_leases[id],elf,bytes,hash,stack,&staged)!=NTE_OK||
+    staged.entry!=plan.entry||staged.code_pages!=plan.code_pages||
+    staged.data_pages!=plan.data_pages||staged.stack_pages!=plan.stack_pages||
+    staged.total_pages!=plan.total_pages||
+    !s875_root_build(base861,&native_cache,native_arena,native_leases,native_extents,id,
+       &native_guard,child_tables861[id],(uintptr_t)child_tables861[id],&native_roots[id])||
+    !native_audit(0)){
+    native_discard_image(id);return PS_EVIDENCE;
+ }
+ uint32_t assigned=0;
+ enum ps_status status=s875_executor_admit(id,&native_roots[id],native_arena,
+    &native_leases[id],&staged,label,native_audit,0,&assigned);
+ if(status!=PS_OK){native_discard_image(id);return status;}
+ if(pr_account(pr_global(),assigned,native_leases[id].generation,0,
+               (uint64_t)native_leases[id].pages*4096u)!=PR_OK||
+    !s865_executor_idle()||!native_audit(0))fail("875-image-publish");
+ *pid=assigned;
  return PS_OK;
 }
 enum ps_status s865_native_stop(uint32_t pid,uint64_t generation,bool authorized){
