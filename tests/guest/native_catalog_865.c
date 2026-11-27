@@ -177,7 +177,39 @@ bool s865_native_probe_shell_controller(void){
 static bool stop_fail(void){
  arch_puts("STYLEOS NATIVE FAIL forced-stop acceptance\n");return false;
 }
+/* Exercise the same supervisor with the same authenticated source after
+ * the successful real F10 command has been consumed. Epochs >=3 deliberately
+ * spin in CPL3 without committing. No additional privileged fault hook. */
+static bool probe_shell_exhaustion(void){
+ struct stop_owned target,peer;
+ if(!owned_refs(stop_pid,stop_window,&target)||!owned_refs(peer_pid,peer_window,&peer))return false;
+ static unsigned char owner[sizeof(struct usr_owner)],window[sizeof(struct ws_window)],port[sizeof(struct nwc_port)];
+ copy_bytes(owner,target.owner,sizeof owner);
+ copy_bytes(window,target.window,sizeof window);
+ copy_bytes(port,target.port,sizeof port);
+ save_peer(&peer);
+ if(s865_shell_recovery_busy()||s865_shell_recovery_exhausted()||s865_shell_take_refresh())return false;
+ uint64_t start=runtime860->dispatcher.dispatches;
+ arch_puts("STYLEOS NATIVE SHELL-EXHAUST-BEGIN");field("dispatches",start);arch_putc('\n');
+ if(!s865_shell_submit_refresh()||!s865_shell_recovery_busy())return false;
+ for(unsigned step=0;step<160&&s865_shell_recovery_busy();++step)s865_native_pump();
+ if(s865_shell_recovery_busy()||!s865_shell_recovery_exhausted()||s865_shell_take_refresh())return false;
+ /* Repeated input must neither fall through to the privileged legacy
+  * restart nor launch an unlimited fourth controller. */
+ if(!s865_shell_submit_refresh()||s865_shell_recovery_busy())return false;
+ uint64_t exhausted=runtime860->dispatcher.dispatches;
+ for(unsigned step=0;step<12;++step)s865_native_pump();
+ if(runtime860->dispatcher.dispatches!=exhausted+12||s865_shell_recovery_busy()||
+    !s865_shell_recovery_exhausted()||s865_shell_take_refresh()||
+    pr_snapshot(pr_global(),0,0,true)!=2||!same_peer(&peer)||
+    !same_bytes(target.owner,owner,sizeof owner)||!same_bytes(target.window,window,sizeof window)||
+    !same_bytes(target.port,port,sizeof port))return false;
+ arch_puts("STYLEOS NATIVE SHELL-EXHAUST-END");field("dispatches",runtime860->dispatcher.dispatches);
+ field("resident",2);arch_putc('\n');
+ return true;
+}
 static bool stop_step(void){
+ if(frame_probe&&stop_phase==1&&!probe_shell_exhaustion())return stop_fail();
  const struct pr_entry *target=pr_find(pr_global(),stop_pid);
  const struct pr_entry *peer=pr_find(pr_global(),peer_pid);
  if(!target||!peer||target->state!=PR_READY||peer->state!=PR_READY||

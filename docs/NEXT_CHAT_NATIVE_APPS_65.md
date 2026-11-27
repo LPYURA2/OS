@@ -1,0 +1,7 @@
+# Shell timeout and exhaustion 65 candidate
+
+Accepted 64 ae0e5eadcf27e4b1517a36cd4a634e3ff2a30800, CI 46040870418 4/4 SUCCESS, guest 15220415595, source 15219344828. Owner: finish independent applications and acceptance, then Deep Drop, then system applications (Explorer first), network/browser/updates, Beta, sound/VPN. Main and old versions preserved.
+
+65 retains positive real F10 recovery, then during the first trusted stop action submits a second request with the same pinned controller ELF. Epochs 3–5 deliberately spin forever in CPL3. Supervisor must retire exactly three real contexts on its existing 32-pump budget, exhaust retries, keep the pending command unapplied, consume repeated refresh without legacy fallback, and run both peers for another 12 dispatches. Verify full owner/window/port bytes unchanged, exact timeout receipts, raw QEMU traps, fresh identities, fairness and original frame/rollback evidence. Application restart becomes PID38, rollback probes 39–42. Fix diagnostic gap scheduling to occur only before source registration, not on subsequent configured commands.
+
+CI pending. Timeout uses pump opportunities rather than wall time. This verifies recovery policy under a diagnostic pinned provider, not yet the full normal shell. Remaining: ordinary verified controller provider, migration of other shell control actions and final honest acceptance. No UI redesign, merge or release. Deep Drop follows acceptance.

@@ -160,16 +160,19 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                 else:code+=b'\xeb\xfe'
             elif window_frame and i==2:
                 # Read a real queued key. Ordinary caller gets zero and exits.
-                # Epoch 1 faults before approval. Epoch 2 sees the same key,
-                # decides refresh, checks the committed epoch, then exits.
+                # Epoch 1 faults before approval. Epoch 2 approves.
+                # Epochs 3+ spin forever without approving, for timeout.
                 code+=b'\xb8\x05\x01\x00\x00\xcd\x80'
                 assert len(code)==0x14
-                code+=b'\x48\x85\xc0\x74\x22\x48\x89\xc3\x48\xc1\xeb\x20'
-                code+=b'\x83\xf8\x44\x75\x1d\x83\xfb\x01\x74\x18'
+                code+=b'\x48\x85\xc0\x74\x27\x48\x89\xc3\x48\xc1\xeb\x20'
+                code+=b'\x83\xf8\x44\x75\x22\x83\xfb\x01\x74\x1d'
+                assert len(code)==0x2a
+                code+=b'\x83\xfb\x02\x77\x1a'
                 code+=b'\xb9\x01\x00\x00\x00\xb8\x06\x01\x00\x00\xcd\x80'
-                assert len(code)==0x36
+                assert len(code)==0x3b
                 code+=b'\x83\xf8\x02\x75\x07\xb8\x02\x00\x00\x00\xcd\x80\x0f\x0b'
-                assert len(code)==0x44
+                assert len(code)==0x49
+                code+=b'\xeb\xfe'
             elif fault_probe and i==0:
                 code+=FAULT_PROBES[fault_probe][0]+b'\x0f\x0b'
             elif bad_rsp and i<3:

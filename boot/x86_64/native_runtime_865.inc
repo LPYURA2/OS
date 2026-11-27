@@ -304,7 +304,7 @@ bool s865_shell_submit_refresh(void){
 #endif
  }
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
- if(!shell_controller.pid)s865_native_request_shell_gap();
+ if(!shell_controller.pid&&!shell_recovery.configured)s865_native_request_shell_gap();
 #endif
  return true;
 }
@@ -345,6 +345,11 @@ static void shell_recovery_tick(void){
    shell_recovery.pid=0;shell_recovery.gen=0;shell_recovery.slices=0;
    shell_recovery.delay=2u*shell_recovery.attempts;
   }else if(++shell_recovery.slices>=SHELL_SLICE_LIMIT){
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+   arch_puts("STYLEOS NATIVE SHELL-TIMEOUT");field("pid",shell_recovery.pid);
+   field("gen",shell_recovery.gen);field("slices",shell_recovery.slices);
+   field("dispatches",runtime860->dispatcher.dispatches);arch_putc('\n');
+#endif
    if(s865_native_stop(shell_recovery.pid,shell_recovery.gen,true)!=PS_OK)fail("shell-recovery-timeout");
    shell_controller_reconcile();
    return;
