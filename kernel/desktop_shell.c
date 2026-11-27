@@ -920,6 +920,51 @@ static void maximize(int id)
     if (id == NOTES || id == NOTE_WINDOW) edit_scroll();
 }
 
+/* Title commands preserve the existing dirty-document guard and the
+ * independent application sessions. A controller never receives a pointer. */
+static void close_legacy_window(int id)
+{
+    struct window *w=&win[id];
+    if ((id == NOTES || id == NOTE_WINDOW) && dirty)
+        notice = "Перед закрытием сохраните текст";
+    else {
+        if ((id == NOTES || id == NOTE_WINDOW) && modern_shell()) {
+#ifdef STYLEOS_LIVE_VOLUME_39
+            if(id==NOTES)paged_editor_open=false;
+#endif
+            document = -1; length = caret = 0; scroll = 0; notice = "";
+        }
+        w->open=false;
+        if(session_kind_for(id)!=DESK_SESSION_COUNT)
+            (void)desk_sessions_stop(desk_sessions_global(),session_kind_for(id));
+        arch_puts("STYLEOS DESKTOP WINDOW CLOSE\n");
+    }
+}
+#ifdef STYLEOS_OWNED_SHELL_865
+static struct {int id,dx,dy;} shell_target={-1,0,0};
+static bool queue_window_action(unsigned key,int id,int dx,int dy)
+{
+    if(id<0||id>=WINDOWS||!s865_shell_submit_command(key))return false;
+    shell_target.id=id;shell_target.dx=dx;shell_target.dy=dy;return true;
+}
+static void apply_window_action(unsigned action)
+{
+    int id=shell_target.id;
+    int dx=shell_target.dx,dy=shell_target.dy;
+    shell_target.id=-1;
+    if(id<0||id>=WINDOWS||!win[id].open)return;
+    struct window *w=&win[id];
+    if(action==8){open_window(id);return;}
+    if(!visible(id))return;
+    front(id);
+    if(action==4)close_legacy_window(id);
+    else if(action==5)maximize(id);
+    else if(action==6){w->minimized=true;arch_puts("STYLEOS DESKTOP WINDOW MINIMIZE\n");}
+    else if(action==7&&!w->maximized&&mouse_down){
+        drag=id;drag_x=dx;drag_y=dy;drag_moved=false;
+    }
+}
+#endif
 static void click(int x, int y)
 {
 #ifdef STYLEOS_LIVE_VOLUME_46
@@ -949,7 +994,12 @@ static void click(int x, int y)
     }
     process_cancel();
 #endif
-    if (contains(start_box(), x, y)) { menu = !menu; return; }
+    if (contains(start_box(), x, y)) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(s865_shell_submit_command(0x3e))return;
+#endif
+        menu = !menu; return;
+    }
     if (contains(language_box(), x, y)) { menu = false; toggle_language(); return; }
     if (menu) {
         struct desk_box m = menu_box();
@@ -972,6 +1022,9 @@ static void click(int x, int y)
         int n = 0;
         for (int i = 0; i < WINDOWS; ++i) if (win[i].open) {
             if (contains(task_button(n++), x, y)) {
+#ifdef STYLEOS_OWNED_SHELL_865
+                if(queue_window_action(active()==i?0x200u:0x201u,i,0,0))return;
+#endif
                 if (active() == i) { win[i].minimized = true; arch_puts("STYLEOS DESKTOP WINDOW MINIMIZE\n"); }
                 else open_window(i);
                 break;
@@ -984,27 +1037,14 @@ static void click(int x, int y)
         struct window *w = &win[id];
         struct desk_box b = w->box;
         if (!w->open || w->minimized || !contains(b, x, y)) continue;
-        front(id);
         int dx = x - b.x, dy = y - b.y, right = b.w - dx;
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(dy<TITLE&&queue_window_action(0x100u+(unsigned)min(right,126),id,dx,dy))return;
+#endif
+        front(id);
         if (dy < TITLE) {
             if (right < 42) {
-                if ((id == NOTES || id == NOTE_WINDOW) && dirty)
-                    notice = "Перед закрытием сохраните текст";
-                else {
-                    if ((id == NOTES || id == NOTE_WINDOW) && modern_shell()) {
-#ifdef STYLEOS_LIVE_VOLUME_39
-                        if(id==NOTES)paged_editor_open=false;
-#endif
-                        document = -1;
-                        length = caret = 0;
-                        scroll = 0;
-                        notice = "";
-                    }
-                    w->open = false;
-                    if (session_kind_for(id) != DESK_SESSION_COUNT)
-                        (void)desk_sessions_stop(desk_sessions_global(), session_kind_for(id));
-                    arch_puts("STYLEOS DESKTOP WINDOW CLOSE\n");
-                }
+                close_legacy_window(id);
             } else if (right < 84) maximize(id);
             else if (right < 126) {
                 w->minimized = true;
@@ -1534,6 +1574,7 @@ static void desktop_shell_step(void *opaque)
     unsigned shell_action=s865_shell_take_command();
     if(shell_action==2){menu=!menu;shell_refreshed=true;}
     else if(shell_action==3){open_window(TASKS);shell_refreshed=true;}
+    else if(shell_action>=4&&shell_action<=8){apply_window_action(shell_action);shell_refreshed=true;}
 #endif
     struct desk_event e;
 #if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))

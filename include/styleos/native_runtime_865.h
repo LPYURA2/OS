@@ -30,8 +30,10 @@ bool s865_native_probe_window_rollback(const struct rt865_launch_request *,uint3
 /* Trusted input submits F10 once; controller reads epoch/key and commits
  * an exact epoch-bound decision. Pending input survives uncommitted death. */
 bool s865_shell_submit_refresh(void);
-/* Only ordinary provisioned controller; F4/Super and F8. Input polling
- * waits until the pending command has completed or recovery is exhausted. */
+/* Only ordinary provisioned controller. Keys: F4/F8; title region
+ * 0x101..0x17e (distance from right, saturated at 126); task button
+ * 0x200 active, 0x201 inactive. No caller-controlled object pointer.
+ * Input polling waits for completed command or bounded exhaustion. */
 bool s865_shell_submit_command(unsigned key);
 bool s865_shell_command_waiting(void);
 unsigned s865_shell_take_command(void);

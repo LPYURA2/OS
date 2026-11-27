@@ -310,23 +310,39 @@ bool s865_shell_submit_command(unsigned key){
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  (void)key;return false;
 #else
- if(key!=0x3e&&key!=0x42)return false;
+ if(key!=0x3e&&key!=0x42&&!(key>=0x101&&key<=0x17e)&&key!=0x200&&key!=0x201)return false;
  return shell_submit_key(key);
 #endif
 }
 bool s865_shell_command_waiting(void){
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
  return !shell_recovery.exhausted&&((shell_refresh_pending&&shell_pending_key!=0x44)||
    (shell_refresh_commit&&shell_commit_action!=1));
+#else
+ return !shell_recovery.exhausted&&(shell_refresh_pending||shell_refresh_commit);
+#endif
 }
 uint64_t s865_shell_controller_event(uint32_t pid,uint64_t gen,uint64_t root){
  if(!shell_controller_auth(pid,gen,root)||!shell_refresh_pending)return 0;
  return (shell_controller.epoch<<32)|shell_pending_key;
 }
+/* Kernel checks the scope of a decision, independently of ELF policy.
+ * The target window and pointer coordinates stay in trusted view state. */
+static unsigned shell_allowed_action(unsigned key){
+ if(key==0x44)return 1;
+ if(key==0x3e)return 2;
+ if(key==0x42)return 3;
+ if(key>=0x101&&key<0x12a)return 4;
+ if(key>=0x12a&&key<0x154)return 5;
+ if(key>=0x154&&key<0x17e)return 6;
+ if(key==0x17e)return 7;
+ if(key==0x200)return 6;
+ if(key==0x201)return 8;
+ return 0;
+}
 uint64_t s865_shell_controller_decide(uint32_t pid,uint64_t gen,uint64_t root,uint64_t epoch,uint64_t action){
  if(!shell_controller_auth(pid,gen,root)||!shell_refresh_pending||shell_refresh_commit||
-    epoch!=shell_controller.epoch||
-    !((shell_pending_key==0x44&&action==1)||(shell_pending_key==0x3e&&action==2)||
-      (shell_pending_key==0x42&&action==3)))return 0;
+    epoch!=shell_controller.epoch||!action||action!=shell_allowed_action(shell_pending_key))return 0;
  shell_refresh_commit=epoch;shell_commit_action=(unsigned)action;
  shell_refresh_pending=false;shell_pending_key=0;return epoch;
 }

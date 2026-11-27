@@ -47,6 +47,22 @@ def exercise(d,proc,serial,folder,wait):
     pf.check(px+12,py,'e6ad63')
     from native_process_view_02 import verify_snapshot
     verify_snapshot(raw(),live=False)
+    # Exercise real title controls on the processes window. The input path
+    # submits a hit-region distance, not a preselected maximize/close action.
+    def title(x,y):
+        count=sum(t==b'STYLEOS SHELL ACTION RENDERED' for t in raw())
+        d.click(x,y)
+        wait(proc,serial,b'STYLEOS SHELL ACTION RENDERED',count+1)
+    title(px+min(pf.w//2,510)-70,py+19)
+    big=d.screen('extended-window-max')
+    if big.pixels==pf.pixels:raise ValueError('maximize missing')
+    title(pf.w-70,19)
+    normal=d.screen('extended-window-restore')
+    normal.check(px+12,py,'e6ad63')
+    if normal.pixels==big.pixels:raise ValueError('restore missing')
+    title(px+min(pf.w//2,510)-25,py+19)
+    gone=d.screen('extended-window-close')
+    if gone.pixels==normal.pixels:raise ValueError('close missing')
     # F10 is a shell refresh, not a kernel reboot. Track the actual note
     # session and text receipts through the refresh and subsequent input.
     before=procs
@@ -57,7 +73,7 @@ def exercise(d,proc,serial,folder,wait):
     rf=d.screen('extended-restart')
     restored=key('f6',0x40)
     if lang['ru']==restart['ru'] or restored['ru']!=restart['ru']:raise ValueError('language switching')
-    (folder/'extended-desktop.json').write_text(json.dumps({'cursor':mv,'menu':opened,'closed':closed,'processes':procs,'restart':restart,'language':lang,'restored':restored,'frames':{x:hashlib.sha256((folder/(x+'.ppm')).read_bytes()).hexdigest() for x in ('extended-cursor-start','extended-cursor-end','extended-menu','extended-menu-closed','extended-processes','extended-restart')}},indent=2)+'\n')
+    (folder/'extended-desktop.json').write_text(json.dumps({'cursor':mv,'menu':opened,'closed':closed,'processes':procs,'restart':restart,'language':lang,'restored':restored,'frames':{x:hashlib.sha256((folder/(x+'.ppm')).read_bytes()).hexdigest() for x in ('extended-cursor-start','extended-cursor-end','extended-menu','extended-menu-closed','extended-processes','extended-window-max','extended-window-restore','extended-window-close','extended-restart')}},indent=2)+'\n')
 
 def verify(folder,lines,root):
     from native_process_view_02 import verify_snapshot
@@ -76,10 +92,10 @@ def verify(folder,lines,root):
     actions=records(lines,b'STYLEOS NATIVE SHELL-ACTION',('epoch','action'))
     submits=records(lines,b'STYLEOS NATIVE SHELL-SUBMIT',('key',))
     renders=[i for i,x in enumerate(lines) if x==b'STYLEOS SHELL ACTION RENDERED']
-    if (len(admitted),len(calls),len(applied),len(retired),len(actions),len(submits),len(renders))!=(4,8,1,4,3,4,3):
+    if (len(admitted),len(calls),len(applied),len(retired),len(actions),len(submits),len(renders))!=(7,14,1,7,6,7,6):
         raise ValueError('ordinary controller lifecycle count')
-    keys=(0x3e,0x3e,0x42,0x44)
-    if [x['key'] for _,x in submits]!=list(keys) or [tuple(x.values()) for _,x in actions]!=[(1,2),(2,2),(3,3)]:
+    keys=(0x3e,0x3e,0x42,0x146,0x146,0x119,0x44)
+    if [x['key'] for _,x in submits]!=list(keys) or [tuple(x.values()) for _,x in actions]!=[(1,2),(2,2),(3,3),(4,5),(5,5),(6,4)]:
         raise ValueError('ordinary command policy')
     for j,(i,a) in enumerate(admitted):
         pid,gen,child,epoch=a.values()
@@ -87,9 +103,9 @@ def verify(folder,lines,root):
         if [tuple(x.values()) for _,x in calls[2*j:2*j+2]]!=[(pid,gen,child,0x105,(epoch<<32)|keys[j]),(pid,gen,child,0x106,epoch)] or tuple(retired[j][1].values())!=(pid,epoch,0):
             raise ValueError('ordinary controller syscall and cleanup')
         if not submits[j][0]<i<calls[2*j][0]<calls[2*j+1][0]:raise ValueError('ordinary controller order')
-        if j<3 and not calls[2*j+1][0]<retired[j][0]<actions[j][0]<renders[j]<submits[j+1][0]:
+        if j<6 and not calls[2*j+1][0]<retired[j][0]<actions[j][0]<renders[j]<submits[j+1][0]:
             raise ValueError('command after retirement and actual render')
-    if applied[0][1]['epoch']!=4 or not calls[-1][0]<applied[0][0]<lines.index(b'STYLEOS DESKTOP SHELL RESTART'):
+    if applied[0][1]['epoch']!=7 or not calls[-1][0]<applied[0][0]<lines.index(b'STYLEOS DESKTOP SHELL RESTART'):
         raise ValueError('ordinary controller refresh ordering')
     if lines.count(b'STYLEOS SHELL PROVIDER READY')!=1:raise ValueError('ordinary provider readiness')
     if not any(x==b'STYLEOS DESKTOP CURSOR DAMAGE PASS' for x in lines):raise ValueError('cursor proof missing')
