@@ -172,6 +172,8 @@ jobs:
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --output build/ordinary-shell
       - name: Deep Drop between real CPL3 clients on the same ordinary ISO
         run: python3 tools/test_deep_drop_guest.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-guest
+      - name: Deep Drop 73 actual minimized destination and gesture cancellation
+        run: python3 tools/test_deep_drop_taskbar_73.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-taskbar-73
       - name: Package the verified boot ISO
         run: |
           mkdir -p build/verified-iso
@@ -192,6 +194,15 @@ jobs:
             build/deep-drop-guest/*.ppm
             build/deep-drop-guest/Deep-Drop-clients.raw
             build/ordinary-shell/build/x86_64/Drop-*.tea
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-deep-drop-73-taskbar
+          path: |
+            build/deep-drop-taskbar-73/*.log
+            build/deep-drop-taskbar-73/*.json
+            build/deep-drop-taskbar-73/*.ppm
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
         with:
