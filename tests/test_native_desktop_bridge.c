@@ -8,7 +8,7 @@ static struct ws_service windows;
 static struct usr_runtime sessions;
 static struct nwc_service ipc;
 static struct ndb_tracker tracked;
-static uint32_t framebuffer[800u*600u];
+static uint32_t framebuffer[800u*600u],baseline[800u*600u];
 static struct desktop_surface surface={
     (uintptr_t)framebuffer,sizeof(framebuffer),800,600,800,DESKTOP_BGR_BYTES
 };
@@ -19,10 +19,14 @@ static void pixel(void *opaque,int x,int y,uint32_t color)
     if(calls)++*calls;
     desk_fill(x,y,1,1,color);
 }
+static void fill(void *opaque,int x,int y,int w,int h,uint32_t color)
+{
+    (void)opaque;desk_fill(x,y,w,h,color);
+}
 static void scene(void)
 {
     desk_fill(0,0,800,600,0x142030);
-    (void)ndb_paint(&ipc,800,540,pixel,0);
+    (void)ndb_paint_rects(&ipc,800,540,pixel,fill,0);
 }
 static void update(unsigned expect)
 {
@@ -123,6 +127,10 @@ int main(void)
     assert(nwc_publish_tile(&ipc,p2,32,131072,w2,pattern,16,16)==NWC_OK);
     update(1);
     assert(framebuffer[16u*800u+10u]==0xabcdef);
+    /* Establish real full-screen background before incremental frame update. */
+    const struct desk_damage all={.all=true};
+    assert(desk_present(&all,scene)==800u*600u);
+    memcpy(baseline,framebuffer,sizeof baseline);
     const struct nwc_rect frame[]={{0,0,300,120,0x112233},{20,30,160,60,0x8899aa},{25,35,5,5,0x00ff00}};
     const struct nwc_rect invalid[]={{0,0,300,120,0x112233},{299,0,2,1,0}};
     assert(nwc_publish_frame(&ipc,p1,16,65536,w2,frame,3)==NWC_DENIED);
@@ -137,6 +145,9 @@ int main(void)
     assert(framebuffer[51u*800u+35u]==0x00ff00);
     assert(framebuffer[135u*800u+309u]==0x112233);
     assert(framebuffer[136u*800u+310u]==0x142030);
+    for(unsigned y=0;y<600;++y)for(unsigned x=0;x<800;++x)
+        if(x<10||x>=310||y<16||y>=136)
+            assert(framebuffer[y*800u+x]==baseline[y*800u+x]);
     assert(ndb_hit(&ipc,800,540,309,135)==w2);
     assert(nwc_publish_frame(&ipc,p2,32,131072,w2,invalid,2)==NWC_INVALID);
     update(0);

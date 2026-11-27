@@ -88,6 +88,16 @@ int main(int argc,char **argv){
    channel->ports[0].events[1].bytes[8]=1;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;
    channel->ports[0].events[1].kind=99;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;
    OK(rt864_shell_boundary(e.root,&v));
+   const struct nwc_rect frame[]={{0,0,400,300,0x123456},{3,4,9,10,0xabcdef}};
+   OK(nwc_publish_frame(channel,pid,999,0x90000,win,frame,2)==NWC_OK&&rt864_shell_boundary(e.root,&v));
+   const struct nwc_frame frame_saved=channel->ports[0].frame;
+   channel->ports[0].frame.count=NWC_FRAME_RECTS+1;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].frame=frame_saved;
+   channel->ports[0].frame.rect[0].w=399;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].frame=frame_saved;
+   channel->ports[0].frame.rect[1].x=UINT32_MAX;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].frame=frame_saved;
+   channel->ports[0].frame.rect[1].rgb=0x1000000;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].frame=frame_saved;
+   channel->ports[0].frame.rect[2].w=1;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].frame=frame_saved;
+   channel->ports[0].frame.generation=0;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].frame=frame_saved;
+   OK(rt864_shell_boundary(e.root,&v));
    struct nwc_port saved=channel->ports[0];channel->ports[0].user_root^=4096;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
    channel->ports[0].head=NWC_EVENTS;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
    channel->ports[0].events[0].sequence=8;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
