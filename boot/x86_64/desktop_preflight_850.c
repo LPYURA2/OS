@@ -675,6 +675,9 @@ static bool large_attach863(void){
 #ifdef STYLEOS_WIDE_GUEST_20
 #include "stylefs_wide_guest_20.inc"
 #endif
+#ifdef STYLEOS_PAGED_GUEST_34
+#include "stylefs_paged_guest_34.inc"
+#endif
 static void disk_admit863(void){
  uint32_t a,b,c,d;
  __asm__ volatile("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"0"(1),"2"(0));
@@ -722,6 +725,9 @@ static void disk_admit863(void){
 #endif
 #ifdef STYLEOS_WIDE_GUEST_20
  s20_run();
+#endif
+#ifdef STYLEOS_PAGED_GUEST_34
+ s34_run();
 #endif
  uint8_t super[512];
 #ifdef STYLEOS_STYLEFS_MOUNT_RO
@@ -1547,6 +1553,11 @@ _Noreturn void s850_preflight(const struct s842_root *base,const struct s842_cac
   if(!identity((uintptr_t)&s20_journal_storage+i,PG_WRITE))fail("sfs20-journal-page");
  for(size_t i=0;i<sizeof s20_stream_storage;i+=4096)
   if(!identity((uintptr_t)&s20_stream_storage+i,PG_WRITE))fail("sfs20-stream-page");
+#endif
+#ifdef STYLEOS_PAGED_GUEST_34
+ if(arch_paging_attest_image_writable(p,(uintptr_t)&s34_storage,sizeof s34_storage)!=PG_OK)fail("sfs34-workspace");
+ for(size_t i=0;i<sizeof s34_storage;i+=4096)
+  if(!identity((uintptr_t)&s34_storage+i,PG_WRITE))fail("sfs34-page");
 #endif
  disk_preflight863=true;
 #endif
