@@ -445,6 +445,7 @@ def main():
                             wait_stop_ready(proc,serial)
                             if args.native_shell_boundary:
                                 from native_forced_stop_verify import wait_shell_boundary
+                                d.screen('native-before-shell-refresh')
                                 d.key('f10');wait_shell_boundary(proc,serial)
                                 d.screen('native-live-shell-refresh')
                             d.key('f9');wait_restart_ready(proc,serial)
@@ -596,7 +597,19 @@ def main():
             if not args.native_catalog:denied+=(b'STYLEOS S848 ',b'STYLEOS NATIVE ADMIT ',b'STYLEOS NATIVE EVENT ')
             if any(x.startswith(denied) for x in lines):raise ValueError('fixture or unsolicited process in owned shell')
             from test_desktop_v0 import Frame
-            if Frame(folder/'note.ppm').pixels!=Frame(folder/'after-denied-fixture.ppm').pixels:raise ValueError('F9 changed shell frame')
+            def unchanged_frame(before,after):
+                a,b=Frame(folder/(before+'.ppm')),Frame(folder/(after+'.ppm'))
+                if (a.w,a.h,a.pixels)!=(b.w,b.h,b.pixels):
+                    raise ValueError('F9 changed shell frame: '+before+' -> '+after)
+            if args.native_shell_boundary:
+                # F10 intentionally resets layout/z-order. Retain strict
+                # F9 pixel invariance separately on each side of that action.
+                # The independent native verifier still checks every CPU
+                # event, shell refresh marker and document state.
+                unchanged_frame('note','native-before-shell-refresh')
+                unchanged_frame('native-live-shell-refresh','after-denied-fixture')
+            else:
+                unchanged_frame('note','after-denied-fixture')
         elif args.four:
             root,events=verify_four_storage(lines,raw,data,site,ref,folder,write,provisioned=args.provisioned,rc=rc,integrated=args.integrated)
         elif cold:
