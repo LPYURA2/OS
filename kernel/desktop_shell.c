@@ -723,6 +723,9 @@ static bool keyboard(unsigned key, unsigned mods)
     if(key==0x01u&&mods==(DESK_CTRL|DESK_SHIFT)){
         if(s865_shell_submit_command(0x42))return false;
     }
+    if(key==0x41u&&!mods){
+        (void)s865_shell_submit_command(0x30c);return false;
+    }
     if(key==0x0fu&&mods==DESK_ALT){
         if(s865_shell_submit_command(0x309))return false;
     }
@@ -1641,7 +1644,7 @@ static void desktop_shell_step(void *opaque)
     if(shell_action==2){menu=!menu;shell_refreshed=true;}
     else if(shell_action==3){open_window(TASKS);shell_refreshed=true;}
     else if(shell_action>=4&&shell_action<=8){apply_window_action(shell_action);shell_refreshed=true;}
-    else if(shell_action>=9&&shell_action<=19){
+    else if(shell_action>=9&&shell_action<=20){
         menu=false;
         if(shell_action==9)show_folder(DESK_ROOT);
         else if(shell_action==10)open_window(ABOUT);
@@ -1667,6 +1670,8 @@ static void desktop_shell_step(void *opaque)
             arch_puts(result==NWC_OK?"STYLEOS NATIVE CLOSE REQUESTED\n":"STYLEOS NATIVE CLOSE REFUSED\n");
         }else if(shell_action==19){
             (void)ndb_cycle_focus(nwc_global(),&native_input,width,work_area().h);
+        }else if(shell_action==20){
+            if(!s865_launch_native_sample())arch_puts("STYLEOS TEA69 LAUNCH REFUSED\n");
         }
 #endif
         shell_refreshed=true;

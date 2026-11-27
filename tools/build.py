@@ -834,6 +834,8 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
     if owned_shell_865 and native_catalog_sha256 is None:
         from build_shell_controller_66 import build as build_shell_controller
         build_shell_controller(folder)
+        from build_native_sample_69 import build as build_native_sample
+        build_native_sample(folder)
         flags += ['-I',str(folder)]
     if owned_shell_865:
         # Link the same authenticated executor and hardware entry as the

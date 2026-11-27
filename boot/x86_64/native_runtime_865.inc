@@ -339,7 +339,7 @@ bool s865_shell_submit_command(unsigned key){
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  (void)key;return false;
 #else
- if(key!=0x3e&&key!=0x42&&!(key>=0x101&&key<=0x17e)&&key!=0x200&&key!=0x201&&!(key>=0x301&&key<=0x30b))return false;
+ if(key!=0x3e&&key!=0x42&&!(key>=0x101&&key<=0x17e)&&key!=0x200&&key!=0x201&&!(key>=0x301&&key<=0x30c))return false;
  return shell_submit_key(key);
 #endif
 }
@@ -367,7 +367,7 @@ static unsigned shell_allowed_action(unsigned key){
  if(key==0x17e)return 7;
  if(key==0x200)return 6;
  if(key==0x201)return 8;
- if(key>=0x301&&key<=0x30b)return key-0x301+9;
+ if(key>=0x301&&key<=0x30c)return key-0x301+9;
  return 0;
 }
 uint64_t s865_shell_controller_decide(uint32_t pid,uint64_t gen,uint64_t root,uint64_t epoch,uint64_t action){
@@ -457,6 +457,39 @@ void s865_native_request_shell_gap(void){
 #endif
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
 #include "shell_controller_66.h"
+#include "native_sample_69.h"
+static uint32_t sample69_pid,sample69_window,sample69_session;
+bool s865_launch_native_sample(void){
+ if(sample69_pid||!native_ready||!s865_executor_idle()||!native_audit(0))return false;
+ struct usr_runtime *u=(struct usr_runtime *)usr_global();
+ if(!u||!u->ready)return false;
+ /* Current ordinary desktop has no login screen. Establish only a local
+  * transient session, on explicit launch. Never unlock an existing session. */
+ if(!u->selected_session){
+  if(sample69_session||u->next_session!=1)return false;
+  if(usr_create(u,1,&sample69_session)!=USR_OK||
+     usr_select(u,sample69_session)!=USR_OK)return false;
+ }
+ const struct nts_pin pin={.package_sha=sample69_pkg_hash,.elf_sha=sample69_elf_hash,
+  .manifest=sample69_manifest,.manifest_bytes=sizeof sample69_manifest,
+  .package_bytes=sizeof sample69_package};
+ struct s865_window_launch out={0};
+ if(s865_native_launch_tea(sample69_package,sizeof sample69_package,&pin,
+  u->selected_session,"Native sample",(struct ws_bounds){80,80,160,120},&out)!=PS_OK)return false;
+ const struct pr_entry *e=pr_find(pr_global(),out.pid);
+ if(!e||!e->scheduler_handle||!e->page_root)fail("sample69-owner");
+ sample69_pid=out.pid;sample69_window=out.window;
+ arch_puts("STYLEOS TEA69 LAUNCHED");field("pid",out.pid);field("gen",e->scheduler_handle);
+ field("root",e->page_root);field("window",out.window);arch_putc('\n');return true;
+}
+static void sample69_reconcile(void){
+ if(sample69_pid&&!pr_find(pr_global(),sample69_pid)){
+  if(ws_find(ws_global(),sample69_window)||nwc_port_count(nwc_global())||!native_audit(0))
+   fail("sample69-retire");
+  arch_puts("STYLEOS TEA69 RETIRED");field("pid",sample69_pid);field("window",sample69_window);arch_putc('\n');
+  sample69_pid=0;sample69_window=0;
+ }
+}
 static bool shell66_read(void *opaque,uint32_t sector,uint8_t out[512]){
  if(opaque||!out||sector>=sizeof shell66_image/512u)return false;
  for(unsigned i=0;i<512;++i)out[i]=shell66_image[sector*512u+i];
@@ -490,6 +523,9 @@ _Noreturn void s865_native_supervise(void (*shell_step)(void *),void *state){
   }
 #endif
   s865_native_pump();
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+  sample69_reconcile();
+#endif
   for(unsigned i=0;i<64;++i)__asm__ volatile("pause");
  }
 }

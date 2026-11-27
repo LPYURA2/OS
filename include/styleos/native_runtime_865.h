@@ -40,10 +40,13 @@ bool s865_native_probe_window_rollback(const struct rt865_launch_request *,uint3
 bool s865_shell_submit_refresh(void);
 /* Only ordinary provisioned controller. Keys: F4/F8; title region
  * 0x101..0x17e (distance from right, saturated at 126); task button
- * 0x200 active, 0x201 inactive; 0x301..0x30b shell menu/shortcut events.
+ * 0x200 active, 0x201 inactive; 0x301..0x30c shell menu/shortcut events.
  * No caller-controlled object pointer.
  * Input polling waits for completed command or bounded exhaustion. */
 bool s865_shell_submit_command(unsigned key);
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+bool s865_launch_native_sample(void);
+#endif
 bool s865_shell_command_waiting(void);
 unsigned s865_shell_take_command(void);
 uint64_t s865_shell_controller_event(uint32_t,uint64_t,uint64_t);

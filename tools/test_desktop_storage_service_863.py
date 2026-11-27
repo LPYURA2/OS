@@ -592,7 +592,7 @@ def main():
                     from native_forced_stop_verify import records
                     from irq_trace_accept_859 import HEADER
                     admitted=records(lines,b'STYLEOS NATIVE SHELL-CONTROLLER',('pid','gen','root','epoch'))
-                    if len(admitted)!=14 or len({a['root'] for _,a in admitted})!=1:raise ValueError('ordinary controller root receipt')
+                    if len(admitted)!=15 or len({a['root'] for _,a in admitted})!=1:raise ValueError('ordinary controller root receipt')
                     child=admitted[0][1]['root']
                     trace_text=data.decode('ascii');headers=list(HEADER.finditer(trace_text))
                     syscalls=[]
@@ -610,7 +610,11 @@ def main():
                             elif vec!=0x50:raise ValueError('unexpected ordinary controller trap')
                         elif int(cr3[0],16)==root and int(m[2],16)!=0x50:
                             raise ValueError('unexpected safe root interrupt')
-                    if syscalls!=[0x105,0x106,2]*14:raise ValueError('ordinary controller raw syscall sequence')
+                    prefix=[0x105,0x106,2]*15
+                    if syscalls[:len(prefix)]!=prefix:raise ValueError('ordinary controller raw syscall sequence')
+                    app=syscalls[len(prefix):]
+                    if len(app)<3 or app[0]!=0x103 or app[-1]!=2 or any(x!=0x102 for x in app[1:-1]):
+                        raise ValueError('ordinary TEA raw frame/input/exit proof')
                 else:
                     for m in re.finditer(r'\bCR3=([0-9a-fA-F]+)\b',data.decode('ascii')):
                         if int(m[1],16)==root:raise ValueError('unsolicited interrupt under ordinary safe root')

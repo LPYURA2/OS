@@ -107,7 +107,24 @@ def exercise(d,proc,serial,folder,wait):
     rf=d.screen('extended-restart')
     restored=key('shift-alt',0x200)
     if lang['modifiers']!=5 or restored['modifiers']!=5 or lang['ru']==restart['ru'] or restored['ru']!=restart['ru']:raise ValueError('language switching')
-    (folder/'extended-desktop.json').write_text(json.dumps({'cursor':mv,'menu':opened,'closed':closed,'processes':procs,'restart':restart,'language':lang,'restored':restored,'frames':{x:hashlib.sha256((folder/(x+'.ppm')).read_bytes()).hexdigest() for x in ('extended-cursor-start','extended-cursor-end','extended-menu','extended-menu-closed','extended-processes','extended-window-max','extended-window-restore','extended-window-drag','extended-window-min','extended-window-taskbar','extended-window-close','extended-about','extended-about-close','extended-restart')}},indent=2)+'\n')
+    # A real standalone pinned .tea runs on explicit F7, no fixture catalog.
+    # Wait for authenticated frame publication, then focus and send Q.
+    d.key('f7');wait(proc,serial,b'STYLEOS TEA69 LAUNCHED',1)
+    wait(proc,serial,b'STYLEOS NATIVE FRAME',1)
+    wait(proc,serial,b'STYLEOS SHELL ACTION RENDERED',14)
+    # Frame publication precedes next desktop damage iteration. Move
+    # into its interior and wait for the real input/render boundary.
+    move(100,100)
+    sample=d.screen('extended-tea-live')
+    sample.check(81,81,'2579a1');sample.check(239,199,'2579a1')
+    d.button(True);d.button(False);d.key('q')
+    wait(proc,serial,b'STYLEOS TEA69 RETIRED',1)
+    move(55,435)
+    ended=d.screen('extended-tea-retired')
+    if ended.pixels==sample.pixels:raise ValueError('native app retirement not rendered')
+    if ended.pixels[3*(ended.w*81+81):3*(ended.w*81+81)+3]==sample.pixels[3*(sample.w*81+81):3*(sample.w*81+81)+3]:
+        raise ValueError('native app pixels retained')
+    (folder/'extended-desktop.json').write_text(json.dumps({'cursor':mv,'menu':opened,'closed':closed,'processes':procs,'restart':restart,'language':lang,'restored':restored,'frames':{x:hashlib.sha256((folder/(x+'.ppm')).read_bytes()).hexdigest() for x in ('extended-cursor-start','extended-cursor-end','extended-menu','extended-menu-closed','extended-processes','extended-window-max','extended-window-restore','extended-window-drag','extended-window-min','extended-window-taskbar','extended-window-close','extended-about','extended-about-close','extended-restart','extended-tea-live','extended-tea-retired')}},indent=2)+'\n')
 
 def verify(folder,lines,root):
     from native_process_view_02 import verify_snapshot
@@ -126,10 +143,10 @@ def verify(folder,lines,root):
     actions=records(lines,b'STYLEOS NATIVE SHELL-ACTION',('epoch','action'))
     submits=records(lines,b'STYLEOS NATIVE SHELL-SUBMIT',('key',))
     renders=[i for i,x in enumerate(lines) if x==b'STYLEOS SHELL ACTION RENDERED']
-    if (len(admitted),len(calls),len(applied),len(retired),len(actions),len(submits),len(renders))!=(14,28,1,14,13,14,13):
+    if (len(admitted),len(calls),len(applied),len(retired),len(actions),len(submits),len(renders))!=(15,30,1,15,14,15,14):
         raise ValueError('ordinary controller lifecycle count')
-    keys=(0x3e,0x3e,0x42,0x146,0x146,0x17e,0x16e,0x201,0x119,0x3e,0x302,0x101,0x309,0x44)
-    if [x['key'] for _,x in submits]!=list(keys) or [tuple(x.values()) for _,x in actions]!=list(enumerate((2,2,3,5,5,7,6,8,4,2,10,4,17),1)):
+    keys=(0x3e,0x3e,0x42,0x146,0x146,0x17e,0x16e,0x201,0x119,0x3e,0x302,0x101,0x309,0x44,0x30c)
+    if [x['key'] for _,x in submits]!=list(keys) or [tuple(x.values()) for _,x in actions]!=[(i,a) for i,a in enumerate((2,2,3,5,5,7,6,8,4,2,10,4,17,0,20),1) if a]:
         raise ValueError('ordinary command policy')
     for j,(i,a) in enumerate(admitted):
         pid,gen,child,epoch=a.values()
@@ -139,8 +156,18 @@ def verify(folder,lines,root):
         if not submits[j][0]<i<calls[2*j][0]<calls[2*j+1][0]:raise ValueError('ordinary controller order')
         if j<13 and not calls[2*j+1][0]<retired[j][0]<actions[j][0]<renders[j]<submits[j+1][0]:
             raise ValueError('command after retirement and actual render')
-    if applied[0][1]['epoch']!=14 or not calls[-1][0]<applied[0][0]<lines.index(b'STYLEOS DESKTOP SHELL RESTART'):
+    if applied[0][1]['epoch']!=14 or not calls[27][0]<applied[0][0]<lines.index(b'STYLEOS DESKTOP SHELL RESTART'):
         raise ValueError('ordinary controller refresh ordering')
+    launch=records(lines,b'STYLEOS TEA69 LAUNCHED',('pid','gen','root','window'))
+    frame=records(lines,b'STYLEOS NATIVE FRAME',('pid','gen','root','window','va','count','status','first'))
+    end=records(lines,b'STYLEOS TEA69 RETIRED',('pid','window'))
+    if len(launch)!=1 or len(frame)!=1 or len(end)!=1:raise ValueError('TEA lifecycle')
+    i,l=launch[0];pid,gen,child,win=l.values()
+    if (pid,gen,win)!=(16,16,1) or child==root or not child:raise ValueError('TEA identity')
+    if tuple(frame[0][1].values())!=(pid,gen,child,0,0x12000000,1,0,0x2579a1) or tuple(end[0][1].values())!=(pid,win):
+        raise ValueError('TEA frame and cleanup evidence')
+    if not calls[29][0]<retired[14][0]<actions[-1][0]<i<frame[0][0]<end[0][0]:
+        raise ValueError('TEA explicit launch ordering')
     if lines.count(b'STYLEOS SHELL PROVIDER READY')!=1:raise ValueError('ordinary provider readiness')
     if not any(x==b'STYLEOS DESKTOP CURSOR DAMAGE PASS' for x in lines):raise ValueError('cursor proof missing')
     for name,expected in data['frames'].items():
