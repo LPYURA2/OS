@@ -1,3 +1,6 @@
+## StyleFS 41 — selected-file read broker candidate
+40 CI pending at start, actual guest SUCCESS. Reuse mount and bounded read for principal-bound single-file grants. [Handoff](NEXT_CHAT_STYLEFS_41.md). Main unchanged.
+
 ## StyleFS 40 — explicit mount lifetime candidate
 39 guest SUCCESS, host compile-only flag failure; fix Clang command and add exact four-grant mount lifetime adapter. [Handoff](NEXT_CHAT_STYLEFS_40.md). Full CI pending. Main unchanged.
 
