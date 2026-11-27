@@ -164,6 +164,16 @@ static enum nwc_status resolve_port(struct nwc_service *s,uint32_t pid,uint64_t 
     *out=win;
     return NWC_OK;
 }
+enum nwc_status nwc_input_ready(struct nwc_service *s,uint32_t pid,uint64_t handle,
+                                uint64_t root,uint64_t window){
+    uint32_t win=0;
+    enum nwc_status r=resolve_port(s,pid,handle,root,window,&win);
+    if(r!=NWC_OK)return r;
+    const struct nwc_port *p=find_port(s,win);
+    if(!p)return NWC_MISSING;
+    if(!authentic(p,pid,handle,root)||!selected(s,p))return NWC_DENIED;
+    return p->length?NWC_OK:NWC_EMPTY;
+}
 static void wire_u32(uint8_t *p,uint32_t v)
 {
     for(unsigned i=0;i<4;++i)p[i]=(uint8_t)(v>>(8*i));

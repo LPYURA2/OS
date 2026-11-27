@@ -108,6 +108,9 @@ enum nwc_status nwc_publish_frame(struct nwc_service *,uint32_t,uint64_t,uint64_
 /* Serialized trusted compositor only, alias invalid after mutation. */
 const struct nwc_frame *nwc_visible_frame(const struct nwc_service *,uint32_t);
 bool nwc_frame_valid(const struct nwc_port *,const struct ws_window *);
+/* Read-only condition for a trusted serialized wait broker. Same authority
+ * checks as receive; no event consumption or output pointer. */
+enum nwc_status nwc_input_ready(struct nwc_service *,uint32_t,uint64_t,uint64_t,uint64_t);
 #define NWC_INPUT_BYTES 64u
 enum nwc_status nwc_receive_wire(struct nwc_service *,uint32_t,uint64_t,uint64_t,
                                   uint64_t window,uint8_t out[NWC_INPUT_BYTES]);

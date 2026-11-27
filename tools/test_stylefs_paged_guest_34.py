@@ -300,6 +300,11 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                                         poll_after["other"]==poll_before["other"],"idle input counters")
                                 elapsed=(ended-poll_start)/1e9
                                 delta=poll_after["empty"]-poll_before["empty"]
+                                require(delta<=1,"more than one empty request during event wait")
+                                lines=complete_lines(uart.read_bytes())
+                                parks=records(lines,b"STYLEOS TEA70 PARK",("pid","gen"))
+                                wakes=records(lines,b"STYLEOS TEA70 WAKE",("pid","gen"))
+                                require(any(v["pid"]==pid_num for _,v in parks) and any(v["pid"]==pid_num for _,v in wakes),"actual park/wake receipts missing")
                                 idle["guest_input_poll_baseline"]={"before":poll_before,"after":poll_after,
                                     "empty_requests":delta,"host_observed_seconds":elapsed,
                                     "empty_requests_per_host_second":delta/elapsed,

@@ -1,6 +1,10 @@
 /* Authenticated native execution core, no test workload dependency unless
  * the explicitly selected CI observer flag is present. */
 #include "native_executor_865.h"
+#if defined(STYLEOS_OWNED_SHELL_865) && !defined(STYLEOS_NATIVE_PINNED_CATALOG)
+bool s865_sample_wait_allowed(uint32_t,uint64_t,uint64_t);
+static struct {uint64_t generation,window;} input_wait70[PS_MAX_SLOTS];
+#endif
 #include <styleos/fx_guest_849.h>
 #include <styleos/arch.h>
 #ifdef STYLEOS_OWNED_SHELL_865
@@ -272,7 +276,20 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    if(poll[id].generation!=ticket->handle){
     poll[id].generation=ticket->handle;poll[id].empty=0;poll[id].delivered=0;poll[id].other=0;
    }
-   if(pixel==NWC_EMPTY)++poll[id].empty;
+   if(pixel==NWC_EMPTY){
+    ++poll[id].empty;
+    /* Preserve the existing EMPTY return value. For the two approved
+     * retry-loop samples only, defer its return until the queue changes.
+     * Single CPU + IF=0 serialize receive, park, enqueue and wake scan. */
+    if(s865_sample_wait_allowed(ticket->pid,ticket->handle,ticket->child_root)){
+     if(rt865_bank_wait_state(&bank862,runtime860,safe,id,ticket->pid,ticket->handle,ticket->child_root,true)!=PS_OK)
+      fail848("70-input-park");
+     input_wait70[id].generation=ticket->handle;input_wait70[id].window=pending860.gpr[1];
+     state=PR_WAITING;
+     arch_puts("STYLEOS TEA70 PARK");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+     arch_putc('\n');
+    }
+   }
    else if(pixel==NWC_OK){
     ++poll[id].delivered;
     arch_puts("STYLEOS TEA70 INPUT-COUNTS");fld848("pid",ticket->pid);
@@ -455,6 +472,25 @@ void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uin
  if(!s865_executor_idle()||!audit||!retire)fail848("native-poll-boundary");
  if(!pr_snapshot(runtime860->dispatcher.registry,0,0,true))return;
  if(!audit(opaque))fail848("native-poll-audit");
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+ /* Queue readiness is checked after the shell's trusted event producer,
+  * before choosing a runnable context. A revoked/hidden port wakes the
+  * waiter too, so it can observe the normal refusal on its next receive. */
+ for(unsigned j=0;j<PS_MAX_SLOTS;++j){
+  const struct rt862_bank_slot *s=&bank862.slots[j];
+  if(!input_wait70[j].generation)continue;
+  if(!s->pid||s->handle!=input_wait70[j].generation){
+   input_wait70[j].generation=0;input_wait70[j].window=0;continue;
+  }
+  const struct pr_entry *p=pr_find(runtime860->dispatcher.registry,s->pid);
+  if(!p||p->state!=PR_WAITING)fail848("70-wait-identity");
+  if(nwc_input_ready((struct nwc_service *)nwc_global(),s->pid,s->handle,s->root,input_wait70[j].window)==NWC_EMPTY)continue;
+  if(rt865_bank_wait_state(&bank862,runtime860,bank862.safe,j,s->pid,s->handle,s->root,false)!=PS_OK)
+   fail848("70-input-wake");
+  input_wait70[j].generation=0;input_wait70[j].window=0;
+  arch_puts("STYLEOS TEA70 WAKE");fld848("pid",s->pid);fld848("gen",s->handle);arch_putc('\n');
+ }
+#endif
  unsigned id;uint32_t pid;
  enum ps_status status=dpr_dispatch(runtime860,&id,&pid);
  if(status==PS_EMPTY)return;

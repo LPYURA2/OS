@@ -231,7 +231,7 @@ enum ps_status s865_native_stop_selected(uint32_t pid){
  const struct pr_table *p=runtime860->dispatcher.registry;
  if(p!=pr_global()||pi_can_request_end(p,pid)!=PI_TARGET_ELIGIBLE)return PS_EVIDENCE;
  const struct pr_entry *e=pr_find(p,pid);
- if(!e||e->state!=PR_READY)return PS_STATE;
+ if(!e||(e->state!=PR_READY&&e->state!=PR_WAITING))return PS_STATE;
  return s865_native_stop(pid,e->scheduler_handle,true);
 }
 enum pa_status s865_native_snapshot(const struct pa_request *q,struct pa_row *rows,
@@ -478,6 +478,15 @@ static const struct sample69_entry sample69_catalog[]={
 #define SAMPLE69_COUNT (sizeof sample69_catalog/sizeof sample69_catalog[0])
 static struct s865_window_launch sample69_live[SAMPLE69_COUNT];
 static uint32_t sample69_session;
+/* Explicitly opted-in immutable sample registry only. Other native callers
+ * retain nonblocking INPUT semantics; no arbitrary binary opt-in by name. */
+bool s865_sample_wait_allowed(uint32_t pid,uint64_t gen,uint64_t root){
+ const struct pr_entry *e=pr_find(pr_global(),pid);
+ if(!e||e->scheduler_handle!=gen||e->page_root!=root)return false;
+ for(unsigned i=0;i<SAMPLE69_COUNT;++i)
+  if(sample69_live[i].pid==pid)return true;
+ return false;
+}
 #ifdef STYLEOS_LIVE_VOLUME_39
 #include <styleos/native_tea_stylefs.h>
 /* Only the mounted volume owner may resolve the exact file revision. */
