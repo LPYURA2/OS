@@ -97,7 +97,7 @@ def exercise(r):
               phase=2,pid=target['pid'],resident=0,pages=0,owners=0,windows=0,ports=0)
     return token
 
-def run(build,out):
+def run(build,out,scenario=None,expected_gestures=1,expected_finishes=1):
     build,out=build.resolve(),out.resolve()
     out.mkdir(parents=True,exist_ok=False)
     iso=build/'StyleOS-owned-shell-865.iso'
@@ -129,7 +129,7 @@ def run(build,out):
             r.line(b'STYLEOS DESKTOP READY')
             frame=desktop.screen('73-boot')
             desktop.x,desktop.y=frame.w//2,frame.h*3//4
-            token=exercise(r)
+            token=exercise(r) if scenario is None else scenario(r)
             desktop.call('stop')
             stats=next(item['stats'] for item in desktop.call('query-blockstats')
                        if item.get('qdev','').endswith(DEVICE) or item.get('device')=='data')
@@ -142,15 +142,22 @@ def run(build,out):
                 proc.wait(timeout=15)
     lines=complete_lines(serial.read_bytes())
     calls=records(lines,CALL,CALL_KEYS)
-    count=verify_trace(trace,calls,[])
-    assert lines.count(b'STYLEOS DD73 TASK-GESTURE')==1
-    assert len([v for _,v in calls if v['op']==FINISH and v['status']==0])==1
+    faults=[] if scenario is None else token['faults']
+    count=verify_trace(trace,calls,faults)
+    assert lines.count(b'STYLEOS DD73 TASK-GESTURE')==expected_gestures
+    assert len([v for _,v in calls if v['op']==FINISH and v['status']==0])==expected_finishes
     assert digest(disk)==before
     result=dict(status='PASS',qemu=version,iso_sha256=digest(iso),transfer=token,
                 verified_cpl3_calls=count,prepublication_cancels=2,
                 insertions=1,minimized_idle_observation_ms=500,guest_disk_writes=0,
                 residual_leased_app_pages=0,private_memory=r.memory_checks,
                 uart_sha256=digest(serial),trace_sha256=digest(trace))
+    if scenario is not None:
+        result.pop('transfer')
+        result.pop('prepublication_cancels')
+        result.pop('minimized_idle_observation_ms')
+        result.update(token)
+        result['insertions']=expected_finishes
     (out/'results.json').write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result),flush=True)
 

@@ -174,10 +174,57 @@ int main(void)
     CHECK(nwc_task_set_minimized(&channel,&tok,false)==NWC_OK);
     tok.minimized=false;
     CHECK(nwc_wait_condition(&channel,b.pid,b.generation,b.root,b.window)==NWC_WAIT_EMPTY);
+    /* 74: revoke each broker phase by minimizing either endpoint or
+     * locking the active session. Restore and start fresh with never reused
+     * IDs; no stale capability may modify a private output buffer. */
+    uint64_t tick=140;
+    for(unsigned reason=0;reason<3;++reason){
+        for(unsigned phase=0;phase<4;++phase){
+            uint64_t now=tick;tick+=10;
+            CHECK(dd_ipc_gesture(&ipc,a.window,b.window,now,9)==DD_OK);
+            g=event(a,DD_REQUEST_TEXT);
+            CHECK(g==ipc.last_gesture);
+            uint64_t old=0;
+            if(phase>=1){
+                CHECK(dd_ipc_call(&ipc,a,DD_CALL_OFFER,g,input,sizeof input,now+1,&old)==DD_OK);
+                CHECK(old>last);last=old;
+                CHECK(event(b,DD_TEXT_OFFER)==old);
+            }
+            if(phase>=2)CHECK(dd_ipc_call(&ipc,b,DD_CALL_ACCEPT,old,0,0,now+2,&n)==DD_OK);
+            if(phase>=3){
+                memset(output,0xab,sizeof output);
+                CHECK(dd_ipc_call(&ipc,b,DD_CALL_READ,old,output,DD_TEXT_MAX,now+3,&n)==DD_OK);
+                CHECK(n==sizeof input&&!memcmp(output,input,sizeof input)&&output[DD_TEXT_MAX]==0xab);
+            }
+            struct dd_endpoint hidden=reason==0?a:b;
+            if(reason<2)CHECK(ws_set_minimized(&windows,hidden.pid,hidden.window,true)==WS_OK);
+            else CHECK(usr_lock(&users)==USR_OK);
+            CHECK(dd_ipc_reconcile(&ipc,now+4));idle();
+            CHECK(!dd_ipc_reconcile(&ipc,now+4));
+            if(reason<2)CHECK(ws_set_minimized(&windows,hidden.pid,hidden.window,false)==WS_OK);
+            else CHECK(usr_select(&users,sid)==USR_OK);
+            memset(output,0xab,sizeof output);
+            CHECK(dd_ipc_call(&ipc,a,DD_CALL_OFFER,g,input,sizeof input,now+5,&n)==DD_STALE&&!n);
+            if(old){
+                CHECK(dd_ipc_call(&ipc,b,DD_CALL_ACCEPT,old,0,0,now+5,&n)==DD_STALE&&!n);
+                CHECK(dd_ipc_call(&ipc,b,DD_CALL_READ,old,output,DD_TEXT_MAX,now+5,&n)==DD_STALE&&!n);
+                CHECK(dd_ipc_call(&ipc,b,DD_CALL_FINISH,old,0,0,now+5,&n)==DD_STALE&&!n);
+            }
+            for(size_t i=0;i<sizeof output;++i)CHECK(output[i]==0xab);
+        }
+    }
+    CHECK(dd_ipc_gesture(&ipc,a.window,b.window,tick,9)==DD_OK);
+    g=event(a,DD_REQUEST_TEXT);
+    CHECK(dd_ipc_call(&ipc,a,DD_CALL_OFFER,g,input,sizeof input,tick+1,&n)==DD_OK&&n>last);
+    last=n;CHECK(event(b,DD_TEXT_OFFER)==last);
+    CHECK(dd_ipc_call(&ipc,b,DD_CALL_ACCEPT,last,0,0,tick+2,&n)==DD_OK);
+    CHECK(dd_ipc_call(&ipc,b,DD_CALL_READ,last,output,DD_TEXT_MAX,tick+3,&n)==DD_OK&&n==sizeof input);
+    CHECK(!memcmp(input,output,sizeof input));
+    CHECK(dd_ipc_call(&ipc,b,DD_CALL_FINISH,last,0,0,tick+4,&n)==DD_OK);idle();
     CHECK(ws_close_app(&windows,b.pid,b.window)==WS_OK);
     CHECK(nwc_wait_condition(&channel,b.pid,b.generation,b.root,b.window)==NWC_WAIT_REVOKED);
     CHECK(nwc_wait_condition(&channel,b.pid,b.generation,b.root,0)==NWC_WAIT_REVOKED);
-    CHECK(dd_ipc_task_gesture(&ipc,a.window,&tok,136,20)==DD_DENIED);
+    CHECK(dd_ipc_task_gesture(&ipc,a.window,&tok,tick+5,20)==DD_DENIED);
     CHECK(nwc_task_snapshot(&channel,tasks,NWC_PORTS)==2);
     idle();
     printf("Deep Drop IPC: %u checks PASS; %zu bytes persistent incl. %u payload bytes\n",

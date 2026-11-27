@@ -603,3 +603,6 @@ Correct live-volume verifier for CRLF UART and exact input receipt; no kernel ch
 
 ### StyleFS 43.1
 Correct legacy editor macro collision; CI pending.
+
+## Deep Drop 74 — base closure candidate
+73 accepted at 701935210e38653141c8cef0e1953ea2050d3ae7, CI 46067252127 12/12. [Base acceptance and scope](architecture/DEEP_DROP_74.md) and [continuation](NEXT_CHAT_DEEP_DROP_74.md). Owner decision: finish bounded initial Deep Drop, then native system applications, then extend Deep Drop system-wide. New test candidate pending full CI; main unchanged.
