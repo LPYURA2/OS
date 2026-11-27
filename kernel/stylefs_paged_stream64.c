@@ -163,3 +163,62 @@ enum pp64_status pp64_get(struct bs_service *b,const struct pp64_layout *l,struc
  }
  return ~sum==map.file.checksum?PP64_OK:PP64_CORRUPT;
 }
+
+struct omit {
+ struct bs_service *b;const struct pp64_layout *l;struct pp64_stream_workspace *w;
+ const struct dc64_node *nodes;size_t count,at;uint64_t id;
+ struct ip64_root old;enum pp64_status error;
+};
+static bool without(void *ctx,uint64_t ordinal,uint8_t *out,size_t cap,size_t *n){
+ (void)ordinal;struct omit *m=ctx;
+ while(m->at<m->count&&(m->nodes[m->at].kind!=SD64_FILE||m->nodes[m->at].id==m->id))m->at++;
+ if(m->at==m->count){m->error=PP64_CORRUPT;return false;}
+ uint64_t id=m->nodes[m->at++].id;size_t len=0;
+ enum ip64_status rc=ip64_export(m->b,m->l->owner,m->l->inode,&m->old,id,&m->w->source,&len);
+ if(rc!=IP64_OK){m->error=ip(rc);return false;}
+ if(len>cap){m->error=PP64_FULL;return false;}
+ for(size_t i=0;i<len;i++)out[i]=m->w->source.map[i];
+ *n=len;return true;
+}
+enum pp64_status pp64_edit(struct bs_service *b,const struct pp64_layout *l,struct pp64_stream_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,
+ uint64_t expected,const struct dc64_edit *e,uint64_t rev,struct pp64_pair *out){
+ if(!cap||!rcap||cap>SIZE_MAX/sizeof *a||rcap>SIZE_MAX/sizeof *runs||!expected)return PP64_INVALID;
+ const void *p[]={b,l,w,a,runs,e,out};
+ size_t n[]={sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *runs,sizeof *e,sizeof *out};
+ for(unsigned i=0;i<7;i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PP64_INVALID;
+ if(!sd64_key_valid(&e->entry.key)||e->entry.target<=1||
+    (e->entry.kind!=SD64_FILE&&e->entry.kind!=SD64_DIRECTORY)||
+    (e->op!=DC64_CREATE&&e->op!=DC64_REMOVE&&e->op!=DC64_RENAME)||
+    (e->op==DC64_CREATE&&e->entry.kind!=SD64_DIRECTORY)||
+    (e->entry.kind==SD64_FILE?!rev:rev!=0)||
+    (e->op==DC64_RENAME&&!sd64_key_valid(&e->destination)))return PP64_INVALID;
+ struct pp64_pair cur;enum pp64_status rc=pp64_mount(b,l,&w->pair,a,cap,runs,rcap,&cur);
+ if(rc!=PP64_OK)return rc;
+ if(cur.sequence!=expected)return PP64_INVALID;
+ rc=pp64_prepare(b,l,&w->pair,a,cap,runs,rcap,&cur);
+ if(rc!=PP64_OK)return rc;
+ if(cur.sequence!=expected)return PP64_INVALID;
+ bool deleting=e->op==DC64_REMOVE&&e->entry.kind==SD64_FILE;
+ if(expected==UINT64_MAX||cur.dir_epoch==UINT64_MAX||(deleting&&cur.inode_epoch==UINT64_MAX))return PP64_FULL;
+ if(e->entry.kind==SD64_FILE){
+  rc=check_key(b,l,w,&e->entry.key,e->entry.target,rev);
+  if(rc!=PP64_OK)return rc;
+ }
+ /* Delete a file map from the old, sorted validated node inventory.
+  * The old directory and inode remain selected until the paired commit.
+  * File remove cannot introduce hierarchy cycles or orphan children. */
+ uint64_t ie=cur.inode_epoch;
+ if(deleting){
+  struct ir64_state *inode=&w->pair.inode;
+  if(!inode->root.files)return PP64_CORRUPT;
+  struct omit m={.b=b,.l=l,.w=w,.nodes=a,.count=(size_t)w->pair.dir.count,
+   .id=e->entry.target,.old=inode->root,.error=PP64_OK};
+  enum ip64_status ir=ir64_publish(inode,&w->pair.iw,runs,rcap,inode->root.files-1,without,&m);
+  if(ir!=IP64_OK)return ir==IP64_CANCELLED&&m.error!=PP64_OK?m.error:ip(ir);
+  ie=inode->root.epoch;
+ }
+ enum dc64_status dr=dc64_hierarchy_apply(&w->pair.dir,&w->pair.dw,a,cap,e);
+ if(dr!=DC64_OK)return dc(dr);
+ return pp64_commit(b,l,&w->pair,a,cap,runs,rcap,expected,w->pair.dir.epoch,ie,out);
+}

@@ -59,6 +59,13 @@ enum pp64_status pp64_put(struct bs_service *,const struct pp64_layout *,struct 
 enum pp64_status pp64_get(struct bs_service *,const struct pp64_layout *,struct pp64_stream_workspace *,
  struct dc64_node *,size_t node_cap,struct sfs64_run *,size_t run_cap,
  uint64_t expected,const struct sd64_key *,uint64_t id,uint64_t revision,pp64_sink,void *);
+/* Guarded mkdir, rename/move, empty rmdir and unlink. File deletion
+ * retires its map and name in one paired commit; no secure erase. The
+ * exact sequence and revision must match. Directory revision is zero.
+ * Caller supplies lifetime-unique IDs and serializes exclusive grants. */
+enum pp64_status pp64_edit(struct bs_service *,const struct pp64_layout *,struct pp64_stream_workspace *,
+ struct dc64_node *,size_t node_cap,struct sfs64_run *,size_t run_cap,
+ uint64_t expected,const struct dc64_edit *,uint64_t revision,struct pp64_pair *);
 #ifdef STYLEFS_HOST_FORMAT
 enum pp64_status pp64_provision(struct bs_service *,const struct pp64_layout *,struct pp64_workspace *,
  struct dc64_node *,size_t node_cap,struct sfs64_run *,size_t run_cap,struct pp64_pair *);
