@@ -1,6 +1,7 @@
 
 #include <styleos/stylefs_paged_pair64.h>
 static const uint8_t magic[8]={'S','F','6','4','P','P','G','1'};
+static const uint8_t magic_ids[8]={'S','F','6','4','P','P','G','2'};
 struct spans {uint64_t receipt,dir,inode,data;};
 static bool sep(const void *a,size_t n,const void *b,size_t m){
  return a&&b&&n<=UINTPTR_MAX-(uintptr_t)a&&m<=UINTPTR_MAX-(uintptr_t)b&&
@@ -47,18 +48,23 @@ static bool args(struct bs_service *b,const struct pp64_layout *l,struct pp64_wo
 }
 static void encode(uint8_t p[512],const struct pp64_layout *l,const struct spans *s,const struct pp64_pair *v){
  for(unsigned i=0;i<512;i++)p[i]=0;
- for(unsigned i=0;i<8;i++)p[i]=magic[i];
+ for(unsigned i=0;i<8;i++)p[i]=v->id_floor?magic_ids[i]:magic[i];
  put(p+8,v->sequence,8);put(p+16,v->dir_epoch,8);put(p+24,v->inode_epoch,8);
  put(p+32,s->receipt,8);put(p+40,s->dir,8);put(p+48,s->inode,8);put(p+56,s->data,8);
  put(p+64,l->dir_sectors,8);put(p+72,l->inode_sectors,8);put(p+80,l->data_sectors,8);put(p+88,l->data_start,8);
  put(p+96,v->slot,4);put(p+100,crc(p,100),4);
+ if(v->id_floor){put(p+104,v->id_floor,8);put(p+112,crc(p,112),4);}
 }
 static bool decode(const uint8_t p[512],const struct pp64_layout *l,const struct spans *s,unsigned slot,struct pp64_pair *v){
- if(!equal(p,magic,8)||!get(p+8,8)||!get(p+16,8)||!get(p+24,8)||
+ bool ids=equal(p,magic_ids,8);
+ if((!ids&&!equal(p,magic,8))||!get(p+8,8)||!get(p+16,8)||!get(p+24,8)||
  get(p+32,8)!=s->receipt||get(p+40,8)!=s->dir||get(p+48,8)!=s->inode||get(p+56,8)!=s->data||
  get(p+64,8)!=l->dir_sectors||get(p+72,8)!=l->inode_sectors||get(p+80,8)!=l->data_sectors||get(p+88,8)!=l->data_start||
- get(p+96,4)!=slot||get(p+100,4)!=crc(p,100)||!zero(p+104,408))return false;
- *v=(struct pp64_pair){get(p+8,8),get(p+16,8),get(p+24,8),slot};return true;
+ get(p+96,4)!=slot||get(p+100,4)!=crc(p,100) )return false;
+ uint64_t floor=0;
+ if(ids){floor=get(p+104,8);if(!floor||get(p+112,4)!=crc(p,112)||!zero(p+116,396))return false;}
+ else if(!zero(p+104,408))return false;
+ *v=(struct pp64_pair){get(p+8,8),get(p+16,8),get(p+24,8),slot,floor};return true;
 }
 static enum pp64_status select_pair(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
  struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,const struct pp64_pair *v){
@@ -73,6 +79,7 @@ static enum pp64_status select_pair(struct bs_service *b,const struct pp64_layou
   * must resolve in the selected paged manifest root, not raw latest. */
  uint64_t files=0;
  for(size_t i=0;i<(size_t)w->dir.count;i++){
+  if(v->id_floor&&a[i].id>v->id_floor)return PP64_CORRUPT;
   if(a[i].kind!=SD64_FILE)continue;
   struct sfs64_file f;
   ir=ip64_stat(b,l->owner,l->inode,&w->inode.root,a[i].id,&w->iw,&f);
@@ -86,14 +93,27 @@ enum pp64_status pp64_mount(struct bs_service *b,const struct pp64_layout *l,str
  struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,struct pp64_pair *out){
  struct spans s;
  if(!args(b,l,w,a,cap,runs,rcap,out)||!layout(b,l,false,&s))return PP64_INVALID;
- struct pp64_pair v[2];bool good[2];
+ struct pp64_pair v[2];bool good[2],blank[2];
  for(unsigned i=0;i<2;i++){
   uint8_t p[512];
   if(bs_read_sector(b,l->owner,l->receipt,i,p)!=BS_OK)return PP64_IO;
-  good[i]=decode(p,l,&s,i,&v[i]);
+  good[i]=decode(p,l,&s,i,&v[i]);blank[i]=zero(p,512);
  }
  if(good[0]&&good[1]&&v[0].sequence==v[1].sequence)return PP64_CORRUPT;
  unsigned first=good[1]&&(!good[0]||v[1].sequence>v[0].sequence)?1:0;
+ /* ID-managed volumes never silently roll back a receipt: an older
+  * watermark could recycle a previously acknowledged object ID. */
+ if(good[first]&&v[first].id_floor){
+  unsigned other=first^1u;
+  if(good[other]){
+   if(!v[other].id_floor||v[first].sequence-v[other].sequence!=1||
+      v[first].id_floor<v[other].id_floor||v[first].id_floor-v[other].id_floor>1)return PP64_CORRUPT;
+  }else if(!blank[other]||v[first].sequence!=1||v[first].id_floor!=1)return PP64_CORRUPT;
+  enum pp64_status rc=select_pair(b,l,w,a,cap,runs,rcap,&v[first]);
+  if(rc==PP64_OK)*out=v[first];
+  return rc;
+ }
+ if(good[first^1u]&&v[first^1u].id_floor)return PP64_CORRUPT;
  for(unsigned i=0;i<2;i++){
   unsigned slot=first^i;if(!good[slot])continue;
   enum pp64_status rc=select_pair(b,l,w,a,cap,runs,rcap,&v[slot]);
@@ -118,26 +138,63 @@ enum pp64_status pp64_commit(struct bs_service *b,const struct pp64_layout *l,st
  if(old.sequence!=expected||de<old.dir_epoch||fe<old.inode_epoch||
     de-old.dir_epoch>1||fe-old.inode_epoch>1||(de==old.dir_epoch&&fe==old.inode_epoch))return PP64_INVALID;
  if(old.sequence==UINT64_MAX)return PP64_FULL;
- struct pp64_pair v={old.sequence+1,de,fe,old.slot^1u};
+ struct dc64_state before=w->dir;
+ uint64_t limit=old.id_floor;
+ if(limit&&limit!=UINT64_MAX)limit++;
+ struct pp64_pair v={old.sequence+1,de,fe,old.slot^1u,limit};
  rc=select_pair(b,l,w,a,cap,runs,rcap,&v);
  if(rc!=PP64_OK)return rc;
+ if(old.id_floor){
+  /* The new sorted graph is in a[]. Every surviving ID <= the old
+   * watermark must have existed in the previous graph with same kind.
+   * Only one new ID, exactly floor+1, is permitted per publication. */
+  size_t retained=0,matched=0;bool added=false;
+  for(size_t i=0;i<(size_t)w->dir.count;i++){
+   if(a[i].id<=old.id_floor)retained++;
+   else{
+    if(added||old.id_floor==UINT64_MAX||a[i].id!=limit)return PP64_INVALID;
+    added=true;
+   }
+  }
+  for(uint64_t i=0;i<before.count;i++){
+   struct sd64_record row;
+   enum dc64_status dr=dc64_entry_at(&before,i,&w->dw,&row);
+   if(dr!=DC64_OK)return dr==DC64_IO?PP64_IO:PP64_CORRUPT;
+   size_t lo=0,hi=(size_t)w->dir.count;
+   while(lo<hi){size_t m=lo+(hi-lo)/2;if(a[m].id<row.target)lo=m+1;else hi=m;}
+   if(lo<(size_t)w->dir.count&&a[lo].id==row.target){
+    if(a[lo].kind!=row.kind)return PP64_INVALID;
+    matched++;
+   }
+  }
+  if(matched!=retained)return PP64_INVALID;
+  v.id_floor=added?limit:old.id_floor;
+ }
  rc=publish(b,l,&s,&v);
  if(rc==PP64_OK)*out=v;
  return rc;
 }
 #ifdef STYLEFS_HOST_FORMAT
-enum pp64_status pp64_provision(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
- struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,struct pp64_pair *out){
+static enum pp64_status provision(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,struct pp64_pair *out,bool ids){
  struct spans s;if(!args(b,l,w,a,cap,runs,rcap,out)||!layout(b,l,true,&s))return PP64_INVALID;
  for(unsigned i=0;i<2;i++){
   uint8_t p[512];if(bs_read_sector(b,l->owner,l->receipt,i,p)!=BS_OK)return PP64_IO;
   if(!zero(p,512))return PP64_INVALID;
  }
- struct pp64_pair v={1,1,1,0};
+ struct pp64_pair v={1,1,1,0,ids?1u:0u};
  enum pp64_status rc=select_pair(b,l,w,a,cap,runs,rcap,&v);
  if(rc!=PP64_OK)return rc;
  if(w->dir.count||w->inode.root.files)return PP64_INVALID;
  rc=publish(b,l,&s,&v);if(rc==PP64_OK)*out=v;return rc;
+}
+enum pp64_status pp64_provision(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,struct pp64_pair *out){
+ return provision(b,l,w,a,cap,runs,rcap,out,false);
+}
+enum pp64_status pp64_provision_ids(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,struct pp64_pair *out){
+ return provision(b,l,w,a,cap,runs,rcap,out,true);
 }
 #endif
 
@@ -200,7 +257,7 @@ enum pp64_status pp64_prepare(struct bs_service *b,const struct pp64_layout *l,s
  if(i.root.epoch>cur.inode_epoch&&(rc=clear(b,l->owner,l->inode,i.active))!=PP64_OK)return rc;
  struct pp64_pair check;rc=pp64_mount(b,l,w,a,cap,runs,rcap,&check);
  if(rc!=PP64_OK)return rc;
- if(check.sequence!=cur.sequence||check.slot!=cur.slot||check.dir_epoch!=cur.dir_epoch||check.inode_epoch!=cur.inode_epoch)return PP64_CORRUPT;
+ if(check.sequence!=cur.sequence||check.slot!=cur.slot||check.dir_epoch!=cur.dir_epoch||check.inode_epoch!=cur.inode_epoch||check.id_floor!=cur.id_floor)return PP64_CORRUPT;
  dr=dc64_mount(&d,b,l->owner,l->dir,l->dir_sectors,&w->dw.publish);
  if(dr!=DC64_OK)return from_dc(dr);
  ir=ir64_mount(&i,b,l->owner,l->inode,l->inode_sectors,l->data_sectors,l->data_start,&w->iw,runs,rcap);

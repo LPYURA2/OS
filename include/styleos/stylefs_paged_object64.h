@@ -60,7 +60,8 @@ enum po64_status po64_snapshot(struct po64_service *,struct po64_snapshot *);
 enum po64_status po64_child_at(struct po64_service *,struct po64_snapshot,
  uint64_t parent,uint64_t ordinal,struct po64_row *);
 /* Supervisor-only namespace mutation. Caller authorizes both directories
- * and supplies a lifetime-unique new ID (persistent allocator not here).
+ * and supplies a lifetime-unique new ID on legacy volumes. ID-managed
+ * volumes accept zero for automatic allocation, or exact next ID.
  * Exact mount/sequence and old file revision; no overwrite, no implicit
  * directory authority from a file token. All tokens expire on commit.
  * New file is empty. Destination NULL means unlink, otherwise move/rename.

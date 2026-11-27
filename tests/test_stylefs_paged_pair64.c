@@ -80,6 +80,29 @@ int main(void){
  struct pp64_layout bad=l;bad.data=bad.inode;bad.data_sectors=I;
  assert(pp64_mount(&b,&bad,&w,nodes,128,runs,128,&pair)==PP64_INVALID);
  durable[0][100]^=1;reopen();check(2,80,1);
+ /* A failed receipt write/flush preserves the old selected floor; if
+  * the new receipt reached durable storage, the new ID remains spent. */
+ memset(disk,0,sizeof disk);memset(durable,0,sizeof durable);attach();
+ assert(dc64_provision(&b,7,l.dir,D)==DC64_OK);
+ assert(ir64_provision(&b,7,l.inode,I,F,1)==IP64_OK);
+ assert(pp64_provision_ids(&b,&l,&w,nodes,128,runs,128,&pair)==PP64_OK);
+ stage_names(1);stage_maps(1,1);memcpy(saved,durable,sizeof saved);
+ for(unsigned mode=1;mode<=3;mode++){
+  memcpy(durable,saved,sizeof durable);reopen();assert(pair.id_floor==1);
+  fail_mode=mode;
+  assert(pp64_commit(&b,&l,&w,nodes,128,runs,128,1,2,2,&pair)==PP64_UNCERTAIN);
+  reopen();assert(pair.id_floor==(mode==3?2u:1u));
+ }
+ memcpy(durable,saved,sizeof durable);reopen();
+ assert(pp64_commit(&b,&l,&w,nodes,128,runs,128,1,2,2,&pair)==PP64_OK);
+ reopen();assert(pair.id_floor==2);
+ stage_names(0);stage_maps(0,1);
+ assert(pp64_commit(&b,&l,&w,nodes,128,runs,128,2,3,3,&pair)==PP64_OK);
+ reopen();assert(pair.id_floor==2);
+ stage_names(1);stage_maps(1,1);
+ assert(pp64_commit(&b,&l,&w,nodes,128,runs,128,3,4,4,&pair)==PP64_INVALID);
+ reopen();assert(pair.id_floor==2&&w.dir.count==0);
+ puts("STYLEFS 49 ID RECEIPT PASS: 3 durability cuts, raw commit refuses deleted ID reuse");
  puts("STYLEFS 30 PAGED PAIR PASS: 80 manifests beyond old bank, exact epochs, mismatch refusal, three receipt cuts and fallback");
  return 0;
 }

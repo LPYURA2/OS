@@ -83,6 +83,10 @@ enum pp64_status pp64_put(struct bs_service *b,const struct pp64_layout *l,struc
  rc=pp64_prepare(b,l,&w->pair,a,cap,current,rcap,&pair);
  if(rc!=PP64_OK)return rc;
  if(pair.sequence!=expected)return PP64_INVALID;
+ if(!rev&&pair.id_floor){
+  if(pair.id_floor==UINT64_MAX)return PP64_FULL;
+  if(id!=pair.id_floor+1)return PP64_INVALID;
+ }
  if(expected==UINT64_MAX||pair.inode_epoch==UINT64_MAX||(!rev&&pair.dir_epoch==UINT64_MAX))return PP64_FULL;
  bool parent=key->parent==1,used=false;
  for(size_t i=0;i<(size_t)w->pair.dir.count;i++){
@@ -199,6 +203,10 @@ enum pp64_status pp64_edit(struct bs_service *b,const struct pp64_layout *l,stru
  rc=pp64_prepare(b,l,&w->pair,a,cap,runs,rcap,&cur);
  if(rc!=PP64_OK)return rc;
  if(cur.sequence!=expected)return PP64_INVALID;
+ if(e->op==DC64_CREATE&&cur.id_floor){
+  if(cur.id_floor==UINT64_MAX)return PP64_FULL;
+  if(e->entry.target!=cur.id_floor+1)return PP64_INVALID;
+ }
  bool deleting=e->op==DC64_REMOVE&&e->entry.kind==SD64_FILE;
  if(expected==UINT64_MAX||cur.dir_epoch==UINT64_MAX||(deleting&&cur.inode_epoch==UINT64_MAX))return PP64_FULL;
  if(e->entry.kind==SD64_FILE){

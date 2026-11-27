@@ -290,6 +290,36 @@ int main(void){
  uint64_t absent=0;uint8_t absent_kind=0;
  assert(sd64_lookup(&b,7,l.dir,&w.pair.dir.root,&bad,w.pair.dw.page,&absent,&absent_kind)==SD64_MISSING);
  check('h',8,2,513,88);
+ /* Stage 49: explicitly new ID-managed volume, not an in-place upgrade. */
+ memset(disk,0,sizeof disk);memset(durable,0,sizeof durable);attach();
+ assert(dc64_provision(&b,7,l.dir,D)==DC64_OK);
+ assert(ir64_provision(&b,7,l.inode,I,F,1)==IP64_OK);
+ assert(pp64_provision_ids(&b,&l,&w.pair,nodes,128,current,128,&pair)==PP64_OK);
+ reopen();assert(pair.id_floor==1);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);before=writes;
+ assert(po64_create_empty(&service,snap,&a,8)==PO64_DENIED&&writes==before);
+ assert(po64_create_empty(&service,snap,&a,0)==PO64_OK&&service.pair.id_floor==2);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);
+ assert(po64_child_at(&service,snap,1,0,&row)==PO64_OK&&row.entry.target==2);
+ assert(po64_change_file(&service,snap,&row,0)==PO64_OK&&service.pair.id_floor==2);
+ assert(po64_unmount(&service)==PO64_OK);reopen();assert(pair.id_floor==2);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);before=writes;
+ assert(po64_create_empty(&service,snap,&a,2)==PO64_DENIED&&writes==before);
+ assert(po64_mkdir(&service,snap,&folder,0)==PO64_OK&&service.pair.id_floor==3);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);
+ assert(po64_create_empty(&service,snap,&a,0)==PO64_OK&&service.pair.id_floor==4);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);
+ assert(po64_child_at(&service,snap,1,0,&row)==PO64_OK&&row.entry.target==4);
+ assert(po64_copy_file(&service,snap,&row,&h,0)==PO64_OK&&service.pair.id_floor==5);
+ assert(po64_unmount(&service)==PO64_OK);reopen();assert(pair.id_floor==5);
+ check('a',4,1,0,0);check('h',5,1,0,0);
+ /* Damage to latest receipt is not allowed to roll the watermark back. */
+ disk[pair.slot][112]^=1;
+ assert(pp64_mount(&b,&l,&w.pair,nodes,128,current,128,&pair)==PP64_CORRUPT);
+ reopen();assert(pair.id_floor==5);
+ puts("STYLEFS 49 ID SERVICE PASS: explicit v2, auto allocate, no reuse after unlink and cold boot, folder and copy, damaged receipt refusal");
  puts("STYLEFS 48 COPY PASS: 32KiB+17, exact source, independent data, zero file, CRC rejection, no partial publication");
  puts("STYLEFS 47 DIRECTORY SERVICE PASS: mkdir, cross-parent move, cold reopen, cycle and nonempty refusal, empty rmdir");
  puts("STYLEFS 45 NAMESPACE SERVICE PASS: create, rename, unlink, stale snapshot, no overwrite, token invalidation, cold reopen, RO denial");

@@ -73,7 +73,7 @@ static enum po64_status live(struct po64_service *s){
  struct pp64_pair p;
  enum pp64_status rc=pp64_mount(s->block,&s->layout,&s->work->pair,s->nodes,s->node_cap,s->runs,s->run_cap,&p);
  if(rc!=PP64_OK){clear(s);return status(rc);}
- if(p.sequence!=s->pair.sequence||p.dir_epoch!=s->pair.dir_epoch||p.inode_epoch!=s->pair.inode_epoch||p.slot!=s->pair.slot){
+ if(p.sequence!=s->pair.sequence||p.dir_epoch!=s->pair.dir_epoch||p.inode_epoch!=s->pair.inode_epoch||p.slot!=s->pair.slot||p.id_floor!=s->pair.id_floor){
   clear(s);return PO64_STALE;
  }
  return PO64_OK;
@@ -223,6 +223,17 @@ static enum po64_status edit_ready(struct po64_service *s,struct po64_snapshot s
  if(snap.mount!=s->mount_id||snap.sequence!=s->pair.sequence)return PO64_STALE;
  return live(s);
 }
+/* ID zero requests automatic allocation only on explicitly formatted
+ * ID-managed volumes. Legacy callers retain the old explicit contract. */
+static enum po64_status edit_id(struct po64_service *s,uint64_t *id){
+ if(s->pair.id_floor){
+  if(s->pair.id_floor==UINT64_MAX)return PO64_FULL;
+  uint64_t next=s->pair.id_floor+1;
+  if(*id&&*id!=next)return PO64_DENIED;
+  *id=next;
+ }
+ return *id>1?PO64_OK:PO64_INVALID;
+}
 static bool edit_parent(struct po64_service *s,uint64_t parent){
  if(parent==1)return true;
  for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
@@ -251,7 +262,8 @@ enum po64_status po64_create_empty(struct po64_service *s,struct po64_snapshot s
  const struct sd64_key *key,uint64_t id){
  enum po64_status rc=edit_ready(s,snap);
  if(rc!=PO64_OK)return rc;
- if(id<=1||!span(s,key,sizeof *key)||!sd64_key_valid(key))return PO64_INVALID;
+ if(!span(s,key,sizeof *key)||!sd64_key_valid(key))return PO64_INVALID;
+ rc=edit_id(s,&id);if(rc!=PO64_OK)return rc;
  if(!edit_parent(s,key->parent))return PO64_DENIED;
  for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
   if(s->nodes[i].id==id)return PO64_DENIED;
@@ -298,7 +310,8 @@ enum po64_status po64_mkdir(struct po64_service *s,struct po64_snapshot snap,
  const struct sd64_key *key,uint64_t id){
  enum po64_status rc=edit_ready(s,snap);
  if(rc!=PO64_OK)return rc;
- if(id<=1||!span(s,key,sizeof *key)||!sd64_key_valid(key))return PO64_INVALID;
+ if(!span(s,key,sizeof *key)||!sd64_key_valid(key))return PO64_INVALID;
+ rc=edit_id(s,&id);if(rc!=PO64_OK)return rc;
  if(!edit_parent(s,key->parent))return PO64_DENIED;
  for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
   if(s->nodes[i].id==id)return PO64_DENIED;
@@ -363,7 +376,8 @@ enum po64_status po64_copy_file(struct po64_service *s,struct po64_snapshot snap
  if(rc!=PO64_OK)return rc;
  if(!span(s,old,sizeof *old)||!span(s,dest,sizeof *dest)||
     old->entry.kind!=SD64_FILE||old->entry.target<=1||!old->revision||
-    !sd64_key_valid(&old->entry.key)||!sd64_key_valid(dest)||new_id<=1)return PO64_INVALID;
+    !sd64_key_valid(&old->entry.key)||!sd64_key_valid(dest))return PO64_INVALID;
+ rc=edit_id(s,&new_id);if(rc!=PO64_OK)return rc;
  if(!edit_parent(s,dest->parent))return PO64_DENIED;
  if(s->work->pair.dir.count>=s->node_cap)return PO64_FULL;
  for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)

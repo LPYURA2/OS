@@ -11,7 +11,7 @@
  * guarded data allocation and rollback are separate future work. */
 enum pp64_status { PP64_OK,PP64_INVALID,PP64_CORRUPT,PP64_IO,PP64_FULL,PP64_UNCERTAIN,PP64_CANCELLED };
 struct pp64_layout {uint64_t owner,receipt,dir,inode,data,dir_sectors,inode_sectors,data_sectors,data_start;};
-struct pp64_pair {uint64_t sequence,dir_epoch,inode_epoch;unsigned slot;};
+struct pp64_pair {uint64_t sequence,dir_epoch,inode_epoch;unsigned slot;uint64_t id_floor;};
 struct pp64_workspace {
  struct dc64_state dir;
  struct dc64_edit_workspace dw;
@@ -75,7 +75,13 @@ enum pp64_status pp64_copy(struct bs_service *,const struct pp64_layout *,struct
 enum pp64_status pp64_edit(struct bs_service *,const struct pp64_layout *,struct pp64_stream_workspace *,
  struct dc64_node *,size_t node_cap,struct sfs64_run *,size_t run_cap,
  uint64_t expected,const struct dc64_edit *,uint64_t revision,struct pp64_pair *);
+/* id_floor=0 denotes legacy caller-allocated format. For a newly
+ * provisioned ID-managed volume, nonzero floor is durable, root=1;
+ * every creation must use floor+1. No fallback to an older ID receipt
+ * on detected damage. This does not protect arbitrary image rollback. */
 #ifdef STYLEFS_HOST_FORMAT
+enum pp64_status pp64_provision_ids(struct bs_service *,const struct pp64_layout *,struct pp64_workspace *,
+ struct dc64_node *,size_t node_cap,struct sfs64_run *,size_t run_cap,struct pp64_pair *);
 enum pp64_status pp64_provision(struct bs_service *,const struct pp64_layout *,struct pp64_workspace *,
  struct dc64_node *,size_t node_cap,struct sfs64_run *,size_t run_cap,struct pp64_pair *);
 #endif
