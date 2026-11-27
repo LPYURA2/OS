@@ -49,7 +49,43 @@ def wait_restart_ready(proc,serial):
         return ticks(lines,r['pid'],i)>=4 and ticks(lines,2,i)>=4
     wait_progress(proc,serial,ready)
 
-def verify_forced_stop(lines,trace,obs):
+def wait_shell_boundary(proc,serial):
+    def ready(lines):
+        marks=[i for i,x in enumerate(lines) if x==b'STYLEOS DESKTOP SHELL RESTART']
+        if len(marks)!=1:return False
+        return all(ticks(lines,pid,marks[0])>=4 for pid in (1,2))
+    wait_progress(proc,serial,ready)
+
+def verify_shell_boundary(lines,roots):
+    # Verify ordered actual guest receipts. The enclosing forced-stop
+    # verifier also binds every EVENT to a CPL3 raw QEMU trap and R12.
+    marks=[i for i,x in enumerate(lines) if x==b'STYLEOS DESKTOP SHELL RESTART']
+    if len(marks)!=1:raise ValueError('exact live refresh marker')
+    at=marks[0]
+    stops=records(lines,FORCED,FKEY)
+    retired=records(lines,RETIRE,RKEY)
+    if len(stops)!=3 or len(retired)!=33:raise ValueError('boundary lifecycle')
+    first_stop=stops[0][0]
+    if not retired[29][0]<at<first_stop:raise ValueError('refresh must occur while both original peers alive')
+    for pid in (1,2):
+        events=[(i,e) for i,e in records(lines,EVENT,EKEY) if e['pid']==pid and e['vector']==0x50]
+        before=[e for i,e in events if retired[29][0]<i<at]
+        after=[e for i,e in events if at<i<first_stop]
+        if len(before)<4 or len(after)<4:raise ValueError('insufficient execution across shell refresh')
+        if any(e['root']!=roots[pid-1] or e['rip']!=0x1000000d or e['state']!=1 for e in before+after):
+            raise ValueError('native identity/state changed across refresh')
+    fields=('root','n','batch','mouse','key','dx','dy','buttons','modifiers','x','y','active','ru','restarts','text','text-hash','text-dirty','note-session','writes')
+    inputs=records(lines,b'STYLEOS S863 EVENT',fields)
+    f10=[(i,e) for i,e in inputs if e['key']==0x44 and not e['mouse']]
+    if len(f10)!=1 or not at<f10[0][0]<first_stop:raise ValueError('actual F10 event missing')
+    earlier=[e for i,e in inputs if i<at]
+    if not earlier or f10[0][1]['restarts']!=earlier[-1]['restarts']+1:raise ValueError('shell refresh counter')
+    if any(f10[0][1][k]!=earlier[-1][k] for k in ('text','text-hash','text-dirty','note-session')):
+        raise ValueError('shell document continuity')
+    # Windows/ports ownership is separately verified by enclosing lifecycle
+    # checks at bind, revoke, rebind and final cleanup. No pixel IPC claim.
+
+def verify_forced_stop(lines,trace,obs,*,shell_boundary=False):
     safe=obs['active']['root']
     def rec(tag,keys):return records(lines,tag,keys)
     admissions=rec(ADMIT,AKEY)
@@ -158,4 +194,5 @@ def verify_forced_stop(lines,trace,obs):
     if sum(e['key']==0x43 for _,e in inputs)!=3 or len(inputs)<2:raise ValueError('three trusted request inputs')
     (i,prev),(j,lang)=inputs[-2:]
     if not done[0][0]<i<j or (prev['key'],lang['key'])!=(0x58,0x40) or lang['root']!=safe or lang['ru']==prev['ru'] or not lang['writes']:raise ValueError('responsive shell after forced stop')
+    if shell_boundary:verify_shell_boundary(lines,roots)
     return result

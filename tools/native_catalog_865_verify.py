@@ -1,6 +1,7 @@
 """Externally provisioned native catalog and independent QEMU CPL3 proof.
 No ELF payload or test scheduling policy is linked into the ordinary kernel."""
 import hashlib,re,struct,time
+import json,zipfile
 from irq_trace_accept_859 import HEADER
 from runtime_mixed_863_verify import row
 
@@ -13,7 +14,12 @@ FAULT_PROBES={
     'forbidden-int':(b'\xcd\x81',13,0x1000000d,0x40a,0),
 }
 
-def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False):
+def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None):
+    if packages is not None:
+        if not forced_stop:raise ValueError('package fixture requires forced-stop profile')
+        packages.mkdir(parents=True,exist_ok=False)
+        from tea_package import pack,inspect
+        package_rows=[]
     if forced_stop and (timer_load or bad_rsp or fault_probe or hang_load):raise ValueError('separate forced stop workload')
     if hang_load and (timer_load or bad_rsp or fault_probe):raise ValueError('separate infinite-loop workload')
     if fault_probe and (timer_load or bad_rsp or fault_probe not in FAULT_PROBES):raise ValueError('separate fault probe')
@@ -44,10 +50,26 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
             blob[:7]=b'\x7fELF\x02\x01\x01'
             struct.pack_into('<HHIQQQIHHHHHH',blob,16,2,62,1,0x10000000,64,0,0,64,56,1,0,0,0)
             struct.pack_into('<IIQQQQQQ',blob,64,1,5,4096,0x10000000,0,len(code),4096,4096)
+            if packages is not None and i<2:
+                # Standalone native packages, independently validated on host.
+                # The existing guest catalog admits the verified ELF payload,
+                # not ZIP bytes. No claim of native .tea installation here.
+                elf=packages/f'probe-{i}.elf'
+                tea=packages/f'probe-{i}.tea'
+                elf.write_bytes(blob)
+                manifest=pack(tea,elf,f'org.styleos.probe{i}',f'Boundary probe {i}','0.1.0','x86_64')
+                if inspect(tea)!=manifest:raise ValueError('package manifest mismatch')
+                with zipfile.ZipFile(tea) as archive: payload=archive.read(manifest['entry'])
+                if payload!=blob or hashlib.sha256(payload).hexdigest()!=manifest['sha256']:
+                    raise ValueError('package payload mismatch')
+                blob=payload
+                package_rows.append(dict(pid_expected=i+1,package=tea.name,package_sha256=hashlib.sha256(tea.read_bytes()).hexdigest(),manifest=manifest))
             lba=3072+16*i
             struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),(b'stop00' if forced_stop and i==0 else f'app{i:02}'.encode()))
             disk.seek(lba*512);disk.write(blob.ljust(8192,b'\0'))
         disk.seek(3000*512);disk.write(catalog)
+    if packages is not None:
+        (packages/'manifest-evidence.json').write_text(json.dumps(package_rows,indent=2)+'\n')
     return hashlib.sha256(catalog).hexdigest()
 
 def wait_native_empty(proc,serial,seconds):
