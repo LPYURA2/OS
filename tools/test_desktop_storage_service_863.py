@@ -350,7 +350,6 @@ def main():
         if not 22<=len(package)<=16384:raise ValueError('peer package extent')
         header=bytearray(512)
         header[:8]=b'STEA769\0'
-        import struct
         struct.pack_into('<II',header,8,1,len(package))
         header[16:48]=hashlib.sha256(package).digest()
         with base.open('r+b') as stream:
