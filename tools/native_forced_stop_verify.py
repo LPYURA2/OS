@@ -160,10 +160,10 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
                 # Four stages, one or more polls per stage. Each group ends
                 # in the successfully returned event verified below.
                 for off in FOCUS_RETURNS:
-                    n=0
+                    poll_count=0
                     while tail and tail[0]==(128,0x10000000+off,0x102,1):
-                        tail=tail[1:];n+=1
-                    if not n:raise ValueError('missing focus poll stage')
+                        tail=tail[1:];poll_count+=1
+                    if not poll_count:raise ValueError('missing focus poll stage')
                 loop=0x10000000+FOCUS_LOOP
                 if window_frame:
                     expected=[(128,0x10000000+off,0x103,1) for off in FRAME_RETURNS]
