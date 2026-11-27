@@ -1,0 +1,92 @@
+name: StyleOS actual native input 56
+on:
+  push:
+    branches: [feature/styleos-native-input-guest-56]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stop-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: GCC and Clang sanitized lifecycle and refusals
+        run: |
+          set -euo pipefail
+          mkdir -p build/forced-stop
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_KERNEL_CAPACITY_32 -DSTYLEOS_OWNED_SHELL_865 -Iinclude tests/test_native_forced_stop.c kernel/{runtime_bank_862,desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/forced-stop/$cc"
+            "build/forced-stop/$cc" | tee "build/forced-stop/$cc.log"
+          done
+      - name: Window capability refusal and lifecycle tests
+        run: python3 tools/test_native_window_channel.py --output build/window-channel-56
+      - name: Focus routing, clipped hit testing and capture
+        run: python3 tools/test_native_desktop_bridge.py --output build/native-focus-56
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-forced-stop-host
+          path: |
+            build/forced-stop/
+            build/window-channel-56/
+            build/native-focus-56/
+  hang-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install actual guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Verify QEMU 8.2.2
+        run: qemu-system-x86_64 --version | head -n1 | grep '^QEMU emulator version 8\.2\.2 '
+      - name: Existing hang coexistence regression (not forced stop)
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-hang --output build/native-hang
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-forced-stop-hang-regression
+          path: build/native-hang/
+          if-no-files-found: warn
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact tracked source
+        run: |
+          set -euo pipefail
+          mkdir -p build/source
+          git archive --format=tar --prefix="StyleOS-$GITHUB_SHA/" "$GITHUB_SHA" | gzip -n > "build/source/StyleOS-$GITHUB_SHA.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > build/source/git-identities.txt
+          (cd build/source && sha256sum -- *.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: styleos-source-${{ github.sha }}
+          path: build/source/
+          if-no-files-found: error
+  forced-stop-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install real guest tools
+        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Check verifier syntax and exact QEMU version
+        run: |
+          python3 -m py_compile tools/native_forced_stop_verify.py tools/native_catalog_865_verify.py tools/test_desktop_storage_service_863.py
+          qemu-system-x86_64 --version | head -n1 | grep '^QEMU emulator version 8\.2\.2 '
+      - name: Actual QMP mouse and keyboard, CPL3 delivery and isolation
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-forced-stop --native-shell-boundary --native-window-ipc --native-window-tile --native-window-input --native-window-focus --output build/native-forced-stop
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-forced-stop-guest
+          path: build/native-forced-stop/
+          if-no-files-found: warn

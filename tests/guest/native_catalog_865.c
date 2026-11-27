@@ -48,7 +48,7 @@ static bool owned_zero(const struct stop_owned *r){
  return clear_bytes(r->owner,sizeof *r->owner)&&clear_bytes(r->window,sizeof *r->window)&&
         clear_bytes(r->port,sizeof *r->port);
 }
-static bool input_probe;
+static bool input_probe,focus_probe;
 static bool grant_owned(uint32_t pid,uint64_t gen,uint32_t *win){
  const struct pr_entry *p=pr_find(pr_global(),pid);
  struct usr_runtime *s=sessions();struct nwc_service *c=channels();
@@ -147,6 +147,11 @@ static bool stop_step(void){
     target_owned.port->length!=1||!target_owned.port->has_tile||
     peer_owned.port->length!=1||!peer_owned.port->has_tile||
     nwc_port_count(channels())!=2||usr_visible_windows(sessions(),0,0)!=2)return stop_fail();
+ if(focus_probe){
+  const struct nwc_event *ev=&peer_owned.port->events[peer_owned.port->head];
+  if(peer_owned.port->next_sequence!=7||ev->sequence!=6||ev->kind!=NWC_KEY||
+     ev->code!=0x30||!ev->down||ev->modifiers)return stop_fail();
+ }
  save_peer(&peer_owned);
  uint32_t old_window=stop_window;
  uint32_t serial=pr_global()->change_serial;
@@ -217,7 +222,9 @@ bool s865_native_catalog_request(void){
  static const uint8_t marker[8]={'s','t','o','p','0','0',0,0};
  bool forced=valid&&count==32&&nc_equal(catalog+16+40,marker,8);
  static const uint8_t input_marker[8]={'i','n','p','u','t','1',0,0};
- input_probe=forced&&nc_equal(catalog+16+NC_RECORD+40,input_marker,8);
+ static const uint8_t focus_marker[8]={'f','o','c','u','s','1',0,0};
+ focus_probe=forced&&nc_equal(catalog+16+NC_RECORD+40,focus_marker,8);
+ input_probe=focus_probe||(forced&&nc_equal(catalog+16+NC_RECORD+40,input_marker,8));
  if(valid)for(unsigned j=0;j<count;j++){
   const uint8_t *r=catalog+16+j*NC_RECORD;
   uint32_t pid;

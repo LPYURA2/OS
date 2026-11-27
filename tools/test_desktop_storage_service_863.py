@@ -215,7 +215,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--native-shell-boundary',action='store_true');p.add_argument('--native-window-ipc',action='store_true');p.add_argument('--native-window-tile',action='store_true');p.add_argument('--native-window-input',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');p.add_argument('--process-stop',action='store_true');p.add_argument('--block-service',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--native-shell-boundary',action='store_true');p.add_argument('--native-window-ipc',action='store_true');p.add_argument('--native-window-tile',action='store_true');p.add_argument('--native-window-input',action='store_true');p.add_argument('--native-window-focus',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');p.add_argument('--process-stop',action='store_true');p.add_argument('--block-service',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
@@ -229,6 +229,7 @@ def main():
     if args.native_fault_probe and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp):p.error('fault probe requires separate catalog')
     if args.native_hang and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe):p.error('hang requires separate catalog')
     if args.native_forced_stop and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe or args.native_hang):p.error('forced stop requires separate native catalog')
+    if args.native_window_focus and not args.native_window_input:p.error('focus requires window input')
     if args.native_window_input and not args.native_window_tile:p.error('input requires window tile')
     if args.native_window_tile and not args.native_window_ipc:p.error('tile requires window IPC')
     if args.native_window_ipc and not args.native_shell_boundary:p.error('window IPC requires shell boundary')
@@ -246,7 +247,7 @@ def main():
     catalog_digest=None
     if args.native_catalog:
         from native_catalog_865_verify import provision_catalog
-        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,forced_stop=args.native_forced_stop,packages=out/'packages' if args.native_shell_boundary else None,window_ipc=args.native_window_ipc,window_tile=args.native_window_tile,window_input=args.native_window_input)
+        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,forced_stop=args.native_forced_stop,packages=out/'packages' if args.native_shell_boundary else None,window_ipc=args.native_window_ipc,window_tile=args.native_window_tile,window_input=args.native_window_input,window_focus=args.native_window_focus)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and img and code and vars):raise RuntimeError('real QEMU mandatory')
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
@@ -445,6 +446,19 @@ def main():
                         from native_catalog_865_verify import wait_native_empty,wait_hang_progress
                         if args.native_forced_stop:
                             from native_forced_stop_verify import wait_stop_ready,wait_restart_ready
+                            if args.native_window_focus:
+                                from native_forced_stop_verify import wait_focus_sequence
+                                wait_focus_sequence(proc,serial,2)
+                                old_x,old_y=d.x,d.y
+                                d.move(1,1);d.button(True)
+                                wait_focus_sequence(proc,serial,3)
+                                d.button(False)
+                                wait_focus_sequence(proc,serial,4)
+                                d.key('a');wait_focus_sequence(proc,serial,5)
+                                # One further real key stays queued for
+                                # the existing stop/revocation scrub proof.
+                                d.key('b')
+                                d.move(old_x,old_y)
                             wait_stop_ready(proc,serial)
                             if args.native_shell_boundary:
                                 from native_forced_stop_verify import wait_shell_boundary
@@ -567,7 +581,7 @@ def main():
                 from native_catalog_865_verify import verify_catalog
                 if args.native_forced_stop:
                     from native_forced_stop_verify import verify_forced_stop
-                    events=verify_forced_stop(lines,data.decode('ascii'),obs,shell_boundary=args.native_shell_boundary,window_ipc=args.native_window_ipc,window_tile=args.native_window_tile,window_input=args.native_window_input)
+                    events=verify_forced_stop(lines,data.decode('ascii'),obs,shell_boundary=args.native_shell_boundary,window_ipc=args.native_window_ipc,window_tile=args.native_window_tile,window_input=args.native_window_input,window_focus=args.native_window_focus)
                 else:
                     events=verify_catalog(lines,data.decode('ascii'),obs,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,ui_stop=args.process_stop)
                 if stats['rd_operations']<4+32*9:raise ValueError('native catalog actual disk reads')

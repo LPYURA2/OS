@@ -2,7 +2,7 @@
 import re,time
 from irq_trace_accept_859 import HEADER
 from runtime_mixed_863_verify import row
-from native_catalog_865_verify import complete_uart_lines
+from native_catalog_865_verify import complete_uart_lines,FOCUS_RETURNS,FOCUS_LOOP
 
 ADMIT=b'STYLEOS NATIVE ADMIT'
 EVENT=b'STYLEOS NATIVE EVENT'
@@ -56,7 +56,13 @@ def wait_shell_boundary(proc,serial):
         return all(ticks(lines,pid,marks[0])>=4 for pid in (1,2))
     wait_progress(proc,serial,ready)
 
-def verify_shell_boundary(lines,roots,loop=0x1000000d):
+def wait_focus_sequence(proc,serial,seq):
+    def ready(lines):
+        rows=records(lines,b'STYLEOS NATIVE INPUT',('pid','gen','root','window','va','bytes','status','seq'))
+        return any(r['pid']==2 and r['status']==0 and r['seq']==seq for _,r in rows)
+    wait_progress(proc,serial,ready)
+
+def verify_shell_boundary(lines,roots,loop=0x1000000d,focus=False):
     # Verify ordered actual guest receipts. The enclosing forced-stop
     # verifier also binds every EVENT to a CPL3 raw QEMU trap and R12.
     marks=[i for i,x in enumerate(lines) if x==b'STYLEOS DESKTOP SHELL RESTART']
@@ -72,7 +78,7 @@ def verify_shell_boundary(lines,roots,loop=0x1000000d):
         before=[e for i,e in events if retired[29][0]<i<at]
         after=[e for i,e in events if at<i<first_stop]
         if len(before)<4 or len(after)<4:raise ValueError('insufficient execution across shell refresh')
-        if any(e['root']!=roots[pid-1] or e['rip']!=loop or e['state']!=1 for e in before+after):
+        if any(e['root']!=roots[pid-1] or e['rip']!=(0x10000000+FOCUS_LOOP if focus and pid==2 else loop) or e['state']!=1 for e in before+after):
             raise ValueError('native identity/state changed across refresh')
     fields=('root','n','batch','mouse','key','dx','dy','buttons','modifiers','x','y','active','ru','restarts','text','text-hash','text-dirty','note-session','writes')
     inputs=records(lines,b'STYLEOS S863 EVENT',fields)
@@ -85,7 +91,7 @@ def verify_shell_boundary(lines,roots,loop=0x1000000d):
     # Windows/ports ownership is separately verified by enclosing lifecycle
     # checks at bind, revoke, rebind and final cleanup. No pixel IPC claim.
 
-def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,window_tile=False,window_input=False):
+def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,window_tile=False,window_input=False,window_focus=False):
     safe=obs['active']['root']
     def rec(tag,keys):return records(lines,tag,keys)
     admissions=rec(ADMIT,AKEY)
@@ -148,7 +154,18 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
             if window_input:prefix.extend([(128,0x1000007e,0x102,1),(128,0x1000009d,0x102,1)])
             loop=0x100000df if window_input else 0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d
             actual=[(e['vector'],e['rip'],e['rax'],e['state']) for e in seq]
-            if actual[:len(prefix)]!=prefix or len(seq)<len(prefix)+4 or any(x!=(0x50,loop,0,1) for x in actual[len(prefix):]):raise ValueError('real loop preemption')
+            if actual[:len(prefix)]!=prefix:raise ValueError('initial native calls')
+            tail=actual[len(prefix):]
+            if window_focus and pid==2:
+                # Four stages, one or more polls per stage. Each group ends
+                # in the successfully returned event verified below.
+                for off in FOCUS_RETURNS:
+                    n=0
+                    while tail and tail[0]==(128,0x10000000+off,0x102,1):
+                        tail=tail[1:];n+=1
+                    if not n:raise ValueError('missing focus poll stage')
+                loop=0x10000000+FOCUS_LOOP
+            if len(tail)<4 or any(x!=(0x50,loop,0,1) for x in tail):raise ValueError('real loop preemption')
             if not end<stop_by_pid[pid]:raise ValueError('release before successful stop')
         else:
             actual=[(e['vector'],e['rip'],e['rax'],e['state']) for e in seq]
@@ -232,13 +249,38 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
             raise ValueError('pixel receipt not adjacent to authenticated trap')
     if window_input:
         receipts=rec(b'STYLEOS NATIVE INPUT',('pid','gen','root','window','va','bytes','status','seq'))
-        if len(receipts)!=6:raise ValueError('input receipt count')
         for pid,idx in ((1,0),(2,1),(33,0)):
             want=[(pid,pid,roots[idx],0,0x12000fe0,64,1,0),(pid,pid,roots[idx],0,0x12000100,64,0,1)]
-            if [tuple(x.values()) for _,x in receipts if x['pid']==pid]!=want:
-                raise ValueError('input destination preflight or event consumption')
+            got=[tuple(x.values()) for _,x in receipts if x['pid']==pid]
+            if got[:2]!=want:raise ValueError('input destination preflight or event consumption')
+            if window_focus and pid==2:
+                later=got[2:]
+                for seqno in (2,3,4,5):
+                    while later and later[0]==(2,2,roots[1],0,0x12000100,64,6,0):later=later[1:]
+                    if not later or later[0]!=(2,2,roots[1],0,0x12000100,64,0,seqno):
+                        raise ValueError('focus polling receipt')
+                    later=later[1:]
+                if later:raise ValueError('extra focus delivery')
+            elif got[2:]:raise ValueError('unexpected input to nonfocused peer')
         calls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x102]
-        if len(calls)!=6 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(receipts,calls)):
+        if len(calls)!=len(receipts) or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(receipts,calls)):
             raise ValueError('input receipt not adjacent to authenticated trap')
-    if shell_boundary:verify_shell_boundary(lines,roots,0x100000df if window_input else 0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d)
+        if window_focus:
+            focus_ok=[(i,x) for i,x in receipts if x['pid']==2 and x['seq'] in (3,4,5)]
+            if len(focus_ok)!=3:raise ValueError('real input event count')
+            marks=[i for i,x in enumerate(lines) if x==b'STYLEOS DESKTOP SHELL RESTART']
+            if len(marks)!=1:raise ValueError('missing focus refresh')
+            f9=[(i,e) for i,e in inputs if e['key']==0x43 and not e['mouse']]
+            route=[(i,e) for i,e in inputs if f9[0][0]<i<marks[0]]
+            down=[(i,e) for i,e in route if e['mouse'] and e['buttons']==1 and (e['x'],e['y'])==(1,1)]
+            up=[(i,e) for i,e in route if e['mouse'] and not e['buttons'] and (e['x'],e['y'])==(1,1)]
+            key=[(i,e) for i,e in route if not e['mouse'] and e['key']==0x1e]
+            # Observer receipt may precede syscall by scheduler dispatch;
+            # exact order and full user wire checks, no fabricated QMP data.
+            if not down or not up or len(key)!=1 or not down[-1][0]<focus_ok[0][0]<up[-1][0]<focus_ok[1][0]<key[0][0]<focus_ok[2][0]<marks[0]:
+                raise ValueError('real pointer/key input ordering')
+            baseline=f9[0][1]
+            if any(e[k]!=baseline[k] for _,e in route for k in ('text','text-hash','text-dirty','note-session')):
+                raise ValueError('native focus leaked into legacy editor')
+    if shell_boundary:verify_shell_boundary(lines,roots,0x100000df if window_input else 0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d,focus=window_focus)
     return result

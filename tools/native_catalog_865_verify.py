@@ -14,7 +14,43 @@ FAULT_PROBES={
     'forbidden-int':(b'\xcd\x81',13,0x1000000d,0x40a,0),
 }
 
-def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False,window_tile=False,window_input=False):
+# Separate PID2 payload: consume initial queued sentinel, then wait for
+# real pointer press/release and a key. Each stage polls only its own port.
+# Final RAX=0 spin proves user code checked every returned wire field.
+FOCUS_RETURNS=(0xf9,0x157,0x1d3,0x24f)
+FOCUS_LOOP=0x2a3
+def focus_payload(code):
+    assert len(code)==0xe3 and code[0xdf:]==b'\xeb\xfe\x0f\x0b'
+    code=bytearray(code)
+    code[0xdf:0xe1]=b'\xeb\x02'
+    failures=[]
+    tests=(
+        ((4,2),(12,2),(28,2),(32,0x5a,True),(33,2,True)),
+        ((4,3),(12,3),(16,1),(20,0),(24,1),(28,8),(32,1),(36,1)),
+        ((4,4),(12,3),(16,0),(20,0),(24,0),(28,8),(32,1),(36,1)),
+        ((4,5),(12,1),(16,0x1e),(20,0),(24,1),(28,0)),
+    )
+    for expected,ret in zip(tests,FOCUS_RETURNS):
+        again=len(code)
+        code+=b'\xbb\0\0\0\0\xb9\x00\x01\x00\x12\xba\x40\0\0\0\xb8\x02\x01\0\0\xcd\x80'
+        assert len(code)==ret
+        code+=b'\x83\xf8\x06\x0f\x84'
+        code+=struct.pack('<i',again-(len(code)+4))
+        code+=b'\x85\xc0\x0f\x85'
+        failures.append(len(code));code+=b'\0'*4
+        code+=b'\xbf\x00\x01\x00\x12'
+        for offset,value,*byte in expected:
+            code+=(b'\x80' if byte else b'\x83')+b'\x7f'+bytes([offset,value])+b'\x0f\x85'
+            failures.append(len(code));code+=b'\0'*4
+    code+=b'\x31\xc0'
+    assert len(code)==FOCUS_LOOP
+    code+=b'\xeb\xfe'
+    fail=len(code);code+=b'\x0f\x0b'
+    for off in failures:struct.pack_into('<i',code,off,fail-(off+4))
+    return bytes(code)
+
+def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False,window_tile=False,window_input=False,window_focus=False):
+    if window_focus and not window_input:raise ValueError('focus requires input fixture')
     if window_input and not window_tile:raise ValueError('input requires tile fixture')
     if window_tile and not window_ipc:raise ValueError('tile requires IPC fixture')
     if window_ipc and (not forced_stop or packages is None):raise ValueError('window IPC requires separate package fixture')
@@ -85,6 +121,7 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                         code=bytearray(code)
                         for off in fixups:struct.pack_into('<i',code,off,fail-(off+4))
                         code=bytes(code)
+                        if window_focus and i==1:code=focus_payload(code)
                 elif window_ipc and i<2:
                     # Real CPL3 register-only call. Failed return faults;
                     # success loops with RAX=0 at code offset 0x24.
@@ -117,7 +154,7 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                 blob=payload
                 package_rows.append(dict(pid_expected=i+1,package=tea.name,package_sha256=hashlib.sha256(tea.read_bytes()).hexdigest(),manifest=manifest))
             lba=3072+16*i
-            struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),(b'stop00' if forced_stop and i==0 else b'input1' if window_input and i==1 else f'app{i:02}'.encode()))
+            struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),(b'stop00' if forced_stop and i==0 else b'focus1' if window_focus and i==1 else b'input1' if window_input and i==1 else f'app{i:02}'.encode()))
             disk.seek(lba*512);disk.write(blob.ljust(8192,b'\0'))
         disk.seek(3000*512);disk.write(catalog)
     if packages is not None:
