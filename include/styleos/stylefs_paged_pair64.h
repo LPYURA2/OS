@@ -49,6 +49,8 @@ struct pp64_stream_workspace {
  struct ip64_workspace source;
  struct sfs64_run plan[PP64_FILE_RUNS];
  uint8_t transfer[SFS64_WINDOW_BYTES],manifest[IP64_MAP_MAX];
+ /* Independent immutable source map during a streaming copy. */
+ uint8_t copy_map[IP64_MAP_MAX];
 };
 typedef bool (*pp64_source)(void *,uint64_t,uint8_t *,size_t);
 typedef bool (*pp64_sink)(void *,uint64_t,const uint8_t *,size_t);
@@ -59,7 +61,14 @@ enum pp64_status pp64_put(struct bs_service *,const struct pp64_layout *,struct 
 enum pp64_status pp64_get(struct bs_service *,const struct pp64_layout *,struct pp64_stream_workspace *,
  struct dc64_node *,size_t node_cap,struct sfs64_run *,size_t run_cap,
  uint64_t expected,const struct sd64_key *,uint64_t id,uint64_t revision,pp64_sink,void *);
-/* Guarded mkdir, rename/move, empty rmdir and unlink. File deletion
+/* Same-volume copy into a new unused key and lifetime-unique ID.
+ * Verify source CRC before publishing destination; source unchanged.
+ * No reflink, overwrite, user callbacks or whole-file allocation. */
+enum pp64_status pp64_copy(struct bs_service *,const struct pp64_layout *,struct pp64_stream_workspace *,
+ struct dc64_node *,size_t,struct sfs64_run *,struct sfs64_run *,size_t,
+ uint64_t expected,const struct sd64_key *source,uint64_t source_id,uint64_t revision,uint64_t bytes,
+ const struct sd64_key *destination,uint64_t new_id,struct pp64_pair *);
+ /* Guarded mkdir, rename/move, empty rmdir and unlink. File deletion
  * retires its map and name in one paired commit; no secure erase. The
  * exact sequence and revision must match. Directory revision is zero.
  * Caller supplies lifetime-unique IDs and serializes exclusive grants. */

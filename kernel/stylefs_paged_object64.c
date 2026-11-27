@@ -356,3 +356,32 @@ enum po64_status po64_change_directory(struct po64_service *s,struct po64_snapsh
   s->runs,s->run_cap,snap.sequence,&e,0,&next);
  return edit_finish(s,pr,&next);
 }
+
+enum po64_status po64_copy_file(struct po64_service *s,struct po64_snapshot snap,
+ const struct po64_row *old,const struct sd64_key *dest,uint64_t new_id){
+ enum po64_status rc=edit_ready(s,snap);
+ if(rc!=PO64_OK)return rc;
+ if(!span(s,old,sizeof *old)||!span(s,dest,sizeof *dest)||
+    old->entry.kind!=SD64_FILE||old->entry.target<=1||!old->revision||
+    !sd64_key_valid(&old->entry.key)||!sd64_key_valid(dest)||new_id<=1)return PO64_INVALID;
+ if(!edit_parent(s,dest->parent))return PO64_DENIED;
+ if(s->work->pair.dir.count>=s->node_cap)return PO64_FULL;
+ for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
+  if(s->nodes[i].id==new_id)return PO64_DENIED;
+ uint64_t id=0;uint8_t kind=0;
+ rc=edit_lookup(s,&old->entry.key,&id,&kind);
+ if(rc!=PO64_OK)return rc==PO64_END?PO64_STALE:rc;
+ if(id!=old->entry.target||kind!=SD64_FILE)return PO64_STALE;
+ struct sfs64_file file;
+ enum ip64_status ir=ip64_stat(s->block,s->layout.owner,s->layout.inode,
+  &s->work->pair.inode.root,id,&s->work->pair.iw,&file);
+ if(ir!=IP64_OK){clear(s);return ir==IP64_IO?PO64_IO:PO64_CORRUPT;}
+ if(file.revision!=old->revision||file.bytes!=old->bytes)return PO64_STALE;
+ rc=edit_lookup(s,dest,&id,&kind);
+ if(rc!=PO64_END)return rc==PO64_OK?PO64_DENIED:rc;
+ struct sd64_key src=old->entry.key,dst=*dest;struct pp64_pair next;
+ s->busy=true;
+ enum pp64_status pr=pp64_copy(s->block,&s->layout,s->work,s->nodes,s->node_cap,
+  s->runs,s->previous,s->run_cap,snap.sequence,&src,old->entry.target,old->revision,old->bytes,&dst,new_id,&next);
+ return edit_finish(s,pr,&next);
+}

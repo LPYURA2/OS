@@ -241,6 +241,56 @@ int main(void){
  assert(po64_child_at(&service,snap,1,2,&folder_row)==PO64_END);
  assert(po64_mkdir(&service,snap,&folder,7)==PO64_DENIED&&writes==before);
  assert(po64_unmount(&service)==PO64_OK);
+ /* Stage 48: multi-window copy, independent destination, corruption refusal. */
+ reopen();
+ p=(struct pattern){77,UINT64_MAX,0};
+ const uint64_t big=SFS64_WINDOW_BYTES+17;
+ assert(put('g',7,0,big,&p)==PP64_OK);
+ reopen();
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ struct sd64_key g=key('g'),h=key('h'),j=key('j'),z=key('z');
+ assert(po64_snapshot(&service,&snap)==PO64_OK);
+ assert(po64_child_at(&service,snap,1,2,&file_row)==PO64_OK&&file_row.entry.target==7);
+ before=writes;
+ assert(po64_copy_file(&service,snap,&file_row,&k,8)==PO64_DENIED&&writes==before);
+ assert(po64_copy_file(&service,snap,&file_row,&h,2)==PO64_DENIED&&writes==before);
+ file_row.bytes++;
+ assert(po64_copy_file(&service,snap,&file_row,&h,8)==PO64_STALE&&writes==before);
+ file_row.bytes--;
+ assert(po64_grant(&service,10,&g,7,1,&token)==PO64_OK);
+ assert(po64_copy_file(&service,snap,&file_row,&h,8)==PO64_OK);
+ assert(po64_read(&service,10,token,accept,0)==PO64_DENIED);
+ assert(po64_copy_file(&service,snap,&file_row,&j,9)==PO64_STALE);
+ assert(po64_unmount(&service)==PO64_OK);
+ reopen();check('g',7,1,big,77);check('h',8,1,big,77);
+ /* A write to a copy must not modify the source. */
+ p=(struct pattern){88,UINT64_MAX,0};
+ assert(put('h',8,1,513,&p)==PP64_OK);reopen();
+ check('g',7,1,big,77);check('h',8,2,513,88);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);
+ assert(po64_create_empty(&service,snap,&z,9)==PO64_OK);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);
+ assert(po64_child_at(&service,snap,1,4,&created)==PO64_OK&&created.entry.target==9);
+ assert(po64_copy_file(&service,snap,&created,&j,10)==PO64_OK);
+ assert(po64_unmount(&service)==PO64_OK);
+ reopen();check('z',9,1,0,0);check('j',10,1,0,0);
+ /* Corrupt the final window of the source, not its metadata. A provisional
+  * first window may have been written, but no destination is published. */
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);
+ assert(po64_child_at(&service,snap,1,2,&file_row)==PO64_OK&&file_row.entry.target==7);
+ assert(ip64_export(&b,7,l.inode,&w.pair.inode.root,7,&w.source,&len)==IP64_OK);
+ assert(sfs64_map_decode(w.source.map,len,F,1,&m));
+ assert(sfs64_map_chunk(&m,big-1,1,&extent,&local,&take));
+ disk[2+D+I+extent.first+local/512][local%512]^=1;
+ struct sd64_key bad=key('q');uint64_t seq=snap.sequence;
+ assert(po64_copy_file(&service,snap,&file_row,&bad,11)==PO64_CORRUPT&&!service.active);
+ reopen();assert(pair.sequence==seq);
+ uint64_t absent=0;uint8_t absent_kind=0;
+ assert(sd64_lookup(&b,7,l.dir,&w.pair.dir.root,&bad,w.pair.dw.page,&absent,&absent_kind)==SD64_MISSING);
+ check('h',8,2,513,88);
+ puts("STYLEFS 48 COPY PASS: 32KiB+17, exact source, independent data, zero file, CRC rejection, no partial publication");
  puts("STYLEFS 47 DIRECTORY SERVICE PASS: mkdir, cross-parent move, cold reopen, cycle and nonempty refusal, empty rmdir");
  puts("STYLEFS 45 NAMESPACE SERVICE PASS: create, rename, unlink, stale snapshot, no overwrite, token invalidation, cold reopen, RO denial");
  puts("STYLEFS 36 OBJECT WRITE PASS: authorized replacement, readonly/wrong principal denial, revocation, cancellation, uncertain close");

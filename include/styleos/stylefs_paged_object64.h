@@ -76,4 +76,8 @@ enum po64_status po64_mkdir(struct po64_service *,struct po64_snapshot,
  const struct sd64_key *,uint64_t new_id);
 enum po64_status po64_change_directory(struct po64_service *,struct po64_snapshot,
  const struct po64_row *,const struct sd64_key *destination);
+/* Exact snapshot/source row, unused destination key and new lifetime-unique
+ * ID. Supervisor authorizes both paths. No implicit file-token authority. */
+enum po64_status po64_copy_file(struct po64_service *,struct po64_snapshot,
+ const struct po64_row *,const struct sd64_key *,uint64_t new_id);
 #endif

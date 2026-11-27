@@ -222,3 +222,63 @@ enum pp64_status pp64_edit(struct bs_service *b,const struct pp64_layout *l,stru
  if(dr!=DC64_OK)return dc(dr);
  return pp64_commit(b,l,&w->pair,a,cap,runs,rcap,expected,w->pair.dir.epoch,ie,out);
 }
+
+struct copy48 {
+ struct bs_service *b;const struct pp64_layout *l;
+ struct sfs64_map map;uint64_t seen;uint32_t sum;enum pp64_status error;
+};
+static bool copy48_source(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ struct copy48 *c=ctx;
+ if(at!=c->seen||at>c->map.file.bytes||n>c->map.file.bytes-at){
+  c->error=PP64_CORRUPT;return false;
+ }
+ size_t done=0;
+ while(done<n){
+  struct sfs_extent64 e;uint64_t local;size_t take=0,got=0;
+  if(!sfs64_map_chunk(&c->map,at+done,n-done,&e,&local,&take)){
+   c->error=PP64_CORRUPT;return false;
+  }
+  if(sfs64_read_window(c->b,c->l->owner,c->l->data,e,local,p+done,take,&got)!=BS_OK||got!=take){
+   c->error=PP64_IO;return false;
+  }
+  done+=take;
+ }
+ c->sum=digest(c->sum,p,n);c->seen+=n;
+ if(c->seen==c->map.file.bytes&&~c->sum!=c->map.file.checksum){
+  c->error=PP64_CORRUPT;return false;
+ }
+ return true;
+}
+enum pp64_status pp64_copy(struct bs_service *b,const struct pp64_layout *l,struct pp64_stream_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *current,struct sfs64_run *previous,size_t rcap,
+ uint64_t expected,const struct sd64_key *src,uint64_t id,uint64_t rev,uint64_t bytes,
+ const struct sd64_key *dst,uint64_t new_id,struct pp64_pair *out){
+ if(!cap||!rcap||cap>SIZE_MAX/sizeof *a||rcap>SIZE_MAX/sizeof *current||
+    !expected||id<=1||new_id<=1||new_id==id||!rev)return PP64_INVALID;
+ const void *p[]={b,l,w,a,current,previous,src,dst,out};
+ size_t n[]={sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *current,
+  rcap*sizeof *previous,sizeof *src,sizeof *dst,sizeof *out};
+ for(unsigned i=0;i<9;i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PP64_INVALID;
+ if(!sd64_key_valid(src)||!sd64_key_valid(dst)||!sd64_compare(src,dst))return PP64_INVALID;
+ struct pp64_pair pair;
+ enum pp64_status rc=pp64_mount(b,l,&w->pair,a,cap,current,rcap,&pair);
+ if(rc!=PP64_OK)return rc;
+ if(pair.sequence!=expected)return PP64_INVALID;
+ rc=check_key(b,l,w,src,id,rev);if(rc!=PP64_OK)return rc;
+ rc=check_key(b,l,w,dst,new_id,0);if(rc!=PP64_OK)return rc;
+ size_t len=0;
+ enum ip64_status ir=ip64_export(b,l->owner,l->inode,&w->pair.inode.root,id,&w->source,&len);
+ if(ir!=IP64_OK)return ip(ir);
+ if(len>sizeof w->copy_map)return PP64_CORRUPT;
+ for(size_t i=0;i<len;i++)w->copy_map[i]=w->source.map[i];
+ struct copy48 c={.b=b,.l=l,.sum=UINT32_MAX,.error=PP64_OK};
+ if(!sfs64_map_decode(w->copy_map,len,l->data_sectors,l->data_start,&c.map)||
+    c.map.file.id!=id||c.map.file.revision!=rev)return PP64_CORRUPT;
+ if(c.map.file.bytes!=bytes)return PP64_INVALID;
+ if(!bytes&&c.map.file.checksum!=0)return PP64_CORRUPT;
+ /* pp64_put protects the current and previous source extents, verifies
+  * every destination sector and only then publishes a new paired root. */
+ rc=pp64_put(b,l,w,a,cap,current,previous,rcap,expected,dst,new_id,0,bytes,
+  copy48_source,&c,out);
+ return rc==PP64_CANCELLED&&c.error!=PP64_OK?c.error:rc;
+}
