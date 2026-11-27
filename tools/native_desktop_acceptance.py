@@ -19,10 +19,10 @@ def exercise(d,proc,serial,folder,wait):
         d.key(name);wait(proc,serial,EVENT,before+1)
         receipt=events(raw())[-1]
         if receipt['key']!=code or receipt['mouse']:raise ValueError('extended input '+name)
-        if code in (0x3e,0x42):
+        if code in (0x3e,0x42,0x01):
             count=sum(x==b'STYLEOS SHELL ACTION RENDERED' for x in raw())
             # The receipt may already have been followed by the render.
-            expected=sum(e['key'] in (0x3e,0x42) and not e['mouse'] for e in events(raw()))
+            expected=sum(e['key'] in (0x3e,0x42,0x01) and not e['mouse'] for e in events(raw()))
             if count<expected:wait(proc,serial,b'STYLEOS SHELL ACTION RENDERED',expected)
         return receipt
     def move(x,y):
@@ -41,7 +41,7 @@ def exercise(d,proc,serial,folder,wait):
     closed=key('f4',0x3e); after=d.screen('extended-menu-closed')
     if menu.pixels==shifted.pixels or menu.pixels==after.pixels:raise ValueError('menu not rendered')
     menu.check(37,menu.h-54-273+19,'76572f')
-    procs=key('f8',0x42); pf=d.screen('extended-processes')
+    procs=key('ctrl-shift-esc',0x01); pf=d.screen('extended-processes')
     if pf.pixels==after.pixels:raise ValueError('process window not drawn')
     px,py=pf.w//3,(pf.h-54)//6
     pf.check(px+12,py,'e6ad63')
@@ -86,7 +86,8 @@ def exercise(d,proc,serial,folder,wait):
     about=d.screen('extended-about')
     ax,ay=pf.w//3,(pf.h-54)//5
     about.check(ax+12,ay,'e6ad63')
-    title(ax+min(pf.w//2,490)-25,ay+19)
+    count=sum(t==b'STYLEOS SHELL ACTION RENDERED' for t in raw())
+    d.key('alt-f4');wait(proc,serial,b'STYLEOS SHELL ACTION RENDERED',count+1)
     about_closed=d.screen('extended-about-close')
     if about_closed.pixels==about.pixels:raise ValueError('about close missing')
     # F10 is a shell refresh, not a kernel reboot. Track the actual note
@@ -120,7 +121,7 @@ def verify(folder,lines,root):
     renders=[i for i,x in enumerate(lines) if x==b'STYLEOS SHELL ACTION RENDERED']
     if (len(admitted),len(calls),len(applied),len(retired),len(actions),len(submits),len(renders))!=(13,26,1,13,12,13,12):
         raise ValueError('ordinary controller lifecycle count')
-    keys=(0x3e,0x3e,0x42,0x146,0x146,0x17e,0x16e,0x201,0x119,0x3e,0x302,0x119,0x44)
+    keys=(0x3e,0x3e,0x42,0x146,0x146,0x17e,0x16e,0x201,0x119,0x3e,0x302,0x101,0x44)
     if [x['key'] for _,x in submits]!=list(keys) or [tuple(x.values()) for _,x in actions]!=list(enumerate((2,2,3,5,5,7,6,8,4,2,10,4),1)):
         raise ValueError('ordinary command policy')
     for j,(i,a) in enumerate(admitted):

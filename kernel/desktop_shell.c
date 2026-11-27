@@ -651,6 +651,9 @@ static void toggle_language(void)
 }
 
 static void restart_shell(void);
+#ifdef STYLEOS_OWNED_SHELL_865
+static bool queue_window_action(unsigned key,int id,int dx,int dy);
+#endif
 
 static bool keyboard(unsigned key, unsigned mods)
 {
@@ -660,7 +663,8 @@ static bool keyboard(unsigned key, unsigned mods)
     /* Global shell shortcuts retain precedence; selecting a legacy window
      * clears native keyboard focus. The driver currently emits key presses. */
     const bool system_key=(key>=0x3bu&&key<=0x44u)||key==0x57u||key==0x58u||
-                          key==DESK_KEY_LANGUAGE||key==0x15bu;
+                          key==DESK_KEY_LANGUAGE||key==0x15bu||
+                          (key==0x01u&&mods==(DESK_CTRL|DESK_SHIFT));
     if(ndb_route_key((struct nwc_service *)nwc_global(),&native_input,
                      width,work_area().h,key,mods,menu||system_key))return false;
 #endif
@@ -696,6 +700,18 @@ static bool keyboard(unsigned key, unsigned mods)
         }
     }
     process_cancel();
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+    /* Common accelerators reserve the system path before app input.
+     * Escape in the Ctrl+Shift chord is not a plain Escape. */
+    if(key==0x01u&&mods==(DESK_CTRL|DESK_SHIFT)){
+        if(s865_shell_submit_command(0x42))return false;
+    }
+    if(key==0x3eu&&mods==DESK_ALT){
+        int id=active();
+        if(id>=0)(void)queue_window_action(0x101u,id,0,0);
+        return false;
+    }
+#endif
 #endif
 #if defined(STYLEOS_OWNED_SHELL_865) && defined(STYLEOS_NATIVE_PINNED_CATALOG)
     if (key == 0x43 && !mods) { (void)s865_native_catalog_request(); return false; }
@@ -1098,6 +1114,9 @@ static void click(int x, int y)
 #endif
         open_window(NOTES);
     } else if (contains(shortcut_box(2), x, y)) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(s865_shell_submit_command(0x308))return;
+#endif
         show_folder(DESK_PROJECTS);
     }
 }
@@ -1598,7 +1617,7 @@ static void desktop_shell_step(void *opaque)
     if(shell_action==2){menu=!menu;shell_refreshed=true;}
     else if(shell_action==3){open_window(TASKS);shell_refreshed=true;}
     else if(shell_action>=4&&shell_action<=8){apply_window_action(shell_action);shell_refreshed=true;}
-    else if(shell_action>=9&&shell_action<=15){
+    else if(shell_action>=9&&shell_action<=16){
         menu=false;
         if(shell_action==9)show_folder(DESK_ROOT);
         else if(shell_action==10)open_window(ABOUT);
@@ -1606,6 +1625,7 @@ static void desktop_shell_step(void *opaque)
         else if(shell_action==12)shell_reboot_request();
         else if(shell_action==13)open_window(NOTES);
         else if(shell_action==14)toggle_language();
+        else if(shell_action==16)show_folder(DESK_PROJECTS);
         shell_refreshed=true;
     }
 #endif

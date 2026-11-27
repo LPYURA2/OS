@@ -40,7 +40,7 @@ def verify_snapshot(lines,*,live):
     inputs=[x for x in lines[end+1:] if x.startswith(EVENT)]
     if not live and b'STYLEOS SHELL PROVIDER READY' in lines:
         # Ordinary F8 input is deferred; actual render follows the snapshot.
-        if not any(x.startswith(EVENT) and b' key=0x0000000000000042 ' in x for x in lines[:start]) or b'STYLEOS SHELL ACTION RENDERED' not in lines[end+1:]:
+        if not any(x.startswith(EVENT) and (b' key=0x0000000000000042 ' in x or (b' key=0x0000000000000001 ' in x and b' modifiers=0x0000000000000003 ' in x)) for x in lines[:start]) or b'STYLEOS SHELL ACTION RENDERED' not in lines[end+1:]:
             raise ValueError('deferred F8 render not observed')
     elif not inputs or b' key=0x0000000000000042 ' not in inputs[0] or b' active=0x0000000000000002 ' not in inputs[0] or b' writes=0x0000000000000000' in inputs[0]:raise ValueError('F8 render not observed')
     return values
