@@ -19,6 +19,9 @@ struct s846_guard { uint64_t pa[3]; };
 #else
 #define S846_ROOT_COUNT 2u
 #endif
+/* Trusted detached layout. A zero triple denotes a vacant slot in the
+ * expanded sparse API. Fixed VAs and physical order code/data/stack. */
+struct s846_extent { unsigned code,data,stack; };
 /* Three contiguous pages per process: code, data, stack. Both leases must
  * be live, distinct, and owned by their respective process. Caller has
  * admitted the scratch table storage and serialized against allocation.
@@ -42,6 +45,15 @@ bool s865_root_build(const struct s842_root *,const struct s842_cache *,const st
  const struct s844_lease [S846_ROOT_COUNT],unsigned,const struct s846_guard *,uint64_t (*)[512],uint64_t,struct s846_root *);
 bool s865_root_audit(const struct s842_root *,const struct s842_cache *,const struct s844_arena *,
  const struct s844_lease [S846_ROOT_COUNT],unsigned,const struct s846_guard *,const struct s846_root *);
+/* Expanded detached roots only. Every live lease has its exact extent;
+ * all arena pages must be accounted for. Existing APIs remain three-page.
+ * Caller proves table ownership and disjointness across all child roots. */
+bool s875_root_build(const struct s842_root *,const struct s842_cache *,const struct s844_arena *,
+ const struct s844_lease [S846_ROOT_COUNT],const struct s846_extent [S846_ROOT_COUNT],
+ unsigned,const struct s846_guard *,uint64_t (*)[512],uint64_t,struct s846_root *);
+bool s875_root_audit(const struct s842_root *,const struct s842_cache *,const struct s844_arena *,
+ const struct s844_lease [S846_ROOT_COUNT],const struct s846_extent [S846_ROOT_COUNT],
+ unsigned,const struct s846_guard *,const struct s846_root *);
 #endif
 /* Verify all four detached roots in the wide host profile. */
 #if (defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
