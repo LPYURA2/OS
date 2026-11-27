@@ -130,10 +130,14 @@ static bool catalog_valid(unsigned *out){
  for(size_t j=16+count*NC_RECORD;j<sizeof catalog;j++)if(catalog[j])return false;
  *out=count;return true;
 }
-static enum ps_status launch_record(const uint8_t *r,uint32_t *pid,uint32_t *win){
+static struct rt865_launch_request record_request(const uint8_t *r){
  struct rt865_launch_request request={.source={.read=catalog_read,.lba=nc_u32(r),.sectors=4095u,.bytes=nc_u32(r+4)}};
  for(unsigned k=0;k<32;k++)request.source.sha256[k]=r[8+k];
  for(unsigned k=0;k<8;k++)request.name[k]=(char)r[40+k];
+ return request;
+}
+static enum ps_status launch_record(const uint8_t *r,uint32_t *pid,uint32_t *win){
+ struct rt865_launch_request request=record_request(r);
  if(!win)return s865_native_launch(&request,pid);
  struct s865_window_launch result={0};
  enum ps_status status=s865_native_launch_window(&request,stop_session,"Stop fixture",
@@ -224,6 +228,14 @@ static bool stop_step(void){
     !revoked(peer_pid,peer_gen,peer_root,peer_window,&peer_owned)||
     nwc_port_count(channels())||usr_visible_windows(sessions(),0,0)||
     ws_snapshot(ws_global(),0,0))return stop_fail();
+ if(frame_probe){
+  unsigned count=0;
+  if(!catalog_valid(&count)||count!=32){native_wipe(catalog,sizeof catalog);return stop_fail();}
+  struct rt865_launch_request request=record_request(catalog+16);
+  bool ok=s865_native_probe_window_rollback(&request,stop_session);
+  native_wipe(catalog,sizeof catalog);
+  if(!ok)return stop_fail();
+ }
  if(usr_lock(sessions())!=USR_OK||usr_close(sessions(),stop_session)!=USR_OK||
     usr_find(sessions(),stop_session))return stop_fail();
  arch_puts("STYLEOS NATIVE STOP-OWNERS-EMPTY");field("pid",peer_pid);field("window",peer_window);
@@ -273,6 +285,14 @@ bool s865_native_catalog_request(void){
    else{peer_pid=pid;peer_gen=owner->scheduler_handle;}
   }
   ++accepted;
+ }
+ if(frame_probe&&accepted==count){
+  uint32_t pid=0xabcdef,win=0x123456;
+  if(launch_record(catalog+16,&pid,&win)!=PS_FULL||pid!=0xabcdef||win!=0x123456||
+     pr_snapshot(pr_global(),0,0,true)!=32||nwc_port_count(channels())!=2){
+   native_wipe(catalog,sizeof catalog);native_catalog_busy=false;return stop_fail();
+  }
+  arch_puts("STYLEOS NATIVE WINDOW-LAUNCH-CAPACITY");field("resident",32);arch_putc('\n');
  }
  native_wipe(catalog,sizeof catalog);native_catalog_busy=false;
  arch_puts("STYLEOS NATIVE CATALOG");field("valid",valid);field("requested",count);field("accepted",accepted);field("resident",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');

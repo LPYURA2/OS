@@ -109,6 +109,12 @@ enum ps_status s865_native_stop(uint32_t pid,uint64_t generation,bool authorized
  return s865_executor_stop(id,pid,generation,native_roots[id].built.root,
                            authorized,native_audit,native_release,0);
 }
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+static unsigned window_launch_fault;
+#define WINDOW_LAUNCH_FAULT(step) (window_launch_fault==(step))
+#else
+#define WINDOW_LAUNCH_FAULT(step) false
+#endif
 enum ps_status s865_native_launch_window(const struct rt865_launch_request *request,
  uint32_t session,const char *title,struct ws_bounds bounds,struct s865_window_launch *out){
  if(!request||!out||!title||!session)return PS_ARGUMENT;
@@ -137,9 +143,10 @@ enum ps_status s865_native_launch_window(const struct rt865_launch_request *requ
  const struct pr_entry *entry=pr_find(registry,pid);
  if(!entry||entry->state!=PR_READY||!entry->scheduler_handle)fail("native-window-launch-owner");
  const uint64_t gen=entry->scheduler_handle,root=entry->page_root;
- if(usr_bind(u,session,pid,gen)!=USR_OK||
-    ws_open_app(w,registry,pid,title,bounds,&win)!=WS_OK||
-    nwc_claim(n,pid,gen,root,win)!=NWC_OK){
+ if(WINDOW_LAUNCH_FAULT(1)||usr_bind(u,session,pid,gen)!=USR_OK||
+    WINDOW_LAUNCH_FAULT(2)||ws_open_app(w,registry,pid,title,bounds,&win)!=WS_OK||
+    WINDOW_LAUNCH_FAULT(3)||nwc_claim(n,pid,gen,root,win)!=NWC_OK||
+    WINDOW_LAUNCH_FAULT(4)){
   if(s865_native_stop(pid,gen,true)!=PS_OK||pr_find(registry,pid)||
      (win&&ws_find(w,win))||!native_audit(0))fail("native-window-launch-rollback");
   return PS_EVIDENCE;
@@ -152,6 +159,43 @@ enum ps_status s865_native_launch_window(const struct rt865_launch_request *requ
 #endif
  return PS_OK;
 }
+#undef WINDOW_LAUNCH_FAULT
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+bool s865_native_probe_window_rollback(const struct rt865_launch_request *request,uint32_t session){
+ unsigned used=0;
+ const struct usr_runtime *u=usr_global();
+ const struct nwc_service *n=nwc_global();
+ struct ws_service *w=ws_global();
+ if(!request||!u||!n||!native_audit(0)||!s865_executor_idle()||window_launch_fault||
+    pr_snapshot(pr_global(),0,0,true)||ws_snapshot(w,0,0)||nwc_port_count(n)||
+    !s844_count(native_arena,&used)||used)return false;
+ uint64_t dispatches=runtime860->dispatcher.dispatches;
+ arch_puts("STYLEOS NATIVE ROLLBACK-BEGIN");field("dispatches",dispatches);arch_putc('\n');
+ for(unsigned phase=1;phase<=4;++phase){
+  struct s865_window_launch out={0xabcdef,0x123456};
+  uint64_t next=native_arena->next;
+  uint32_t next_win=w->next_id;
+  window_launch_fault=phase;
+  enum ps_status status=s865_native_launch_window(request,session,"Rollback probe",(struct ws_bounds){0,0,160,120},&out);
+  window_launch_fault=0;
+  if(status!=PS_EVIDENCE||out.pid!=0xabcdef||out.window!=0x123456||
+     !s865_executor_idle()||!native_audit(0)||!s844_count(native_arena,&used)||used||
+     native_arena->next!=next+1||w->next_id!=next_win+(phase>=3?1u:0u)||
+     runtime860->dispatcher.dispatches!=dispatches||pr_snapshot(pr_global(),0,0,true)||
+     ws_snapshot(w,0,0)||nwc_port_count(n))return false;
+  for(unsigned i=0;i<PR_MAX_PROCESSES;++i)
+   if(u->owners[i].pid||u->owners[i].session_id||u->owners[i].scheduler_handle)return false;
+  const volatile uint8_t *pages=(const volatile uint8_t *)(uintptr_t)native_arena->base;
+  for(size_t i=0;i<3u*4096u;++i)if(pages[i])return false;
+  arch_puts("STYLEOS NATIVE ROLLBACK-PHASE");field("phase",phase);
+  field("used",used);field("resident",pr_snapshot(pr_global(),0,0,true));
+  field("windows",ws_snapshot(w,0,0));field("ports",nwc_port_count(n));
+  field("dispatches",dispatches);arch_putc('\n');
+ }
+ arch_puts("STYLEOS NATIVE ROLLBACK-END");field("dispatches",dispatches);arch_putc('\n');
+ return true;
+}
+#endif
 enum ps_status s865_native_stop_selected(uint32_t pid){
  if(!native_ready||!s865_executor_idle()||runtime860->dispatcher.current!=-1)return PS_STATE;
  if(!native_audit(0))return PS_EVIDENCE;

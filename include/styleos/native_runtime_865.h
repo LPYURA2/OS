@@ -16,6 +16,10 @@ enum ps_status s865_native_launch(const struct rt865_launch_request *,uint32_t *
 struct s865_window_launch { uint32_t pid,window; };
 enum ps_status s865_native_launch_window(const struct rt865_launch_request *,
     uint32_t session,const char *title,struct ws_bounds,struct s865_window_launch *);
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+/* Acceptance-only fault injection; requires empty resident registry. */
+bool s865_native_probe_window_rollback(const struct rt865_launch_request *,uint32_t);
+#endif
 void s865_native_pump(void);
 /* Trusted trap continuation on safe root, with exact READY caller identity.
  * Copy only from the admitted private data page, never dereference user VA.

@@ -91,7 +91,39 @@ def verify_shell_boundary(lines,roots,loop=0x1000000d,focus=False,frame=False):
     # Windows/ports ownership is separately verified by enclosing lifecycle
     # checks at bind, revoke, rebind and final cleanup. No pixel IPC claim.
 
+def verify_rollback_probe(lines):
+    begin=records(lines,b'STYLEOS NATIVE ROLLBACK-BEGIN',('dispatches',))
+    end=records(lines,b'STYLEOS NATIVE ROLLBACK-END',('dispatches',))
+    cap=records(lines,b'STYLEOS NATIVE WINDOW-LAUNCH-CAPACITY',('resident',))
+    if len(begin)!=1 or len(end)!=1 or len(cap)!=1 or cap[0][1]['resident']!=32:
+        raise ValueError('rollback or capacity evidence count')
+    lo,start=begin[0];hi,last=end[0]
+    if not cap[0][0]<lo<hi or start!=last:raise ValueError('rollback interval')
+    part=lines[lo+1:hi]
+    phases=records(part,b'STYLEOS NATIVE ROLLBACK-PHASE',('phase','used','resident','windows','ports','dispatches'))
+    admits=records(part,ADMIT,AKEY);leases=records(part,LEASE,('pid','gen','pa','pages'))
+    stops=records(part,FORCED,FKEY);retires=records(part,RETIRE,RKEY)
+    if any(len(x)!=4 for x in (phases,admits,leases,stops,retires)):
+        raise ValueError('rollback lifecycle counts')
+    if records(part,EVENT,EKEY) or records(part,IRQ,('slot','root','initial','current','lvt','isr','irr')):
+        raise ValueError('unpublished rollback process dispatched')
+    for j,((ai,a),(li,l),(ri,r),(si,s),(pi,phase)) in enumerate(zip(admits,leases,retires,stops,phases),1):
+        pid=33+j
+        if tuple(a.values())!=(0,pid,pid,admits[0][1]['root'],0x10000000) or tuple(l.values())!=(pid,pid,leases[0][1]['pa'],3):
+            raise ValueError('rollback fresh identity and reused lease')
+        if tuple(r.values())!=(0,a['root'],pid) or tuple(s.values())!=(0,pid,pid,a['root']):
+            raise ValueError('rollback retirement identity')
+        if tuple(phase.values())!=(j,0,0,0,0,start['dispatches']) or not ai<li<ri<si<pi:
+            raise ValueError('rollback resources or ordering')
+        if j>1 and not phases[j-2][0]<ai:raise ValueError('rollback interleaving')
+    original=lines[:lo]+lines[hi+1:]
+    done=records(original,DONE,('resident','dispatches'))
+    if len(done)!=1 or done[0][1]['dispatches']!=start['dispatches']:
+        raise ValueError('rollback dispatch accounting')
+    return original
+
 def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,window_tile=False,window_input=False,window_focus=False,window_frame=False):
+    if window_frame:lines=verify_rollback_probe(lines)
     safe=obs['active']['root']
     def rec(tag,keys):return records(lines,tag,keys)
     admissions=rec(ADMIT,AKEY)
