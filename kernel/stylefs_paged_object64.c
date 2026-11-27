@@ -7,23 +7,24 @@ static enum po64_status status(enum pp64_status rc){
  switch(rc){
  case PP64_OK:return PO64_OK;
  case PP64_FULL:return PO64_FULL;
- case PP64_IO:case PP64_UNCERTAIN:return PO64_IO;
+ case PP64_IO:return PO64_IO;
+ case PP64_UNCERTAIN:return PO64_UNCERTAIN;
  case PP64_CORRUPT:return PO64_CORRUPT;
  case PP64_CANCELLED:return PO64_CANCELLED;
  default:return PO64_STALE;
  }
 }
-static void clear(struct po64_service *s){
+static void forget(struct po64_service *s){
  for(unsigned i=0;i<PO64_HANDLES;i++)s->handles[i]=(struct po64_handle){0};
- s->active=false;
 }
-static bool ro(struct bs_service *b,const struct pp64_layout *l){
+static void clear(struct po64_service *s){forget(s);s->active=false;}
+static bool mode(struct bs_service *b,const struct pp64_layout *l,bool write){
  const uint64_t tokens[]={l->receipt,l->dir,l->inode,l->data};
  for(unsigned i=0;i<4;i++){
   bool found=false;
   for(unsigned j=0;j<BS_GRANTS;j++){
    const struct bs_grant *g=&b->grants[j];
-   if(g->token==tokens[i]&&g->owner==l->owner&&g->rights==BS_READ&&g->token){
+   if(g->token==tokens[i]&&g->owner==l->owner&&g->rights==(write?(BS_READ|BS_WRITE):BS_READ)&&g->token){
     found=true;break;
    }
   }
@@ -34,21 +35,30 @@ static bool ro(struct bs_service *b,const struct pp64_layout *l){
 static bool span(struct po64_service *s,const void *p,size_t n){
  return sep(p,n,s,sizeof *s)&&sep(p,n,s->block,sizeof *s->block)&&
  sep(p,n,s->work,sizeof *s->work)&&sep(p,n,s->nodes,s->node_cap*sizeof *s->nodes)&&
- sep(p,n,s->runs,s->run_cap*sizeof *s->runs);
+ sep(p,n,s->runs,s->run_cap*sizeof *s->runs)&&
+ (!s->writable||sep(p,n,s->previous,s->run_cap*sizeof *s->previous));
 }
-enum po64_status po64_mount(struct po64_service *s,struct bs_service *b,const struct pp64_layout *l,
- struct pp64_stream_workspace *w,struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap){
+static enum po64_status mount(struct po64_service *s,struct bs_service *b,const struct pp64_layout *l,
+ struct pp64_stream_workspace *w,struct dc64_node *a,size_t cap,struct sfs64_run *runs,struct sfs64_run *previous,size_t rcap,bool write){
  if(!s)return PO64_INVALID;
  if(s->busy)return PO64_BUSY;
  if(s->active||!cap||!rcap||cap>SIZE_MAX/sizeof *a||rcap>SIZE_MAX/sizeof *runs)return PO64_INVALID;
- const void *p[]={s,b,l,w,a,runs};size_t n[]={sizeof *s,sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *runs};
- for(unsigned i=0;i<6;i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PO64_INVALID;
- if(!ro(b,l))return PO64_DENIED;
+ const void *p[]={s,b,l,w,a,runs,previous};size_t n[]={sizeof *s,sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *runs,rcap*sizeof *previous};
+ for(unsigned i=0;i<(write?7u:6u);i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PO64_INVALID;
+ if(!mode(b,l,write))return PO64_DENIED;
  struct pp64_pair pair;
  enum pp64_status rc=pp64_mount(b,l,&w->pair,a,cap,runs,rcap,&pair);
  if(rc!=PP64_OK)return status(rc);
  clear(s);s->block=b;s->layout=*l;s->pair=pair;s->work=w;s->nodes=a;s->node_cap=cap;s->runs=runs;s->run_cap=rcap;
- s->active=true;return PO64_OK;
+ s->writable=write;s->previous=previous;s->active=true;return PO64_OK;
+}
+enum po64_status po64_mount(struct po64_service *s,struct bs_service *b,const struct pp64_layout *l,
+ struct pp64_stream_workspace *w,struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap){
+ return mount(s,b,l,w,a,cap,runs,0,rcap,false);
+}
+enum po64_status po64_mount_rw(struct po64_service *s,struct bs_service *b,const struct pp64_layout *l,
+ struct pp64_stream_workspace *w,struct dc64_node *a,size_t cap,struct sfs64_run *runs,struct sfs64_run *previous,size_t rcap){
+ return mount(s,b,l,w,a,cap,runs,previous,rcap,true);
 }
 enum po64_status po64_unmount(struct po64_service *s){
  if(!s)return PO64_INVALID;
@@ -58,7 +68,7 @@ enum po64_status po64_unmount(struct po64_service *s){
 }
 static enum po64_status live(struct po64_service *s){
  if(!s->active)return PO64_STALE;
- if(!ro(s->block,&s->layout)){clear(s);return PO64_STALE;}
+ if(!mode(s->block,&s->layout,s->writable)){clear(s);return PO64_STALE;}
  struct pp64_pair p;
  enum pp64_status rc=pp64_mount(s->block,&s->layout,&s->work->pair,s->nodes,s->node_cap,s->runs,s->run_cap,&p);
  if(rc!=PP64_OK){clear(s);return status(rc);}
@@ -67,10 +77,11 @@ static enum po64_status live(struct po64_service *s){
  }
  return PO64_OK;
 }
-enum po64_status po64_grant(struct po64_service *s,uint64_t principal,const struct sd64_key *key,uint64_t id,uint64_t rev,uint64_t *token){
- if(!s||!principal||id<=1||!rev)return PO64_INVALID;
+enum po64_status po64_grant_access(struct po64_service *s,uint64_t principal,const struct sd64_key *key,uint64_t id,uint64_t rev,unsigned rights,uint64_t *token){
+ if(!s||!principal||id<=1||!rev||!rights||(rights&~(PO64_READ|PO64_WRITE)))return PO64_INVALID;
  if(s->busy)return PO64_BUSY;
  if(!s->active)return PO64_STALE;
+ if((rights&PO64_WRITE)&&!s->writable)return PO64_DENIED;
  if(!span(s,key,sizeof *key)||!span(s,token,sizeof *token)||!sep(key,sizeof *key,token,sizeof *token)||!sd64_key_valid(key))return PO64_INVALID;
  enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
  struct dc64_state *d=&s->work->pair.dir;uint64_t found=0;uint8_t kind=0;
@@ -86,10 +97,13 @@ enum po64_status po64_grant(struct po64_service *s,uint64_t principal,const stru
  for(unsigned i=0;i<PO64_HANDLES;i++)if(!s->handles[i].token){
   if(s->serial==UINT64_MAX)return PO64_FULL;
   uint64_t t=++s->serial;
-  s->handles[i]=(struct po64_handle){t,principal,id,rev,*key};
+  s->handles[i]=(struct po64_handle){t,principal,id,rev,*key,rights};
   *token=t;return PO64_OK;
  }
  return PO64_FULL;
+}
+enum po64_status po64_grant(struct po64_service *s,uint64_t principal,const struct sd64_key *key,uint64_t id,uint64_t rev,uint64_t *token){
+ return po64_grant_access(s,principal,key,id,rev,PO64_READ,token);
 }
 static struct po64_handle *find(struct po64_service *s,uint64_t principal,uint64_t token){
  for(unsigned i=0;i<PO64_HANDLES;i++)if(s->handles[i].token==token&&s->handles[i].principal==principal)return &s->handles[i];
@@ -113,7 +127,7 @@ enum po64_status po64_read(struct po64_service *s,uint64_t principal,uint64_t to
  if(!s||!principal||!token||!sink)return PO64_INVALID;
  if(s->busy)return PO64_BUSY;
  if(!s->active)return PO64_STALE;
- struct po64_handle *h=find(s,principal,token);if(!h)return PO64_DENIED;
+ struct po64_handle *h=find(s,principal,token);if(!h||!(h->rights&PO64_READ))return PO64_DENIED;
  enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
  /* Key copied to local trusted span; callback reentry cannot revoke or
   * change token. The raw service is never exposed to applications. */
@@ -125,4 +139,27 @@ enum po64_status po64_read(struct po64_service *s,uint64_t principal,uint64_t to
  rc=status(pr);
  if(rc!=PO64_OK&&rc!=PO64_CANCELLED)clear(s);
  return rc;
+}
+
+enum po64_status po64_write(struct po64_service *s,uint64_t principal,uint64_t token,uint64_t bytes,pp64_source source,void *ctx){
+ if(!s||!principal||!token||(bytes&&!source))return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ struct po64_handle *h=find(s,principal,token);
+ if(!s->writable||!h||!(h->rights&PO64_WRITE))return PO64_DENIED;
+ enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
+ struct po64_handle copy=*h;struct pp64_pair next;
+ s->busy=true;
+ enum pp64_status pr=pp64_put(s->block,&s->layout,s->work,s->nodes,s->node_cap,s->runs,s->previous,s->run_cap,
+  s->pair.sequence,&copy.key,copy.id,copy.revision,bytes,source,ctx,&next);
+ s->busy=false;
+ if(pr==PP64_OK){
+  s->pair=next;forget(s);return PO64_OK;
+ }
+ if(pr==PP64_CANCELLED){
+  rc=live(s);return rc==PO64_OK?PO64_CANCELLED:rc;
+ }
+ /* Any other failure after staging began must not expose stale handles.
+  * In particular an uncertain publication is never silently retried. */
+ clear(s);return status(pr);
 }

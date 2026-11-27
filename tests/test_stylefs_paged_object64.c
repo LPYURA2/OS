@@ -68,6 +68,11 @@ static void read_only(void){
  assert(bs_grant_range(&b,g,7,2+D,I,BS_READ,&l.inode)==BS_OK);
  assert(bs_grant_range(&b,g,7,2+D+I,F,BS_READ,&l.data)==BS_OK);
 }
+static bool write_source(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ assert(po64_write(&service,10,token,0,0,0)==PO64_BUSY);
+ assert(po64_unmount(&service)==PO64_BUSY);
+ return source(ctx,at,p,n);
+}
 int main(void){
  attach();assert(dc64_provision(&b,7,l.dir,D)==DC64_OK);
  assert(ir64_provision(&b,7,l.inode,I,F,1)==IP64_OK);
@@ -117,6 +122,34 @@ int main(void){
  assert(po64_read(&service,10,tmp,accept,0)==PO64_CORRUPT&&!service.active);
  assert(po64_read(&service,10,tmp,accept,0)==PO64_STALE);
  assert(writes==0);
+ /* Cold attach restores intact durable bytes and RW grants. */
+ reopen();
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,current,128)==PO64_INVALID);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_grant(&service,10,&a,2,1,&tmp)==PO64_OK);
+ p=(struct pattern){55,UINT64_MAX,0};before=writes;
+ assert(po64_write(&service,10,tmp,513,source,&p)==PO64_DENIED&&writes==before);
+ assert(po64_grant_access(&service,10,&a,2,1,PO64_WRITE,&token)==PO64_OK);
+ assert(po64_read(&service,10,token,sink,&p)==PO64_DENIED);
+ assert(po64_write(&service,20,token,513,source,&p)==PO64_DENIED&&writes==before);
+ assert(po64_grant(&service,20,&k,3,1,&other)==PO64_OK);
+ p.cancel=0;
+ assert(po64_write(&service,10,token,513,source,&p)==PO64_CANCELLED);
+ p.cancel=UINT64_MAX;
+ assert(po64_write(&service,10,token,513,write_source,&p)==PO64_OK);
+ assert(po64_read(&service,20,other,sink,&p)==PO64_DENIED);
+ assert(po64_write(&service,10,token,513,source,&p)==PO64_DENIED);
+ assert(po64_grant(&service,10,&a,2,1,&tmp)==PO64_STALE);
+ assert(po64_grant_access(&service,10,&a,2,2,PO64_READ|PO64_WRITE,&token)==PO64_OK);
+ p.seen=0;assert(po64_read(&service,10,token,sink,&p)==PO64_OK&&p.seen==513);
+ assert(po64_grant(&service,20,&k,3,1,&other)==PO64_OK);
+ p=(struct pattern){44,UINT64_MAX,0};
+ assert(po64_read(&service,20,other,sink,&p)==PO64_OK&&p.seen==513);
+ fail=writes+1;p.seed=66;
+ assert(po64_write(&service,10,token,513,source,&p)==PO64_UNCERTAIN&&!service.active);
+ assert(po64_read(&service,20,other,sink,&p)==PO64_STALE);
+ reopen();check('a',2,2,513,55);check('b',3,1,513,44);
+ puts("STYLEFS 36 OBJECT WRITE PASS: authorized replacement, readonly/wrong principal denial, revocation, cancellation, uncertain close");
  puts("STYLEFS 35 OBJECT SERVICE PASS: exact revision, principal isolation, revoke, reentry, stale grant, readonly media");
  return 0;
 }
