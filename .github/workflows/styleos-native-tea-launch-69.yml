@@ -155,3 +155,25 @@ jobs:
           name: styleos-ordinary-shell
           path: build/ordinary-shell/
           if-no-files-found: warn
+
+  stylefs-live-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          set -euo pipefail
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Build and verify existing live StyleFS volume
+        run: python3 tools/test_stylefs_live_volume_39.py --output build/tea-stylefs-live
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-tea-stylefs-live
+          path: build/tea-stylefs-live/
+          if-no-files-found: warn

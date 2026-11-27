@@ -46,6 +46,11 @@ bool s865_shell_submit_refresh(void);
 bool s865_shell_submit_command(unsigned key);
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
 bool s865_launch_native_sample(void);
+#ifdef STYLEOS_LIVE_VOLUME_39
+struct po64_row;
+/* Explicit Explorer selection of the individually approved package only. */
+bool s865_launch_native_file(const struct po64_row *);
+#endif
 #endif
 bool s865_shell_command_waiting(void);
 unsigned s865_shell_take_command(void);

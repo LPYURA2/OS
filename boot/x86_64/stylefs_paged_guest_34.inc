@@ -12,6 +12,8 @@
 #ifdef STYLEOS_LIVE_VOLUME_39
 #include <styleos/stylefs_paged_volume64.h>
 #include <styleos/desktop_paged_view.h>
+#include <styleos/native_tea_stylefs.h>
+#include <styleos/native_runtime_865.h>
 #ifdef STYLEOS_LIVE_VOLUME_50
 #define S34_SERIAL "STYLEOS-SFS50-DATA  "
 #define S34_TAG "STYLEOS-SFS50-PRIVATE-V2"
@@ -264,6 +266,22 @@ bool s43_read_text(const struct po64_row *row,char *out,size_t cap,size_t *bytes
  if(rc!=PO64_OK||copy.used!=row->bytes)return false;
  *bytes=copy.used;return true;
 }
+/* Separate principal for an explicit, exact-revision package read.
+ * Scratch never belongs to Explorer or a user process. */
+static uint8_t s69_package_scratch[NTP_MAX_PACKAGE];
+bool s69_use_tea_file(const struct po64_row *row,const struct nts_pin *pin,
+ ntsfs_consumer consumer,void *ctx){
+ if(!s41_root_view()||!row||!pin||row->entry.kind!=SD64_FILE||
+    row->bytes!=pin->package_bytes)return false;
+ struct po64_service *s=&s34_work.volume.objects;
+ uint64_t token=0;
+ if(po64_grant(s,404,&row->entry.key,row->entry.target,row->revision,&token)!=PO64_OK)return false;
+ enum ntsfs_status status=ntsfs_use(s,404,token,pin,s69_package_scratch,consumer,ctx);
+ if(s->active){
+  if(po64_revoke(s,404,token)!=PO64_OK)fail("tea69-stylefs-revoke");
+ }else (void)pv64_close(&s34_work.volume);
+ return status==NTSFS_OK;
+}
 #ifdef STYLEOS_LIVE_VOLUME_44
 bool s44_writable(void){
  struct po64_service *s=&s34_work.volume.objects;
@@ -395,6 +413,7 @@ bool s42_select(unsigned row,bool open){
  if(!open)return true;
  if(v->rows[row].entry.kind==SD64_FILE){
   if(s43_text_supported(&v->rows[row]))(void)s43_open_editor(&v->rows[row]);
+  else (void)s865_launch_native_file(&v->rows[row]);
   return true;
  }
  if(v->rows[row].entry.kind!=SD64_DIRECTORY)return true;

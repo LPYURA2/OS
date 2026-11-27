@@ -478,6 +478,11 @@ static const struct sample69_entry sample69_catalog[]={
 #define SAMPLE69_COUNT (sizeof sample69_catalog/sizeof sample69_catalog[0])
 static struct s865_window_launch sample69_live[SAMPLE69_COUNT];
 static uint32_t sample69_session;
+#ifdef STYLEOS_LIVE_VOLUME_39
+#include <styleos/native_tea_stylefs.h>
+/* Only the mounted volume owner may resolve the exact file revision. */
+bool s69_use_tea_file(const struct po64_row *,const struct nts_pin *,ntsfs_consumer,void *);
+#endif
 /* Narrow legacy provisioned media extent, never a raw probe of StyleFS
  * volumes. The approved digest and exact size reside in the boot image.
  * Temporary package storage is bounded and scrubbed after use. */
@@ -498,11 +503,7 @@ static bool sample69_read_peer(const struct sample69_entry *a){
  return true;
 }
 #endif
-bool s865_launch_native_sample(void){
- if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
- unsigned index=0;
- while(index<SAMPLE69_COUNT&&sample69_live[index].pid)++index;
- if(index==SAMPLE69_COUNT)return false;
+static bool sample69_session_ready(void){
  struct usr_runtime *u=(struct usr_runtime *)usr_global();
  if(!u||!u->ready)return false;
  /* No login yet: local transient session, created only once. Never unlock
@@ -512,7 +513,20 @@ bool s865_launch_native_sample(void){
   if(usr_create(u,1,&sample69_session)!=USR_OK||
      usr_select(u,sample69_session)!=USR_OK)return false;
  }
- if(u->selected_session!=sample69_session)return false;
+ return u->selected_session==sample69_session;
+}
+static bool sample69_publish(unsigned index,struct s865_window_launch out){
+ const struct pr_entry *e=pr_find(pr_global(),out.pid);
+ if(!e||!e->scheduler_handle||!e->page_root)fail("sample69-owner");
+ sample69_live[index]=out;
+ arch_puts("STYLEOS TEA69 LAUNCHED");field("pid",out.pid);field("gen",e->scheduler_handle);
+ field("root",e->page_root);field("window",out.window);arch_putc('\n');return true;
+}
+bool s865_launch_native_sample(void){
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
+ unsigned index=0;
+ while(index<SAMPLE69_COUNT&&sample69_live[index].pid)++index;
+ if(index==SAMPLE69_COUNT||!sample69_session_ready())return false;
  const struct sample69_entry *a=&sample69_catalog[index];
  struct s865_window_launch out={0};
  enum ps_status status=PS_EVIDENCE;
@@ -533,12 +547,32 @@ bool s865_launch_native_sample(void){
  }
 #endif
  if(status!=PS_OK)return false;
- const struct pr_entry *e=pr_find(pr_global(),out.pid);
- if(!e||!e->scheduler_handle||!e->page_root)fail("sample69-owner");
- sample69_live[index]=out;
- arch_puts("STYLEOS TEA69 LAUNCHED");field("pid",out.pid);field("gen",e->scheduler_handle);
- field("root",e->page_root);field("window",out.window);arch_putc('\n');return true;
+ return sample69_publish(index,out);
 }
+#ifdef STYLEOS_LIVE_VOLUME_39
+struct sample69_file_launch {const struct sample69_entry *app;struct s865_window_launch out;};
+static bool sample69_consume_file(void *opaque,const uint8_t *bytes,size_t size){
+ struct sample69_file_launch *c=opaque;
+ if(!sample69_session_ready())return false;
+ return s865_native_launch_tea(bytes,size,&c->app->pin,sample69_session,
+   c->app->name,c->app->bounds,&c->out)==PS_OK;
+}
+bool s865_launch_native_file(const struct po64_row *row){
+ static const char name[]="Native-peer.tea";
+ const unsigned index=1;
+ const struct sample69_entry *a=&sample69_catalog[index];
+ if(!row||row->entry.kind!=SD64_FILE||row->entry.key.length!=sizeof name-1||
+    row->bytes!=a->bytes||sample69_live[index].pid||
+    !native_ready||!s865_executor_idle()||!native_audit(0))return false;
+ for(size_t i=0;i<sizeof name-1;++i)
+  if(row->entry.key.name[i]!=(uint8_t)name[i])return false;
+ struct sample69_file_launch c={.app=a};
+ if(!s69_use_tea_file(row,&a->pin,sample69_consume_file,&c))return false;
+ arch_puts("STYLEOS TEA69 STYLEFS");field("id",row->entry.target);
+ field("revision",row->revision);field("bytes",row->bytes);arch_putc('\n');
+ return sample69_publish(index,c.out);
+}
+#endif
 static void sample69_reconcile(void){
  for(unsigned i=0;i<SAMPLE69_COUNT;++i){
   struct s865_window_launch *a=&sample69_live[i];
