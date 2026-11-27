@@ -141,3 +141,105 @@ enum pp64_status pp64_provision(struct bs_service *b,const struct pp64_layout *l
 }
 #endif
 
+
+static enum pp64_status from_ip(enum ip64_status rc){
+ switch(rc){
+ case IP64_OK:return PP64_OK;
+ case IP64_FULL:return PP64_FULL;
+ case IP64_IO:return PP64_IO;
+ case IP64_UNCERTAIN:return PP64_UNCERTAIN;
+ case IP64_CORRUPT:return PP64_CORRUPT;
+ default:return PP64_INVALID;
+ }
+}
+static enum pp64_status from_dc(enum dc64_status rc){
+ switch(rc){
+ case DC64_OK:return PP64_OK;
+ case DC64_FULL:return PP64_FULL;
+ case DC64_IO:return PP64_IO;
+ case DC64_UNCERTAIN:return PP64_UNCERTAIN;
+ case DC64_CORRUPT:return PP64_CORRUPT;
+ default:return PP64_INVALID;
+ }
+}
+static enum pp64_status clear(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t at){
+ uint8_t p[512]={0},check[512];
+ if(bs_write_sector(b,owner,token,at,p)!=BS_OK||
+    bs_read_sector(b,owner,token,at,check)!=BS_OK||!zero(check,512))return PP64_UNCERTAIN;
+ return PP64_OK;
+}
+enum pp64_status pp64_prepare(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,struct pp64_pair *out){
+ struct spans s;
+ if(!args(b,l,w,a,cap,runs,rcap,out)||!layout(b,l,true,&s)||
+    !grant(b,l->owner,l->dir,l->dir_sectors,true)||!grant(b,l->owner,l->inode,l->inode_sectors,true)||
+    !grant(b,l->owner,l->data,l->data_sectors,true))return PP64_INVALID;
+ struct pp64_pair cur,other;enum pp64_status rc=pp64_mount(b,l,w,a,cap,runs,rcap,&cur);
+ if(rc!=PP64_OK)return rc;
+ unsigned slot=cur.slot^1u;uint8_t p[512];
+ if(bs_read_sector(b,l->owner,l->receipt,slot,p)!=BS_OK)return PP64_IO;
+ bool retire=false;
+ if(decode(p,l,&s,slot,&other)){
+  if(other.sequence>cur.sequence){
+   if(other.sequence-cur.sequence!=1||other.dir_epoch<cur.dir_epoch||other.inode_epoch<cur.inode_epoch||
+      other.dir_epoch-cur.dir_epoch>1||other.inode_epoch-cur.inode_epoch>1)return PP64_CORRUPT;
+   retire=true;
+  }else if(other.sequence==cur.sequence||cur.sequence-other.sequence!=1||
+    other.dir_epoch>cur.dir_epoch||other.inode_epoch>cur.inode_epoch||
+    cur.dir_epoch-other.dir_epoch>1||cur.inode_epoch-other.inode_epoch>1)return PP64_CORRUPT;
+ }else if(!zero(p,512))retire=true;
+ struct dc64_state d;struct ir64_state i;
+ enum dc64_status dr=dc64_mount(&d,b,l->owner,l->dir,l->dir_sectors,&w->dw.publish);
+ if(dr!=DC64_OK)return from_dc(dr);
+ enum ip64_status ir=ir64_mount(&i,b,l->owner,l->inode,l->inode_sectors,l->data_sectors,l->data_start,&w->iw,runs,rcap);
+ if(ir!=IP64_OK)return from_ip(ir);
+ if(d.epoch<cur.dir_epoch||d.epoch-cur.dir_epoch>1||i.root.epoch<cur.inode_epoch||i.root.epoch-cur.inode_epoch>1||
+    (d.epoch>cur.dir_epoch&&d.active==w->dir.active)||(i.root.epoch>cur.inode_epoch&&i.active==w->inode.active))return PP64_CORRUPT;
+ if(retire&&(rc=clear(b,l->owner,l->receipt,slot))!=PP64_OK)return rc;
+ if(d.epoch>cur.dir_epoch&&(rc=clear(b,l->owner,l->dir,d.active))!=PP64_OK)return rc;
+ if(i.root.epoch>cur.inode_epoch&&(rc=clear(b,l->owner,l->inode,i.active))!=PP64_OK)return rc;
+ struct pp64_pair check;rc=pp64_mount(b,l,w,a,cap,runs,rcap,&check);
+ if(rc!=PP64_OK)return rc;
+ if(check.sequence!=cur.sequence||check.slot!=cur.slot||check.dir_epoch!=cur.dir_epoch||check.inode_epoch!=cur.inode_epoch)return PP64_CORRUPT;
+ dr=dc64_mount(&d,b,l->owner,l->dir,l->dir_sectors,&w->dw.publish);
+ if(dr!=DC64_OK)return from_dc(dr);
+ ir=ir64_mount(&i,b,l->owner,l->inode,l->inode_sectors,l->data_sectors,l->data_start,&w->iw,runs,rcap);
+ if(ir!=IP64_OK)return from_ip(ir);
+ if(d.epoch!=cur.dir_epoch||i.root.epoch!=cur.inode_epoch)return PP64_CORRUPT;
+ *out=check;return PP64_OK;
+}
+enum pp64_status pp64_plan(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *current,struct sfs64_run *previous,size_t rcap,
+ uint64_t expected,uint64_t bytes,struct sfs64_run *out,size_t slots,size_t *count){
+ if(!cap||cap>SIZE_MAX/sizeof *a||!rcap||rcap>SIZE_MAX/sizeof *current||slots>SIZE_MAX/sizeof *out||!expected||
+    (!out&&slots))return PP64_INVALID;
+ const void *p[]={b,l,w,a,current,previous,count,out};
+ size_t n[]={sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *current,rcap*sizeof *previous,sizeof *count,slots*sizeof *out};
+ for(unsigned i=0;i<(slots?8u:7u);i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PP64_INVALID;
+ struct pp64_pair pair;
+ enum pp64_status rc=pp64_mount(b,l,w,a,cap,current,rcap,&pair);
+ if(rc!=PP64_OK)return rc;
+ if(pair.sequence!=expected)return PP64_INVALID;
+ struct ir64_state latest,prior;
+ enum ip64_status ir=ir64_mount(&latest,b,l->owner,l->inode,l->inode_sectors,l->data_sectors,l->data_start,&w->iw,current,rcap);
+ if(ir!=IP64_OK)return from_ip(ir);
+ if(latest.root.epoch!=pair.inode_epoch)return PP64_INVALID;
+ size_t nc=0,np=0;
+ ir=ip64_inventory(b,l->owner,l->inode,&latest.root,&w->iw,current,rcap,&nc);
+ if(ir!=IP64_OK)return from_ip(ir);
+ /* Under serialized writer contract epochs are adjacent. A missing or
+  * corrupt previous root is not selectable; transport/scratch errors
+  * instead fail closed. A valid older root is protected even if its
+  * paired directory receipt has already been retired. */
+ if(pair.inode_epoch>1){
+  ir=ir64_mount_epoch(&prior,b,l->owner,l->inode,l->inode_sectors,l->data_sectors,l->data_start,
+   pair.inode_epoch-1,&w->iw,previous,rcap);
+  if(ir==IP64_OK){
+   ir=ip64_inventory(b,l->owner,l->inode,&prior.root,&w->iw,previous,rcap,&np);
+   if(ir!=IP64_OK)return from_ip(ir);
+  }else if(ir!=IP64_CORRUPT)return from_ip(ir);
+ }
+ enum sfs64_alloc_status ar=sfs64_allocate(l->data_sectors,l->data_start,
+  (struct sfs64_inventory){current,nc},(struct sfs64_inventory){previous,np},bytes,out,slots,count);
+ return ar==SFS64_ALLOC_OK?PP64_OK:ar==SFS64_ALLOC_FULL||ar==SFS64_ALLOC_OUTPUT?PP64_FULL:PP64_INVALID;
+}

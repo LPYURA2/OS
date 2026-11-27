@@ -111,8 +111,8 @@ static void sort(struct sfs64_run *a,size_t n){
  for(size_t i=n/2;i;i--)sift(a,n,i-1);
  for(size_t i=n;i>1;i--){swap(a,a+i-1);sift(a,i-1,0);}
 }
-enum ip64_status ip64_validate(struct bs_service *b,uint64_t owner,uint64_t token,
- const struct ip64_root *r,struct ip64_workspace *w,struct sfs64_run *runs,size_t cap){
+static enum ip64_status validate(struct bs_service *b,uint64_t owner,uint64_t token,
+ const struct ip64_root *r,struct ip64_workspace *w,struct sfs64_run *runs,size_t cap,size_t *count){
  if(!args(b,r,w)||!geometry(b,owner,token,r,false)||cap>SIZE_MAX/sizeof *runs||
     (cap&&(!sep(runs,cap*sizeof *runs,b,sizeof *b)||!sep(runs,cap*sizeof *runs,r,sizeof *r)||
      !sep(runs,cap*sizeof *runs,w,sizeof *w))))return IP64_INVALID;
@@ -137,7 +137,19 @@ enum ip64_status ip64_validate(struct bs_service *b,uint64_t owner,uint64_t toke
  if(total!=r->files)return IP64_CORRUPT;
  sort(runs,used);
  for(size_t i=1;i<used;i++)if(runs[i].first<runs[i-1].first+runs[i-1].sectors)return IP64_CORRUPT;
+ if(count)*count=used;
  return IP64_OK;
+}
+enum ip64_status ip64_validate(struct bs_service *b,uint64_t owner,uint64_t token,
+ const struct ip64_root *r,struct ip64_workspace *w,struct sfs64_run *runs,size_t cap){
+ return validate(b,owner,token,r,w,runs,cap,0);
+}
+enum ip64_status ip64_inventory(struct bs_service *b,uint64_t owner,uint64_t token,
+ const struct ip64_root *r,struct ip64_workspace *w,struct sfs64_run *runs,size_t cap,size_t *count){
+ if(cap>SIZE_MAX/sizeof *runs||!sep(count,sizeof *count,b,sizeof *b)||
+    !sep(count,sizeof *count,r,sizeof *r)||!sep(count,sizeof *count,w,sizeof *w)||
+    (cap&&!sep(count,sizeof *count,runs,cap*sizeof *runs)))return IP64_INVALID;
+ return validate(b,owner,token,r,w,runs,cap,count);
 }
 enum ip64_status ip64_stat(struct bs_service *b,uint64_t owner,uint64_t token,
  const struct ip64_root *r,uint64_t id,struct ip64_workspace *w,struct sfs64_file *out){

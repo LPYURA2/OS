@@ -24,6 +24,10 @@ enum ip64_status ip64_build(struct bs_service *,uint64_t owner,uint64_t token,
  * exhaustion. This validates one snapshot, not retained-bank allocation. */
 enum ip64_status ip64_validate(struct bs_service *,uint64_t owner,uint64_t token,
  const struct ip64_root *,struct ip64_workspace *,struct sfs64_run *,size_t capacity);
+/* Same complete validation, plus exact count of sorted occupied runs.
+ * Count output is unchanged on failure and must not alias any input. */
+enum ip64_status ip64_inventory(struct bs_service *,uint64_t owner,uint64_t token,
+ const struct ip64_root *,struct ip64_workspace *,struct sfs64_run *,size_t capacity,size_t *count);
 /* Binary search after successful full validation of immutable root.
  * Return copied metadata, no borrowed pointers and no output on error. */
 enum ip64_status ip64_stat(struct bs_service *,uint64_t owner,uint64_t token,
