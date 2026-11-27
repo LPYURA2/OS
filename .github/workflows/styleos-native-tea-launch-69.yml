@@ -1,7 +1,7 @@
 name: StyleOS native apps and Deep Drop acceptance
 on:
   push:
-    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72, feature/styleos-deep-drop-73, feature/styleos-deep-drop-74]
+    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72, feature/styleos-deep-drop-73, feature/styleos-deep-drop-74, feature/styleos-native-apps-75]
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,6 +27,26 @@ jobs:
         with:
           name: deep-drop-host
           path: build/deep-drop/
+  native-image-75-host:
+    if: github.ref_name == 'feature/styleos-native-apps-75'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Multi-page detached loader GCC and Clang ASan UBSan
+        run: |
+          set -euo pipefail
+          mkdir -p build/native-image-75
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_KERNEL_CAPACITY_32 -Iinclude tests/test_native_app_image_75.c kernel/{native_app_image_75,native_tea_elf,physical_arena_844}.c -o "build/native-image-75/$cc"
+            "build/native-image-75/$cc" | tee "build/native-image-75/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-image-75-host
+          path: build/native-image-75/
   stop-host:
     runs-on: ubuntu-24.04
     steps:
@@ -175,7 +195,7 @@ jobs:
       - name: Deep Drop 73 actual minimized destination and gesture cancellation
         run: python3 tools/test_deep_drop_taskbar_73.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-taskbar-73
       - name: Deep Drop 74 revoke and recover on ordinary native taskbar
-        if: github.ref_name == 'feature/styleos-deep-drop-74'
+        if: (github.ref_name == 'feature/styleos-deep-drop-74' || github.ref_name == 'feature/styleos-native-apps-75')
         run: python3 tools/test_deep_drop_recovery_74.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-recovery-74
       - name: Package the verified boot ISO
         run: |
@@ -207,7 +227,7 @@ jobs:
             build/deep-drop-taskbar-73/*.ppm
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
-        if: always() && github.ref_name == 'feature/styleos-deep-drop-74'
+        if: always() && (github.ref_name == 'feature/styleos-deep-drop-74' || github.ref_name == 'feature/styleos-native-apps-75')
         with:
           name: styleos-deep-drop-74-recovery
           path: |
