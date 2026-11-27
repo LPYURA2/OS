@@ -124,7 +124,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                 stats = [x["stats"] for x in o["stats"] if x.get("qdev") in (DEVICE,"/machine/peripheral/"+DEVICE)]
                 require(len(stats)==1, "wrong stats")
                 return o,stats[0]
-            _, start = snapshot("prelaunch")
+            _, disk_stats_before = snapshot("prelaunch")
             d.call("cont")
             deadline = time.monotonic()+180
             while time.monotonic()<deadline and proc.poll() is None:
@@ -353,8 +353,8 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         from native_process_view_02 import decimal,ROW,HEADER,END
                         lines=complete_lines(uart.read_bytes())
                         end=max(i for i,x in enumerate(lines) if x==END)
-                        start=max(i for i,x in enumerate(lines[:end]) if x.startswith(HEADER+b" "))
-                        values=[decimal(x,ROW,(b"pid",b"group",b"state",b"ticks",b"bytes")) for x in lines[start+1:end]]
+                        snapshot_start=max(i for i,x in enumerate(lines[:end]) if x.startswith(HEADER+b" "))
+                        values=[decimal(x,ROW,(b"pid",b"group",b"state",b"ticks",b"bytes")) for x in lines[snapshot_start+1:end]]
                         require(len(values)==1 and values[0][0]==pid_num and values[0][2]==3,"Processes must show actual waiting PID")
                         d.key("down");d.key("delete")
                         arm=wait_prefix(b"STYLEOS PROCESSES ARM ")
@@ -402,11 +402,11 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                 require(b"STYLEOS DESKTOP READY" in uart.read_bytes() and b"STYLEOS NATIVE RUNTIME READY" in uart.read_bytes(),"live desktop missing")
             require(b"STYLEOS S863S DMA-AFTER " in uart.read_bytes() and b"STYLEOS S863S BAR4 " in uart.read_bytes(), "missing owned-root DMA admission receipts")
             require(not any(b" FAIL " in x for x in uart.read_bytes().splitlines()),"kernel failure receipt")
-            written=final["wr_bytes"]-start["wr_bytes"]
+            written=final["wr_bytes"]-disk_stats_before["wr_bytes"]
             require(written>0 if save44 or namespace46 in ("create","delete") else written==expected_writes, "write byte count")
-            require(final["unmap_bytes"]==start["unmap_bytes"], "unexpected unmap")
+            require(final["unmap_bytes"]==disk_stats_before["unmap_bytes"], "unexpected unmap")
             if expected_writes or save44 or namespace46 in ('create','delete'):
-                require(final["flush_operations"]-start["flush_operations"]>=2, "flush evidence")
+                require(final["flush_operations"]-disk_stats_before["flush_operations"]>=2, "flush evidence")
             for k in ("failed_wr_operations","invalid_wr_operations","failed_flush_operations","invalid_flush_operations"):
                 require(final.get(k,0)==start.get(k,0), k)
             d.call("quit")
