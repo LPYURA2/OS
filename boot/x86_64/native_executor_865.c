@@ -73,8 +73,8 @@ unsigned s848_dispatch_raw(struct s847_raw *f,uint64_t cr2,uint64_t root){
  /* Validate actual non-IRQ frame before retiring our timer. The
   * classifier's armed argument describes the post-retirement contract.
   * Never discard a pending or in-service IRQ to manufacture a syscall. */
- enum rt865_frame_kind kind=rt865_classify_native_frame(f,(uintptr_t)f,f->vector==14?cr2:0,
-    root,bank862.safe,bank862.cs,bank862.ss,f->vector==V&&armed848);
+ enum rt865_frame_kind kind=s875_classify_native_frame(f,(uintptr_t)f,f->vector==14?cr2:0,
+    root,bank862.safe,bank862.cs,bank862.ss,f->vector==V&&armed848,rt862_extent(&bank862,(unsigned)id));
  if(kind==RT865_INVALID)fail848("865-frame-contract");
  if(f->vector!=V){
   if(!armed848||rd848(0x320)!=V||rd848(0x380)!=COUNT||
@@ -179,8 +179,8 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   fail848("865-safe-return");
  if(pending860.vector!=V){if(!drain865(safe,original->cs,id))fail848("865-timer-drain");}
  else if(pending848(0x200))fail848("865-irq-duplicate");
- enum rt865_frame_kind kind=rt865_classify_native_frame(&pending860,frame860,cr2862,
-     ticket->child_root,safe,bank862.cs,bank862.ss,pending860.vector==V);
+ enum rt865_frame_kind kind=s875_classify_native_frame(&pending860,frame860,cr2862,
+     ticket->child_root,safe,bank862.cs,bank862.ss,pending860.vector==V,rt862_extent(&bank862,id));
  if(kind==RT865_INVALID)fail848("865-receipt-kind");
  enum pr_state state=kind==RT865_USER_FAULT?PR_FAULTED:kind==RT865_TERMINAL?(pending860.vector==128?PR_EXITED:PR_FAULTED):PR_READY;
  __asm__ volatile("lidt %0;lgdt %1"::"m"(*i0),"m"(*g0):"memory");

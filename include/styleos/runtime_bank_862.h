@@ -7,7 +7,22 @@
  * The architecture must authenticate the live CPU/IRQ/FP and audit mappings.
  * Inputs are trusted, distinct kernel objects; no user pointer ABI. */
 struct rt862_bank_slot { uint32_t pid; uint64_t handle, root; struct up_context context; };
-struct rt862_bank { uint64_t safe; uint16_t cs,ss; struct rt862_bank_slot slots[PS_MAX_SLOTS]; };
+struct rt862_bank { uint64_t safe; uint16_t cs,ss; struct rt862_bank_slot slots[PS_MAX_SLOTS];
+#ifdef STYLEOS_OWNED_SHELL_865
+ /* Zero triple means historical three-page context; expanded entries are
+  * published atomically with admission and cleared at terminal release. */
+ struct s846_extent extents[PS_MAX_SLOTS];
+#endif
+};
+static inline struct s846_extent rt862_extent(const struct rt862_bank *b,unsigned slot){
+#ifdef STYLEOS_OWNED_SHELL_865
+ struct s846_extent e=b->extents[slot];
+ if(e.code||e.data||e.stack)return e;
+#else
+ (void)b;(void)slot;
+#endif
+ return (struct s846_extent){1,1,1};
+}
 bool rt862_bank_init(struct rt862_bank *,struct dpr_service *,uint64_t,uint16_t,uint16_t);
 bool rt862_bank_enter(const struct rt862_bank *,const struct dpr_service *,const struct rt862_selection *,uint64_t,struct up_context *);
 /* Only after a real safe-root return, FP suspension and EOI. */
@@ -48,6 +63,14 @@ enum ps_status rt863_bank_admit_initial(struct rt862_bank *,struct dpr_service *
 enum ps_status rt865_bank_admit_image(struct rt862_bank *,struct dpr_service *,
  uint64_t,unsigned,const struct s846_root *,const struct s844_lease *,
  const struct nte_loaded *,const char *,const struct up_context *,uint32_t *);
+#ifdef STYLEOS_OWNED_SHELL_865
+#include <styleos/native_app_image_75.h>
+/* Expanded staged image admission. Trusted architecture must first verify
+ * actual PTEs, lease, staged image provenance and FP ownership. */
+enum ps_status rt875_bank_admit_image(struct rt862_bank *,struct dpr_service *,
+ uint64_t,unsigned,const struct s846_root *,const struct s844_lease *,
+ const struct nai75_layout *,const char *,const struct up_context *,uint32_t *);
+#endif
 /* Kernel-owned request. The default zero GPR array is a native entry context;
  * no workload identity or expected instruction sites are required.
  * The reader and audit are trusted, serialized, non-mutating capabilities.

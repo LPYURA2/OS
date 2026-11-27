@@ -12,3 +12,6 @@ New s875_root_build/audit constructs and fully audits detached expanded roots us
 
 ## 75 implementation 3
 Connected ordinary runtime to per-slot trusted extent registry, frozen mixed-size sparse root audit and exact bounded private-data alias calculation. Legacy launch still uses {1,1,1}; rollback/retire clear extent and leases. Expanded staging/root primitives host verified previously; latest runtime changes need fresh CI (all old guest tests). Next implement bank/admission and architecture PC/SP/FP/syscall/timer/fault bounds for expanded layouts, actual multi-page CPL3 proof and cleanup; no new app UI yet. Astra reconcile against latest HEAD; don't restart accepted work.
+
+## 75 implementation 4
+Extent-aware frame decoder, native classifier, bank admission, saved context, tick/yield/terminal receipt and architecture trap classifier. New host test for expanded vs legacy context, fault and slot reuse. Verify CI. Next wire actual staged expanded launch through safe-root/FP proof and root extent registry; ensure no inconsistent bank/lease extent, confirm actual CPL3 execution from later code page with RW/NX data and guarded stack, real timer/syscall/fault/cleanup, then native runtime/SDK gate. No generic app install or real expanded execution claim yet. Preserve Astra handoff and existing tests.

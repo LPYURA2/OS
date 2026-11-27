@@ -15,6 +15,9 @@ bool s847_gdt_append(uint8_t *,size_t,uint16_t limit,uint16_t tr,uint16_t kernel
 /* Decode only a complete user-origin frame at exact TSS IST top minus 176.
  * Hardware adapter supplies observed frame VA, CR2 and CR3, never user input. */
 bool s847_decode(const struct s847_raw *,uint64_t frame_va,uint64_t cr2,uint64_t cr3,uint16_t cs,uint16_t ss,struct up_context *,struct up_event *);
+/* Trusted exact mapped extent, not a user-supplied limit. */
+bool s875_decode(const struct s847_raw *,uint64_t,uint64_t,uint64_t,uint16_t,uint16_t,
+ struct s846_extent,struct up_context *,struct up_event *);
 #if defined(STYLEOS_INTEGRATED_RUNTIME_864) || defined(STYLEOS_TEST_RUNTIME_ENTRY_CLASSIFIER_865)
 /* Classify the admitted ABI's frame independently of workload instructions,
  * expected GPR patterns, progress words and fixture tick budgets.
@@ -27,6 +30,8 @@ enum rt865_frame_kind rt865_classify_frame(const struct s847_raw *,uint64_t,uint
  * The strict classifier above remains the resumable-context contract. */
 enum rt865_frame_kind rt865_classify_native_frame(const struct s847_raw *,uint64_t,uint64_t,
  uint64_t,uint64_t,uint16_t,uint16_t,bool);
+enum rt865_frame_kind s875_classify_native_frame(const struct s847_raw *,uint64_t,uint64_t,
+ uint64_t,uint64_t,uint16_t,uint16_t,bool,struct s846_extent);
 #endif
 /* Bridge a validated raw trap to the lifecycle model. Return true with
  * a decision only on success; modify only RAX for returning calls. The

@@ -12,8 +12,9 @@ static bool layout(const struct rt862_bank *b,const struct dpr_service *d,const 
  for(unsigned i=0;i<6;i++)for(unsigned j=0;j<i;j++)if(len[i]&&len[j]&&!apart(ptr[i],len[i],ptr[j],len[j]))return false;
  return true;
 }
-static bool context(const struct rt862_bank *b,const struct up_context *c){
- if(c->cs!=b->cs||c->ss!=b->ss||!(c->status&2)||(c->status&~UINT64_C(0x8d7))||c->pc<S846_CODE||c->pc>=S846_CODE+PAGE||c->sp<=S846_STACK||c->sp>S846_STACK+PAGE)return false;
+static bool extent_valid(struct s846_extent e){return e.code&&e.code<=8&&e.data&&e.data<=16&&e.stack&&e.stack<=4;}
+static bool context(const struct rt862_bank *b,const struct up_context *c,struct s846_extent e){
+ if(!extent_valid(e)||c->cs!=b->cs||c->ss!=b->ss||!(c->status&2)||(c->status&~UINT64_C(0x8d7))||c->pc<S846_CODE||c->pc>=S846_CODE+e.code*PAGE||c->sp<=S846_STACK||c->sp>S846_STACK+e.stack*PAGE)return false;
  for(unsigned i=15;i<31;i++)if(c->gpr[i])return false;
  return true;
 }
@@ -32,13 +33,20 @@ static bool binding(const struct rt862_bank *b,const struct dpr_service *d){
  }
  for(unsigned i=0;i<PS_MAX_SLOTS;i++){
   const struct rt862_bank_slot *c=&b->slots[i];const struct ps_slot *slot=&s->slots[i];const struct pr_entry *p=pr_find(s->registry,c->pid);
-  if(!c->pid){if(seen[i]||c->handle||c->root||!zero(&c->context,sizeof c->context)||slot->pid||slot->handle||slot->user_root||s->current==(int)i)return false;continue;}
+  if(!c->pid){
+#ifdef STYLEOS_OWNED_SHELL_865
+   if(!zero(&b->extents[i],sizeof b->extents[i]))return false;
+#endif
+   if(seen[i]||c->handle||c->root||!zero(&c->context,sizeof c->context)||slot->pid||slot->handle||slot->user_root||s->current==(int)i)return false;
+   continue;
+  }
+  if(!extent_valid(rt862_extent(b,i)))return false;
   if(seen[i]!=1||!c->pid||!c->handle||!root(c->root)||c->root==b->safe||slot->pid!=c->pid||slot->handle!=c->handle||slot->user_root!=c->root||!p||p->type!=PR_NATIVE_USER||p->scheduler_handle!=c->handle||p->page_root!=c->root||((p->state==PR_RUNNING)!=(s->current==(int)i)))return false;
   if(p->state==PR_READY||p->state==PR_RUNNING
 #ifdef STYLEOS_OWNED_SHELL_865
      ||p->state==PR_WAITING
 #endif
-    ){if(!context(b,&c->context))return false;}
+    ){if(!context(b,&c->context,rt862_extent(b,i)))return false;}
   else if(p->state==PR_EXITED||p->state==PR_FAULTED){if(!zero(&c->context,sizeof c->context))return false;}
   else return false;
  }
@@ -100,7 +108,8 @@ bool rt862_bank_enter(const struct rt862_bank *b,const struct dpr_service *d,con
 }
 enum ps_status rt862_bank_tick(struct rt862_bank *b,struct dpr_service *d,const struct rt862_selection *t,uint64_t live,const struct rt860_tick *r){
  if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),r,sizeof *r,_Alignof(struct rt860_tick))||!ticket(b,d,t,live)||r->slot!=t->slot||r->dispatch!=t->dispatch||r->pid!=t->pid||r->handle!=t->handle||r->safe_root!=live||r->child_root!=t->child_root)return PS_EVIDENCE;
- struct rt860_bounds bounds={{S846_CODE,S846_CODE+PAGE},{S846_STACK,S846_STACK+PAGE},{S846_IST,S846_IST+PAGE},b->cs,b->ss};struct s847_raw saved;
+ struct s846_extent e=rt862_extent(b,t->slot);
+ struct rt860_bounds bounds={{S846_CODE,S846_CODE+e.code*PAGE},{S846_STACK,S846_STACK+e.stack*PAGE},{S846_IST,S846_IST+PAGE},b->cs,b->ss};struct s847_raw saved;
  enum ps_status status=dpr_tick_860(d,&bounds,r,&saved);if(status!=PS_OK)return status;
  struct up_context c={.pc=saved.rip,.sp=saved.rsp,.cs=saved.cs,.ss=saved.ss,.status=saved.rflags&~IF};for(unsigned i=0;i<15;i++)c.gpr[i]=saved.gpr[i];
  b->slots[t->slot].context=c;return PS_OK;
@@ -108,7 +117,7 @@ enum ps_status rt862_bank_tick(struct rt862_bank *b,struct dpr_service *d,const 
 enum ps_status rt862_bank_finish(struct rt862_bank *b,struct dpr_service *d,const struct rt862_selection *t,uint64_t live,uint64_t safe_flags,const struct s847_raw *f,uint64_t va,uint64_t cr2){
  if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),f,sizeof *f,_Alignof(struct s847_raw))||!ticket(b,d,t,live)||(safe_flags&~UINT64_C(0x8d7))||!(safe_flags&2)||(f->rflags&0x202)!=0x202||f->rsp<=S846_STACK)return PS_EVIDENCE;
  struct s847_raw normalized=*f;normalized.rflags&=~IF;struct up_context decoded;struct up_event event;
- if(!s847_decode(&normalized,va,cr2,t->child_root,b->cs,b->ss,&decoded,&event))return PS_EVIDENCE;
+ if(!s875_decode(&normalized,va,cr2,t->child_root,b->cs,b->ss,rt862_extent(b,t->slot),&decoded,&event))return PS_EVIDENCE;
  enum ps_event end;
  if(event.kind==UP_FAULT)end=PS_FAULT;
  else if(event.vector==128&&f->gpr[0]==S847_CALL_EXIT&&!cr2)end=PS_EXIT;
@@ -183,6 +192,9 @@ enum ps_status rt862_bank_release(struct rt862_bank *b,struct dpr_service *d,uin
  for(unsigned i=0;i<WS_MAX_WINDOWS;i++)if(d->windows->windows[i].id&&d->windows->windows[i].owner_pid==pid)return PS_STATE;
  enum ps_status status=dpr_release(d,slot,handle);if(status!=PS_OK)return status;
  volatile unsigned char *p=(void *)c;for(size_t i=0;i<sizeof *c;i++)p[i]=0;
+#ifdef STYLEOS_OWNED_SHELL_865
+ b->extents[slot]=(struct s846_extent){0};
+#endif
  return PS_OK;
 }
 
@@ -199,7 +211,7 @@ enum ps_status rt863_bank_admit_initial(struct rt862_bank *b,struct dpr_service 
     !binding(b,d)||live!=b->safe||d->dispatcher.current!=-1||
     slot>=PS_MAX_SLOTS)return PS_EVIDENCE;
  const struct up_context proposed=*initial;
- if(!context(b,&proposed)||proposed.status!=2||(proposed.sp&15u))
+ if(!context(b,&proposed,(struct s846_extent){1,1,1})||proposed.status!=2||(proposed.sp&15u))
     return PS_EVIDENCE;
  uint32_t assigned=0;
  enum ps_status status=rt862_bank_admit(b,d,live,slot,handle,child,name,&assigned);
@@ -245,6 +257,52 @@ enum ps_status rt865_bank_admit_image(struct rt862_bank *b,struct dpr_service *d
  }
  return rt863_bank_admit_initial(b,d,live,slot,lease->generation,child->built.root,name,initial,pid);
 }
+
+#ifdef STYLEOS_OWNED_SHELL_865
+enum ps_status rt875_bank_admit_image(struct rt862_bank *b,struct dpr_service *d,
+ uint64_t live,unsigned slot,const struct s846_root *child,const struct s844_lease *lease,
+ const struct nai75_layout *image,const char *name,const struct up_context *initial,uint32_t *pid){
+ if(!layout(b,d,child,sizeof *child,_Alignof(struct s846_root),lease,sizeof *lease,_Alignof(struct s844_lease))||
+    !layout(b,d,image,sizeof *image,_Alignof(struct nai75_layout),initial,sizeof *initial,_Alignof(struct up_context))||
+    !layout(b,d,pid,sizeof *pid,_Alignof(uint32_t),0,0,1)||
+    !apart(child,sizeof *child,image,sizeof *image)||!apart(child,sizeof *child,initial,sizeof *initial)||
+    !apart(lease,sizeof *lease,image,sizeof *image)||!apart(lease,sizeof *lease,initial,sizeof *initial)||
+    !apart(pid,sizeof *pid,child,sizeof *child)||!apart(pid,sizeof *pid,lease,sizeof *lease)||
+    !apart(pid,sizeof *pid,image,sizeof *image)||!apart(pid,sizeof *pid,initial,sizeof *initial)||
+    !binding(b,d)||live!=b->safe||d->dispatcher.current!=-1||
+    slot>=S846_ROOT_COUNT||slot>=PS_MAX_SLOTS||!child->ready||child->built.error!=PG_OK||
+    !root(child->built.root)||child->built.root==live||child->built.root!=child->plan.tables_pa||
+    !child->built.used||child->built.used>child->plan.capacity||child->plan.capacity!=PG_TABLE_PAGES||
+    child->plan.arch!=PG_X86||child->plan.count<3||child->plan.count>PG_MAX_MAPS||
+    !root(lease->pa)||lease->owner!=S846_OWNER_A+slot||!lease->generation||
+    child->lease.pa!=lease->pa||child->lease.owner!=lease->owner||
+    child->lease.pages!=lease->pages||child->lease.generation!=lease->generation)return PS_EVIDENCE;
+ struct s846_extent e={image->code_pages,image->data_pages,image->stack_pages};
+ if(!extent_valid(e)||lease->pages!=e.code+e.data+e.stack||image->total_pages!=lease->pages||
+    lease->pa>(UINT64_C(1)<<47)-lease->pages*PAGE||
+    !image->code_file||image->code_file>image->code_mem||
+    image->code_mem>e.code*PAGE||image->code_mem<=(e.code-1u)*PAGE||
+    !image->data_mem||image->data_file>image->data_mem||
+    image->data_mem>e.data*PAGE||image->data_mem<=(e.data-1u)*PAGE||
+    image->entry<S846_CODE||image->entry-S846_CODE>=image->code_file||
+    initial->pc!=image->entry||initial->sp!=S846_STACK+e.stack*PAGE||
+    initial->status!=2||!context(b,initial,e))return PS_EVIDENCE;
+ const uint64_t vas[3]={S846_CODE,S846_DATA,S846_STACK};
+ const unsigned pages[3]={e.code,e.data,e.stack};
+ uint64_t pa=lease->pa;
+ for(unsigned i=0;i<3;i++){
+  const struct pg_mapping *m=&child->plan.maps[child->plan.count-3+i];
+  if(m->va!=vas[i]||m->pa!=pa||m->bytes!=pages[i]*PAGE||m->flags!=(i?PG_WRITE:PG_EXEC))return PS_EVIDENCE;
+  pa+=pages[i]*PAGE;
+ }
+ const struct up_context proposed=*initial;
+ uint32_t assigned=0;
+ enum ps_status status=rt862_bank_admit(b,d,live,slot,lease->generation,child->built.root,name,&assigned);
+ if(status!=PS_OK)return status;
+ b->extents[slot]=e;b->slots[slot].context=proposed;*pid=assigned;
+ return PS_OK;
+}
+#endif
 
 enum ps_status rt865_launch_prepared(struct rt862_bank *b,struct dpr_service *d,
  uint64_t live,unsigned slot,const struct s846_root *child,const struct s844_arena *arena,
@@ -313,8 +371,9 @@ enum ps_status rt863_bank_syscall(struct rt862_bank *b,struct dpr_service *d,
     f->gpr[0]==S847_CALL_EXIT)return PS_EVIDENCE;
  struct s847_raw normalized=*f;normalized.rflags&=~IF;
  struct up_context saved;struct up_event event;
- if(!s847_decode(&normalized,va,cr2,t->child_root,b->cs,b->ss,&saved,&event)||
-    event.kind!=UP_EVENT_NONE||!context(b,&saved))return PS_EVIDENCE;
+ const struct s846_extent extent=rt862_extent(b,t->slot);
+ if(!s875_decode(&normalized,va,cr2,t->child_root,b->cs,b->ss,extent,&saved,&event)||
+    event.kind!=UP_EVENT_NONE||!context(b,&saved,extent))return PS_EVIDENCE;
  uint64_t result=UC772_BAD;
  if(f->gpr[0]==S847_CALL_YIELD)result=0;
  else if(f->gpr[0]==S847_CALL_RANGE){size_t offset=0;
@@ -341,7 +400,7 @@ enum ps_status rt863_coop_commit(struct rt862_bank *b,struct dpr_service *d,
  if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),f,sizeof *f,_Alignof(struct s847_raw))||
     !ticket(b,d,t,live)||(flags&~UINT64_C(0x8d7))||!(flags&2)||f->rsp<=S846_STACK)return PS_EVIDENCE;
  struct up_context saved;struct up_event event;
- if(!s847_decode(f,va,cr2,t->child_root,b->cs,b->ss,&saved,&event)||!context(b,&saved))return PS_EVIDENCE;
+ if(!s847_decode(f,va,cr2,t->child_root,b->cs,b->ss,&saved,&event)||!context(b,&saved,(struct s846_extent){1,1,1}))return PS_EVIDENCE;
  enum ps_event kind=PS_YIELD;
  if(event.kind==UP_FAULT)kind=PS_FAULT;
  else if(cr2)return PS_EVIDENCE;
@@ -369,7 +428,7 @@ enum ps_status rt863_bank_event(struct rt862_bank *b,struct dpr_service *d,
 #ifdef STYLEOS_INTEGRATED_RUNTIME_864
  /* Recheck the original raw receipt on the safe root. Never commit a
   * normalized user context or execute a syscall from an invalid stack. */
- if(rt865_classify_native_frame(&r->frame,r->frame_va,cr2,t->child_root,live,b->cs,b->ss,r->vector==0x50)==RT865_USER_FAULT){
+ if(s875_classify_native_frame(&r->frame,r->frame_va,cr2,t->child_root,live,b->cs,b->ss,r->vector==0x50,rt862_extent(b,t->slot))==RT865_USER_FAULT){
   if((r->safe_flags&~UINT64_C(0x8d7))||!(r->safe_flags&2)||
      r->isr!=(r->vector==0x50)||r->eoi!=(r->vector==0x50))return PS_EVIDENCE;
   enum ps_status status=dpr_observe(d,t->slot,t->handle,t->child_root,live,PS_FAULT);

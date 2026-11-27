@@ -16,8 +16,9 @@ bool s847_gdt_append(uint8_t *g,size_t len,uint16_t limit,uint16_t tr,uint16_t c
  put64(g+end+8,UINT64_C(0x00cff2000000ffff)|UINT64_C(0x0000010000000000));
  *out=(struct s847_selectors){(uint16_t)(end|3),(uint16_t)((end+8)|3),(uint16_t)(end+15)};return true;
 }
-bool s847_decode(const struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root,uint16_t cs,uint16_t ss,struct up_context *out,struct up_event *ev){
- if(!region(f,sizeof *f,_Alignof(struct s847_raw))||!region(out,sizeof *out,_Alignof(struct up_context))||!region(ev,sizeof *ev,_Alignof(struct up_event))||!separate(f,sizeof *f,out,sizeof *out)||!separate(f,sizeof *f,ev,sizeof *ev)||!separate(out,sizeof *out,ev,sizeof *ev)||!root||root>=LOW||(root&(P-1))||(cs&7)!=3||(ss&7)!=3||cs<11||ss<11||cs==ss||f->cs!=cs||f->ss!=ss||!(f->rflags&2)||(f->rflags&~UINT64_C(0x8d7))||f->rip<S846_CODE||f->rip>=S846_CODE+P||f->rsp<S846_STACK||f->rsp>S846_STACK+P)return false;
+static bool extent_ok(struct s846_extent e){return e.code&&e.code<=8&&e.data&&e.data<=16&&e.stack&&e.stack<=4;}
+bool s875_decode(const struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root,uint16_t cs,uint16_t ss,struct s846_extent extent,struct up_context *out,struct up_event *ev){
+ if(!region(f,sizeof *f,_Alignof(struct s847_raw))||!region(out,sizeof *out,_Alignof(struct up_context))||!region(ev,sizeof *ev,_Alignof(struct up_event))||!separate(f,sizeof *f,out,sizeof *out)||!separate(f,sizeof *f,ev,sizeof *ev)||!separate(out,sizeof *out,ev,sizeof *ev)||!root||root>=LOW||(root&(P-1))||(cs&7)!=3||(ss&7)!=3||cs<11||ss<11||cs==ss||f->cs!=cs||f->ss!=ss||!(f->rflags&2)||(f->rflags&~UINT64_C(0x8d7))||!extent_ok(extent)||f->rip<S846_CODE||f->rip>=S846_CODE+extent.code*P||f->rsp<S846_STACK||f->rsp>S846_STACK+extent.stack*P)return false;
  uint64_t ist;
  if(f->vector==128){if(f->error)return false;ist=S846_IST;}
  else if(f->vector==14){if(!(f->error&4)||(f->error&~UINT64_C(7))||cr2>=LOW)return false;ist=S846_IST+3*P;}
@@ -34,16 +35,20 @@ bool s847_decode(const struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root
  struct up_event e={.kind=f->vector!=128?UP_FAULT:UP_EVENT_NONE,.vector=f->vector,.syndrome=f->error,.fault_va=f->vector==14?cr2:0,.active_root=root,.kernel_sp=va};
  *out=c;*ev=e;return true;
 }
+bool s847_decode(const struct s847_raw *f,uint64_t va,uint64_t cr2,uint64_t root,uint16_t cs,uint16_t ss,struct up_context *out,struct up_event *ev){
+ return s875_decode(f,va,cr2,root,cs,ss,(struct s846_extent){1,1,1},out,ev);
+}
 
 #if defined(STYLEOS_INTEGRATED_RUNTIME_864) || defined(STYLEOS_TEST_RUNTIME_ENTRY_CLASSIFIER_865)
-enum rt865_frame_kind rt865_classify_frame(const struct s847_raw *f,uint64_t va,
- uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed)
+static enum rt865_frame_kind classify_extent(const struct s847_raw *f,uint64_t va,
+ uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed,struct s846_extent extent)
 {
  if(!region(f,sizeof *f,_Alignof(struct s847_raw))||
     !child||child>=LOW||(child&(P-1))||!safe||safe>=LOW||(safe&(P-1))||child==safe||
     (cs&7)!=3||(ss&7)!=3||cs<11||ss<11||cs==ss||
     f->cs!=cs||f->ss!=ss||(f->rflags&0x202)!=0x202||(f->rflags&~UINT64_C(0xad7))||
-    f->rip<S846_CODE||f->rip>=S846_CODE+P||f->rsp<=S846_STACK||f->rsp>S846_STACK+P||
+    !extent_ok(extent)||f->rip<S846_CODE||f->rip>=S846_CODE+extent.code*P||
+    f->rsp<=S846_STACK||f->rsp>S846_STACK+extent.stack*P||
     (f->vector!=14&&cr2))return RT865_INVALID;
  if(f->vector==0x50)
     return armed&&!f->error&&va==S846_IST+P-16-sizeof *f?RT865_TICK:RT865_INVALID;
@@ -52,13 +57,18 @@ enum rt865_frame_kind rt865_classify_frame(const struct s847_raw *f,uint64_t va,
  if(armed)return RT865_INVALID;
  struct s847_raw n=*f;n.rflags&=~UINT64_C(0x200);
  struct up_context c;struct up_event e;
- if(!s847_decode(&n,va,cr2,child,cs,ss,&c,&e))return RT865_INVALID;
+ if(!s875_decode(&n,va,cr2,child,cs,ss,extent,&c,&e))return RT865_INVALID;
  return e.kind==UP_FAULT||f->gpr[0]==S847_CALL_EXIT?RT865_TERMINAL:RT865_SYSCALL;
 }
-enum rt865_frame_kind rt865_classify_native_frame(const struct s847_raw *f,uint64_t va,
- uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed)
+enum rt865_frame_kind rt865_classify_frame(const struct s847_raw *f,uint64_t va,
+ uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed){
+ return classify_extent(f,va,cr2,child,safe,cs,ss,armed,(struct s846_extent){1,1,1});
+}
+enum rt865_frame_kind s875_classify_native_frame(const struct s847_raw *f,uint64_t va,
+ uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed,struct s846_extent extent)
 {
- enum rt865_frame_kind kind=rt865_classify_frame(f,va,cr2,child,safe,cs,ss,armed);
+ if(!extent_ok(extent))return RT865_INVALID;
+ enum rt865_frame_kind kind=classify_extent(f,va,cr2,child,safe,cs,ss,armed,extent);
  if(kind!=RT865_INVALID||!region(f,sizeof *f,_Alignof(struct s847_raw)))return kind;
 #if defined(STYLEOS_OWNED_SHELL_865) || defined(STYLEOS_TEST_RUNTIME_ENTRY_CLASSIFIER_865)
  /* These additional CPU exceptions are terminal only. User RIP, RSP and
@@ -76,13 +86,17 @@ enum rt865_frame_kind rt865_classify_native_frame(const struct s847_raw *f,uint6
   if(f->vector==14&&(f->error&0x14)==0x14&&!(f->error&~UINT64_C(0x15)))return RT865_USER_FAULT;
  }
 #endif
- if(f->rsp>S846_STACK&&f->rsp<=S846_STACK+P)return kind;
+ if(f->rsp>S846_STACK&&f->rsp<=S846_STACK+extent.stack*P)return kind;
  /* Only RSP is user-controlled and out of range. Check every other field,
   * including exact IST, selectors, roots, flags and vector/error evidence.
   * The temporary copy is never published or used for IRET. */
- struct s847_raw copy=*f;copy.rsp=S846_STACK+P;
- return rt865_classify_frame(&copy,va,cr2,child,safe,cs,ss,armed)==RT865_INVALID?
+ struct s847_raw copy=*f;copy.rsp=S846_STACK+extent.stack*P;
+ return classify_extent(&copy,va,cr2,child,safe,cs,ss,armed,extent)==RT865_INVALID?
     RT865_INVALID:RT865_USER_FAULT;
+}
+enum rt865_frame_kind rt865_classify_native_frame(const struct s847_raw *f,uint64_t va,
+ uint64_t cr2,uint64_t child,uint64_t safe,uint16_t cs,uint16_t ss,bool armed){
+ return s875_classify_native_frame(f,va,cr2,child,safe,cs,ss,armed,(struct s846_extent){1,1,1});
 }
 #endif
 

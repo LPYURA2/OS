@@ -43,6 +43,8 @@ jobs:
             "build/native-image-75/$cc" | tee "build/native-image-75/$cc.log"
             "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_KERNEL_CAPACITY_32 -DSTYLEOS_OWNED_SHELL_865 -Iinclude tests/test_native_app_root_75.c kernel/{user_root_846,apic_root_842,cache_policy_800,physical_arena_844,paging}.c -o "build/native-image-75/root-$cc"
             "build/native-image-75/root-$cc" | tee "build/native-image-75/root-$cc.log"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -DSTYLEOS_KERNEL_CAPACITY_32 -DSTYLEOS_OWNED_SHELL_865 -DSTYLEOS_INTEGRATED_RUNTIME_864 -Iinclude tests/test_native_app_context_75.c kernel/{runtime_bank_862,desktop_process_runtime,process_scheduler,process_runtime,window_service,runtime_tick_860,process_entry_847,user_copy_772}.c -o "build/native-image-75/context-$cc"
+            "build/native-image-75/context-$cc" | tee "build/native-image-75/context-$cc.log"
           done
       - uses: actions/upload-artifact@v4
         if: always()
