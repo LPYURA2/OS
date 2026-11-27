@@ -264,6 +264,24 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    fld848("seq",pixel==NWC_OK?((uint32_t)wire[4]|((uint32_t)wire[5]<<8)|((uint32_t)wire[6]<<16)|((uint32_t)wire[7]<<24)):0);
    arch_putc('\n');
 #endif
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+   /* Bounded per-slot statistics; a new generation cannot inherit counts.
+    * Count real authenticated input requests; emit only on delivery, not
+    * during busy empty polling. Neither status nor scheduling is altered. */
+   static struct {uint64_t generation,empty,delivered,other;} poll[PS_MAX_SLOTS];
+   if(poll[id].generation!=ticket->handle){
+    poll[id].generation=ticket->handle;poll[id].empty=0;poll[id].delivered=0;poll[id].other=0;
+   }
+   if(pixel==NWC_EMPTY)++poll[id].empty;
+   else if(pixel==NWC_OK){
+    ++poll[id].delivered;
+    arch_puts("STYLEOS TEA70 INPUT-COUNTS");fld848("pid",ticket->pid);
+    fld848("gen",ticket->handle);fld848("empty",poll[id].empty);
+    fld848("delivered",poll[id].delivered);fld848("other",poll[id].other);
+    fld848("kind",(uint32_t)wire[12]|((uint32_t)wire[13]<<8)|((uint32_t)wire[14]<<16)|((uint32_t)wire[15]<<24));
+    fld848("code",(uint32_t)wire[16]|((uint32_t)wire[17]<<8)|((uint32_t)wire[18]<<16)|((uint32_t)wire[19]<<24));arch_putc('\n');
+   }else ++poll[id].other;
+#endif
    volatile uint8_t *wipe_wire=wire;
    for(size_t j=0;j<NWC_INPUT_BYTES;++j)wipe_wire[j]=0;
   }else{

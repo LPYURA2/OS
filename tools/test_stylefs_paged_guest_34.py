@@ -273,6 +273,18 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                                 visible.check(281,81,"976332");visible.check(439,199,"976332")
                             input_ready=time.monotonic_ns()
                             if cycle==1:
+                                def received(kind,code):
+                                    deadline=time.monotonic()+40
+                                    while time.monotonic()<deadline and proc.poll() is None:
+                                        rows=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 INPUT-COUNTS",
+                                            ("pid","gen","empty","delivered","other","kind","code"))
+                                        matches=[v for _,v in rows if v["pid"]==pid_num and v["kind"]==kind and v["code"]==code]
+                                        if matches:return matches[-1]
+                                        time.sleep(.05)
+                                    raise RuntimeError("missing authenticated input counter")
+                                # Actual consumption of pointer release, not merely QMP submission.
+                                poll_before=received(3,0)
+                                poll_start=time.monotonic_ns()
                                 idle["one_app_no_input"]=host_idle_sample(proc,10)
                             closed_start=time.monotonic_ns()
                             d.key("q")
@@ -280,6 +292,18 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             require(pid in retired.split() and window in retired.split(),"exact process retirement")
                             wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*cycle)
                             ended=time.monotonic_ns()
+                            if cycle==1:
+                                poll_after=received(1,0x10)
+                                require(poll_after["gen"]==poll_before["gen"] and
+                                        poll_after["empty"]>=poll_before["empty"] and
+                                        poll_after["delivered"]==poll_before["delivered"]+1 and
+                                        poll_after["other"]==poll_before["other"],"idle input counters")
+                                elapsed=(ended-poll_start)/1e9
+                                delta=poll_after["empty"]-poll_before["empty"]
+                                idle["guest_input_poll_baseline"]={"before":poll_before,"after":poll_after,
+                                    "empty_requests":delta,"host_observed_seconds":elapsed,
+                                    "empty_requests_per_host_second":delta/elapsed,
+                                    "scope":"same process between consumed release and Q, includes host boundary overhead; not guest CPU usage"}
                             expected.extend([(1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)])
                             resources=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 RESOURCES",
                                 ("phase","pid","resident","pages","owners","windows","ports"))
