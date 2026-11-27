@@ -573,3 +573,7 @@ Correct test compilation warning and add corrupted-file rejection check; CI pend
 ## StyleFS 40 — directory view candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_40.md). Main unchanged.
+
+
+### StyleFS 40.1
+Correct live-volume verifier for CRLF UART and exact input receipt; no kernel changes. Stage39 boot and first read proven by failed-run artifact, full live test not yet accepted.

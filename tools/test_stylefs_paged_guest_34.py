@@ -114,7 +114,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
                     lines=uart.read_bytes().splitlines(keepends=True)
                     failures=[x for x in lines if b" FAIL " in x and x.endswith(b"\n")]
                     require(not failures,"guest fail-stop: "+repr(failures))
-                    if live and b"STYLEOS DESKTOP READY\n" in lines and any(x.startswith(b"STYLEOS S863 READY") for x in lines):
+                    if live and any(x.rstrip(b"\r\n")==b"STYLEOS DESKTOP READY" and x.endswith(b"\n") for x in lines) and any(x.startswith(b"STYLEOS S863 READY ") and x.endswith(b"\n") for x in lines):
                         break
                     if not live and any(x.startswith(b"SFS34 ") and x.endswith(b"\n") for x in lines):
                         break
@@ -122,8 +122,21 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
             else:
                 raise RuntimeError("no guest receipt")
             if live and receipt=="SFS39 MOUNT PASS":
-                d.move(20,0)
-                d.wait_uart("SFS39 INPUT READ PASS", timeout=40)
+                require(b"SFS39 DESKTOP READ PASS" in uart.read_bytes().splitlines(),
+                        "mounted object not readable before input")
+                # A single relative mouse event, not an absolute-coordinate helper.
+                d.call("input-send-event", events=[{"type":"rel","data":{"axis":"x","value":20}}])
+                # Desktop.wait_uart prepends STYLEOS DESKTOP; this receipt
+                # belongs to the volume service, so match the full line.
+                deadline=time.monotonic()+40
+                while time.monotonic()<deadline and proc.poll() is None:
+                    lines=uart.read_bytes().splitlines()
+                    require(not any(b" FAIL " in x for x in lines),"guest failure after input")
+                    if b"SFS39 INPUT READ PASS" in lines and any(x.startswith(b"STYLEOS S863 EVENT ") for x in lines):
+                        break
+                    time.sleep(.05)
+                else:
+                    raise RuntimeError("live volume input receipt missing")
             d.call("stop")
             o, final = snapshot("final")
             verify_ready(o)
