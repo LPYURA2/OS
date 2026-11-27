@@ -48,7 +48,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Install actual guest tools
-        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+        run: |
+          set -euo pipefail
+          # These guest tools are Ubuntu packages. Do not depend on unrelated
+          # third-party repositories preinstalled on hosted runners.
+          test -r /etc/apt/sources.list.d/ubuntu.sources
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
       - name: Verify QEMU 8.2.2
         run: qemu-system-x86_64 --version | head -n1 | grep '^QEMU emulator version 8\.2\.2 '
       - name: Existing hang coexistence regression (not forced stop)
@@ -85,7 +92,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Install real guest tools
-        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+        run: |
+          set -euo pipefail
+          # These guest tools are Ubuntu packages. Do not depend on unrelated
+          # third-party repositories preinstalled on hosted runners.
+          test -r /etc/apt/sources.list.d/ubuntu.sources
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
       - name: Check verifier syntax and exact QEMU version
         run: |
           python3 -m py_compile tools/native_forced_stop_verify.py tools/native_catalog_865_verify.py tools/test_desktop_storage_service_863.py
@@ -107,7 +121,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Install guest tools
-        run: sudo apt-get update && sudo apt-get install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+        run: |
+          set -euo pipefail
+          # These guest tools are Ubuntu packages. Do not depend on unrelated
+          # third-party repositories preinstalled on hosted runners.
+          test -r /etc/apt/sources.list.d/ubuntu.sources
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
       - name: Ordinary ISO without diagnostic catalog
         run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --extended-desktop --output build/ordinary-shell
       - uses: actions/upload-artifact@v4
