@@ -408,7 +408,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
             if expected_writes or save44 or namespace46 in ('create','delete'):
                 require(final["flush_operations"]-disk_stats_before["flush_operations"]>=2, "flush evidence")
             for k in ("failed_wr_operations","invalid_wr_operations","failed_flush_operations","invalid_flush_operations"):
-                require(final.get(k,0)==start.get(k,0), k)
+                require(final.get(k,0)==disk_stats_before.get(k,0), k)
             d.call("quit")
             require(proc.wait(timeout=20)==0, "QEMU exit")
         finally:
