@@ -11,7 +11,7 @@ def make(folder,index,name,color):
         emit(op);fix.append((len(code),name));emit(b'\0'*4)
     # Private data page: first rectangle (0,0,160,120,color).
     emit(b'\xbe\x00\x00\x00\x12')
-    for off,value in enumerate((0,0,160,120,0x2579a1)):
+    for off,value in enumerate((0,0,160,120,color)):
         emit(b'\xc7\x46'+bytes([off*4])+struct.pack('<I',value))
     emit(b'\xb8\x03\x01\x00\x00\x31\xdb\x89\xf1\xba\x01\x00\x00\x00\xcd\x80')
     emit(b'\x85\xc0');jump(b'\x0f\x85','fail')
@@ -44,3 +44,8 @@ def make(folder,index,name,color):
 def build(folder):
     (folder/'native_sample_69.h').write_text(
         make(folder,0,'Native-sample',0x2579a1)+make(folder,1,'Native-peer',0x976332))
+    # Both approved packages must carry independent executable identities.
+    first=(folder/'Native-sample.elf').read_bytes()
+    second=(folder/'Native-peer.elf').read_bytes()
+    if first==second or hashlib.sha256(first).digest()==hashlib.sha256(second).digest():
+        raise ValueError('native sample ELF identity collision')
