@@ -137,6 +137,16 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
                     time.sleep(.05)
                 else:
                     raise RuntimeError("live volume input receipt missing")
+                d.key("f2")
+                deadline=time.monotonic()+40
+                while time.monotonic()<deadline and proc.poll() is None:
+                    lines=uart.read_bytes().splitlines()
+                    require(not any(b" FAIL " in x for x in lines),"guest failure opening Explorer")
+                    if b"SFS41 EXPLORER ROWS" in lines:
+                        break
+                    time.sleep(.05)
+                else:
+                    raise RuntimeError("Explorer did not render mounted file rows")
             d.call("stop")
             o, final = snapshot("final")
             verify_ready(o)

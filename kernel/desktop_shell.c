@@ -5,6 +5,9 @@
 #include <styleos/arch.h>
 #include <styleos/desktop_v0.h>
 #include <styleos/desktop_stylefs.h>
+#ifdef STYLEOS_LIVE_VOLUME_39
+#include <styleos/desktop_paged_view.h>
+#endif
 #include <styleos/desktop_sessions.h>
 #include <styleos/desktop_text_app.h>
 #include <styleos/native_desktop_bridge.h>
@@ -102,13 +105,19 @@ static struct {
 static bool data_writable(void) {
     return filesystem.mode ? filesystem.disk.mounted && filesystem.disk.io.write && filesystem.disk.io.flush : store.writable;
 }
-static bool data_available(void) { return filesystem.mode ? filesystem.disk.mounted : store.writable; }
+static bool data_available(void) {
+#ifdef STYLEOS_LIVE_VOLUME_39
+    return s41_root_view()!=0;
+#else
+    return filesystem.mode ? filesystem.disk.mounted : store.writable;
+#endif
+}
 
 /* The updatable desktop has one visual identity. Media detection selects a
  * storage backend, never an older skin. Keep old standalone profiles intact. */
 static bool modern_shell(void)
 {
-#ifdef STYLEOS_DESKTOP_UPDATE
+#if defined(STYLEOS_DESKTOP_UPDATE) || defined(STYLEOS_LIVE_VOLUME_39)
     return true;
 #else
     return filesystem.mode;
@@ -117,7 +126,9 @@ static bool modern_shell(void)
 
 static const char *data_description(void)
 {
-#ifdef STYLEOS_DESKTOP_UPDATE
+#ifdef STYLEOS_LIVE_VOLUME_39
+    return s41_root_view()?"StyleFS — только чтение":"Диск данных не подключён";
+#elif defined(STYLEOS_DESKTOP_UPDATE)
     if (!data_sectors) return "Диск данных не обнаружен";
     if (filesystem.disk.mounted) return filesystem.disk.format == 2 ? "Диск данных StyleFS v2" : "Диск данных StyleFS v1";
     if (store.writable) return "Диск заметок старого формата";
@@ -935,6 +946,10 @@ static void draw_window(int id, int top)
     desk_line(r - 31, y - 3, r - 20, y + 8, LIGHT);
     desk_line(r - 20, y - 3, r - 31, y + 8, LIGHT);
 
+#ifdef STYLEOS_LIVE_VOLUME_39
+    if (id == FILES && s41_root_view()) desk_fs_paged_root_draw(s41_root_view(),b);
+    else
+#endif
     if (id == FILES && modern_shell() && !data_available()) draw_without_data(b);
     else if (id == FILES && filesystem.mode) desk_fs_draw(&filesystem, b);
     else if (id == FILES) {

@@ -11,6 +11,7 @@
 #define S34_BYTES 1041u
 #ifdef STYLEOS_LIVE_VOLUME_39
 #include <styleos/stylefs_paged_volume64.h>
+#include <styleos/desktop_paged_view.h>
 #define S34_SERIAL "STYLEOS-SFS39-DATA  "
 #define S34_TAG "STYLEOS-SFS39-PRIVATE-V1"
 #elif defined(STYLEOS_OBJECT_GUEST_37)
@@ -111,6 +112,7 @@ struct s34_work {
  struct s34_guard guard;
  uint64_t token;
  unsigned observations;
+ struct dp41_view root_view;
 #endif
 #ifdef STYLEOS_OBJECT_GUEST_37
  struct po64_service object;
@@ -197,6 +199,25 @@ static void s39_read(void){
   arch_puts(s34_work.observations==1?"SFS39 DESKTOP READ PASS\n":"SFS39 INPUT READ PASS\n");
  }
 }
+const struct dp41_view *s41_root_view(void){
+ return s34_work.volume.objects.active&&s34_work.root_view.valid?&s34_work.root_view:0;
+}
+static bool s41_load_root(void){
+ struct dp41_view *v=&s34_work.root_view;
+ struct po64_service *s=&s34_work.volume.objects;
+ struct po64_snapshot snap;
+ v->valid=false;v->count=0;v->more=false;
+ if(po64_snapshot(s,&snap)!=PO64_OK)return false;
+ for(unsigned i=0;i<=DP41_ROWS;i++){
+  struct po64_row row;
+  enum po64_status rc=po64_child_at(s,snap,1,i,&row);
+  if(rc==PO64_END){v->valid=true;return true;}
+  if(rc!=PO64_OK)return false;
+  if(i==DP41_ROWS){v->more=true;v->valid=true;return true;}
+  v->rows[v->count++]=row;
+ }
+ return false;
+}
 static void s39_admit(void){
  struct s34_guard *g=&s34_work.guard;
  g->live=&disk863.s.live;uint8_t buf[512];uint64_t gen=0;
@@ -220,6 +241,10 @@ static void s39_admit(void){
  struct sd64_key k=s34_key(1,'a');
  if(po64_grant(&s34_work.volume.objects,101,&k,2,1,&s34_work.token)!=PO64_OK){
   (void)pv64_close(&s34_work.volume);(void)bs_detach(svc,gen);arch_puts("SFS39 REFUSE object\n");return;
+ }
+ if(!s41_load_root()){
+  (void)pv64_close(&s34_work.volume);(void)bs_detach(svc,gen);
+  arch_puts("SFS39 REFUSE directory\n");return;
  }
  arch_puts("SFS39 MOUNT PASS\n");
 }

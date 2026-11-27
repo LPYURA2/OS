@@ -1003,3 +1003,66 @@ bool desk_fs_save_note(struct desk_fs *b, unsigned folder, int *id, const char *
 {
     return save_named_text(b, folder, id, data, length, "Заметка");
 }
+
+#ifdef STYLEOS_LIVE_VOLUME_39
+#include <styleos/desktop_paged_view.h>
+/* Use the existing Explorer palette, sidebar, row sizes and columns.
+ * This is a read-only first-page adapter, not a redesign. No disk access
+ * in paint, no legacy ID conversion, no fabricated file rows. */
+static void size41(int x,int y,int right,uint64_t bytes){
+ char text[24],rev[24];unsigned n=0;
+ const char *unit=" Б";
+ if(bytes>=UINT64_C(1099511627776)){bytes=bytes/UINT64_C(1099511627776)+(bytes%UINT64_C(1099511627776)!=0);unit=" ТиБ";}
+ else if(bytes>=UINT64_C(1073741824)){bytes=bytes/UINT64_C(1073741824)+(bytes%UINT64_C(1073741824)!=0);unit=" ГиБ";}
+ else if(bytes>=UINT64_C(1048576)){bytes=bytes/UINT64_C(1048576)+(bytes%UINT64_C(1048576)!=0);unit=" МиБ";}
+ else if(bytes>=1024){bytes=bytes/1024+(bytes%1024!=0);unit=" КиБ";}
+ do{rev[n++]=(char)('0'+bytes%10);bytes/=10;}while(bytes);
+ for(unsigned i=0;i<n;i++)text[i]=rev[n-i-1];
+ text[n]=0;
+ x=desk_text(x,y,right,text,DIM);desk_text(x,y,right,unit,DIM);
+}
+void desk_fs_paged_root_draw(const struct dp41_view *v,struct desk_box a){
+ if(!v||!v->valid||v->count>DP41_ROWS)return;
+ int side=sidebar(a),left=a.x+side,right=a.x+a.w-14,footer=a.y+a.h-FOOT;
+ desk_text(a.x+151,a.y+53,right,"Данные",TEXT);
+ desk_fill(a.x+1,a.y+83,a.w-2,1,LINE);
+ desk_fill(left,a.y+84,1,a.h-85,LINE);
+ desk_text(a.x+16,a.y+94,left-6,"Быстрый доступ",TEXT);
+ for(unsigned i=0;i<sizeof places/sizeof *places;i++){
+  int y=a.y+SIDE_ROWS+(int)i*ROW_H;
+  side_icon(a.x+18,y+4,i,DISABLED);
+  desk_text(a.x+45,y+5,left-8,places[i],DISABLED);
+ }
+ desk_fill(a.x+12,a.y+341,side-24,1,LINE);
+ desk_icon(a.x+36,a.y+SYSTEM_ROW+4,22,DESK_DRIVE,DIM);
+ desk_text(a.x+67,a.y+SYSTEM_ROW+5,left-6,"Диск данных",TEXT);
+ button(a,side+13,91,132,"+ Новая папка",false);
+ button(a,side+152,91,105,"+ Текст",false);
+ button(a,side+267,91,80,"Открыть",false);
+ int type=right-157,size=right-74;
+ desk_text(left+16,a.y+130,type-12,"Имя",DIM);
+ desk_text(type,a.y+130,size-8,"Тип",DIM);
+ desk_text(size,a.y+130,right,"Размер",DIM);
+ desk_fill(left+12,a.y+152,right-left-12,1,LINE);
+ unsigned shown=0;
+ for(unsigned i=0;i<v->count;i++){
+  int y=a.y+FILE_TOP+(int)i*ROW_H;if(y+ROW_H>footer)break;
+  const struct po64_row *row=&v->rows[i];
+  char name[SD64_NAME+1];unsigned n=row->entry.key.length;
+  if(!n||n>SD64_NAME)continue;
+  for(unsigned j=0;j<n;j++)name[j]=(char)row->entry.key.name[j];
+  name[n]=0;
+  bool dir=row->entry.kind==SD64_DIRECTORY;
+  desk_icon(left+20,y+4,22,dir?DESK_FOLDER:DESK_PAPER,dir?AMBER:TEXT);
+  desk_text(left+55,y+5,type-12,name,TEXT);
+  desk_text(type,y+5,size-8,dir?"Папка":"Файл",DIM);
+  if(!dir)size41(size,y+5,right,row->bytes);
+  ++shown;
+ }
+ if(!v->count)desk_text(left+20,a.y+FILE_TOP+10,right,"Папка пуста",DIM);
+ desk_fill(left+12,a.y+a.h-34,right-left-12,1,LINE);
+ desk_text(left+14,a.y+a.h-26,right,v->more||shown<v->count?"Только чтение — часть списка":"Только чтение",DIM);
+ static bool reported;
+ if(shown&&!reported){reported=true;arch_puts("SFS41 EXPLORER ROWS\n");}
+}
+#endif
