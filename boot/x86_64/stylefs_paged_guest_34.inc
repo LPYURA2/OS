@@ -9,7 +9,11 @@
 #define S34_I UINT64_C(66)
 #define S34_F (S34_CAP-2-S34_D-S34_I)
 #define S34_BYTES 1041u
-#ifdef STYLEOS_OBJECT_GUEST_37
+#ifdef STYLEOS_LIVE_VOLUME_39
+#include <styleos/stylefs_paged_volume64.h>
+#define S34_SERIAL "STYLEOS-SFS39-DATA  "
+#define S34_TAG "STYLEOS-SFS39-PRIVATE-V1"
+#elif defined(STYLEOS_OBJECT_GUEST_37)
 #include <styleos/stylefs_paged_object64.h>
 #define S34_SERIAL "STYLEOS-SFS37-DATA  "
 #define S34_TAG "STYLEOS-SFS37-PRIVATE-V1"
@@ -102,6 +106,12 @@ struct s34_work {
  struct pp64_stream_workspace stream;
  struct dc64_node nodes[32];
  struct sfs64_run current[32],previous[32];
+#ifdef STYLEOS_LIVE_VOLUME_39
+ struct pv64_volume volume;
+ struct s34_guard guard;
+ uint64_t token;
+ unsigned observations;
+#endif
 #ifdef STYLEOS_OBJECT_GUEST_37
  struct po64_service object;
 #endif
@@ -168,6 +178,50 @@ static void s37_replace(struct bs_service *svc,const struct pp64_layout *l){
     po64_grant(s,101,&k,3,1,&t)!=PO64_STALE)fail("sfs37-replace");
  s37_read_new();
  if(po64_unmount(s)!=PO64_OK)fail("sfs37-unmount");
+}
+#endif
+#ifdef STYLEOS_LIVE_VOLUME_39
+/* Long-lived backend and volume are in the attested writable image, never
+ * on the boot stack. Read-only grants; no legacy raw-sector exposure. */
+static void s39_read(void){
+ struct po64_service *s=&s34_work.volume.objects;
+ if(!s->active)return;
+ uint64_t seen=0;
+ if(po64_read(s,101,s34_work.token,s34_sink,&seen)!=PO64_OK||seen!=S34_BYTES){
+  (void)pv64_close(&s34_work.volume);
+  arch_puts("SFS39 UNAVAILABLE\n");return;
+ }
+ if(po64_read(s,202,s34_work.token,s34_sink,&seen)!=PO64_DENIED)fail("sfs39-principal");
+ if(s34_work.observations<2){
+  ++s34_work.observations;
+  arch_puts(s34_work.observations==1?"SFS39 DESKTOP READ PASS\n":"SFS39 INPUT READ PASS\n");
+ }
+}
+static void s39_admit(void){
+ struct s34_guard *g=&s34_work.guard;
+ g->live=&disk863.s.live;uint8_t buf[512];uint64_t gen=0;
+ if(!s34_begin(g,S34_IDENT,0)||!ata48_bind(&g->ata,&s34_ops,g,S34_SERIAL,S34_N)){
+  arch_puts("SFS39 REFUSE identity\n");return;
+ }
+ if(!s34_begin(g,S34_READ,0)||!ata48_read(&g->ata,0,buf)){arch_puts("SFS39 REFUSE tag-read\n");return;}
+ static const char tag[]=S34_TAG;
+ for(unsigned i=0;i<512;i++)if(buf[i]!=(i<sizeof(tag)-1?(uint8_t)tag[i]:0)){
+  arch_puts("SFS39 REFUSE tag\n");return;
+ }
+ g->tagged=true;
+ struct bs_service *svc=&disk863.s.block;
+ const struct bs_backend backend={g,UINT64_C(0x701080862839),S34_CAP,false,false,s34_read,0,0};
+ const struct pv64_geometry geometry={0,S34_CAP,S34_D,S34_I,1};
+ if(bs_attach(svc,&backend,&gen)!=BS_OK){arch_puts("SFS39 REFUSE attach\n");return;}
+ if(pv64_mount(&s34_work.volume,svc,gen,BLOCK_SHELL_OWNER,&geometry,false,&s34_work.stream,
+    s34_work.nodes,32,s34_work.current,0,32)!=PO64_OK){
+  (void)bs_detach(svc,gen);arch_puts("SFS39 REFUSE metadata\n");return;
+ }
+ struct sd64_key k=s34_key(1,'a');
+ if(po64_grant(&s34_work.volume.objects,101,&k,2,1,&s34_work.token)!=PO64_OK){
+  (void)pv64_close(&s34_work.volume);(void)bs_detach(svc,gen);arch_puts("SFS39 REFUSE object\n");return;
+ }
+ arch_puts("SFS39 MOUNT PASS\n");
 }
 #endif
 static _Noreturn void s34_run(void){

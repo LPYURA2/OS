@@ -563,3 +563,8 @@ Correct test compilation warning and add corrupted-file rejection check; CI pend
 ## StyleFS 38 — mounted volume lifetime candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_38.md). Main unchanged.
+
+
+## StyleFS 39 — live desktop read-only volume candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_39.md). Main unchanged.

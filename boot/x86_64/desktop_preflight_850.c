@@ -727,7 +727,14 @@ static void disk_admit863(void){
  s20_run();
 #endif
 #ifdef STYLEOS_PAGED_GUEST_34
+#ifdef STYLEOS_LIVE_VOLUME_39
+ (void)&s34_run;
+ s39_admit();
+ /* No legacy raw-sector exposure; return to native desktop even on refusal. */
+ return;
+#else
  s34_run();
+#endif
 #endif
  uint8_t super[512];
 #ifdef STYLEOS_STYLEFS_MOUNT_RO
@@ -826,6 +833,9 @@ void s863_storage_document(bool saved,unsigned slot,const char *data,size_t byte
 #endif
 }
 uint32_t s863_disk_probe(void){
+#ifdef STYLEOS_LIVE_VOLUME_39
+ return 0;
+#endif
 #ifdef STYLEOS_STYLEFS_MOUNT_RO
  return disk_ready863()?STYLEFS_RO_SECTORS:0;
 #else
@@ -1084,6 +1094,9 @@ __attribute__((noinline)) void s863_shell_pump(void){
 void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsigned active,bool ru,unsigned restarts,size_t text,uint64_t text_hash,bool text_dirty,unsigned note_session,size_t writes,unsigned inputs,unsigned batch){
  shell_boundary863();
  if(inputs!=3||batch>32||(!ev)!=(!batch))fail("863-shell-input");
+#ifdef STYLEOS_LIVE_VOLUME_39
+ if(s34_work.observations<2)s39_read();
+#endif
  if(!ev){
 #ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863
   rtc_sample863();

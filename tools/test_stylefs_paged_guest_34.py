@@ -60,7 +60,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -114,19 +114,29 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw):
                     lines=uart.read_bytes().splitlines(keepends=True)
                     failures=[x for x in lines if b" FAIL " in x and x.endswith(b"\n")]
                     require(not failures,"guest fail-stop: "+repr(failures))
-                    if any(x.startswith(b"SFS34 ") and x.endswith(b"\n") for x in lines):
+                    if live and b"STYLEOS DESKTOP READY\n" in lines and any(x.startswith(b"STYLEOS S863 READY") for x in lines):
+                        break
+                    if not live and any(x.startswith(b"SFS34 ") and x.endswith(b"\n") for x in lines):
                         break
                 time.sleep(.05)
             else:
                 raise RuntimeError("no guest receipt")
+            if live and receipt=="SFS39 MOUNT PASS":
+                d.move(20,0)
+                d.wait_uart("SFS39 INPUT READ PASS", timeout=40)
             d.call("stop")
             o, final = snapshot("final")
             verify_ready(o)
             bar = [x for bus in o["pci"] for x in bus["devices"] if x.get("qdev_id")==CONTROLLER][0]["regions"]
             require(len(bar)==1,"BAR count")
             verify_bar(o["pci"],o["mtree"],bar[0]["address"])
-            rows = [x for x in uart.read_bytes().splitlines() if x.startswith(b"SFS34 ")]
-            require(rows==[receipt.encode()], "unexpected guest result "+repr(rows))
+            rows = [x for x in uart.read_bytes().splitlines() if x.startswith(b"SFS39 " if live else b"SFS34 ")]
+            expected=[receipt.encode()]
+            if live and receipt=="SFS39 MOUNT PASS":
+                expected += [b"SFS39 DESKTOP READ PASS",b"SFS39 INPUT READ PASS"]
+            require(rows==expected, "unexpected guest result "+repr(rows))
+            if live:
+                require(b"STYLEOS DESKTOP READY" in uart.read_bytes() and b"STYLEOS NATIVE RUNTIME READY" in uart.read_bytes(),"live desktop missing")
             require(b"STYLEOS S863S DMA-AFTER " in uart.read_bytes() and b"STYLEOS S863S BAR4 " in uart.read_bytes(), "missing owned-root DMA admission receipts")
             require(not any(b" FAIL " in x for x in uart.read_bytes().splitlines()),"kernel failure receipt")
             require(final["wr_bytes"]-start["wr_bytes"]==expected_writes, "write byte count")

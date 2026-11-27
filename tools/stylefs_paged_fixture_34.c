@@ -7,14 +7,18 @@
 #include <unistd.h>
 enum {N=512,D=66,I=66,F=N-2-D-I};
 static struct bs_service b;static struct pp64_stream_workspace w;
-static struct dc64_node nodes[32];static struct sfs64_run runs[32];
+static struct dc64_node nodes[32];static struct sfs64_run runs[32],previous[32];
+static bool source39(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ (void)ctx;for(size_t i=0;i<n;i++){uint64_t x=at+i;p[i]=(uint8_t)(x*37u+x/512u*91u+13u);}return true;
+}
 static bool rd(void *c,uint64_t n,uint8_t *p){return n<N&&pread(*(int *)c,p,512,(off_t)(n*512))==512;}
 static bool wr(void *c,uint64_t n,const uint8_t *p){return n<N&&pwrite(*(int *)c,p,512,(off_t)(n*512))==512;}
 static bool fl(void *c){return fdatasync(*(int *)c)==0;}
 static bool sink(void *c,uint64_t at,const uint8_t *p,size_t n){return fwrite(p,1,n,c)==n&&at<1041;}
 int main(int argc,char **argv){
  if(argc!=3&&argc!=4)return 1;
- bool create=!strcmp(argv[1],"new");
+ bool live=!strcmp(argv[1],"new39");
+ bool create=live||!strcmp(argv[1],"new");
  bool object=!strcmp(argv[1],"get37");
  if((create&&argc!=3)||(!create&&(argc!=4||(!object&&strcmp(argv[1],"get")))))return 1;
  int fd=open(argv[2],create?O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW:O_RDONLY|O_NOFOLLOW,0600);
@@ -32,6 +36,10 @@ int main(int argc,char **argv){
  struct pp64_pair pair;
  if(ok&&create)ok=dc64_provision(&b,1,l.dir,D)==DC64_OK&&ir64_provision(&b,1,l.inode,I,F,1)==IP64_OK&&
  pp64_provision(&b,&l,&w.pair,nodes,32,runs,32,&pair)==PP64_OK;
+ if(ok&&live){
+  struct sd64_key k={.parent=1,.length=1,.name={'a'}};
+  ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,1,&k,2,0,1041,source39,0,&pair)==PP64_OK;
+ }
  if(ok&&!create){
   FILE *out=fopen(argv[3],"wbx");struct sd64_key k={.parent=2,.length=1,.name={'b'}};
   ok=out&&pp64_get(&b,&l,&w,nodes,32,runs,32,object?5:4,&k,3,object?2:1,sink,out)==PP64_OK;
