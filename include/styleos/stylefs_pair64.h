@@ -52,6 +52,20 @@ struct sp64_put_workspace {
 enum sp64_status sp64_put_file(struct bs_service *,const struct sp64_layout *,
  struct sp64_put_workspace *,struct dc64_node *,size_t cap,const struct sd64_key *,
  uint64_t id,uint64_t revision,uint64_t bytes,sp64_source,void *,struct sp64_pair *);
+/* Guarded namespace edits. CREATE only directory; REMOVE file/directory;
+ * RENAME moves either kind. Exact committed sequence and file revision
+ * guard stale requests. File deletion removes its manifest in the same
+ * paired transaction; retained snapshot extents remain protected.
+ * Caller allocates lifetime-unique object IDs, no recursive deletion,
+ * no secure erase. Scratch is disjoint and trusted. */
+struct sp64_edit_workspace {
+ struct sp64_workspace pair;
+ uint8_t payload[SFS64_BANK_BYTES];
+};
+enum sp64_status sp64_edit(struct bs_service *,const struct sp64_layout *,
+ struct sp64_edit_workspace *,struct dc64_node *,size_t cap,
+ uint64_t expected_sequence,const struct dc64_edit *,uint64_t expected_revision,
+ struct sp64_pair *);
 #ifdef STYLEFS_HOST_FORMAT
 enum sp64_status sp64_provision(struct bs_service *,const struct sp64_layout *,
  struct sp64_workspace *,struct dc64_node *,size_t cap,struct sp64_pair *);

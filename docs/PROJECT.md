@@ -495,3 +495,8 @@ Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary bo
 ## StyleFS 26 — guarded recovery candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_26.md). No ordinary boot or main changes.
+
+
+## StyleFS 27 — guarded edits candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_27.md). No ordinary boot or main changes.

@@ -277,3 +277,71 @@ enum sp64_status sp64_put_file(struct bs_service *b,const struct sp64_layout *l,
  }
  return sp64_commit(b,l,&w->pair,a,cap,current.sequence,dir_epoch,current.data_epoch+1,out);
 }
+
+/* Build a manifest snapshot without the exact deleted object. Existing
+ * bank validation proves all ranges and IDs; do not modify retained maps. */
+static enum sp64_status remove_map(struct sfs64_journal *j,uint64_t id,uint64_t rev,
+ uint8_t *dst,size_t *used){
+ if(!sfs64_journal_ready(j,true)||j->writer)return SP64_INVALID;
+ const uint8_t *p=j->payload[j->active];size_t n=j->length[j->active],at=0;
+ if(!sfs64_snapshot_valid(p,n,j->capacity,j->data_start))return SP64_CORRUPT;
+ bool found=false;*used=0;
+ while(at<n){
+  size_t before=at;uint64_t len=get(p+at,4);at+=4;
+  struct sfs64_map m;
+  if(len>n-at||!sfs64_map_decode(p+at,(size_t)len,j->capacity,j->data_start,&m))return SP64_CORRUPT;
+  at+=(size_t)len;
+  if(m.file.id==id){
+   if(found||m.file.revision!=rev)return SP64_INVALID;
+   found=true;continue;
+  }
+  for(size_t i=before;i<at;i++)dst[(*used)++]=p[i];
+ }
+ return found?SP64_OK:SP64_INVALID;
+}
+enum sp64_status sp64_edit(struct bs_service *b,const struct sp64_layout *l,
+ struct sp64_edit_workspace *w,struct dc64_node *a,size_t cap,uint64_t expected,
+ const struct dc64_edit *e,uint64_t rev,struct sp64_pair *out){
+ if(!w||!cap||cap>SIZE_MAX/sizeof *a||!expected||
+    !sep(w,sizeof *w,b,sizeof *b)||!sep(w,sizeof *w,l,sizeof *l)||
+    !sep(w,sizeof *w,a,cap*sizeof *a)||!sep(w,sizeof *w,out,sizeof *out)||
+    !sep(e,sizeof *e,w,sizeof *w)||!sep(e,sizeof *e,a,cap*sizeof *a)||
+    !sep(e,sizeof *e,b,sizeof *b)||!sep(e,sizeof *e,l,sizeof *l)||
+    !sep(e,sizeof *e,out,sizeof *out)||!sd64_key_valid(&e->entry.key)||
+    e->entry.target<=1||
+    (e->entry.kind!=SD64_FILE&&e->entry.kind!=SD64_DIRECTORY)||
+    (e->op!=DC64_CREATE&&e->op!=DC64_REMOVE&&e->op!=DC64_RENAME)||
+    (e->op==DC64_CREATE&&e->entry.kind!=SD64_DIRECTORY)||
+    (e->entry.kind==SD64_FILE?!rev:rev!=0)||
+    (e->op==DC64_RENAME&&!sd64_key_valid(&e->destination)))return SP64_INVALID;
+ struct sp64_pair cur;
+ enum sp64_status rc=sp64_mount(b,l,&w->pair,a,cap,&cur);
+ if(rc!=SP64_OK)return rc;
+ if(cur.sequence!=expected)return SP64_INVALID;
+ rc=sp64_prepare(b,l,&w->pair,a,cap,&cur);
+ if(rc!=SP64_OK)return rc;
+ if(cur.sequence!=expected)return SP64_INVALID;
+ bool deleting=e->op==DC64_REMOVE&&e->entry.kind==SD64_FILE;
+ if(cur.sequence==UINT64_MAX||cur.dir_epoch==UINT64_MAX||
+    (deleting&&cur.data_epoch==UINT64_MAX))return SP64_FULL;
+ struct sfs64_journal *j=&w->pair.data;
+ size_t bytes=0;
+ if(e->entry.kind==SD64_FILE){
+  struct sfs64_file f;
+  if(sfs64_stream_stat(j,e->entry.target,&f)!=SJ_OK||f.revision!=rev)return SP64_INVALID;
+  if(deleting){
+   rc=remove_map(j,e->entry.target,rev,w->payload,&bytes);
+   if(rc!=SP64_OK)return rc;
+  }
+ }
+ /* Validate hierarchy and exact name/object and publish inactive directory
+  * first. It remains invisible until the paired receipt is durable. */
+ enum dc64_status dr=dc64_hierarchy_apply(&w->pair.dir,&w->pair.dw,a,cap,e);
+ if(dr!=DC64_OK)return from_dir(dr);
+ if(deleting){
+  enum sj_status jr=sfs64_journal_publish(j,w->payload,bytes);
+  if(jr!=SJ_OK)return from_data(jr);
+ }
+ return sp64_commit(b,l,&w->pair,a,cap,cur.sequence,cur.dir_epoch+1,
+                    cur.data_epoch+(deleting?1u:0u),out);
+}
