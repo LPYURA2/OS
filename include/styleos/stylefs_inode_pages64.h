@@ -32,4 +32,8 @@ enum ip64_status ip64_inventory(struct bs_service *,uint64_t owner,uint64_t toke
  * Return copied metadata, no borrowed pointers and no output on error. */
 enum ip64_status ip64_stat(struct bs_service *,uint64_t owner,uint64_t token,
  const struct ip64_root *,uint64_t id,struct ip64_workspace *,struct sfs64_file *);
+/* Copy exact encoded map into workspace.map; length unchanged on failure.
+ * Requires previously validated immutable root. */
+enum ip64_status ip64_export(struct bs_service *,uint64_t owner,uint64_t token,
+ const struct ip64_root *,uint64_t id,struct ip64_workspace *,size_t *length);
 #endif

@@ -520,3 +520,8 @@ Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary bo
 ## StyleFS 31 — paged recovery and allocation candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_31.md). Main unchanged.
+
+
+## StyleFS 32 — paged streaming candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_32.md). Main unchanged.

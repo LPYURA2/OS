@@ -176,3 +176,33 @@ enum ip64_status ip64_stat(struct bs_service *b,uint64_t owner,uint64_t token,
  }
  return IP64_MISSING;
 }
+
+enum ip64_status ip64_export(struct bs_service *b,uint64_t owner,uint64_t token,
+ const struct ip64_root *r,uint64_t id,struct ip64_workspace *w,size_t *length){
+ if(!args(b,r,w)||!geometry(b,owner,token,r,false)||!id||
+    !sep(length,sizeof *length,w,sizeof *w)||!sep(length,sizeof *length,r,sizeof *r)||
+    !sep(length,sizeof *length,b,sizeof *b))return IP64_INVALID;
+ uint64_t lo=0,hi=r->pages;
+ while(lo<hi){
+  uint64_t mid=lo+(hi-lo)/2;struct page_info info;
+  enum ip64_status rc=load(b,owner,token,r,w,mid,&info);
+  if(rc!=IP64_OK)return rc;
+  if(id<info.first)hi=mid;
+  else if(id>info.last)lo=mid+1;
+  else{
+   size_t at=IP64_HEADER;
+   while(at<info.used){
+    uint64_t len=get(w->page+at,4);at+=4;struct sfs64_map m;
+    if(len>sizeof w->map||!sfs64_map_decode(w->page+at,(size_t)len,r->data_capacity,r->data_start,&m))return IP64_CORRUPT;
+    if(m.file.id==id){
+     for(size_t i=0;i<len;i++)w->map[i]=w->page[at+i];
+     *length=(size_t)len;return IP64_OK;
+    }
+    if(m.file.id>id)break;
+    at+=(size_t)len;
+   }
+   return IP64_MISSING;
+  }
+ }
+ return IP64_MISSING;
+}
