@@ -568,3 +568,8 @@ Correct test compilation warning and add corrupted-file rejection check; CI pend
 ## StyleFS 39 — live desktop read-only volume candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_39.md). Main unchanged.
+
+
+## StyleFS 40 — directory view candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_40.md). Main unchanged.

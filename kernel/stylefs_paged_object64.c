@@ -46,11 +46,12 @@ static enum po64_status mount(struct po64_service *s,struct bs_service *b,const 
  const void *p[]={s,b,l,w,a,runs,previous};size_t n[]={sizeof *s,sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *runs,rcap*sizeof *previous};
  for(unsigned i=0;i<(write?7u:6u);i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PO64_INVALID;
  if(!mode(b,l,write))return PO64_DENIED;
+ if(s->serial==UINT64_MAX)return PO64_FULL;
  struct pp64_pair pair;
  enum pp64_status rc=pp64_mount(b,l,&w->pair,a,cap,runs,rcap,&pair);
  if(rc!=PP64_OK)return status(rc);
  clear(s);s->block=b;s->layout=*l;s->pair=pair;s->work=w;s->nodes=a;s->node_cap=cap;s->runs=runs;s->run_cap=rcap;
- s->writable=write;s->previous=previous;s->active=true;return PO64_OK;
+ s->mount_id=++s->serial;s->writable=write;s->previous=previous;s->active=true;return PO64_OK;
 }
 enum po64_status po64_mount(struct po64_service *s,struct bs_service *b,const struct pp64_layout *l,
  struct pp64_stream_workspace *w,struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap){
@@ -162,4 +163,53 @@ enum po64_status po64_write(struct po64_service *s,uint64_t principal,uint64_t t
  /* Any other failure after staging began must not expose stale handles.
   * In particular an uncertain publication is never silently retried. */
  clear(s);return status(pr);
+}
+
+enum po64_status po64_snapshot(struct po64_service *s,struct po64_snapshot *out){
+ if(!s)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ if(!span(s,out,sizeof *out))return PO64_INVALID;
+ enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
+ *out=(struct po64_snapshot){s->mount_id,s->pair.sequence};
+ return PO64_OK;
+}
+static enum po64_status row_read(struct po64_service *s,uint64_t index,struct sd64_record *out){
+ enum dc64_status rc=dc64_entry_at(&s->work->pair.dir,index,&s->work->pair.dw,out);
+ if(rc==DC64_OK)return PO64_OK;
+ clear(s);return rc==DC64_IO?PO64_IO:PO64_CORRUPT;
+}
+enum po64_status po64_child_at(struct po64_service *s,struct po64_snapshot snap,uint64_t parent,uint64_t ordinal,struct po64_row *out){
+ if(!s||!parent||!snap.mount||!snap.sequence)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ if(!span(s,out,sizeof *out))return PO64_INVALID;
+ if(snap.mount!=s->mount_id||snap.sequence!=s->pair.sequence)return PO64_STALE;
+ enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
+ uint64_t count=s->work->pair.dir.count;
+ /* Mount verified sorted unique object inventory and every parent edge. */
+ if(parent!=1){
+  size_t lo=0,hi=(size_t)count;
+  while(lo<hi){size_t m=lo+(hi-lo)/2;if(s->nodes[m].id<parent)lo=m+1;else hi=m;}
+  if(lo==(size_t)count||s->nodes[lo].id!=parent||s->nodes[lo].kind!=SD64_DIRECTORY)return PO64_DENIED;
+ }
+ /* Directory keys sorted by parent then name: find the first child,
+  * without scanning all earlier directories or narrowing 64-bit IDs. */
+ uint64_t lo=0,hi=count;struct sd64_record e;
+ while(lo<hi){
+  uint64_t m=lo+(hi-lo)/2;
+  rc=row_read(s,m,&e);if(rc!=PO64_OK)return rc;
+  if(e.key.parent<parent)lo=m+1;else hi=m;
+ }
+ if(ordinal>=count-lo)return PO64_END;
+ rc=row_read(s,lo+ordinal,&e);if(rc!=PO64_OK)return rc;
+ if(e.key.parent!=parent)return PO64_END;
+ struct po64_row row={.entry=e};
+ if(e.kind==SD64_FILE){
+  struct sfs64_file f;
+  enum ip64_status ir=ip64_stat(s->block,s->layout.owner,s->layout.inode,&s->work->pair.inode.root,e.target,&s->work->pair.iw,&f);
+  if(ir!=IP64_OK){clear(s);return ir==IP64_IO?PO64_IO:PO64_CORRUPT;}
+  row.bytes=f.bytes;row.revision=f.revision;
+ }
+ *out=row;return PO64_OK;
 }
