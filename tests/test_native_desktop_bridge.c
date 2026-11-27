@@ -8,6 +8,7 @@ static struct ws_service windows;
 static struct usr_runtime sessions;
 static struct nwc_service ipc;
 static struct ndb_tracker tracked;
+static uint32_t raised;
 static uint32_t framebuffer[800u*600u],baseline[800u*600u];
 static struct desktop_surface surface={
     (uintptr_t)framebuffer,sizeof(framebuffer),800,600,800,DESKTOP_BGR_BYTES
@@ -26,12 +27,12 @@ static void fill(void *opaque,int x,int y,int w,int h,uint32_t color)
 static void scene(void)
 {
     desk_fill(0,0,800,600,0x142030);
-    (void)ndb_paint_rects(&ipc,800,540,pixel,fill,0);
+    (void)ndb_paint_top(&ipc,800,540,raised,pixel,fill,0);
 }
 static void update(unsigned expect)
 {
     struct desk_damage d={0};
-    unsigned n=ndb_track(&ipc,&tracked,800,540,&d);
+    unsigned n=ndb_track_top(&ipc,&tracked,800,540,raised,&d);
     assert(n==expect);
     if(n)assert(d.all || d.count);
     if(n)assert(desk_present(&d,scene)!=0);
@@ -103,22 +104,41 @@ int main(void)
     uint32_t p3=create(48,"Third.tea"),w3=0;
     assert(usr_bind(&sessions,s1,p3,48)==USR_OK);
     assert(ws_open_app(&windows,&processes,p3,"Third",
-           (struct ws_bounds){400,200,80,60},&w3)==WS_OK);
+           (struct ws_bounds){796,538,80,60},&w3)==WS_OK);
     assert(nwc_claim(&ipc,p3,48,196608,w3)==NWC_OK);
+    pattern[0]=0xabcdef;
     assert(nwc_publish_tile(&ipc,p3,48,196608,w3,pattern,16,16)==NWC_OK);
-    assert(ndb_cycle_focus(&ipc,&input,800,540)&&input.focus==w3);
+    pattern[0]=0xff446688;
+    update(1);
+    assert(framebuffer[538u*800u+796u]==0xabcdef);
+    assert(ndb_cycle_focus(&ipc,&input,800,540)&&input.focus==w3&&input.raised==w3);
+    raised=input.raised;update(0);
+    assert(ndb_hit_top(&ipc,800,540,raised,796,538)==w3);
     assert(ndb_request_close(&ipc,&input,800,540,w1)==NWC_DENIED);
     assert(ndb_request_close(&ipc,&input,800,540,w3)==NWC_OK);
     assert(nwc_receive(&ipc,p3,48,196608,w3,&ev)==NWC_OK&&ev.code==0x3e&&ev.modifiers==DESK_ALT);
     for(unsigned n=0;n<NWC_EVENTS;++n)assert(ndb_request_close(&ipc,&input,800,540,w3)==NWC_OK);
     assert(ndb_request_close(&ipc,&input,800,540,w3)==NWC_FULL);
-    assert(ndb_cycle_focus(&ipc,&input,800,540)&&input.focus==w1);
+    assert(ndb_cycle_focus(&ipc,&input,800,540)&&input.focus==w1&&input.raised==w1);
+    raised=input.raised;update(2);
+    assert(framebuffer[538u*800u+796u]==0x446688);
+    assert(ndb_hit_top(&ipc,800,540,raised,796,538)==w1);
+    assert(pr_is_live(&processes,p1)&&pr_is_live(&processes,p3));
+    assert(ndb_route_pointer(&ipc,&input,800,540,796,538,1,0,true,false,false));
+    assert(input.capture==w1&&input.focus==w1);
+    assert(!ndb_cycle_focus(&ipc,&input,800,540));
+    assert(ndb_route_pointer(&ipc,&input,800,540,796,538,0,0,false,true,false));
+    assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_OK&&ev.kind==NWC_POINTER&&ev.down);
+    assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_OK&&ev.kind==NWC_POINTER&&!ev.down);
     assert(ws_set_minimized(&windows,p3,w3,true)==WS_OK);
+    update(1);
+    assert(framebuffer[538u*800u+796u]==0x446688);
     assert(!ndb_cycle_focus(&ipc,&input,800,540)&&input.focus==w1);
     assert(ws_close_app(&windows,p3,w3)==WS_OK);
     assert(nwc_reconcile(&ipc)==1);
     assert(pr_transition(&processes,p3,48,PR_EXITED)==PR_OK);
     assert(usr_reconcile(&sessions)==1);
+    raised=0;update(0);
     assert(!ndb_route_pointer(&ipc,&input,800,540,700,500,1,0,true,false,false));
     assert(!input.focus&&!input.capture);
     assert(!ndb_route_key(&ipc,&input,800,540,0x1e,0,false));

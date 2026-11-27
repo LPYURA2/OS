@@ -62,12 +62,25 @@ static unsigned snapshot(const struct nwc_service *ipc,int width,int height,
     }
     return count;
 }
-unsigned ndb_track(const struct nwc_service *ipc,struct ndb_tracker *tracker,
-                   int width,int height,struct desk_damage *damage)
+/* Stable default registry order, with one explicitly raised visible surface
+ * at the end. No registry slots are moved and no user buffer is changed. */
+static unsigned ordered(const struct nwc_service *ipc,int width,int height,uint32_t top,
+                        struct ndb_seen out[NWC_PORTS])
+{
+    unsigned count=snapshot(ipc,width,height,out);
+    for(unsigned i=0;i<count;++i)if(out[i].window_id==top){
+        struct ndb_seen raised=out[i];
+        for(unsigned j=i;j+1<count;++j)out[j]=out[j+1];
+        out[count-1]=raised;break;
+    }
+    return count;
+}
+unsigned ndb_track_top(const struct nwc_service *ipc,struct ndb_tracker *tracker,
+                       int width,int height,uint32_t top,struct desk_damage *damage)
 {
     if(!tracker || !damage || tracker->count>NWC_PORTS)return 0;
     struct ndb_seen next[NWC_PORTS]={0};
-    unsigned count=snapshot(ipc,width,height,next), changes=0;
+    unsigned count=ordered(ipc,width,height,top,next), changes=0;
     for(unsigned i=0;i<tracker->count;++i){
         struct ndb_seen previous=tracker->last[i];
         bool unchanged=false;
@@ -84,18 +97,42 @@ unsigned ndb_track(const struct nwc_service *ipc,struct ndb_tracker *tracker,
                same(next[i],tracker->last[j])){unchanged=true;break;}
         if(!unchanged){desk_damage_add(damage,next[i].rect);++changes;}
     }
+    /* A relative order reversal changes overlapping pixels even when both
+     * content generations and rectangles are identical. Repaint both
+     * bounded regions; additions/removals keep original damage semantics. */
+    for(unsigned i=0;i<tracker->count;++i)for(unsigned j=i+1;j<tracker->count;++j){
+        unsigned ni=count,nj=count;
+        for(unsigned k=0;k<count;++k){
+            if(next[k].window_id==tracker->last[i].window_id)ni=k;
+            if(next[k].window_id==tracker->last[j].window_id)nj=k;
+        }
+        if(ni<count&&nj<count&&ni>nj){
+            desk_damage_add(damage,next[ni].rect);desk_damage_add(damage,next[nj].rect);
+            changes+=2;
+        }
+    }
     for(unsigned i=0;i<NWC_PORTS;++i)
         tracker->last[i]=i<count?next[i]:(struct ndb_seen){0};
     tracker->count=count;
     return changes;
 }
-unsigned ndb_paint_rects(const struct nwc_service *ipc,int width,int height,
-                   ndb_pixel_plot plot,ndb_rect_plot fill,void *opaque)
+unsigned ndb_track(const struct nwc_service *ipc,struct ndb_tracker *tracker,
+                   int width,int height,struct desk_damage *damage)
+{
+    return ndb_track_top(ipc,tracker,width,height,0,damage);
+}
+unsigned ndb_paint_top(const struct nwc_service *ipc,int width,int height,uint32_t top,
+                       ndb_pixel_plot plot,ndb_rect_plot fill,void *opaque)
 {
     if(!ipc || !ipc->ready || !ipc->windows || !plot || width<=0 || height<=0)return 0;
     unsigned painted=0;
-    for(unsigned i=0;i<WS_MAX_WINDOWS;++i){
-        const struct ws_window *window=&ipc->windows->windows[i];
+    unsigned raised=WS_MAX_WINDOWS;
+    for(unsigned i=0;i<WS_MAX_WINDOWS;++i)
+        if(top&&ipc->windows->windows[i].id==top){raised=i;break;}
+    for(unsigned i=0;i<=WS_MAX_WINDOWS;++i){
+        if(i==raised&&i<WS_MAX_WINDOWS)continue;
+        if(i==WS_MAX_WINDOWS&&raised==WS_MAX_WINDOWS)break;
+        const struct ws_window *window=&ipc->windows->windows[i==WS_MAX_WINDOWS?raised:i];
         if(!window->id || window->role!=WS_APP_WINDOW)continue;
         const struct nwc_frame *frame=nwc_visible_frame(ipc,window->id);
         if(frame){
@@ -124,6 +161,11 @@ unsigned ndb_paint_rects(const struct nwc_service *ipc,int width,int height,
     return painted;
 }
 
+unsigned ndb_paint_rects(const struct nwc_service *ipc,int width,int height,
+                         ndb_pixel_plot plot,ndb_rect_plot fill,void *opaque)
+{
+    return ndb_paint_top(ipc,width,height,0,plot,fill,opaque);
+}
 unsigned ndb_paint(const struct nwc_service *ipc,int width,int height,
                    ndb_pixel_plot plot,void *opaque)
 {
@@ -131,16 +173,20 @@ unsigned ndb_paint(const struct nwc_service *ipc,int width,int height,
 }
 /* Reuse snapshot instead of a second, inconsistent definition of the
  * visible region. Later painted entries are in front. */
-uint32_t ndb_hit(const struct nwc_service *ipc,int width,int height,int x,int y)
+uint32_t ndb_hit_top(const struct nwc_service *ipc,int width,int height,uint32_t top,int x,int y)
 {
     struct ndb_seen seen[NWC_PORTS]={0};
-    unsigned n=snapshot(ipc,width,height,seen);
+    unsigned n=ordered(ipc,width,height,top,seen);
     while(n){
         const struct ndb_seen *v=&seen[--n];
         if(x>=v->rect.x&&y>=v->rect.y&&(int64_t)x-v->rect.x<v->rect.w&&(int64_t)y-v->rect.y<v->rect.h)
             return v->window_id;
     }
     return 0;
+}
+uint32_t ndb_hit(const struct nwc_service *ipc,int width,int height,int x,int y)
+{
+    return ndb_hit_top(ipc,width,height,0,x,y);
 }
 static bool focus_visible(const struct nwc_service *ipc,int width,int height,uint32_t id)
 {
@@ -155,8 +201,9 @@ bool ndb_route_pointer(struct nwc_service *ipc,struct ndb_input *input,int width
 {
     if(!input)return false;
     if(pressed){
-        input->focus=blocked?0:ndb_hit(ipc,width,height,x,y);
+        input->focus=blocked?0:ndb_hit_top(ipc,width,height,input->raised,x,y);
         input->capture=input->focus;
+        if(input->focus)input->raised=input->focus;
     }
     uint32_t id=input->capture;
     if(!id)return false;
@@ -198,12 +245,14 @@ bool ndb_cycle_focus(const struct nwc_service *ipc,struct ndb_input *input,int w
     if(!input||input->capture)return false;
     struct ndb_seen seen[NWC_PORTS]={0};
     unsigned count=snapshot(ipc,width,height,seen);
-    if(!count){input->focus=0;return false;}
+    if(!count){input->focus=0;input->raised=0;return false;}
     for(unsigned i=0;i<count;++i)if(seen[i].window_id==input->focus){
         if(count==1)return false;
         input->focus=seen[(i+count-1)%count].window_id;
+        input->raised=input->focus;
         return true;
     }
     input->focus=seen[count-1].window_id;
+    input->raised=input->focus;
     return true;
 }

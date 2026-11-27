@@ -1393,7 +1393,11 @@ static void draw(void)
         if (visible(order[i]) && desk_clip_visible(win[order[i]].box)) draw_window(order[i], top);
 
     /* Only authenticated kernel-owned tiles, never direct user pointers. */
+#ifdef STYLEOS_OWNED_SHELL_865
+    (void)ndb_paint_top(nwc_global(),width,work_area().h,native_input.raised,native_plot,native_fill,0);
+#else
     (void)ndb_paint_rects(nwc_global(),width,work_area().h,native_plot,native_fill,0);
+#endif
 
     struct desk_box panel = panel_box(), start = start_box();
     desk_fill(panel.x, panel.y, panel.w, panel.h, PANEL);
@@ -1698,8 +1702,12 @@ static void desktop_shell_step(void *opaque)
     if (desk_import_active()) imported = desk_import_poll(&filesystem);
 #endif
     struct desk_damage damage = {0};
+#ifdef STYLEOS_OWNED_SHELL_865
+    unsigned native_changes=ndb_track_top(nwc_global(),&native_view,width,work_area().h,native_input.raised,&damage);
+#else
     unsigned native_changes = ndb_track(nwc_global(), &native_view,
                                         width, work_area().h, &damage);
+#endif
     bool process_changed=false;
 #ifdef STYLEOS_OWNED_SHELL_865
     const bool process_shown=visible(TASKS);

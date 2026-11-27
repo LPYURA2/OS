@@ -32,7 +32,13 @@ unsigned ndb_paint(const struct nwc_service *ipc, int width, int height,
  * subsequent motion/release even after leaving its tile. No click-through
  * when the target queue is full or the captured window has disappeared.
  * Shell passes blocked for menus, panel, or an existing shell drag. */
-struct ndb_input { uint32_t focus,capture; };
+/* raised is compositor view state, never a process or channel identity. */
+struct ndb_input { uint32_t focus,capture,raised; };
+unsigned ndb_track_top(const struct nwc_service *,struct ndb_tracker *,int,int,
+                       uint32_t,struct desk_damage *);
+unsigned ndb_paint_top(const struct nwc_service *,int,int,uint32_t,
+                       ndb_pixel_plot,ndb_rect_plot,void *);
+uint32_t ndb_hit_top(const struct nwc_service *,int,int,uint32_t,int,int);
 uint32_t ndb_hit(const struct nwc_service *,int width,int height,int x,int y);
 bool ndb_route_pointer(struct nwc_service *,struct ndb_input *,int width,int height,
                         int x,int y,uint32_t buttons,uint32_t modifiers,
