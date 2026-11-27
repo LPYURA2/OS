@@ -588,8 +588,32 @@ def main():
                 if stats['rd_operations']<4+32*9:raise ValueError('native catalog actual disk reads')
             else:
                 events=[]
-                for m in re.finditer(r'\bCR3=([0-9a-fA-F]+)\b',data.decode('ascii')):
-                    if int(m[1],16)==root:raise ValueError('unsolicited interrupt under ordinary safe root')
+                if args.extended_desktop:
+                    from native_forced_stop_verify import records
+                    from irq_trace_accept_859 import HEADER
+                    admitted=records(lines,b'STYLEOS NATIVE SHELL-CONTROLLER',('pid','gen','root','epoch'))
+                    if len(admitted)!=1:raise ValueError('ordinary controller root receipt')
+                    child=admitted[0][1]['root']
+                    trace_text=data.decode('ascii');headers=list(HEADER.finditer(trace_text))
+                    syscalls=[]
+                    for j,m in enumerate(headers):
+                        block=trace_text[m.start():headers[j+1].start() if j+1<len(headers) else len(trace_text)]
+                        cr3=re.findall(r'\bCR3=([0-9a-fA-F]+)\b',block)
+                        if len(cr3)!=1:raise ValueError('ordinary trace root')
+                        if int(cr3[0],16)==child:
+                            vec,err,soft,cpl,cs,rip,pc,ss,sp=map(lambda x:int(x,16),m.groups()[1:])
+                            if cpl!=3 or cs!=0x5b or ss!=0x63 or err:raise ValueError('ordinary isolated controller trap')
+                            if vec==128:
+                                ax=re.findall(r'\bRAX=([0-9a-fA-F]+)\b',block)
+                                if len(ax)!=1 or not soft:raise ValueError('ordinary syscall evidence')
+                                syscalls.append(int(ax[0],16))
+                            elif vec!=0x50:raise ValueError('unexpected ordinary controller trap')
+                        elif int(cr3[0],16)==root and int(m[2],16)!=0x50:
+                            raise ValueError('unexpected safe root interrupt')
+                    if syscalls!=[0x105,0x106,2]:raise ValueError('ordinary controller raw syscall sequence')
+                else:
+                    for m in re.finditer(r'\bCR3=([0-9a-fA-F]+)\b',data.decode('ascii')):
+                        if int(m[1],16)==root:raise ValueError('unsolicited interrupt under ordinary safe root')
             marker=b'STYLEOS S865 SHELL-ONLY fixture-launch=deny'
             direct=[x for x in lines if x.startswith(b'STYLEOS OWNED BOOT ')]
             ready=[x for x in lines if x.startswith(b'STYLEOS S863 READY ')]

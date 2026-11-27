@@ -45,9 +45,12 @@ def exercise(d,proc,serial,folder,wait):
     # F10 is a shell refresh, not a kernel reboot. Track the actual note
     # session and text receipts through the refresh and subsequent input.
     before=procs
-    restart=key('f10',0x44); rf=d.screen('extended-restart')
-    if restart['restarts']!=before['restarts']+1 or any(restart[k]!=before[k] for k in ('text','text-hash','text-dirty','note-session')):raise ValueError('shell restart state')
-    lang=key('f6',0x40); restored=key('f6',0x40)
+    restart=key('f10',0x44)
+    wait(proc,serial,b'STYLEOS DESKTOP SHELL RESTART',1)
+    lang=key('f6',0x40)
+    if restart['restarts']!=before['restarts'] or lang['restarts']!=before['restarts']+1 or any(restart[k]!=before[k] or lang[k]!=before[k] for k in ('text','text-hash','text-dirty','note-session')):raise ValueError('deferred shell restart state')
+    rf=d.screen('extended-restart')
+    restored=key('f6',0x40)
     if lang['ru']==restart['ru'] or restored['ru']!=restart['ru']:raise ValueError('language switching')
     (folder/'extended-desktop.json').write_text(json.dumps({'cursor':mv,'menu':opened,'closed':closed,'processes':procs,'restart':restart,'language':lang,'restored':restored,'frames':{x:hashlib.sha256((folder/(x+'.ppm')).read_bytes()).hexdigest() for x in ('extended-cursor-start','extended-cursor-end','extended-menu','extended-menu-closed','extended-processes','extended-restart')}},indent=2)+'\n')
 
@@ -60,6 +63,19 @@ def verify(folder,lines,root):
         receipt=data[name]
         if receipt['root']!=root or receipt not in actual:raise ValueError('extended receipt '+name)
     if lines.count(b'STYLEOS DESKTOP SHELL RESTART')!=1:raise ValueError('shell refresh marker')
+    from native_forced_stop_verify import records
+    admitted=records(lines,b'STYLEOS NATIVE SHELL-CONTROLLER',('pid','gen','root','epoch'))
+    calls=records(lines,b'STYLEOS NATIVE SHELL-CALL',('pid','gen','root','op','reply'))
+    applied=records(lines,b'STYLEOS NATIVE SHELL-APPLY',('epoch',))
+    retired=records(lines,b'STYLEOS NATIVE SHELL-CONTROLLER-RETIRED',('pid','epoch','resident'))
+    if len(admitted)!=1 or len(calls)!=2 or len(applied)!=1 or len(retired)!=1:raise ValueError('ordinary controller lifecycle count')
+    i,a=admitted[0];pid,gen,child,epoch=a.values()
+    if not pid or not gen or child==root or not child or epoch!=1:raise ValueError('ordinary controller identity')
+    if [tuple(x.values()) for _,x in calls]!=[(pid,gen,child,0x105,0x100000044),(pid,gen,child,0x106,1)] or tuple(retired[0][1].values())!=(pid,1,0):
+        raise ValueError('ordinary controller syscall and cleanup')
+    if applied[0][1]['epoch']!=1 or not i<calls[0][0]<calls[1][0]<applied[0][0]<lines.index(b'STYLEOS DESKTOP SHELL RESTART'):
+        raise ValueError('ordinary controller actual decision ordering')
+    if lines.count(b'STYLEOS SHELL PROVIDER READY')!=1:raise ValueError('ordinary provider readiness')
     if not any(x==b'STYLEOS DESKTOP CURSOR DAMAGE PASS' for x in lines):raise ValueError('cursor proof missing')
     for name,expected in data['frames'].items():
         if hashlib.sha256((folder/(name+'.ppm')).read_bytes()).hexdigest()!=expected:raise ValueError('UI frame digest')

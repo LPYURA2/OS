@@ -831,6 +831,10 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         (folder/'native_catalog_digest.h').write_text('static const unsigned char native_catalog_digest[32] = {'+','.join(str(x) for x in digest)+'};\n')
         flags += ['-DSTYLEOS_NATIVE_PINNED_CATALOG=1','-I',str(folder)]
         sources += ['tests/guest/native_catalog_865.c']
+    if owned_shell_865 and native_catalog_sha256 is None:
+        from build_shell_controller_66 import build as build_shell_controller
+        build_shell_controller(folder)
+        flags += ['-I',str(folder)]
     if owned_shell_865:
         # Link the same authenticated executor and hardware entry as the
         # integrated test; omit the workload orchestration and all observers.

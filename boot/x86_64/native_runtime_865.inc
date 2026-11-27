@@ -260,10 +260,8 @@ enum ps_status s865_shell_controller_launch(const struct rt865_launch_request *r
  shell_controller.pid=pid;shell_controller.gen=e->scheduler_handle;
  shell_controller.root=e->page_root;shell_controller.epoch=++shell_epoch;
  *out=pid;
-#ifdef STYLEOS_NATIVE_PINNED_CATALOG
  arch_puts("STYLEOS NATIVE SHELL-CONTROLLER");field("pid",pid);field("gen",e->scheduler_handle);
  field("root",e->page_root);field("epoch",shell_epoch);arch_putc('\n');
-#endif
  return PS_OK;
 }
 static bool shell_controller_auth(uint32_t pid,uint64_t gen,uint64_t root){
@@ -299,9 +297,7 @@ bool s865_shell_submit_refresh(void){
  if(!shell_refresh_pending&&!shell_refresh_commit){
   shell_recovery.attempts=0;shell_recovery.delay=0;
   shell_refresh_pending=true;
-#ifdef STYLEOS_NATIVE_PINNED_CATALOG
   arch_puts("STYLEOS NATIVE SHELL-SUBMIT");field("key",0x44);arch_putc('\n');
-#endif
  }
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  if(!shell_controller.pid&&!shell_recovery.configured)s865_native_request_shell_gap();
@@ -319,9 +315,7 @@ uint64_t s865_shell_controller_decide(uint32_t pid,uint64_t gen,uint64_t root,ui
 }
 uint64_t s865_shell_take_refresh(void){
  uint64_t epoch=shell_refresh_commit;shell_refresh_commit=0;
-#ifdef STYLEOS_NATIVE_PINNED_CATALOG
  if(epoch){arch_puts("STYLEOS NATIVE SHELL-APPLY");field("epoch",epoch);arch_putc('\n');}
-#endif
  return epoch;
 }
 uint64_t s865_shell_take_redraw(void){
@@ -338,10 +332,8 @@ static void shell_recovery_tick(void){
  if(!shell_recovery.configured||shell_recovery.exhausted)return;
  if(shell_recovery.pid){
   if(!pr_find(pr_global(),shell_recovery.pid)){
-#ifdef STYLEOS_NATIVE_PINNED_CATALOG
    arch_puts("STYLEOS NATIVE SHELL-CONTROLLER-RETIRED");field("pid",shell_recovery.pid);
    field("epoch",shell_epoch);field("resident",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');
-#endif
    shell_recovery.pid=0;shell_recovery.gen=0;shell_recovery.slices=0;
    shell_recovery.delay=2u*shell_recovery.attempts;
   }else if(++shell_recovery.slices>=SHELL_SLICE_LIMIT){
@@ -366,10 +358,8 @@ static void shell_recovery_tick(void){
  enum ps_status status=s865_shell_controller_launch(&shell_recovery.request,&pid);
  if(status!=PS_OK){shell_recovery.delay=2u*shell_recovery.attempts;return;}
  shell_recovery.pid=pid;shell_recovery.gen=shell_controller.gen;shell_recovery.slices=0;
-#ifdef STYLEOS_NATIVE_PINNED_CATALOG
  arch_puts("STYLEOS NATIVE SHELL-RECOVERY");field("pid",pid);field("attempt",shell_recovery.attempts);
  field("dispatches",runtime860->dispatcher.dispatches);arch_putc('\n');
-#endif
 }
 void s865_native_pump(void){
  if(!native_ready)fail("native-runtime-not-ready");
@@ -394,9 +384,27 @@ void s865_native_request_shell_gap(void){
  if(pr_snapshot(pr_global(),0,0,true)==2)shell_gap_requested=true;
 }
 #endif
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+#include "shell_controller_66.h"
+static bool shell66_read(void *opaque,uint32_t sector,uint8_t out[512]){
+ if(opaque||!out||sector>=sizeof shell66_image/512u)return false;
+ for(unsigned i=0;i<512;++i)out[i]=shell66_image[sector*512u+i];
+ return true;
+}
+static bool shell66_register(void){
+ struct rt865_launch_request request={.source={.read=shell66_read,
+  .sectors=sizeof shell66_image/512u,.bytes=SHELL66_BYTES},.name="Shell controller"};
+ for(unsigned i=0;i<32;++i)request.source.sha256[i]=shell66_hash[i];
+ if(s865_shell_configure_recovery(&request)!=PS_OK)return false;
+ arch_puts("STYLEOS SHELL PROVIDER READY\n");return true;
+}
+#endif
 _Noreturn void s865_native_supervise(void (*shell_step)(void *),void *state){
  if(!native_ready||!shell_step||!state||!s865_executor_idle()||!native_audit(0))
   fail("native-supervisor-entry");
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+ if(!shell66_register())fail("shell-provider-register");
+#endif
  for(;;){
   shell_step(state);
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG

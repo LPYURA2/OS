@@ -210,10 +210,8 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    else reply=s865_shell_controller_request(ticket->pid,ticket->handle,ticket->child_root);
   }
   slot->context.gpr[0]=reply;
-#ifdef STYLEOS_NATIVE_PINNED_CATALOG
   arch_puts("STYLEOS NATIVE SHELL-CALL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
   fld848("root",ticket->child_root);fld848("op",op);fld848("reply",reply);arch_putc('\n');
-#endif
  }
  if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
