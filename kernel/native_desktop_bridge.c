@@ -183,3 +183,27 @@ bool ndb_route_key(struct nwc_service *ipc,struct ndb_input *input,int width,int
     /* A full queue or revoked port must not reroute this key to a legacy app. */
     return true;
 }
+
+enum nwc_status ndb_request_close(struct nwc_service *ipc,const struct ndb_input *input,
+                                  int width,int height,uint32_t expected_window)
+{
+    if(!ipc||!input||!expected_window)return NWC_INVALID;
+    if(input->focus!=expected_window||input->capture||
+       !focus_visible(ipc,width,height,expected_window))return NWC_DENIED;
+    return nwc_send_key(ipc,expected_window,0x3eu,DESK_ALT,true);
+}
+
+bool ndb_cycle_focus(const struct nwc_service *ipc,struct ndb_input *input,int width,int height)
+{
+    if(!input||input->capture)return false;
+    struct ndb_seen seen[NWC_PORTS]={0};
+    unsigned count=snapshot(ipc,width,height,seen);
+    if(!count){input->focus=0;return false;}
+    for(unsigned i=0;i<count;++i)if(seen[i].window_id==input->focus){
+        if(count==1)return false;
+        input->focus=seen[(i+count-1)%count].window_id;
+        return true;
+    }
+    input->focus=seen[count-1].window_id;
+    return true;
+}

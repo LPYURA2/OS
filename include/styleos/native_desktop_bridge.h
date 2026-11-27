@@ -39,4 +39,10 @@ bool ndb_route_pointer(struct nwc_service *,struct ndb_input *,int width,int hei
                         bool pressed,bool released,bool blocked);
 bool ndb_route_key(struct nwc_service *,struct ndb_input *,int width,int height,
                     uint32_t key,uint32_t modifiers,bool blocked);
+/* Trusted shell operations, restricted to current visible native ports.
+ * Closing is cooperative Alt+F4 delivery, never forced termination.
+ * No focus mutation while a pointer capture is in progress. */
+enum nwc_status ndb_request_close(struct nwc_service *,const struct ndb_input *,
+                                 int width,int height,uint32_t expected_window);
+bool ndb_cycle_focus(const struct nwc_service *,struct ndb_input *,int width,int height);
 #endif

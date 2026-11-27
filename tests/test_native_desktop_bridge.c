@@ -93,6 +93,32 @@ int main(void)
     for(unsigned n=0;n<NWC_EVENTS;++n)
         assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_OK&&ev.code==0x30);
     assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_EMPTY);
+    assert(ndb_request_close(&ipc,&input,800,540,w1+1)==NWC_DENIED);
+    assert(ndb_request_close(&ipc,&input,800,540,w1)==NWC_OK);
+    assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_OK&&ev.kind==NWC_KEY&&ev.code==0x3e&&ev.modifiers==DESK_ALT);
+    assert(pr_is_live(&processes,p1)&&ws_find(&windows,w1));
+    assert(!ndb_cycle_focus(&ipc,&input,800,540));
+    /* A second visible same-session port can receive focus, without
+     * changing either process, frame, window or capture identity. */
+    uint32_t p3=create(48,"Third.tea"),w3=0;
+    assert(usr_bind(&sessions,s1,p3,48)==USR_OK);
+    assert(ws_open_app(&windows,&processes,p3,"Third",
+           (struct ws_bounds){400,200,80,60},&w3)==WS_OK);
+    assert(nwc_claim(&ipc,p3,48,196608,w3)==NWC_OK);
+    assert(nwc_publish_tile(&ipc,p3,48,196608,w3,pattern,16,16)==NWC_OK);
+    assert(ndb_cycle_focus(&ipc,&input,800,540)&&input.focus==w3);
+    assert(ndb_request_close(&ipc,&input,800,540,w1)==NWC_DENIED);
+    assert(ndb_request_close(&ipc,&input,800,540,w3)==NWC_OK);
+    assert(nwc_receive(&ipc,p3,48,196608,w3,&ev)==NWC_OK&&ev.code==0x3e&&ev.modifiers==DESK_ALT);
+    for(unsigned n=0;n<NWC_EVENTS;++n)assert(ndb_request_close(&ipc,&input,800,540,w3)==NWC_OK);
+    assert(ndb_request_close(&ipc,&input,800,540,w3)==NWC_FULL);
+    assert(ndb_cycle_focus(&ipc,&input,800,540)&&input.focus==w1);
+    assert(ws_set_minimized(&windows,p3,w3,true)==WS_OK);
+    assert(!ndb_cycle_focus(&ipc,&input,800,540)&&input.focus==w1);
+    assert(ws_close_app(&windows,p3,w3)==WS_OK);
+    assert(nwc_reconcile(&ipc)==1);
+    assert(pr_transition(&processes,p3,48,PR_EXITED)==PR_OK);
+    assert(usr_reconcile(&sessions)==1);
     assert(!ndb_route_pointer(&ipc,&input,800,540,700,500,1,0,true,false,false));
     assert(!input.focus&&!input.capture);
     assert(!ndb_route_key(&ipc,&input,800,540,0x1e,0,false));
@@ -161,7 +187,10 @@ int main(void)
     assert(framebuffer[135u*800u+309u]==0x142030);
     assert(ndb_route_pointer(&ipc,&input,800,540,10,16,1,0,true,false,false));
     assert(input.focus==w2);
+    assert(ndb_request_close(&ipc,&input,800,540,w2)==NWC_DENIED);
+    assert(!ndb_cycle_focus(&ipc,&input,800,540));
     assert(usr_lock(&sessions)==USR_OK);
+    assert(ndb_request_close(&ipc,&input,800,540,w2)==NWC_DENIED);
     assert(ndb_route_pointer(&ipc,&input,800,540,10,16,0,0,false,true,false));
     assert(!input.focus&&!input.capture);
     assert(!ndb_hit(&ipc,800,540,10,16));
