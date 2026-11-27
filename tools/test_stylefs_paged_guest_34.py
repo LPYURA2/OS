@@ -60,7 +60,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -197,6 +197,41 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                 d.key("backspace")
                 wait_exact(b"SFS42 UP DIRECTORY")
                 wait_exact(b"SFS42 ROOT ROWS",2)
+                if tea69 is not None:
+                    # The new directory e follows a and d, and contains
+                    # exactly one individually pinned package.
+                    d.key("down");d.key("down");d.key("ret")
+                    wait_exact(b"SFS42 ENTER DIRECTORY",2)
+                    d.key("ret")
+                    def wait_prefix(marker):
+                        deadline=time.monotonic()+40
+                        while time.monotonic()<deadline and proc.poll() is None:
+                            rows=uart.read_bytes().splitlines()
+                            require(not any(b" FAIL " in x for x in rows),"TEA guest failure")
+                            matches=[x for x in rows if x.startswith(marker)]
+                            if matches:return matches[0]
+                            time.sleep(.05)
+                        raise RuntimeError("missing TEA receipt "+repr(marker))
+                    if tea69:
+                        file=wait_prefix(b"STYLEOS TEA69 STYLEFS id=")
+                        require(b" id=0x0000000000000006 " in file and b" revision=0x0000000000000001 " in file,"exact selected file")
+                        launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ")
+                        frame=wait_prefix(b"STYLEOS NATIVE FRAME ")
+                        pid=launch.split()[3]
+                        require(pid in frame.split(),"frame belongs to launched PID")
+                        # Subsequent input boundary lets the compositor draw.
+                        d.click(350,130)
+                        visible=d.screen("tea69-file-visible")
+                        visible.check(281,81,"976332");visible.check(439,199,"976332")
+                        d.key("q")
+                        retired=wait_prefix(b"STYLEOS TEA69 RETIRED ")
+                        require(pid in retired.split(),"exact process retirement")
+                    else:
+                        wait_exact(b"STYLEOS TEA69 STYLEFS REFUSED")
+                        # Another ordinary input must still be processed.
+                        d.key("backspace");wait_exact(b"SFS42 UP DIRECTORY",2)
+                        rows=uart.read_bytes().splitlines()
+                        require(not any(x.startswith((b"STYLEOS TEA69 LAUNCHED ",b"STYLEOS NATIVE FRAME ")) for x in rows),"invalid package executed")
             d.call("stop")
             o, final = snapshot("final")
             verify_ready(o)

@@ -280,6 +280,7 @@ bool s69_use_tea_file(const struct po64_row *row,const struct nts_pin *pin,
  if(s->active){
   if(po64_revoke(s,404,token)!=PO64_OK)fail("tea69-stylefs-revoke");
  }else (void)pv64_close(&s34_work.volume);
+ if(status!=NTSFS_OK)arch_puts("STYLEOS TEA69 STYLEFS REFUSED\n");
  return status==NTSFS_OK;
 }
 #ifdef STYLEOS_LIVE_VOLUME_44

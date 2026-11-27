@@ -16,6 +16,12 @@ static bool source43(void *ctx,uint64_t at,uint8_t *p,size_t n){
  (void)ctx;if(at>sizeof text43-1||n>sizeof text43-1-at)return false;
  memcpy(p,text43+at,n);return true;
 }
+static uint8_t tea69[16384];
+static size_t tea69_size;
+static bool source69(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ (void)ctx;if(at>tea69_size||n>tea69_size-at)return false;
+ memcpy(p,tea69+(size_t)at,n);return true;
+}
 static bool rd(void *c,uint64_t n,uint8_t *p){return n<N&&pread(*(int *)c,p,512,(off_t)(n*512))==512;}
 static bool wr(void *c,uint64_t n,const uint8_t *p){return n<N&&pwrite(*(int *)c,p,512,(off_t)(n*512))==512;}
 static bool fl(void *c){return fdatasync(*(int *)c)==0;}
@@ -23,11 +29,18 @@ static bool sink(void *c,uint64_t at,const uint8_t *p,size_t n){return fwrite(p,
 int main(int argc,char **argv){
  if(argc!=3&&argc!=4)return 1;
  bool ids=!strcmp(argv[1],"new50")||!strcmp(argv[1],"check50");
- bool live=!strcmp(argv[1],"new39")||!strcmp(argv[1],"new50");
+ bool tea=!strcmp(argv[1],"newtea69");
+ bool live=tea||!strcmp(argv[1],"new39")||!strcmp(argv[1],"new50");
  bool create=live||!strcmp(argv[1],"new");
  bool object=!strcmp(argv[1],"get37");
  bool verify=!strcmp(argv[1],"check46")||!strcmp(argv[1],"check50");
- if((create&&argc!=3)||(!create&&(argc!=4||(!verify&&!object&&strcmp(argv[1],"get")))))return 1;
+ if((create&&argc!=(tea?4:3))||(!create&&(argc!=4||(!verify&&!object&&strcmp(argv[1],"get")))))return 1;
+ if(tea){
+  FILE *f=fopen(argv[3],"rb");if(!f)return 1;
+  tea69_size=fread(tea69,1,sizeof tea69,f);
+  bool valid=!ferror(f)&&fgetc(f)==EOF&&tea69_size>=22;
+  if(fclose(f)||!valid)return 1;
+ }
  int fd=open(argv[2],create?O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW:O_RDONLY|O_NOFOLLOW,0600);
  if(fd<0)return 1;
  struct stat st;
@@ -50,6 +63,12 @@ int main(int argc,char **argv){
   if(ok)ok=pp64_edit(&b,&l,&w,nodes,32,runs,32,pair.sequence,&e,0,&pair)==PP64_OK;
   k=(struct sd64_key){.parent=3,.length=5,.name={'x','.','t','x','t'}};
   if(ok)ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,4,0,sizeof text43-1,source43,0,&pair)==PP64_OK;
+ }
+ if(ok&&tea){
+  struct dc64_edit e={.op=DC64_CREATE,.entry={{.parent=1,.length=1,.name={'e'}},5,SD64_DIRECTORY}};
+  ok=pp64_edit(&b,&l,&w,nodes,32,runs,32,pair.sequence,&e,0,&pair)==PP64_OK;
+  struct sd64_key k={.parent=5,.length=15,.name="Native-peer.tea"};
+  if(ok)ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,6,0,tea69_size,source69,0,&pair)==PP64_OK;
  }
  if(ok&&verify){
   bool recreated=ids&&!strcmp(argv[3],"recreated");

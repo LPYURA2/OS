@@ -34,6 +34,20 @@ def main():
         require(read_sector(raw,0)==tag and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"readonly disk changed")
         raw.unlink()
     volume.unlink()
+    package=folder/"x86_64/Native-peer.tea"
+    require(package.is_file(),"standalone peer package absent")
+    # Generated package is independently provisioned into StyleFS.
+    # The exact EFI path can vary; ordinary stage 69 already checks absence.
+    damaged=out/"damaged.tea"
+    payload=bytearray(package.read_bytes());payload[len(payload)//2]^=1
+    damaged.write_bytes(payload)
+    for name,source,valid in (("tea-valid",package,True),("tea-invalid",damaged,False)):
+        volume=out/(name+"-volume.raw");run(tool,"newtea69",volume,source)
+        raw=out/(name+".raw");fixture(raw,N,volume,TAG)
+        before=hashlib.sha256(volume.read_bytes()).digest()
+        results.append(boot(out/name,iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid))
+        require(read_sector(raw,0)==TAG and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"TEA volume changed")
+        raw.unlink();volume.unlink()
     (out/"results.json").write_text(json.dumps(results,indent=2)+"\n")
     print("STYLEFS 39 LIVE VOLUME PASS: mount, desktop ready, input-boundary read, foreign media refusal, zero writes")
 if __name__=="__main__":main()
