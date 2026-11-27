@@ -310,7 +310,7 @@ bool s865_shell_submit_command(unsigned key){
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  (void)key;return false;
 #else
- if(key!=0x3e&&key!=0x42&&!(key>=0x101&&key<=0x17e)&&key!=0x200&&key!=0x201)return false;
+ if(key!=0x3e&&key!=0x42&&!(key>=0x101&&key<=0x17e)&&key!=0x200&&key!=0x201&&!(key>=0x301&&key<=0x307))return false;
  return shell_submit_key(key);
 #endif
 }
@@ -338,6 +338,7 @@ static unsigned shell_allowed_action(unsigned key){
  if(key==0x17e)return 7;
  if(key==0x200)return 6;
  if(key==0x201)return 8;
+ if(key>=0x301&&key<=0x307)return key-0x301+9;
  return 0;
 }
 uint64_t s865_shell_controller_decide(uint32_t pid,uint64_t gen,uint64_t root,uint64_t epoch,uint64_t action){

@@ -17,7 +17,13 @@ def decimal(line,tag,keys):
 def verify_snapshot(lines,*,live):
     starts=[i for i,x in enumerate(lines) if x.startswith(HEADER+b' ')]
     ends=[i for i,x in enumerate(lines) if x==END]
-    if len(starts)!=1 or len(ends)!=1 or ends[0]<=starts[0]:raise ValueError('process view receipt count')
+    ordinary=not live and b'STYLEOS SHELL PROVIDER READY' in lines
+    if ordinary:
+        if not 1<=len(starts)<=2 or len(ends)!=len(starts):raise ValueError('ordinary snapshot count')
+        for start,end in zip(starts,ends):
+            if end!=start+1 or decimal(lines[start],HEADER,(b'valid',b'total',b'flags'))!=(1,0,3):
+                raise ValueError('ordinary process snapshot after controller cleanup')
+    elif len(starts)!=1 or len(ends)!=1 or ends[0]<=starts[0]:raise ValueError('process view receipt count')
     start,end=starts[0],ends[0]
     if decimal(lines[start],HEADER,(b'valid',b'total',b'flags'))!=(1,int(live),3):raise ValueError('process view validity/count/flags')
     values=[decimal(x,ROW,(b'pid',b'group',b'state',b'ticks',b'bytes')) for x in lines[start+1:end]]

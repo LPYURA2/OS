@@ -965,6 +965,13 @@ static void apply_window_action(unsigned action)
     }
 }
 #endif
+static void shell_reboot_request(void)
+{
+    if(desk_sessions_has_unsaved(desk_sessions_global())){
+        open_window(desk_sessions_notes_unsaved(desk_sessions_global())?NOTE_WINDOW:NOTES);
+        notice="Перед перезагрузкой сохраните текст";
+    }else{arch_puts("STYLEOS DESKTOP REBOOT\n");desk_reboot();}
+}
 static void click(int x, int y)
 {
 #ifdef STYLEOS_LIVE_VOLUME_46
@@ -1000,23 +1007,29 @@ static void click(int x, int y)
 #endif
         menu = !menu; return;
     }
-    if (contains(language_box(), x, y)) { menu = false; toggle_language(); return; }
+    if (contains(language_box(), x, y)) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(s865_shell_submit_command(0x306))return;
+#endif
+        menu = false; toggle_language(); return;
+    }
     if (menu) {
         struct desk_box m = menu_box();
-        menu = false;
         if (contains(m, x, y)) {
             int d = y - m.y;
+#ifdef STYLEOS_OWNED_SHELL_865
+            unsigned command=d>=13&&d<58?0x301:d>=58&&d<98?0x302:
+                d>=98&&d<140?0x303:d>=156&&d<201?0x304:0x307;
+            if(s865_shell_submit_command(command))return;
+#endif
+            menu = false;
             if (d >= 13 && d < 58) show_folder(DESK_ROOT);
             else if (d < 98 && d >= 58) open_window(ABOUT);
             else if (d < 140 && d >= 98) open_window(TASKS);
-            else if (d >= 156 && d < 201) {
-                if (desk_sessions_has_unsaved(desk_sessions_global())) {
-                    open_window(desk_sessions_notes_unsaved(desk_sessions_global()) ? NOTE_WINDOW : NOTES);
-                    notice = "Перед перезагрузкой сохраните текст";
-                } else { arch_puts("STYLEOS DESKTOP REBOOT\n"); desk_reboot(); }
-            }
+            else if (d >= 156 && d < 201) shell_reboot_request();
             return;
         }
+        menu = false;
     }
     if (contains(panel_box(), x, y)) {
         int n = 0;
@@ -1074,9 +1087,19 @@ static void click(int x, int y)
         }
         return;
     }
-    if (contains(shortcut_box(0), x, y)) show_folder(DESK_ROOT);
-    else if (contains(shortcut_box(1), x, y)) open_window(NOTES);
-    else if (contains(shortcut_box(2), x, y)) show_folder(DESK_PROJECTS);
+    if (contains(shortcut_box(0), x, y)) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(s865_shell_submit_command(0x301))return;
+#endif
+        show_folder(DESK_ROOT);
+    } else if (contains(shortcut_box(1), x, y)) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(s865_shell_submit_command(0x305))return;
+#endif
+        open_window(NOTES);
+    } else if (contains(shortcut_box(2), x, y)) {
+        show_folder(DESK_PROJECTS);
+    }
 }
 
 static void accent(struct desk_box b)
@@ -1575,6 +1598,16 @@ static void desktop_shell_step(void *opaque)
     if(shell_action==2){menu=!menu;shell_refreshed=true;}
     else if(shell_action==3){open_window(TASKS);shell_refreshed=true;}
     else if(shell_action>=4&&shell_action<=8){apply_window_action(shell_action);shell_refreshed=true;}
+    else if(shell_action>=9&&shell_action<=15){
+        menu=false;
+        if(shell_action==9)show_folder(DESK_ROOT);
+        else if(shell_action==10)open_window(ABOUT);
+        else if(shell_action==11)open_window(TASKS);
+        else if(shell_action==12)shell_reboot_request();
+        else if(shell_action==13)open_window(NOTES);
+        else if(shell_action==14)toggle_language();
+        shell_refreshed=true;
+    }
 #endif
     struct desk_event e;
 #if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))

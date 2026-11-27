@@ -19,13 +19,14 @@ def build(folder):
     emit(b'\x48\x89\xc3\x48\xc1\xeb\x20') # epoch
     eq(0x44,'a1');eq(0x3e,'a2');eq(0x42,'a3')
     eq(0x200,'a6');eq(0x201,'a8')
+    for key in range(0x301,0x308):eq(key,'a'+str(key-0x301+9))
     cmp(0x101);jump(b'\x0f\x82','fail')
     cmp(0x12a);jump(b'\x0f\x82','a4')
     cmp(0x154);jump(b'\x0f\x82','a5')
     cmp(0x17e);jump(b'\x0f\x82','a6')
     jump(b'\x0f\x84','a7')
     jump(b'\xe9','fail')
-    for action in range(1,9):
+    for action in range(1,16):
         mark('a'+str(action))
         emit(b'\xb9'+struct.pack('<I',action))
         jump(b'\xe9','decide')
