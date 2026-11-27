@@ -608,18 +608,20 @@ def main():
                     from irq_trace_accept_859 import HEADER
                     admitted=records(lines,b'STYLEOS NATIVE SHELL-CONTROLLER',('pid','gen','root','epoch'))
                     apps=records(lines,b'STYLEOS TEA69 LAUNCHED',('pid','gen','root','window'))
-                    if len(admitted)!=16 or len(apps)!=2:raise ValueError('ordinary controller/app receipts')
+                    if len(admitted)!=17 or len(apps)!=2:raise ValueError('ordinary controller/app receipts')
                     children={a['root'] for _,a in apps}
-                    if len(children)!=2 or {a['root'] for _,a in admitted}!=children:
+                    controller_roots={a['root'] for _,a in admitted}
+                    refresh_root=admitted[-1][1]['root']
+                    if len(children)!=2 or refresh_root in children or refresh_root==root or controller_roots!=children|{refresh_root}:
                         raise ValueError('ordinary isolated root count')
                     trace_text=data.decode('ascii');headers=list(HEADER.finditer(trace_text))
-                    syscalls={child:[] for child in children}
+                    syscalls={child:[] for child in controller_roots}
                     for j,m in enumerate(headers):
                         block=trace_text[m.start():headers[j+1].start() if j+1<len(headers) else len(trace_text)]
                         cr3=re.findall(r'\bCR3=([0-9a-fA-F]+)\b',block)
                         if len(cr3)!=1:raise ValueError('ordinary trace root')
                         child=int(cr3[0],16)
-                        if child in children:
+                        if child in controller_roots:
                             vec,err,soft,cpl,cs,rip,pc,ss,sp=map(lambda x:int(x,16),m.groups()[1:])
                             if cpl!=3 or cs!=0x5b or ss!=0x63 or err:raise ValueError('ordinary isolated trap')
                             if vec==128:
@@ -629,6 +631,7 @@ def main():
                             elif vec!=0x50:raise ValueError('unexpected ordinary child trap')
                         elif child==root and int(m[2],16)!=0x50:
                             raise ValueError('unexpected safe root interrupt')
+                    if syscalls[refresh_root]!=[0x105,0x106,2]:raise ValueError('live refresh raw controller syscall sequence')
                     for _,a in apps:
                         child=a['root']
                         n=sum(c['root']==child for _,c in admitted)
