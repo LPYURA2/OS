@@ -56,7 +56,7 @@ def wait_shell_boundary(proc,serial):
         return all(ticks(lines,pid,marks[0])>=4 for pid in (1,2))
     wait_progress(proc,serial,ready)
 
-def verify_shell_boundary(lines,roots):
+def verify_shell_boundary(lines,roots,loop=0x1000000d):
     # Verify ordered actual guest receipts. The enclosing forced-stop
     # verifier also binds every EVENT to a CPL3 raw QEMU trap and R12.
     marks=[i for i,x in enumerate(lines) if x==b'STYLEOS DESKTOP SHELL RESTART']
@@ -72,7 +72,7 @@ def verify_shell_boundary(lines,roots):
         before=[e for i,e in events if retired[29][0]<i<at]
         after=[e for i,e in events if at<i<first_stop]
         if len(before)<4 or len(after)<4:raise ValueError('insufficient execution across shell refresh')
-        if any(e['root']!=roots[pid-1] or e['rip']!=0x1000000d or e['state']!=1 for e in before+after):
+        if any(e['root']!=roots[pid-1] or e['rip']!=loop or e['state']!=1 for e in before+after):
             raise ValueError('native identity/state changed across refresh')
     fields=('root','n','batch','mouse','key','dx','dy','buttons','modifiers','x','y','active','ru','restarts','text','text-hash','text-dirty','note-session','writes')
     inputs=records(lines,b'STYLEOS S863 EVENT',fields)
@@ -85,7 +85,7 @@ def verify_shell_boundary(lines,roots):
     # Windows/ports ownership is separately verified by enclosing lifecycle
     # checks at bind, revoke, rebind and final cleanup. No pixel IPC claim.
 
-def verify_forced_stop(lines,trace,obs,*,shell_boundary=False):
+def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False):
     safe=obs['active']['root']
     def rec(tag,keys):return records(lines,tag,keys)
     admissions=rec(ADMIT,AKEY)
@@ -142,7 +142,11 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False):
         if (r['id'],r['root'])!=(a['slot'],a['root']) or not per[pid]:raise ValueError('retirement owner')
         seq=[e for _,e in per[pid]]
         if pid in (1,2,33):
-            if (seq[0]['vector'],seq[0]['rip'],seq[0]['rax'],seq[0]['state'])!=(128,0x1000000d,1,1) or len(seq)<5 or any((e['vector'],e['rip'],e['rax'],e['state'])!=(0x50,0x1000000d,0,1) for e in seq[1:]):raise ValueError('real loop preemption')
+            prefix=[(128,0x1000000d,1,1)]
+            if window_ipc:prefix.append((128,0x1000001e,0x100,1))
+            loop=0x10000024 if window_ipc else 0x1000000d
+            actual=[(e['vector'],e['rip'],e['rax'],e['state']) for e in seq]
+            if actual[:len(prefix)]!=prefix or len(seq)<len(prefix)+4 or any(x!=(0x50,loop,0,1) for x in actual[len(prefix):]):raise ValueError('real loop preemption')
             if not end<stop_by_pid[pid]:raise ValueError('release before successful stop')
         else:
             actual=[(e['vector'],e['rip'],e['rax'],e['state']) for e in seq]
@@ -187,6 +191,8 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False):
         actual=e['rip']-2*(e['vector']==128)
         if (vec,err,soft,cpl,cs,rip,pc,ss,sp,cr3)!=(e['vector'],e['error'],int(e['vector']==128),3,0x5b,actual,actual,0x63,e['sp'],e['root']):raise ValueError('raw CPU mismatch')
         if one(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')!=e['flags'] or one(r'\bRAX=([0-9a-fA-F]+)\b')!=e['rax'] or one(r'\bR12=([0-9a-fA-F]+)\b')!=e['slot']+1:raise ValueError('raw CPU registers')
+        if window_ipc and e['vector']==128 and e['rax']==0x100:
+            if one(r'\bRBX=([0-9a-fA-F]+)\b')!=0 or one(r'\bRCX=([0-9a-fA-F]+)\b')!=0xb10000+e['slot']+1:raise ValueError('raw pixel arguments')
         result.append((int(m[1]),e))
     if not started or idx!=len(events) or di!=len(drains):raise ValueError('raw CPU count')
     fields=('root','n','batch','mouse','key','dx','dy','buttons','modifiers','x','y','active','ru','restarts','text','text-hash','text-dirty','note-session','writes')
@@ -194,5 +200,12 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False):
     if sum(e['key']==0x43 for _,e in inputs)!=3 or len(inputs)<2:raise ValueError('three trusted request inputs')
     (i,prev),(j,lang)=inputs[-2:]
     if not done[0][0]<i<j or (prev['key'],lang['key'])!=(0x58,0x40) or lang['root']!=safe or lang['ru']==prev['ru'] or not lang['writes']:raise ValueError('responsive shell after forced stop')
-    if shell_boundary:verify_shell_boundary(lines,roots)
+    if window_ipc:
+        pixels=rec(b'STYLEOS NATIVE PIXEL',('pid','gen','root','window','rgb','status'))
+        if len(pixels)!=3 or [tuple(x.values()) for _,x in pixels]!=[(1,1,roots[0],0,0xb10001,0),(2,2,roots[1],0,0xb10002,0),(33,33,roots[0],0,0xb10001,0)]:
+            raise ValueError('authenticated pixel receipts')
+        calls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x100]
+        if len(calls)!=3 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(pixels,calls)):
+            raise ValueError('pixel receipt not adjacent to authenticated trap')
+    if shell_boundary:verify_shell_boundary(lines,roots,0x10000024 if window_ipc else 0x1000000d)
     return result

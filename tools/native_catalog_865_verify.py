@@ -14,7 +14,8 @@ FAULT_PROBES={
     'forbidden-int':(b'\xcd\x81',13,0x1000000d,0x40a,0),
 }
 
-def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None):
+def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False):
+    if window_ipc and (not forced_stop or packages is None):raise ValueError('window IPC requires separate package fixture')
     if packages is not None:
         if not forced_stop:raise ValueError('package fixture requires forced-stop profile')
         packages.mkdir(parents=True,exist_ok=False)
@@ -37,7 +38,11 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
             code+=b'\xb8\x01\x00\x00\x00\xcd\x80'
             if (hang_load and i==0) or (forced_stop and i<2):
                 # Valid user context, no syscall/fault/exit after yield.
-                code+=b'\xeb\xfe'
+                if window_ipc and i<2:
+                    # Real CPL3 register-only call. Failed return faults;
+                    # success loops with RAX=0 at code offset 0x24.
+                    code+=b'\xbb\x00\x00\x00\x00\xb9'+struct.pack('<I',0xb10000+i+1)+b'\xb8\x00\x01\x00\x00\xcd\x80\x85\xc0\x75\x04\x31\xc0\xeb\xfe\x0f\x0b'
+                else:code+=b'\xeb\xfe'
             elif fault_probe and i==0:
                 code+=FAULT_PROBES[fault_probe][0]+b'\x0f\x0b'
             elif bad_rsp and i<3:

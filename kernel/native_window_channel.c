@@ -165,6 +165,25 @@ enum nwc_status nwc_publish_tile(struct nwc_service *s,uint32_t pid,
     p->tile=tile;p->has_tile=true;
     return NWC_OK;
 }
+enum nwc_status nwc_publish_pixel(struct nwc_service *s,uint32_t pid,uint64_t handle,
+                                  uint64_t root,uint64_t window,uint64_t rgb)
+{
+    if(!pid || !handle || !root || (root&4095u) ||
+       window>UINT32_MAX || rgb>UINT32_C(0x00ffffff))return NWC_INVALID;
+    if(!consistent(s))return NWC_NOT_READY;
+    uint32_t win=(uint32_t)window;
+    if(!win){
+        for(unsigned i=0;i<NWC_PORTS;++i){
+            const struct nwc_port *p=&s->ports[i];
+            if(!p->window_id || !authentic(p,pid,handle,root) || !valid_port(s,p))continue;
+            if(win)return NWC_DENIED;
+            win=p->window_id;
+        }
+        if(!win)return NWC_DENIED;
+    }
+    uint32_t pixel=(uint32_t)rgb;
+    return nwc_publish_tile(s,pid,handle,root,win,&pixel,1,1);
+}
 enum nwc_status nwc_visible_tile(const struct nwc_service *s,uint32_t win,
                                  struct nwc_tile *out)
 {

@@ -215,7 +215,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--native-shell-boundary',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');p.add_argument('--process-stop',action='store_true');p.add_argument('--block-service',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--native-shell-boundary',action='store_true');p.add_argument('--native-window-ipc',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');p.add_argument('--process-stop',action='store_true');p.add_argument('--block-service',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
@@ -229,6 +229,7 @@ def main():
     if args.native_fault_probe and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp):p.error('fault probe requires separate catalog')
     if args.native_hang and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe):p.error('hang requires separate catalog')
     if args.native_forced_stop and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe or args.native_hang):p.error('forced stop requires separate native catalog')
+    if args.native_window_ipc and not args.native_shell_boundary:p.error('window IPC requires shell boundary')
     if args.native_shell_boundary and not args.native_forced_stop:p.error('shell boundary requires forced-stop profile')
     if args.extended_desktop and (not args.owned_shell or args.native_catalog):p.error('extended desktop requires ordinary no-catalog ISO')
     if args.process_view and not (args.owned_shell and args.native_hang):p.error('process view requires native hang profile')
@@ -243,7 +244,7 @@ def main():
     catalog_digest=None
     if args.native_catalog:
         from native_catalog_865_verify import provision_catalog
-        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,forced_stop=args.native_forced_stop,packages=out/'packages' if args.native_shell_boundary else None)
+        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,forced_stop=args.native_forced_stop,packages=out/'packages' if args.native_shell_boundary else None,window_ipc=args.native_window_ipc)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and img and code and vars):raise RuntimeError('real QEMU mandatory')
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
@@ -564,7 +565,7 @@ def main():
                 from native_catalog_865_verify import verify_catalog
                 if args.native_forced_stop:
                     from native_forced_stop_verify import verify_forced_stop
-                    events=verify_forced_stop(lines,data.decode('ascii'),obs,shell_boundary=args.native_shell_boundary)
+                    events=verify_forced_stop(lines,data.decode('ascii'),obs,shell_boundary=args.native_shell_boundary,window_ipc=args.native_window_ipc)
                 else:
                     events=verify_catalog(lines,data.decode('ascii'),obs,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,ui_stop=args.process_stop)
                 if stats['rd_operations']<4+32*9:raise ValueError('native catalog actual disk reads')
@@ -611,8 +612,9 @@ def main():
                 live=Frame(folder/'native-before-shell-refresh.ppm')
                 refreshed=Frame(folder/'native-live-shell-refresh.ppm')
                 stopped=Frame(folder/'after-denied-fixture.ppm')
-                live.check(0,0,'a00002')
-                refreshed.check(0,0,'a00002')
+                expected_tile='b10002' if args.native_window_ipc else 'a00002'
+                live.check(0,0,expected_tile)
+                refreshed.check(0,0,expected_tile)
                 before.expect_changes_in(live,[(0,0,1,1)])
                 refreshed.expect_changes_in(stopped,[(0,0,1,1)])
                 if before.pixels[:3]!=stopped.pixels[:3] or before.pixels[:3]==live.pixels[:3]:

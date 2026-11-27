@@ -71,6 +71,13 @@ enum nwc_status nwc_publish_tile(struct nwc_service *,uint32_t pid,uint64_t hand
                                  const uint32_t *kernel_pixels,
                                  unsigned width,unsigned height);
 /* Compositor-only snapshot. Hidden, locked and foreign windows are denied. */
+/* x86 register-only probe ABI: RAX=operation, RBX=window (0 selects
+ * the caller's unique valid port), RCX=24-bit RGB; RAX returns nwc_status.
+ * Only the architecture's authenticated trap dispatcher supplies identity.
+ * No raw pointers, no implicit window creation, no cross-owner authority. */
+#define NWC_CALL_PIXEL UINT64_C(0x100)
+enum nwc_status nwc_publish_pixel(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+                                  uint64_t window,uint64_t rgb);
 enum nwc_status nwc_visible_tile(const struct nwc_service *,uint32_t window_id,
                                  struct nwc_tile *kernel_output);
 /* Discard stale ports after the process/window service reconciles exit/fault;

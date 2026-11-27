@@ -188,6 +188,27 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   .frame_va=frame860,.vector=pending860.vector,.isr=pending860.vector==V,
   .eoi=pending860.vector==V,.safe_flags=flags848(),.frame=pending860};
  if(rt863_bank_event(&bank862,runtime860,ticket,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
+#ifdef STYLEOS_OWNED_SHELL_865
+ /* Only after actual CPL3 trap, safe-root return, scheduler commit and
+  * full mapping audit. Never accept caller-supplied PID/root/generation. */
+ if(kind==RT865_SYSCALL && pending860.gpr[0]==NWC_CALL_PIXEL){
+  const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
+  struct rt862_bank_slot *slot=&bank862.slots[id];
+  if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
+     caller->page_root!=ticket->child_root||slot->pid!=ticket->pid||
+     slot->handle!=ticket->handle||slot->root!=ticket->child_root||
+     runtime860->dispatcher.current!=-1||root848()!=safe||(flags848()&0x200))
+   fail848("865-pixel-owner");
+  enum nwc_status pixel=nwc_publish_pixel((struct nwc_service *)nwc_global(),
+    ticket->pid,ticket->handle,ticket->child_root,pending860.gpr[1],pending860.gpr[2]);
+  slot->context.gpr[0]=(uint64_t)pixel;
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+  arch_puts("STYLEOS NATIVE PIXEL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+  fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
+  fld848("rgb",pending860.gpr[2]);fld848("status",pixel);arch_putc('\n');
+#endif
+ }
+#endif
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  arch_puts("STYLEOS NATIVE EVENT");fld848("slot",id);fld848("pid",ticket->pid);fld848("root",ticket->child_root);
  fld848("vector",pending860.vector);fld848("error",pending860.error);fld848("rip",pending860.rip);
