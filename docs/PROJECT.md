@@ -505,3 +505,8 @@ Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary bo
 ## StyleFS 28 — packed inode metadata candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_28.md). No ordinary boot or main changes.
+
+
+## StyleFS 29 — paired paged root candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_29.md). No ordinary boot or main changes.
