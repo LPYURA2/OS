@@ -550,3 +550,8 @@ A separate terminal diagnostic observes trusted QEMU/OVMF RSDP/XSDT/MADT without
 Решение владельца 24.11.2026: после завершения реализации фундамента — отдельная комплексная приёмка всего ядра по [KERNEL_FINAL_ACCEPTANCE.md](architecture/KERNEL_FINAL_ACCEPTANCE.md). До её PASS фундамент окончательно не принят; файловую систему не начинать.
 
 После успешной комплексной приёмки ядра и до файловой системы — отдельное обсуждение владельцем [технического уровня, оптимизации, производительности и системных требований](architecture/POST_ACCEPTANCE_PERFORMANCE_REVIEW.md). Числа не утверждены; решение об объёме дальнейшей оптимизации принимает владелец.
+
+
+## StyleFS 47 — scoped selected-file save
+
+Stage 46 exact CI 45975481777: 9/9 SUCCESS. Stage 47 candidate adds explicit save permission to the existing process/file broker, bounded kernel-buffer copy-on-write replacement (32 KiB), stale token rejection, and cold reopen checks. No new CPL3 syscall, raw user pointers or ordinary mount. See [continuation](NEXT_CHAT_STYLEFS_47.md).
