@@ -27,7 +27,7 @@ def wait_progress(proc,serial,predicate):
     end=time.monotonic()+60
     while time.monotonic()<end:
         raw=serial.read_bytes() if serial.exists() else b''
-        if b' FAIL ' in raw or proc.poll() is not None:raise RuntimeError('forced stop guest failed')
+        if b' FAIL ' in raw or b'STYLEOS DESKTOP RUNTIME BOUNDARY ERROR' in raw or proc.poll() is not None:raise RuntimeError('forced stop guest failed; inspect UART')
         if predicate(complete_uart_lines(raw)):return
         time.sleep(.03)
     raise RuntimeError('forced stop progress timeout')

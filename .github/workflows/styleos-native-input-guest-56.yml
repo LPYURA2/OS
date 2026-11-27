@@ -22,6 +22,14 @@ jobs:
           done
       - name: Window capability refusal and lifecycle tests
         run: python3 tools/test_native_window_channel.py --output build/window-channel-56
+      - name: Runtime boundary recognizes valid pointer events and rejects malformed records
+        run: |
+          set -euo pipefail
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -ffunction-sections -fdata-sections -Wl,--gc-sections -Iinclude tests/test_runtime_bootstrap_863.c kernel/{runtime_entry_858,desktop_process_runtime,process_scheduler,process_runtime,window_service,user_session_runtime,native_window_channel}.c -o "build/forced-stop/boundary-$cc"
+            "build/forced-stop/boundary-$cc" owned
+            "build/forced-stop/boundary-$cc" ordinary
+          done
       - name: Focus routing, clipped hit testing and capture
         run: python3 tools/test_native_desktop_bridge.py --output build/native-focus-56
       - uses: actions/upload-artifact@v4

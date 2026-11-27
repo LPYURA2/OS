@@ -120,7 +120,11 @@ bool rt864_services_boundary(uint64_t live_root){
   for(unsigned j=0;j<i;j++)if(n->ports[j].window_id==q->window_id)return false;
   for(unsigned j=0;j<q->length;j++){
    const struct nwc_event *e=&q->events[(q->head+j)%NWC_EVENTS];
-   if(e->window_id!=q->window_id||e->sequence!=q->next_sequence-q->length+j||(e->kind!=NWC_KEY&&e->kind!=NWC_TEXT)||e->size>NWC_TEXT_BYTES)return false;
+   if(e->window_id!=q->window_id||e->sequence!=q->next_sequence-q->length+j||e->size>NWC_TEXT_BYTES)return false;
+   if(e->kind==NWC_POINTER){
+    if(e->size!=8||(e->code&~7u)||(e->modifiers&~15u)||e->down!=((e->code&1u)!=0))return false;
+    for(unsigned k=8;k<NWC_TEXT_BYTES;++k)if(e->bytes[k])return false;
+   }else if(e->kind!=NWC_KEY&&e->kind!=NWC_TEXT)return false;
   }
   if(q->has_tile&&(!q->tile.generation||q->tile.window_id!=q->window_id||!q->tile.width||!q->tile.height||q->tile.width>NWC_TILE_WIDTH||q->tile.height>NWC_TILE_HEIGHT))return false;
  }

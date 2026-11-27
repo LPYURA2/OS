@@ -79,6 +79,15 @@ int main(int argc,char **argv){
    OK(dpr_admit(runtime,0,999,0x90000,0,"ipc",&pid)==PS_OK&&usr_bind(users,sid,pid,999)==USR_OK);
    OK(ws_open_app(w,p,pid,"ipc",(struct ws_bounds){0,0,400,300},&win)==WS_OK&&nwc_claim(channel,pid,999,0x90000,win)==NWC_OK);
    OK(nwc_send_key(channel,win,65,0,true)==NWC_OK&&rt864_shell_boundary(e.root,&v));
+   OK(nwc_send_pointer(channel,win,-1,7,1,0)==NWC_OK&&rt864_shell_boundary(e.root,&v));
+   struct nwc_event pointer=channel->ports[0].events[1];
+   channel->ports[0].events[1].size=7;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;
+   channel->ports[0].events[1].code=8;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;
+   channel->ports[0].events[1].modifiers=16;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;
+   channel->ports[0].events[1].down=false;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;
+   channel->ports[0].events[1].bytes[8]=1;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;
+   channel->ports[0].events[1].kind=99;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;
+   OK(rt864_shell_boundary(e.root,&v));
    struct nwc_port saved=channel->ports[0];channel->ports[0].user_root^=4096;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
    channel->ports[0].head=NWC_EVENTS;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
    channel->ports[0].events[0].sequence=8;NO(rt864_shell_boundary(e.root,&v));channel->ports[0]=saved;
