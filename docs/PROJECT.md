@@ -1,3 +1,6 @@
+## StyleFS 44 — concrete page-table and lease audit candidate
+42 CI 8/8, 43 host SUCCESS. Reuse existing root audit and lease checks with file read adapter. [Handoff](NEXT_CHAT_STYLEFS_44.md). CI pending, no actual CPL3 proof. Main unchanged.
+
 ## StyleFS 43 — bounded file-read syscall staging candidate
 Reuse safe-root frame/ticket validation and bounded user-page range check. [Handoff](NEXT_CHAT_STYLEFS_43.md). CI pending; no hardware syscall claim. Main unchanged.
 
