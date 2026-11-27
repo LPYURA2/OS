@@ -175,7 +175,12 @@ jobs:
         if: always()
         with:
           name: styleos-tea-stylefs-live
-          path: build/tea-stylefs-live/
+          # Never archive the 4 TiB sparse guest fixture on a failed run.
+          # Preserve ISO, bounded provision data, UART, QMP and JSON evidence.
+          path: |
+            build/tea-stylefs-live/
+            !build/tea-stylefs-live/*.raw
+            !build/tea-stylefs-live/**/*.raw
           if-no-files-found: warn
 
   fault-acceptance:

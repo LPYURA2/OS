@@ -223,7 +223,10 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                     def wait_prefix(marker,count=1):
                         deadline=time.monotonic()+40
                         while time.monotonic()<deadline and proc.poll() is None:
-                            rows=uart.read_bytes().splitlines()
+                            # The serial file can end halfway through a receipt.
+                            # Only use complete lines; keep the original raw UART.
+                            from uart_receipts import complete_lines as complete_tea_lines
+                            rows=complete_tea_lines(uart.read_bytes())
                             require(not any(b" FAIL " in x for x in rows),"TEA guest failure")
                             matches=[x for x in rows if x.startswith(marker)]
                             if len(matches)>=count:return matches[count-1]
