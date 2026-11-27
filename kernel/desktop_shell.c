@@ -1779,8 +1779,13 @@ static void desktop_shell_step(void *opaque)
     struct desk_damage damage = {0};
 #ifdef STYLEOS_OWNED_SHELL_865
     unsigned native_changes=ndb_track_top(nwc_global(),&native_view,width,work_area().h,native_input.raised,&damage);
+    /* The historical pinned catalog proves isolated tile/frame damage with
+     * no taskbar controls; the ordinary native .tea path exposes the panel.
+     * Keep the original strict diagnostic pixel contract intact. */
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
     if(ndb_task_panel_update(nwc_global(),&native_panel,width,height,legacy_task_count(),
                              native_input.focus,&damage))++native_changes;
+#endif
 #else
     unsigned native_changes = ndb_track(nwc_global(), &native_view,
                                         width, work_area().h, &damage);
