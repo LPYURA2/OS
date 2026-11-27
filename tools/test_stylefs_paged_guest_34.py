@@ -240,6 +240,15 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         d.key("q")
                         retired=wait_prefix(b"STYLEOS TEA69 RETIRED ")
                         require(pid in retired.split(),"exact process retirement")
+                        from native_forced_stop_verify import records
+                        resources=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 RESOURCES",
+                            ("phase","pid","resident","pages","owners","windows","ports"))
+                        pid_num=int(pid.split(b"=")[1],16)
+                        require([tuple(v.values()) for _,v in resources]==[
+                            (1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)],"StyleFS TEA resource release")
+                        (folder/"native-resource-accounting.json").write_text(json.dumps({
+                            "scope":"native leased user pages only","page_bytes":4096,
+                            "snapshots":[v for _,v in resources]},indent=2)+"\n")
                     else:
                         wait_exact(b"STYLEOS TEA69 STYLEFS REFUSED")
                         # Another ordinary input must still be processed.

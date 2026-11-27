@@ -216,6 +216,13 @@ def verify(folder,lines,root):
         raise ValueError('live TEA refresh identity/order')
     if len(roots)!=2 or not frame[0][0]<launch[1][0]<frame[1][0]<end[0][0]<end[1][0]:
         raise ValueError('TEA coexistence')
+    resources=records(lines,b'STYLEOS TEA70 RESOURCES',('phase','pid','resident','pages','owners','windows','ports'))
+    expected=[(1,16,1,3,1,1,1),(1,18,2,6,2,2,2),(2,16,1,3,1,1,1),(2,18,0,0,0,0,0)]
+    if [tuple(v.values()) for _,v in resources]!=expected:
+        raise ValueError('native resource accounting and release')
+    (folder/'native-resource-accounting.json').write_text(json.dumps({
+        'scope':'native leased user pages only; excludes kernel, tables, surfaces and caches',
+        'page_bytes':4096,'snapshots':[v for _,v in resources]},indent=2)+'\n')
     if lines.count(b'STYLEOS SHELL PROVIDER READY')!=1:raise ValueError('ordinary provider readiness')
     if not any(x==b'STYLEOS DESKTOP CURSOR DAMAGE PASS' for x in lines):raise ValueError('cursor proof missing')
     for name,expected in data['frames'].items():

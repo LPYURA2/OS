@@ -1,7 +1,7 @@
-name: StyleOS native TEA launch 69
+name: StyleOS native application acceptance 70
 on:
   push:
-    branches: [feature/styleos-native-tea-launch-69]
+    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70]
   workflow_dispatch:
 permissions:
   contents: read

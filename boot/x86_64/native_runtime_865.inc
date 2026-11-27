@@ -515,12 +515,28 @@ static bool sample69_session_ready(void){
  }
  return u->selected_session==sample69_session;
 }
+/* Count actual native leases, not VM RAM or estimated process sizes.
+ * Kernel image, reserved tables, graphics and caches are outside this metric. */
+static void sample70_resources(unsigned phase,uint32_t pid){
+ unsigned used=0,owners=0;
+ const struct usr_runtime *u=usr_global();
+ const struct nwc_service *ports=nwc_global();
+ const struct ws_service *windows=ws_global();
+ if(!u||!ports||!windows||!native_audit(0)||!s844_count(native_arena,&used))fail("sample70-resource-audit");
+ size_t resident=pr_snapshot(pr_global(),0,0,true);
+ for(unsigned i=0;i<PR_MAX_PROCESSES;++i)if(u->owners[i].pid)++owners;
+ if(used!=3u*resident)fail("sample70-page-account");
+ arch_puts("STYLEOS TEA70 RESOURCES");field("phase",phase);field("pid",pid);
+ field("resident",resident);field("pages",used);field("owners",owners);
+ field("windows",ws_snapshot(windows,0,0));field("ports",nwc_port_count(ports));arch_putc('\n');
+}
 static bool sample69_publish(unsigned index,struct s865_window_launch out){
  const struct pr_entry *e=pr_find(pr_global(),out.pid);
  if(!e||!e->scheduler_handle||!e->page_root)fail("sample69-owner");
  sample69_live[index]=out;
  arch_puts("STYLEOS TEA69 LAUNCHED");field("pid",out.pid);field("gen",e->scheduler_handle);
- field("root",e->page_root);field("window",out.window);arch_putc('\n');return true;
+ field("root",e->page_root);field("window",out.window);arch_putc('\n');
+ sample70_resources(1,out.pid);return true;
 }
 bool s865_launch_native_sample(void){
  if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
@@ -583,6 +599,7 @@ static void sample69_reconcile(void){
    if(n->ports[j].window_id==a->window||n->ports[j].owner_pid==a->pid)
     fail("sample69-port-retire");
   arch_puts("STYLEOS TEA69 RETIRED");field("pid",a->pid);field("window",a->window);arch_putc('\n');
+  sample70_resources(2,a->pid);
   *a=(struct s865_window_launch){0};
  }
 }
