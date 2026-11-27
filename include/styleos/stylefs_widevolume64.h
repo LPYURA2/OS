@@ -60,4 +60,10 @@ enum wv64_status wv64_copy(struct wv64_state *,struct wv64_workspace *,struct ow
  * newer metadata headers may be cleared. No file-content writes. */
 enum wv64_status wv64_reconcile(struct wv64_state *,struct bs_service *,const struct wv64_layout *,
  struct ns64_node *,size_t,struct wv64_workspace *,struct ow64_inventory banks[2]);
+/* Exact existing path/id/revision, streamed copy-on-write save.
+ * Inode-only checkpoint advances sequence and inode epoch, not directory.
+ * Older diagnostic readers that require a directory increment refuse this
+ * checkpoint sequence. Never downgrade a written volume without migration. */
+enum wv64_status wv64_replace(struct wv64_state *,struct wv64_workspace *,struct ow64_inventory banks[2],
+ const uint8_t *,size_t,uint64_t id,uint64_t revision,uint64_t bytes,is64_source,void *);
 #endif

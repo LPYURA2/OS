@@ -16,4 +16,8 @@ struct is64_workspace {
 typedef bool (*is64_source)(void *,uint64_t,uint8_t *,size_t);
 enum is64_status is64_create(struct ic64_state *,uint64_t data_token,struct is64_workspace *,
  struct ow64_inventory banks[2],uint64_t id,uint64_t bytes,is64_source,void *);
+/* Copy-on-write replacement of an exact current revision. Old extents
+ * remain protected by both-bank allocation. Same ID and new revision. */
+enum is64_status is64_replace(struct ic64_state *,uint64_t,struct is64_workspace *,
+ struct ow64_inventory banks[2],uint64_t id,uint64_t revision,uint64_t bytes,is64_source,void *);
 #endif

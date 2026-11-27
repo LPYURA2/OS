@@ -43,8 +43,9 @@ static enum wv64_status receipts(struct bs_service *b,const struct wv64_layout *
  }
  if(x[0].valid&&x[1].valid){
   const struct receipt *a=x[0].seq>x[1].seq?x:x+1,*z=a==x?x+1:x;
-  if(a->seq-z->seq!=1||a->dir<=z->dir||a->dir-z->dir!=1||
-     a->inode<z->inode||a->inode-z->inode>1)return WV64_CORRUPT;
+  if(a->seq-z->seq!=1||a->dir<z->dir||a->dir-z->dir>1||
+     a->inode<z->inode||a->inode-z->inode>1||
+     (a->dir==z->dir&&a->inode==z->inode))return WV64_CORRUPT;
  }
  return WV64_OK;
 }
@@ -486,4 +487,46 @@ enum wv64_status wv64_reconcile(struct wv64_state *s,struct bs_service *b,const 
  enum wv64_status rc=repair_inner(s,w,inv,&g);
  if(rc!=WV64_OK){s->ready=false;s->proof.valid=false;s->dir.valid=false;s->inode.table.valid=false;}
  return rc;
+}
+
+/* Copy-on-write save of an existing file. Directory tree and ID unchanged.
+ * Common receipt is the only acknowledgment; do not publish a new name,
+ * truncate in place or erase any retained data extent. */
+enum wv64_status wv64_replace(struct wv64_state *s,struct wv64_workspace *w,struct ow64_inventory inv[2],
+ const uint8_t *path,size_t n,uint64_t id,uint64_t revision,uint64_t bytes,is64_source source,void *ctx){
+ if(!s||!s->ready||!s->write||s->busy)return WV64_LOCKED;
+ if(!buffers(s,w,inv)||!n||!external(s,w,path,n)||!id||!revision||(bytes&&!source)||
+    !sep(path,n,inv,2*sizeof *inv))return WV64_INVALID;
+ for(unsigned i=0;i<2;i++)if(!sep(path,n,inv[i].entries,inv[i].slots*sizeof *inv[i].entries)||
+    !sep(path,n,inv[i].runs,inv[i].slots*sizeof *inv[i].runs))return WV64_INVALID;
+ if(s->sequence==UINT64_MAX||s->inode_epoch==UINT64_MAX||revision==UINT64_MAX)return WV64_FULL;
+ struct geometry g;struct receipt x[2];struct wv64_layout *l=&s->layout;
+ if(!layout(s->block,l,true,&g)||receipts(s->block,l,&g,true,x)!=WV64_OK){s->ready=false;return WV64_RECOVERY;}
+ unsigned last=newest(x);
+ if(!x[last].valid||x[last].seq!=s->sequence||x[last].dir!=s->dir_epoch||
+    x[last].inode!=s->inode_epoch||s->dir.epoch!=s->dir_epoch||
+    s->inode.table.geometry.epoch!=s->inode_epoch){s->ready=false;return WV64_RECOVERY;}
+ struct dc64_state fresh;
+ if(dc64_mount(&fresh,s->block,l->owner,l->dir,l->dir_sectors,&w->writer)!=DC64_OK||
+    fresh.epoch!=s->dir_epoch||fresh.active!=s->dir.active||fresh.count!=s->dir.count||
+    ownership(s,w,inv)!=WV64_OK||validate(s,w)!=WV64_OK){s->ready=false;return WV64_RECOVERY;}
+ struct sfs64_map old;
+ enum wv64_status rc=get_map(s,w,path,n,id,revision,&old);
+ if(rc!=WV64_OK)return rc;
+ s->busy=true;s->ready=false;
+ enum is64_status ir=is64_replace(&s->inode,l->data,&w->stream,inv,id,revision,bytes,source,ctx);
+ if(ir!=IS64_OK){
+  s->busy=false;
+  if((ir==IS64_CANCELLED||ir==IS64_FULL||ir==IS64_INVALID)&&s->inode.table.valid&&
+     s->inode.table.geometry.epoch==s->inode_epoch){
+   s->ready=true;return ir==IS64_CANCELLED?WV64_CANCELLED:ir==IS64_FULL?WV64_FULL:WV64_INVALID;
+  }
+  return WV64_RECOVERY;
+ }
+ if(validate(s,w)!=WV64_OK||s->dir.epoch!=s->dir_epoch||
+    s->inode.table.geometry.epoch!=s->inode_epoch+1){s->busy=false;return WV64_RECOVERY;}
+ rc=save(s->block,l,&g,(struct receipt){s->sequence+1,s->dir.epoch,s->inode.table.geometry.epoch,true},last^1u);
+ s->busy=false;
+ if(rc!=WV64_OK)return WV64_RECOVERY;
+ ++s->sequence;s->inode_epoch=s->inode.table.geometry.epoch;s->ready=true;return WV64_OK;
 }

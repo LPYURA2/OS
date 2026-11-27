@@ -1,3 +1,6 @@
+## StyleFS 46 — copy-on-write existing file save candidate
+45 CI 9/9 SUCCESS, actual CPL3 file read and denial/cleanup. Add exact revision replacement with separate allocation and inode-only checkpoint. [Handoff](NEXT_CHAT_STYLEFS_46.md). CI pending. Main unchanged.
+
 ## StyleFS 45 — native CPL3 file-read guest candidate
 44 CI 8/8 SUCCESS. Separate guest profile uses actual native executor, guarded volume and selected-file broker. [Handoff](NEXT_CHAT_STYLEFS_45.md). CI pending; ordinary boot unchanged.
 

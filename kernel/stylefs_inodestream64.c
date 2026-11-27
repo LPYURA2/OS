@@ -27,7 +27,7 @@ static bool paired(struct ic64_state *s,uint64_t token){
 static bool max_id(void *ctx,const struct sfs64_map *m){
  uint64_t *id=ctx;if(m->file.id>*id)*id=m->file.id;return true;
 }
-struct merge {struct it64_state old;struct is64_workspace *w;uint64_t page,ordinal;unsigned at,count;size_t bytes;enum it64_status error;};
+struct merge {struct it64_state old;struct is64_workspace *w;uint64_t page,ordinal,replace_id;unsigned at,count;size_t bytes;enum it64_status error;};
 static bool merged(void *ctx,uint64_t i,uint8_t *out,size_t limit,size_t *n){
  struct merge *m=ctx;
  if(i!=m->ordinal++)return false;
@@ -40,13 +40,20 @@ static bool merged(void *ctx,uint64_t i,uint8_t *out,size_t limit,size_t *n){
    m->at=0;
   }
   blob=m->w->old[m->at++];
+  if(m->replace_id){
+   struct sfs64_map old;
+   if(!sfs64_map_decode(blob.bytes,blob.length,m->old.geometry.capacity,m->old.geometry.data_start,&old)){
+    m->error=IT64_CORRUPT;return false;
+   }
+   if(old.file.id==m->replace_id)blob=(struct it64_blob){m->w->manifest,m->bytes};
+  }
  }
  if(blob.length>limit)return false;
  for(size_t j=0;j<blob.length;j++)out[j]=blob.bytes[j];
  *n=blob.length;return true;
 }
-enum is64_status is64_create(struct ic64_state *s,uint64_t token,struct is64_workspace *w,
- struct ow64_inventory inv[2],uint64_t id,uint64_t bytes,is64_source source,void *ctx){
+static enum is64_status stream(struct ic64_state *s,uint64_t token,struct is64_workspace *w,
+ struct ow64_inventory inv[2],uint64_t id,uint64_t revision,uint64_t bytes,is64_source source,void *ctx){
  if(!s||!s->table.valid)return IS64_STALE;
  if(!id||(bytes&&!source)||!inv||!w||!paired(s,token))return IS64_INVALID;
  for(unsigned i=0;i<2;i++)if(!inv[i].slots||inv[i].slots>SIZE_MAX/sizeof *inv[i].entries||
@@ -67,8 +74,15 @@ enum is64_status is64_create(struct ic64_state *s,uint64_t token,struct is64_wor
   enum it64_status it=it64_walk(&tables[i],w->old_page,max_id,&max);
   if(it!=IT64_OK)return it==IT64_IO?IS64_IO:IS64_CORRUPT;
  }
- if(id<=max)return IS64_INVALID;
- if(s->table.count==UINT64_MAX||s->table.geometry.epoch==UINT64_MAX)return IS64_FULL;
+ if(revision){
+  struct sfs64_map old;
+  enum it64_status tr=it64_lookup(&s->table,s->table.geometry.epoch,id,w->old_page,&old);
+  if(tr==IT64_MISSING)return IS64_INVALID;
+  if(tr!=IT64_OK)return tr==IT64_IO?IS64_IO:IS64_CORRUPT;
+  if(old.file.revision!=revision)return IS64_INVALID;
+  if(revision==UINT64_MAX)return IS64_FULL;
+ }else if(id<=max)return IS64_INVALID;
+ if((!revision&&s->table.count==UINT64_MAX)||s->table.geometry.epoch==UINT64_MAX)return IS64_FULL;
  struct sfs64_inventory a={inv[0].runs,inv[0].count},b={inv[1].runs,inv[1].count};
  size_t nr=0;
  enum sfs64_alloc_status ar=sfs64_allocate(proof.capacity,proof.data_start,a,b,bytes,w->plan,IS64_RUNS,&nr);
@@ -96,12 +110,22 @@ enum is64_status is64_create(struct ic64_state *s,uint64_t token,struct is64_wor
  }
  if(off!=bytes){t->valid=false;return IS64_CORRUPT;}
  size_t n=sfs64_map_length(nr);
- struct sfs64_file file={id,1,bytes,~crc};
+ struct sfs64_file file={id,revision+1,bytes,~crc};
  if(!sfs64_map_encode(w->manifest,n,file,proof.capacity,proof.data_start,w->plan,nr))return IS64_CORRUPT;
- struct merge m={.old=*t,.w=w,.bytes=n,.error=IT64_OK};
- ic=ic64_publish(s,&w->commit,t->count+1,merged,&m);
+ struct merge m={.old=*t,.w=w,.bytes=n,.replace_id=revision?id:0,.error=IT64_OK};
+ ic=ic64_publish(s,&w->commit,t->count+(revision?0u:1u),merged,&m);
  if(ic==IC64_OK)return IS64_OK;
  if(ic==IC64_FULL)return IS64_FULL;
  if(ic==IC64_IO||ic==IC64_UNCERTAIN||m.error==IT64_IO){t->valid=false;return IS64_UNCERTAIN;}
  return ic==IC64_STALE?IS64_STALE:IS64_CORRUPT;
+}
+
+enum is64_status is64_create(struct ic64_state *s,uint64_t token,struct is64_workspace *w,
+ struct ow64_inventory inv[2],uint64_t id,uint64_t bytes,is64_source source,void *ctx){
+ return stream(s,token,w,inv,id,0,bytes,source,ctx);
+}
+enum is64_status is64_replace(struct ic64_state *s,uint64_t token,struct is64_workspace *w,
+ struct ow64_inventory inv[2],uint64_t id,uint64_t revision,uint64_t bytes,is64_source source,void *ctx){
+ if(!revision)return IS64_INVALID;
+ return stream(s,token,w,inv,id,revision,bytes,source,ctx);
 }
