@@ -12,7 +12,10 @@
 #ifdef STYLEOS_LIVE_VOLUME_39
 #include <styleos/stylefs_paged_volume64.h>
 #include <styleos/desktop_paged_view.h>
-#ifdef STYLEOS_LIVE_VOLUME_46
+#ifdef STYLEOS_LIVE_VOLUME_50
+#define S34_SERIAL "STYLEOS-SFS50-DATA  "
+#define S34_TAG "STYLEOS-SFS50-PRIVATE-V2"
+#elif defined(STYLEOS_LIVE_VOLUME_46)
 #define S34_SERIAL "STYLEOS-SFS46-DATA  "
 #define S34_TAG "STYLEOS-SFS46-PRIVATE-V1"
 #elif defined(STYLEOS_LIVE_VOLUME_44)
@@ -343,8 +346,12 @@ static bool s46_commit(uint64_t protected_id){
  struct sd64_key key={.parent=s46.parent,.length=(uint16_t)s46.n};
  for(unsigned i=0;i<s46.n;i++)key.name[i]=(uint8_t)s46.name[i];
  if(op==1){
+#ifdef STYLEOS_LIVE_VOLUME_50
+  if(sd64_key_valid(&key))rc=po64_create_empty(s,s46.snap,&key,0);
+#else
   if(s46.snap.sequence<UINT64_C(0x7fffffffffffffff)&&sd64_key_valid(&key))
    rc=po64_create_empty(s,s46.snap,&key,UINT64_C(0x8000000000000000)|(s46.snap.sequence+1));
+#endif
  }else if(op==2&&sd64_key_valid(&key)){
   rc=po64_change_file(s,s46.snap,&s46.row,&key);
  }else if(op==3)rc=po64_change_file(s,s46.snap,&s46.row,0);
@@ -442,6 +449,11 @@ static void s39_admit(void){
     s34_work.nodes,32,s34_work.current,writable?s34_work.previous:0,32)!=PO64_OK){
   (void)bs_detach(svc,gen);arch_puts("SFS39 REFUSE metadata\n");return;
  }
+#ifdef STYLEOS_LIVE_VOLUME_50
+ if(!s34_work.volume.objects.pair.id_floor){
+  (void)pv64_close(&s34_work.volume);(void)bs_detach(svc,gen);arch_puts("SFS39 REFUSE metadata\n");return;
+ }
+#endif
  struct sd64_key k=s34_key(1,'a');
  if(po64_grant(&s34_work.volume.objects,101,&k,2,1,&s34_work.token)!=PO64_OK){
   (void)pv64_close(&s34_work.volume);(void)bs_detach(svc,gen);arch_puts("SFS39 REFUSE object\n");return;

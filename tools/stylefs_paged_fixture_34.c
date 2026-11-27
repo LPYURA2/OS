@@ -22,10 +22,11 @@ static bool fl(void *c){return fdatasync(*(int *)c)==0;}
 static bool sink(void *c,uint64_t at,const uint8_t *p,size_t n){return fwrite(p,1,n,c)==n&&at<1041;}
 int main(int argc,char **argv){
  if(argc!=3&&argc!=4)return 1;
- bool live=!strcmp(argv[1],"new39");
+ bool ids=!strcmp(argv[1],"new50")||!strcmp(argv[1],"check50");
+ bool live=!strcmp(argv[1],"new39")||!strcmp(argv[1],"new50");
  bool create=live||!strcmp(argv[1],"new");
  bool object=!strcmp(argv[1],"get37");
- bool verify=!strcmp(argv[1],"check46");
+ bool verify=!strcmp(argv[1],"check46")||!strcmp(argv[1],"check50");
  if((create&&argc!=3)||(!create&&(argc!=4||(!verify&&!object&&strcmp(argv[1],"get")))))return 1;
  int fd=open(argv[2],create?O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW:O_RDONLY|O_NOFOLLOW,0600);
  if(fd<0)return 1;
@@ -41,7 +42,7 @@ int main(int argc,char **argv){
  bs_grant_range(&b,g,1,2+D+I,F,rights,&l.data)==BS_OK;
  struct pp64_pair pair;
  if(ok&&create)ok=dc64_provision(&b,1,l.dir,D)==DC64_OK&&ir64_provision(&b,1,l.inode,I,F,1)==IP64_OK&&
- pp64_provision(&b,&l,&w.pair,nodes,32,runs,32,&pair)==PP64_OK;
+ (ids?pp64_provision_ids(&b,&l,&w.pair,nodes,32,runs,32,&pair):pp64_provision(&b,&l,&w.pair,nodes,32,runs,32,&pair))==PP64_OK;
  if(ok&&live){
   struct sd64_key k={.parent=1,.length=1,.name={'a'}};
   ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,1,&k,2,0,1041,source39,0,&pair)==PP64_OK;
@@ -51,7 +52,8 @@ int main(int argc,char **argv){
   if(ok)ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,4,0,sizeof text43-1,source43,0,&pair)==PP64_OK;
  }
  if(ok&&verify){
-  bool present=!strcmp(argv[3],"present");
+  bool recreated=ids&&!strcmp(argv[3],"recreated");
+  bool present=recreated||!strcmp(argv[3],"present");
   ok=(present||!strcmp(argv[3],"absent"))&&pp64_mount(&b,&l,&w.pair,nodes,32,runs,32,&pair)==PP64_OK;
   struct sd64_key k={.parent=3,.length=5,.name={'y','.','t','x','t'}};
   uint64_t id=0;uint8_t kind=0;
@@ -59,9 +61,9 @@ int main(int argc,char **argv){
    enum sd64_status rc=sd64_lookup(&b,1,l.dir,&w.pair.dir.root,&k,w.pair.dw.page,&id,&kind);
    if(present){
     struct sfs64_file file;
-    ok=pair.sequence==6&&rc==SD64_OK&&id==(UINT64_C(0x8000000000000000)|5)&&kind==SD64_FILE&&
+    ok=pair.sequence==(recreated?9u:6u)&&pair.id_floor==(ids?(recreated?6u:5u):0u)&&rc==SD64_OK&&id==(ids?(recreated?6u:5u):(UINT64_C(0x8000000000000000)|5))&&kind==SD64_FILE&&
      ip64_stat(&b,1,l.inode,&w.pair.inode.root,id,&w.pair.iw,&file)==IP64_OK&&file.bytes==0&&file.revision==1;
-   }else ok=pair.sequence==7&&rc==SD64_MISSING;
+   }else ok=pair.sequence==7&&pair.id_floor==(ids?5u:0u)&&rc==SD64_MISSING;
    k.name[0]='z';
    if(ok)ok=sd64_lookup(&b,1,l.dir,&w.pair.dir.root,&k,w.pair.dw.page,&id,&kind)==SD64_MISSING;
   }
