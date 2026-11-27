@@ -80,6 +80,14 @@ enum nwc_status nwc_publish_tile(struct nwc_service *,uint32_t pid,uint64_t hand
  * 1..16 pixels per dimension, row-major little-endian RGB24 in u32.
  * The architecture copies the complete bounded buffer before calling. */
 #define NWC_CALL_TILE UINT64_C(0x101)
+/* RAX=0x102, RBX=window (0 unique port), RCX=private writable data VA,
+ * RDX=64. RAX returns nwc_status. Fixed little-endian wire, no C padding
+ * or kernel pointers: version, sequence, window, kind, code, modifiers,
+ * down, size (8 u32), then 32 bytes. Failed calls do not consume input. */
+#define NWC_CALL_INPUT UINT64_C(0x102)
+#define NWC_INPUT_BYTES 64u
+enum nwc_status nwc_receive_wire(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+                                  uint64_t window,uint8_t out[NWC_INPUT_BYTES]);
 enum nwc_status nwc_publish_block(struct nwc_service *,uint32_t,uint64_t,uint64_t,
                                   uint64_t window,const uint32_t *,unsigned,unsigned);
 enum nwc_status nwc_publish_pixel(struct nwc_service *,uint32_t,uint64_t,uint64_t,

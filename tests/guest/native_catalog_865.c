@@ -48,6 +48,7 @@ static bool owned_zero(const struct stop_owned *r){
  return clear_bytes(r->owner,sizeof *r->owner)&&clear_bytes(r->window,sizeof *r->window)&&
         clear_bytes(r->port,sizeof *r->port);
 }
+static bool input_probe;
 static bool grant_owned(uint32_t pid,uint64_t gen,uint32_t *win){
  const struct pr_entry *p=pr_find(pr_global(),pid);
  struct usr_runtime *s=sessions();struct nwc_service *c=channels();
@@ -57,6 +58,8 @@ static bool grant_owned(uint32_t pid,uint64_t gen,uint32_t *win){
     nwc_claim(c,pid,gen,p->page_root,*win)!=NWC_OK)return false;
  /* Nonempty IPC queue and tile must be scrubbed, not just hidden. */
  uint32_t pixel=UINT32_C(0x00a00000)|pid;uint8_t data[2]={0x5a,(uint8_t)pid};
+ const uint8_t probe[2]={0x5a,0x70};
+ if(input_probe&&nwc_send_text(c,*win,probe,sizeof probe)!=NWC_OK)return false;
  return nwc_send_text(c,*win,data,sizeof data)==NWC_OK&&
         nwc_publish_tile(c,pid,gen,p->page_root,*win,&pixel,1,1)==NWC_OK;
 }
@@ -177,7 +180,7 @@ static bool stop_step(void){
   if(!grant_owned(fresh,restarted->scheduler_handle,&stop_window)||stop_window==old_window||
      !same_peer(&peer_owned)||nwc_port_count(channels())!=2)return stop_fail();
   struct stop_owned fresh_owned;
-  if(!owned_refs(fresh,stop_window,&fresh_owned)||fresh_owned.port->next_sequence!=2||
+  if(!owned_refs(fresh,stop_window,&fresh_owned)||fresh_owned.port->next_sequence!=(input_probe?3u:2u)||
      fresh_owned.port->tile.generation!=1||fresh_owned.port->owner_pid!=fresh||
      fresh_owned.port->scheduler_handle!=restarted->scheduler_handle)return stop_fail();
   arch_puts("STYLEOS NATIVE STOP-OWNERS-REBOUND");field("pid",fresh);field("window",stop_window);
@@ -213,6 +216,8 @@ bool s865_native_catalog_request(void){
  bool valid=catalog_valid(&count);
  static const uint8_t marker[8]={'s','t','o','p','0','0',0,0};
  bool forced=valid&&count==32&&nc_equal(catalog+16+40,marker,8);
+ static const uint8_t input_marker[8]={'i','n','p','u','t','1',0,0};
+ input_probe=forced&&nc_equal(catalog+16+NC_RECORD+40,input_marker,8);
  if(valid)for(unsigned j=0;j<count;j++){
   const uint8_t *r=catalog+16+j*NC_RECORD;
   uint32_t pid;

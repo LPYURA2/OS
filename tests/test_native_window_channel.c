@@ -64,6 +64,17 @@ int main(void)
     assert(event.sequence==4 && event.code=='C');
     assert(nwc_receive(&ipc,pid_a,16,65536,win_a,&event)==NWC_EMPTY);
 
+    uint8_t wire[NWC_INPUT_BYTES];
+    memset(wire,0x5a,sizeof wire);
+    assert(nwc_receive_wire(&ipc,pid_a,16,65536,0,wire)==NWC_EMPTY && wire[0]==0x5a);
+    assert(nwc_send_text(&ipc,win_a,txt,sizeof txt)==NWC_OK);
+    assert(nwc_receive_wire(&ipc,pid_b,32,131072,win_a,wire)==NWC_DENIED && wire[0]==0x5a);
+    assert(nwc_receive_wire(&ipc,pid_a,16,65536,UINT64_C(0x100000001),wire)==NWC_INVALID && wire[0]==0x5a);
+    assert(nwc_receive_wire(&ipc,pid_a,16,65536,0,wire)==NWC_OK);
+    assert(wire[0]==1 && wire[4]==5 && wire[8]==win_a && wire[12]==NWC_TEXT &&
+           wire[28]==sizeof txt && !memcmp(wire+32,txt,sizeof txt) && wire[37]==0 && wire[63]==0);
+    assert(nwc_receive_wire(&ipc,pid_a,16,65536,0,wire)==NWC_EMPTY && wire[4]==5);
+
     for(unsigned i=0;i<NWC_TILE_PIXELS;++i)pixels[i]=0xff001100u+i;
     assert(nwc_publish_tile(&ipc,pid_a,16,65536,win_a,pixels,0,16)==NWC_INVALID);
     assert(nwc_publish_tile(&ipc,pid_a,16,65536,win_a,pixels,17,16)==NWC_INVALID);

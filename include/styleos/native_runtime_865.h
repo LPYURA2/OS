@@ -14,6 +14,10 @@ void s865_native_pump(void);
  * On failure leave kernel destination unchanged. Destination is trusted
  * separate kernel scratch, not caller controlled. */
 bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,size_t);
+/* Trusted, serialized safe-root continuation only. Result is a kernel-only
+ * alias of the exact admitted private data span; never return to CPL3.
+ * Valid until the next scheduling/admission/release boundary. */
+volatile uint8_t *s865_native_data_span(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,size_t);
 /* Read-only snapshot for a trusted supervisor on the owned root, IF=0.
  * No CPL3 entry. CPU ticks are accepted LAPIC preemptions, not elapsed time;
  * resident_bytes counts the three leased user pages, not total system memory. */

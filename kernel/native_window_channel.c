@@ -146,6 +146,46 @@ enum nwc_status nwc_receive(struct nwc_service *s,uint32_t pid,uint64_t handle,
     p->head=(p->head+1)%NWC_EVENTS;--p->length;
     return NWC_OK;
 }
+static enum nwc_status resolve_port(struct nwc_service *s,uint32_t pid,uint64_t handle,
+                                    uint64_t root,uint64_t window,uint32_t *out)
+{
+    if(!pid || !handle || !root || (root&4095u) || window>UINT32_MAX)return NWC_INVALID;
+    if(!consistent(s))return NWC_NOT_READY;
+    uint32_t win=(uint32_t)window;
+    if(!win){
+        for(unsigned i=0;i<NWC_PORTS;++i){
+            const struct nwc_port *p=&s->ports[i];
+            if(!p->window_id || !authentic(p,pid,handle,root) || !valid_port(s,p))continue;
+            if(win)return NWC_DENIED;
+            win=p->window_id;
+        }
+        if(!win)return NWC_DENIED;
+    }
+    *out=win;
+    return NWC_OK;
+}
+static void wire_u32(uint8_t *p,uint32_t v)
+{
+    for(unsigned i=0;i<4;++i)p[i]=(uint8_t)(v>>(8*i));
+}
+enum nwc_status nwc_receive_wire(struct nwc_service *s,uint32_t pid,uint64_t handle,
+                                 uint64_t root,uint64_t window,uint8_t out[NWC_INPUT_BYTES])
+{
+    if(!out)return NWC_INVALID;
+    uint32_t win=0;
+    enum nwc_status r=resolve_port(s,pid,handle,root,window,&win);
+    if(r!=NWC_OK)return r;
+    struct nwc_event ev={0};
+    r=nwc_receive(s,pid,handle,root,win,&ev);
+    if(r!=NWC_OK)return r;
+    uint8_t wire[NWC_INPUT_BYTES]={0};
+    const uint32_t fields[]={1,ev.sequence,ev.window_id,(uint32_t)ev.kind,
+                             ev.code,ev.modifiers,ev.down?1u:0u,ev.size};
+    for(unsigned i=0;i<8;++i)wire_u32(wire+4*i,fields[i]);
+    for(unsigned i=0;i<ev.size && i<NWC_TEXT_BYTES;++i)wire[32+i]=ev.bytes[i];
+    for(unsigned i=0;i<NWC_INPUT_BYTES;++i)out[i]=wire[i];
+    return NWC_OK;
+}
 enum nwc_status nwc_publish_tile(struct nwc_service *s,uint32_t pid,
                                  uint64_t handle,uint64_t root,uint32_t win,
                                  const uint32_t *pixels,unsigned w,unsigned h)
@@ -173,17 +213,9 @@ enum nwc_status nwc_publish_block(struct nwc_service *s,uint32_t pid,uint64_t ha
        window>UINT32_MAX || !w || !h || w>NWC_TILE_WIDTH || h>NWC_TILE_HEIGHT)return NWC_INVALID;
     for(size_t i=0;i<(size_t)w*h;++i)
         if(pixels[i]>UINT32_C(0x00ffffff))return NWC_INVALID;
-    if(!consistent(s))return NWC_NOT_READY;
-    uint32_t win=(uint32_t)window;
-    if(!win){
-        for(unsigned i=0;i<NWC_PORTS;++i){
-            const struct nwc_port *p=&s->ports[i];
-            if(!p->window_id || !authentic(p,pid,handle,root) || !valid_port(s,p))continue;
-            if(win)return NWC_DENIED;
-            win=p->window_id;
-        }
-        if(!win)return NWC_DENIED;
-    }
+    uint32_t win=0;
+    enum nwc_status r=resolve_port(s,pid,handle,root,window,&win);
+    if(r!=NWC_OK)return r;
     return nwc_publish_tile(s,pid,handle,root,win,pixels,w,h);
 }
 enum nwc_status nwc_publish_pixel(struct nwc_service *s,uint32_t pid,uint64_t handle,

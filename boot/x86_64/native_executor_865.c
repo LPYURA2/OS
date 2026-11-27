@@ -192,7 +192,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
 #ifdef STYLEOS_OWNED_SHELL_865
  /* Only after actual CPL3 trap, safe-root return, scheduler commit and
   * full mapping audit. Never accept caller-supplied PID/root/generation. */
- if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE)){
+ if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
@@ -209,6 +209,29 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
    fld848("rgb",pending860.gpr[2]);fld848("status",pixel);arch_putc('\n');
 #endif
+  }else if(pending860.gpr[0]==NWC_CALL_INPUT){
+   uint8_t wire[NWC_INPUT_BYTES]={0};
+   volatile uint8_t *dst=0;
+   if(pending860.gpr[3]==NWC_INPUT_BYTES)
+    dst=s865_native_data_span(id,ticket->pid,ticket->handle,ticket->child_root,
+                             pending860.gpr[2],NWC_INPUT_BYTES);
+   /* Preflight destination before dequeuing; no failure point between
+    * successful dequeue and bounded write to an audited private alias. */
+   if(dst){
+    pixel=nwc_receive_wire((struct nwc_service *)nwc_global(),ticket->pid,
+                          ticket->handle,ticket->child_root,pending860.gpr[1],wire);
+    if(pixel==NWC_OK)
+     for(size_t j=0;j<NWC_INPUT_BYTES;++j)dst[j]=wire[j];
+   }
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+   arch_puts("STYLEOS NATIVE INPUT");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+   fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
+   fld848("va",pending860.gpr[2]);fld848("bytes",pending860.gpr[3]);fld848("status",pixel);
+   fld848("seq",pixel==NWC_OK?((uint32_t)wire[4]|((uint32_t)wire[5]<<8)|((uint32_t)wire[6]<<16)|((uint32_t)wire[7]<<24)):0);
+   arch_putc('\n');
+#endif
+   volatile uint8_t *wipe_wire=wire;
+   for(size_t j=0;j<NWC_INPUT_BYTES;++j)wipe_wire[j]=0;
   }else{
    uint64_t shape=pending860.gpr[3];
    unsigned w=(unsigned)(shape&65535u),h=(unsigned)((shape>>16)&65535u);

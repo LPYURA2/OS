@@ -85,7 +85,7 @@ def verify_shell_boundary(lines,roots,loop=0x1000000d):
     # Windows/ports ownership is separately verified by enclosing lifecycle
     # checks at bind, revoke, rebind and final cleanup. No pixel IPC claim.
 
-def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,window_tile=False):
+def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,window_tile=False,window_input=False):
     safe=obs['active']['root']
     def rec(tag,keys):return records(lines,tag,keys)
     admissions=rec(ADMIT,AKEY)
@@ -145,7 +145,8 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
             prefix=[(128,0x1000000d,1,1)]
             if window_tile:prefix.extend([(128,0x10000043,0x101,1),(128,0x1000005e,0x101,1)])
             elif window_ipc:prefix.append((128,0x1000001e,0x100,1))
-            loop=0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d
+            if window_input:prefix.extend([(128,0x1000007e,0x102,1),(128,0x1000009d,0x102,1)])
+            loop=0x100000df if window_input else 0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d
             actual=[(e['vector'],e['rip'],e['rax'],e['state']) for e in seq]
             if actual[:len(prefix)]!=prefix or len(seq)<len(prefix)+4 or any(x!=(0x50,loop,0,1) for x in actual[len(prefix):]):raise ValueError('real loop preemption')
             if not end<stop_by_pid[pid]:raise ValueError('release before successful stop')
@@ -197,6 +198,9 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
         if window_tile and e['vector']==128 and e['rax']==0x101:
             want=0x12000ff8 if e['rip']==0x10000043 else 0x12000000
             if one(r'\bRBX=([0-9a-fA-F]+)\b')!=0 or one(r'\bRCX=([0-9a-fA-F]+)\b')!=want or one(r'\bRDX=([0-9a-fA-F]+)\b')!=0x20002:raise ValueError('raw tile arguments')
+        if window_input and e['vector']==128 and e['rax']==0x102:
+            want=0x12000fe0 if e['rip']==0x1000007e else 0x12000100
+            if one(r'\bRBX=([0-9a-fA-F]+)\b')!=0 or one(r'\bRCX=([0-9a-fA-F]+)\b')!=want or one(r'\bRDX=([0-9a-fA-F]+)\b')!=64:raise ValueError('raw input arguments')
         result.append((int(m[1]),e))
     if not started or idx!=len(events) or di!=len(drains):raise ValueError('raw CPU count')
     fields=('root','n','batch','mouse','key','dx','dy','buttons','modifiers','x','y','active','ru','restarts','text','text-hash','text-dirty','note-session','writes')
@@ -226,5 +230,15 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
         calls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x100]
         if len(calls)!=3 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(pixels,calls)):
             raise ValueError('pixel receipt not adjacent to authenticated trap')
-    if shell_boundary:verify_shell_boundary(lines,roots,0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d)
+    if window_input:
+        receipts=rec(b'STYLEOS NATIVE INPUT',('pid','gen','root','window','va','bytes','status','seq'))
+        if len(receipts)!=6:raise ValueError('input receipt count')
+        for pid,idx in ((1,0),(2,1),(33,0)):
+            want=[(pid,pid,roots[idx],0,0x12000fe0,64,1,0),(pid,pid,roots[idx],0,0x12000100,64,0,1)]
+            if [tuple(x.values()) for _,x in receipts if x['pid']==pid]!=want:
+                raise ValueError('input destination preflight or event consumption')
+        calls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x102]
+        if len(calls)!=6 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(receipts,calls)):
+            raise ValueError('input receipt not adjacent to authenticated trap')
+    if shell_boundary:verify_shell_boundary(lines,roots,0x100000df if window_input else 0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d)
     return result

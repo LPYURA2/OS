@@ -14,7 +14,8 @@ FAULT_PROBES={
     'forbidden-int':(b'\xcd\x81',13,0x1000000d,0x40a,0),
 }
 
-def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False,window_tile=False):
+def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False,window_tile=False,window_input=False):
+    if window_input and not window_tile:raise ValueError('input requires tile fixture')
     if window_tile and not window_ipc:raise ValueError('tile requires IPC fixture')
     if window_ipc and (not forced_stop or packages is None):raise ValueError('window IPC requires separate package fixture')
     if packages is not None:
@@ -53,6 +54,37 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                     assert len(code)==0x5e
                     code+=b'\x85\xc0\x75\x04\x31\xc0\xeb\xfe\x0f\x0b'
                     assert len(code)==0x68
+                    if window_input:
+                        # Keep original tile failure UD at 0x66. On success
+                        # jump over it, refuse a cross-page input destination,
+                        # then read the same event into private data memory.
+                        code=code[:0x64]+b'\xeb\x02'+code[0x66:]
+                        fixups=[]
+                        def check(test):
+                            nonlocal code
+                            code+=test+b'\x0f\x85'
+                            fixups.append(len(code));code+=b'\0'*4
+                        def input_call(va):
+                            return b'\xbb\0\0\0\0\xb9'+struct.pack('<I',va)+b'\xba\x40\0\0\0\xb8\x02\x01\0\0\xcd\x80'
+                        code+=input_call(0x12000fe0)
+                        assert len(code)==0x7e
+                        check(b'\x83\xf8\x01')
+                        code+=input_call(0x12000100)
+                        assert len(code)==0x9d
+                        check(b'\x85\xc0')
+                        code+=b'\xbf'+struct.pack('<I',0x12000100)
+                        check(b'\x83\x3f\x01')
+                        check(b'\x83\x7f\x04\x01')
+                        check(b'\x83\x7f\x0c\x02')
+                        check(b'\x83\x7f\x1c\x02')
+                        check(b'\x66\x81\x7f\x20\x5a\x70')
+                        code+=b'\x31\xc0'
+                        assert len(code)==0xdf
+                        code+=b'\xeb\xfe'
+                        fail=len(code);code+=b'\x0f\x0b'
+                        code=bytearray(code)
+                        for off in fixups:struct.pack_into('<i',code,off,fail-(off+4))
+                        code=bytes(code)
                 elif window_ipc and i<2:
                     # Real CPL3 register-only call. Failed return faults;
                     # success loops with RAX=0 at code offset 0x24.
@@ -85,7 +117,7 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                 blob=payload
                 package_rows.append(dict(pid_expected=i+1,package=tea.name,package_sha256=hashlib.sha256(tea.read_bytes()).hexdigest(),manifest=manifest))
             lba=3072+16*i
-            struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),(b'stop00' if forced_stop and i==0 else f'app{i:02}'.encode()))
+            struct.pack_into('<II32s8s',catalog,16+48*i,lba,len(blob),hashlib.sha256(blob).digest(),(b'stop00' if forced_stop and i==0 else b'input1' if window_input and i==1 else f'app{i:02}'.encode()))
             disk.seek(lba*512);disk.write(blob.ljust(8192,b'\0'))
         disk.seek(3000*512);disk.write(catalog)
     if packages is not None:
