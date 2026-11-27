@@ -1,3 +1,6 @@
+## StyleFS 43 — bounded file-read syscall staging candidate
+Reuse safe-root frame/ticket validation and bounded user-page range check. [Handoff](NEXT_CHAT_STYLEFS_43.md). CI pending; no hardware syscall claim. Main unchanged.
+
 ## StyleFS 42 — process-bound file broker candidate
 40 and 41 CI 8/8 SUCCESS. Reuse process registry and broker, check trusted identity and terminal-state refusal. [Handoff](NEXT_CHAT_STYLEFS_42.md). CI pending. Main unchanged.
 

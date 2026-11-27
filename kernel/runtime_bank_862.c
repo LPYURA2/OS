@@ -284,17 +284,23 @@ enum ps_status rt865_launch_prepared(struct rt862_bank *b,struct dpr_service *d,
  * RANGE only validates a user interval; no user dereference. A returning
  * syscall is a scheduling boundary: save the result, transition to READY,
  * and let the existing dispatcher choose the next context. */
-enum ps_status rt863_bank_syscall(struct rt862_bank *b,struct dpr_service *d,
+static bool syscall_frame(struct rt862_bank *b,struct dpr_service *d,
  const struct rt862_selection *t,uint64_t live,uint64_t safe_flags,
- const struct s847_raw *f,uint64_t va,uint64_t cr2){
+ const struct s847_raw *f,uint64_t va,uint64_t cr2,struct up_context *saved,struct up_event *event){
  if(!layout(b,d,t,sizeof *t,_Alignof(struct rt862_selection),f,sizeof *f,_Alignof(struct s847_raw))||
     !ticket(b,d,t,live)||(safe_flags&~UINT64_C(0x8d7))||!(safe_flags&2)||
     (f->rflags&0x202)!=0x202||f->rsp<=S846_STACK||cr2||f->vector!=128||
-    f->gpr[0]==S847_CALL_EXIT)return PS_EVIDENCE;
+    f->gpr[0]==S847_CALL_EXIT)return false;
  struct s847_raw normalized=*f;normalized.rflags&=~IF;
+ if(!s847_decode(&normalized,va,cr2,t->child_root,b->cs,b->ss,saved,event)||
+    event->kind!=UP_EVENT_NONE||!context(b,saved))return false;
+ return true;
+}
+enum ps_status rt863_bank_syscall(struct rt862_bank *b,struct dpr_service *d,
+ const struct rt862_selection *t,uint64_t live,uint64_t safe_flags,
+ const struct s847_raw *f,uint64_t va,uint64_t cr2){
  struct up_context saved;struct up_event event;
- if(!s847_decode(&normalized,va,cr2,t->child_root,b->cs,b->ss,&saved,&event)||
-    event.kind!=UP_EVENT_NONE||!context(b,&saved))return PS_EVIDENCE;
+ if(!syscall_frame(b,d,t,live,safe_flags,f,va,cr2,&saved,&event))return PS_EVIDENCE;
  uint64_t result=UC772_BAD;
  if(f->gpr[0]==S847_CALL_YIELD)result=0;
  else if(f->gpr[0]==S847_CALL_RANGE){size_t offset=0;
@@ -304,6 +310,58 @@ enum ps_status rt863_bank_syscall(struct rt862_bank *b,struct dpr_service *d,
  if(status!=PS_OK)return status;
  b->slots[t->slot].context=saved;return PS_OK;
 }
+#ifdef STYLEOS_TEST_FILE_SYSCALL_43
+#include <styleos/stylefs_file_syscall43.h>
+/* The trusted architecture adapter has to prove the actual leaf, lease,
+ * identity-mapped backing and safe-root lifetime before calling. This
+ * candidate is not connected to the native executor or ordinary boot. */
+enum ps_status rt43_file_read(struct rt862_bank *b,struct dpr_service *d,
+ const struct rt862_selection *t,uint64_t live,uint64_t safe_flags,
+ const struct s847_raw *f,uint64_t va,uint64_t cr2,const struct fs43_binding *a){
+ struct up_context saved;struct up_event event;
+ if(!syscall_frame(b,d,t,live,safe_flags,f,va,cr2,&saved,&event)||f->gpr[0]!=FS43_CALL_READ)return PS_EVIDENCE;
+ if(!region(a,sizeof *a,_Alignof(struct fs43_binding))||!a->service||!a->mount||!a->work||!a->page||
+    !a->audit||a->service->processes!=d->dispatcher.registry||!a->service->broker||
+    !a->mount->block||!a->mount->volume.nodes||a->mount->volume.slots>SIZE_MAX/sizeof *a->mount->volume.nodes)return PS_EVIDENCE;
+ const void *ptr[]={b,d,d->dispatcher.registry,d->windows,t,f,a,a->service,a->service->broker,
+ a->mount,a->work,a->mount->block,a->mount->volume.nodes,a->page};
+ const size_t len[]={sizeof *b,sizeof *d,sizeof *d->dispatcher.registry,sizeof *d->windows,
+ sizeof *t,sizeof *f,sizeof *a,sizeof *a->service,sizeof *a->service->broker,
+ sizeof *a->mount,sizeof *a->work,sizeof *a->mount->block,
+ a->mount->volume.slots*sizeof *a->mount->volume.nodes,UC772_PAGE};
+ for(unsigned i=0;i<14;i++){
+  if(!region(ptr[i],len[i],i==13?UC772_PAGE:1))return PS_ARGUMENT;
+  for(unsigned j=0;j<i;j++)if(!apart(ptr[i],len[i],ptr[j],len[j]))return PS_ARGUMENT;
+ }
+ if(!a->audit(a->context,t,a->page))return PS_EVIDENCE;
+ /* RAX=call, RBX=token, RCX=file offset, RDX=user destination,
+  * RSI=length (see process_entry_847 raw GPR ordering). All lengths
+  * constrained by existing uc772_plan. Return count or negative status. */
+ size_t offset=0,done=0;
+ uint8_t staging[UC772_MAX_COPY]={0};
+ enum wv64_status status=WV64_INVALID;
+ if(f->gpr[4]<=UC772_MAX_COPY&&
+    uc772_plan(event.active_root,t->child_root,S846_DATA,f->gpr[3],(size_t)f->gpr[4],&offset)==UC772_OK){
+  struct pf64_identity id={t->pid,t->handle,t->child_root};
+  status=pf64_read(a->service,a->mount,a->work,&id,f->gpr[1],f->gpr[2],staging,(size_t)f->gpr[4],&done);
+ }
+ if(status==WV64_OK&&done>f->gpr[4])return PS_EVIDENCE;
+ if(!a->audit(a->context,t,a->page))return PS_EVIDENCE;
+ saved.gpr[0]=status==WV64_OK?done:UINT64_C(0)-(uint64_t)status;
+ enum ps_status rc=dpr_observe(d,t->slot,t->handle,t->child_root,live,PS_YIELD);
+ if(rc!=PS_OK)return rc;
+ /* Once scheduler commit succeeds, the independently audited, pinned
+  * backing page is still valid on the serialized safe root. */
+ if(status==WV64_OK){
+  volatile uint8_t *dest=a->page+offset;
+  for(size_t i=0;i<done;i++)dest[i]=staging[i];
+ }
+ b->slots[t->slot].context=saved;
+ volatile uint8_t *wipe=staging;for(size_t i=0;i<sizeof staging;i++)wipe[i]=0;
+ return PS_OK;
+}
+#endif
+
 #endif
 
 #ifdef STYLEOS_TEST_RUNTIME_COOP_863
