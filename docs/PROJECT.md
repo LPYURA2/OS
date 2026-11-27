@@ -609,3 +609,6 @@ Correct legacy editor macro collision; CI pending.
 
 
 Owner clarification 28.11.2026: Deep Drop must also support future native applications added after installation, through a common versioned public SDK and system service (not per-app shell changes). [Application contract](architecture/DEEP_DROP_APP_CONTRACT.md). This requirement is not yet implemented; generalized acceptance follows real app migration.
+
+## Native apps 75 — start after bounded Deep Drop base acceptance
+74 runtime/test SHA cb30e3f91bf4dbfed6f0fb3c9477b9981283afbb, CI 46067891027 12/12 SUCCESS; owner contract docs d549606395a0efc9a8146ea702a6c73886d65cf2 (same runtime/tests, own CI independently tracked). [75 work plan](architecture/NATIVE_APPS_75.md), [continuation](NEXT_CHAT_NATIVE_APPS_75.md). Base text Deep Drop is accepted within tested limits; generalized extension deferred until real applications are integrated. Main unchanged.
