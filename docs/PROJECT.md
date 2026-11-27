@@ -1,3 +1,6 @@
+## StyleFS 42 — process-bound file broker candidate
+40 and 41 CI 8/8 SUCCESS. Reuse process registry and broker, check trusted identity and terminal-state refusal. [Handoff](NEXT_CHAT_STYLEFS_42.md). CI pending. Main unchanged.
+
 ## StyleFS 41 — selected-file read broker candidate
 40 CI pending at start, actual guest SUCCESS. Reuse mount and bounded read for principal-bound single-file grants. [Handoff](NEXT_CHAT_STYLEFS_41.md). Main unchanged.
 
