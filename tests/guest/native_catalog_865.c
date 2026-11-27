@@ -102,6 +102,12 @@ static bool catalog_read(void *unused,uint32_t lba,uint8_t out[512]){
 }
 static uint32_t nc_u32(const uint8_t *p){return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
 static bool nc_equal(const uint8_t *a,const uint8_t *b,size_t n){unsigned diff=0;for(size_t j=0;j<n;j++)diff|=a[j]^b[j];return !diff;}
+/* Dedicated expanded fixture records. Only accepted under this explicitly
+ * pinned test catalog, never in the ordinary kernel or generic installer. */
+static bool wide_record(const uint8_t *r){
+ static const uint8_t a[8]={'w','i','d','e','7','5',0,0},b[8]={'f','a','u','l','t','7','5',0};
+ return nc_equal(r+40,a,8)||nc_equal(r+40,b,8);
+}
 static bool catalog_valid(unsigned *out){
  for(unsigned j=0;j<NC_SECTORS;j++)if(!s863_disk_read(NC_FIRST+j,catalog+512*j))return false;
  uint8_t digest[32];nte_sha256(catalog,sizeof catalog,digest);
@@ -112,7 +118,8 @@ static bool catalog_valid(unsigned *out){
  for(unsigned j=0;j<count;j++){
   const uint8_t *r=catalog+16+j*NC_RECORD;
   uint32_t lba=nc_u32(r),bytes=nc_u32(r+4);
-  if(lba<3072u||lba>=4095u||bytes<120u||bytes>8192u||(bytes+511)/512>4095u-lba)return false;
+  if(lba<3072u||lba>=4095u||bytes<120u||
+     bytes>(count==3&&wide_record(r)?20480u:8192u)||(bytes+511)/512>4095u-lba)return false;
   bool named=false,ended=false,hashed=false;
   for(unsigned k=0;k<32;k++)if(r[8+k])hashed=true;
   for(unsigned k=0;k<8;k++){
@@ -138,6 +145,23 @@ static struct rt865_launch_request record_request(const uint8_t *r){
 }
 static enum ps_status launch_record(const uint8_t *r,uint32_t *pid,uint32_t *win){
  struct rt865_launch_request request=record_request(r);
+ if(!win&&wide_record(r)){
+  static uint8_t image[20480];
+  const size_t bytes=request.source.bytes,blocks=(bytes+511u)/512u;
+  if(bytes>sizeof image||!blocks)return PS_EVIDENCE;
+  for(size_t i=0;i<blocks;++i)if(!catalog_read(0,request.source.lba+(uint32_t)i,image+i*512u)){
+   native_wipe(image,sizeof image);return PS_EVIDENCE;
+  }
+  enum ps_status status=s875_native_launch_image(image,bytes,request.source.sha256,2,request.name,pid);
+  native_wipe(image,sizeof image);
+  if(status==PS_OK){
+   const struct pr_entry *p=pr_find(pr_global(),*pid);
+   if(!p)return PS_EVIDENCE;
+   arch_puts("STYLEOS WIDE75 ADMIT");field("pid",*pid);field("gen",p->scheduler_handle);
+   field("root",p->page_root);field("bytes",p->resident_bytes);arch_putc('\n');
+  }
+  return status;
+ }
  if(!win)return s865_native_launch(&request,pid);
  struct s865_window_launch result={0};
  enum ps_status status=s865_native_launch_window(&request,stop_session,"Stop fixture",
