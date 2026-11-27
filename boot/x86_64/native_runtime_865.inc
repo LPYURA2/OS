@@ -467,16 +467,37 @@ struct sample69_entry {
  const char *name;
  struct ws_bounds bounds;
 };
-#define SAMPLE69(n,label,x,y) {sample69_##n##_package,sizeof sample69_##n##_package, \
+#define SAMPLE69(n,source,label,x,y) {source,sample69_##n##_bytes, \
  {sample69_##n##_pkg_hash,sample69_##n##_elf_hash,sample69_##n##_manifest, \
- sizeof sample69_##n##_manifest,sizeof sample69_##n##_package},label,{x,y,160,120}}
+ sizeof sample69_##n##_manifest,sample69_##n##_bytes},label,{x,y,160,120}}
 static const struct sample69_entry sample69_catalog[]={
- SAMPLE69(0,"Native-sample",80,80),SAMPLE69(1,"Native-peer",280,80)
+ SAMPLE69(0,sample69_0_package,"Native-sample",80,80),
+ SAMPLE69(1,0,"Native-peer",280,80)
 };
 #undef SAMPLE69
 #define SAMPLE69_COUNT (sizeof sample69_catalog/sizeof sample69_catalog[0])
 static struct s865_window_launch sample69_live[SAMPLE69_COUNT];
 static uint32_t sample69_session;
+/* Narrow legacy provisioned media extent, never a raw probe of StyleFS
+ * volumes. The approved digest and exact size reside in the boot image.
+ * Temporary package storage is bounded and scrubbed after use. */
+#if defined(STYLEOS_PROVISIONED_STORAGE_864) && !defined(STYLEOS_LIVE_VOLUME_39) && !defined(STYLEOS_STYLEFS_MOUNT_RO) && !defined(STYLEOS_STYLEFS_MOUNT_RW) && !defined(STYLEOS_STYLEFS_DESKTOP_SCOPE) && !defined(STYLEOS_LBA48_BLOCK_19) && !defined(STYLEOS_WIDE_GUEST_20) && !defined(STYLEOS_PAGED_GUEST_34)
+bool s863_disk_read(uint32_t,uint8_t[512]);
+static uint8_t sample69_disk_package[NTP_MAX_PACKAGE];
+static bool sample69_read_peer(const struct sample69_entry *a){
+ uint8_t sector[512];uint32_t bytes=0;
+ if(!s863_disk_read(3000u,sector)||
+    ntp_disk_header(sector,a->pin.package_sha,&bytes)!=NTP_OK||
+    bytes!=a->bytes||bytes>NTP_MAX_PACKAGE)return false;
+ for(uint32_t i=0;i<(bytes+511u)/512u;++i){
+  if(!s863_disk_read(3001u+i,sector))return false;
+  size_t at=(size_t)i*512u,remaining=bytes-at;
+  size_t count=remaining<512u?remaining:512u;
+  for(size_t j=0;j<count;++j)sample69_disk_package[at+j]=sector[j];
+ }
+ return true;
+}
+#endif
 bool s865_launch_native_sample(void){
  if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
  unsigned index=0;
@@ -494,8 +515,24 @@ bool s865_launch_native_sample(void){
  if(u->selected_session!=sample69_session)return false;
  const struct sample69_entry *a=&sample69_catalog[index];
  struct s865_window_launch out={0};
- if(s865_native_launch_tea(a->package,a->bytes,&a->pin,sample69_session,
-  a->name,a->bounds,&out)!=PS_OK)return false;
+ enum ps_status status=PS_EVIDENCE;
+ if(a->package)status=s865_native_launch_tea(a->package,a->bytes,&a->pin,sample69_session,
+    a->name,a->bounds,&out);
+#if defined(STYLEOS_PROVISIONED_STORAGE_864) && !defined(STYLEOS_LIVE_VOLUME_39) && !defined(STYLEOS_STYLEFS_MOUNT_RO) && !defined(STYLEOS_STYLEFS_MOUNT_RW) && !defined(STYLEOS_STYLEFS_DESKTOP_SCOPE) && !defined(STYLEOS_LBA48_BLOCK_19) && !defined(STYLEOS_WIDE_GUEST_20) && !defined(STYLEOS_PAGED_GUEST_34)
+ else{
+  if(sample69_read_peer(a)){
+   status=s865_native_launch_tea(sample69_disk_package,a->bytes,&a->pin,sample69_session,
+     a->name,a->bounds,&out);
+   if(status==PS_OK){
+    arch_puts("STYLEOS TEA69 DISK");field("bytes",a->bytes);
+    field("sectors",1u+(a->bytes+511u)/512u);arch_putc('\n');
+   }
+  }
+  volatile uint8_t *wipe=sample69_disk_package;
+  for(size_t i=0;i<sizeof sample69_disk_package;++i)wipe[i]=0;
+ }
+#endif
+ if(status!=PS_OK)return false;
  const struct pr_entry *e=pr_find(pr_global(),out.pid);
  if(!e||!e->scheduler_handle||!e->page_root)fail("sample69-owner");
  sample69_live[index]=out;

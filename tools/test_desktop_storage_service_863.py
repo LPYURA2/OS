@@ -343,6 +343,22 @@ def main():
                 (out/f'external-{i}.elf').write_bytes(elf)
                 external_receipts.append((i,lba,len(elf),sectors))
         (out/'external-elf.json').write_text(json.dumps(external_receipts,indent=2))
+    if args.extended_desktop:
+        # The peer payload is not linked into EFI. Provision its canonical
+        # package independently in the bounded legacy data-disk region.
+        package=(build/'x86_64/Native-peer.tea').read_bytes()
+        if not 22<=len(package)<=16384:raise ValueError('peer package extent')
+        header=bytearray(512)
+        header[:8]=b'STEA769\0'
+        import struct
+        struct.pack_into('<II',header,8,1,len(package))
+        header[16:48]=hashlib.sha256(package).digest()
+        with base.open('r+b') as stream:
+            stream.seek(3000*512)
+            stream.write(header)
+            stream.write(package.ljust((len(package)+511)//512*512,b'\0'))
+        if package in efi.read_bytes():raise ValueError('peer package leaked into EFI')
+        (out/'Native-peer.tea').write_bytes(package)
     original=base.read_bytes();base.chmod(0o444)
     image('create','-f','qcow2','-F','raw','-b',str(base),str(top))
     media=None;iso=None;iso_sha=None
@@ -623,6 +639,18 @@ def main():
                         app=seq[len(prefix):]
                         if len(app)<3 or app[0]!=0x103 or app[-1]!=2 or any(x!=0x102 for x in app[1:-1]):
                             raise ValueError('ordinary TEA raw frame/input/exit proof')
+                    disk=records(lines,b'STYLEOS TEA69 DISK',('bytes','sectors'))
+                    package=(out/'Native-peer.tea').read_bytes()
+                    if len(disk)!=1 or tuple(disk[0][1].values())!=(len(package),1+(len(package)+511)//512):
+                        raise ValueError('external peer read receipt')
+                    if stats['rd_operations']<4+disk[0][1]['sectors']:raise ValueError('external package actual disk reads')
+                    (folder/'native-perf-counters.json').write_text(json.dumps({
+                        'scope':'QEMU TCG; syscall counts, not CPU utilization or physical timing',
+                        'controllers':len(admitted),'app_count':len(apps),
+                        'app_syscalls':[{ 'pid':a['pid'],'syscalls':len(syscalls[a['root']])-3*sum(c['root']==a['root'] for _,c in admitted),
+                        'input_polls':syscalls[a['root']].count(0x102)} for _,a in apps],
+                        'external_package_bytes':len(package),'package_sectors':disk[0][1]['sectors'],
+                        'disk_reads':stats['rd_operations'],'disk_writes':stats['wr_operations']},indent=2)+'\n')
                 else:
                     for m in re.finditer(r'\bCR3=([0-9a-fA-F]+)\b',data.decode('ascii')):
                         if int(m[1],16)==root:raise ValueError('unsolicited interrupt under ordinary safe root')

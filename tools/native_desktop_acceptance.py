@@ -1,6 +1,6 @@
 """Extra ordinary ISO UI checks, entirely on host. No kernel test module."""
 from uart_receipts import complete_lines
-import hashlib,json
+import hashlib,json,time
 from test_desktop_v0 import Frame
 from runtime_mixed_863_verify import row
 
@@ -109,6 +109,8 @@ def exercise(d,proc,serial,folder,wait):
     if lang['modifiers']!=5 or restored['modifiers']!=5 or lang['ru']==restart['ru'] or restored['ru']!=restart['ru']:raise ValueError('language switching')
     # A real standalone pinned .tea runs on explicit F7, no fixture catalog.
     # Wait for authenticated frame publication, then focus and send Q.
+    timings={}
+    started=time.monotonic_ns()
     d.key('f7');wait(proc,serial,b'STYLEOS TEA69 LAUNCHED',1)
     wait(proc,serial,b'STYLEOS NATIVE FRAME',1)
     wait(proc,serial,b'STYLEOS SHELL ACTION RENDERED',14)
@@ -117,21 +119,31 @@ def exercise(d,proc,serial,folder,wait):
     move(100,100)
     sample=d.screen('extended-tea-live')
     sample.check(81,81,'2579a1');sample.check(239,199,'2579a1')
+    timings['first_launch_to_frame_ms']=(time.monotonic_ns()-started)/1e6
+    started=time.monotonic_ns()
     d.key('f7');wait(proc,serial,b'STYLEOS TEA69 LAUNCHED',2)
     wait(proc,serial,b'STYLEOS NATIVE FRAME',2)
     wait(proc,serial,b'STYLEOS SHELL ACTION RENDERED',15)
     move(100,101)
     both=d.screen('extended-tea-both')
     both.check(81,81,'2579a1');both.check(281,81,'976332')
+    timings['disk_launch_to_frame_ms']=(time.monotonic_ns()-started)/1e6
+    started=time.monotonic_ns()
     d.button(True);d.button(False);d.key('q')
     wait(proc,serial,b'STYLEOS TEA69 RETIRED',1)
+    timings['first_close_ms']=(time.monotonic_ns()-started)/1e6
     move(300,100)
     peer=d.screen('extended-tea-peer')
     peer.check(281,81,'976332');peer.check(439,199,'976332')
     if peer.pixels[3*(peer.w*81+81):3*(peer.w*81+81)+3]==sample.pixels[3*(sample.w*81+81):3*(sample.w*81+81)+3]:
         raise ValueError('first app retained after retirement')
+    started=time.monotonic_ns()
     d.button(True);d.button(False);d.key('q')
     wait(proc,serial,b'STYLEOS TEA69 RETIRED',2)
+    timings['peer_close_ms']=(time.monotonic_ns()-started)/1e6
+    (folder/'native-perf-timing.json').write_text(json.dumps({
+        'scope':'host monotonic QEMU/QMP end-to-end; includes input and screenshot overhead',
+        'milliseconds':timings},indent=2)+'\n')
     move(55,435)
     ended=d.screen('extended-tea-retired')
     if ended.pixels[3*(ended.w*81+281):3*(ended.w*81+281)+3]==peer.pixels[3*(peer.w*81+281):3*(peer.w*81+281)+3]:

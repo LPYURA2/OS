@@ -38,7 +38,10 @@ def make(folder,index,name,color):
     assert len(package)<=16384
     def arr(name,data):return 'static const uint8_t '+name+'[]={'+','.join(str(x) for x in data)+'};\n'
     prefix='sample69_'+str(index)+'_'
-    return (arr(prefix+'package',package)+arr(prefix+'manifest',meta)+
+    # Peer is stored on a separately provisioned data disk; compile only
+    # its independently approved pins and extent, never its package bytes.
+    return ((arr(prefix+'package',package) if index==0 else '')+
+        '#define '+prefix+'bytes '+str(len(package))+'u\n'+arr(prefix+'manifest',meta)+
         arr(prefix+'pkg_hash',hashlib.sha256(package).digest())+
         arr(prefix+'elf_hash',hashlib.sha256(blob).digest()))
 def build(folder):
