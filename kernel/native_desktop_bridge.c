@@ -256,3 +256,59 @@ bool ndb_cycle_focus(const struct nwc_service *ipc,struct ndb_input *input,int w
     input->raised=input->focus;
     return true;
 }
+
+/* Panel coordinates intentionally preserve the previous five-slot layout. */
+struct desk_box ndb_task_box(int width,int height,unsigned slots,unsigned index)
+{
+    if(width<800||height<600||slots<NDB_LEGACY_TASKS||
+       slots>NDB_LEGACY_TASKS+NWC_PORTS||index>=slots)return (struct desk_box){0};
+    int step=(width-252)/(int)slots;
+    if(step>160)step=160;
+    return (struct desk_box){164+(int)index*step,height-52,step-4,48};
+}
+static bool task_equal(const struct nwc_task *a,const struct nwc_task *b)
+{
+    return a->window_id==b->window_id&&a->pid==b->pid&&
+           a->session_id==b->session_id&&a->generation==b->generation&&
+           a->root==b->root&&a->minimized==b->minimized;
+}
+bool ndb_task_panel_update(const struct nwc_service *ipc,struct ndb_task_panel *panel,
+                           int width,int height,unsigned legacy,uint32_t focus,
+                           struct desk_damage *damage)
+{
+    if(!panel||!damage||legacy>NDB_LEGACY_TASKS||width<800||height<600||
+       panel->count>NWC_PORTS)return false;
+    struct ndb_task_panel next={0};
+    next.legacy=legacy;
+    size_t n=nwc_task_snapshot(ipc,next.tasks,NWC_PORTS);
+    if(n>NWC_PORTS)return false;
+    next.count=(unsigned)n;next.slots=legacy+next.count;
+    if(next.slots<NDB_LEGACY_TASKS)next.slots=NDB_LEGACY_TASKS;
+    for(unsigned i=0;i<next.count;++i)
+        if(next.tasks[i].window_id==focus&&!next.tasks[i].minimized)next.focus=focus;
+    bool changed=false;
+    if((panel->count||next.count)&&(panel->legacy!=legacy||panel->slots!=next.slots)){
+        desk_damage_add(damage,(struct desk_box){164,height-52,width-266,48});
+        changed=true;
+    }else{
+        for(unsigned i=0;i<panel->count||i<next.count;++i){
+            if(i<panel->count&&i<next.count&&task_equal(&panel->tasks[i],&next.tasks[i])&&
+               (panel->focus==panel->tasks[i].window_id)==(next.focus==next.tasks[i].window_id))continue;
+            desk_damage_add(damage,ndb_task_box(width,height,next.slots,legacy+i));
+            changed=true;
+        }
+    }
+    *panel=next;
+    return changed;
+}
+const struct nwc_task *ndb_task_hit(const struct ndb_task_panel *panel,int width,int height,
+                                    unsigned legacy,int x,int y)
+{
+    if(!panel||panel->legacy!=legacy||panel->count>NWC_PORTS)return 0;
+    for(unsigned i=0;i<panel->count;++i){
+        struct desk_box b=ndb_task_box(width,height,panel->slots,legacy+i);
+        if(b.w>0&&x>=b.x&&y>=b.y&&(int64_t)x-b.x<b.w&&(int64_t)y-b.y<b.h)
+            return &panel->tasks[i];
+    }
+    return 0;
+}

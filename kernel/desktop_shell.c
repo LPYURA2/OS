@@ -70,6 +70,8 @@ static struct ndb_tracker native_view;
 static struct ndb_input native_input;
 static bool native_drag_armed;
 static int native_press_x,native_press_y;
+static struct ndb_task_panel native_panel;
+static bool native_panel_press;
 #endif
 static void native_plot(void *unused,int x,int y,uint32_t rgb)
 { (void)unused;desk_fill(x,y,1,1,rgb); }
@@ -186,9 +188,25 @@ static struct desk_box language_box(void)
 { return (struct desk_box){width - 102, panel_box().y + 8, 42, 37}; }
 static struct desk_box start_box(void) { return (struct desk_box){9, panel_box().y + 1, 153, 51}; }
 static struct desk_box menu_box(void) { return (struct desk_box){9, panel_box().y - 273, 313, 260}; }
+#ifdef STYLEOS_OWNED_SHELL_865
+static unsigned legacy_task_count(void)
+{
+    unsigned count=0;
+    for(int i=0;i<WINDOWS;++i)if(win[i].open)++count;
+    return count;
+}
+#endif
 static struct desk_box task_button(int number)
-{ return (struct desk_box){164 + number * min(160, (width - 252) / WINDOWS), panel_box().y + 2,
-                           min(156, (width - 252) / WINDOWS - 4), 48}; }
+{
+#ifdef STYLEOS_OWNED_SHELL_865
+    unsigned slots=legacy_task_count()+native_panel.count;
+    if(slots<WINDOWS)slots=WINDOWS;
+    return ndb_task_box(width,height,slots,(unsigned)number);
+#else
+    return (struct desk_box){164 + number * min(160, (width - 252) / WINDOWS), panel_box().y + 2,
+                           min(156, (width - 252) / WINDOWS - 4), 48};
+#endif
+}
 
 static int active(void)
 {
@@ -1416,10 +1434,25 @@ static void draw(void)
         struct desk_box b = task_button(n++);
         desk_round(b, i == top ? 0x202c3e : 0x172231);
         if (i == top) accent(b);
-        desk_icon(b.x + 12, b.y + 12, 23, app_icon(i), LIGHT);
-        desk_text(b.x + 45, b.y + 14, b.x + b.w - 3,
+        desk_icon(b.x + (b.w<70?(b.w-23)/2:12), b.y + 12, 23, app_icon(i), LIGHT);
+        if(b.w>=70)desk_text(b.x + 45, b.y + 14, b.x + b.w - 3,
                   modern_shell() && i == NOTES ? "Редактор" : app_name(i), LIGHT);
     }
+#ifdef STYLEOS_OWNED_SHELL_865
+    for(unsigned i=0;i<native_panel.count;++i){
+        const struct nwc_task *task=&native_panel.tasks[i];
+        struct desk_box b=ndb_task_box(width,height,native_panel.slots,native_panel.legacy+i);
+        if(!b.w)continue;
+        bool focused=native_panel.focus==task->window_id;
+        desk_round(b,focused?0x202c3e:0x172231);
+        if(focused)accent(b);
+        uint32_t color=task->minimized?MUTED:LIGHT;
+        desk_icon(b.x+(b.w<70?(b.w-23)/2:12),b.y+12,23,DESK_TASK,color);
+        const struct ws_window *w=ws_find(ws_global(),task->window_id);
+        if(w&&w->owner_pid==task->pid&&b.w>=70)
+            desk_text(b.x+45,b.y+14,b.x+b.w-3,w->title,color);
+    }
+#endif
     struct desk_box lang = language_box();
     desk_round(lang, contains(lang, mx, my) ? 0x34455e : 0x202c40);
     desk_text(lang.x + 9, panel.y + 16, width - 61, russian ? "RU" : "EN", LIGHT);
@@ -1459,6 +1492,27 @@ static bool mouse(const struct desk_event *event)
     const bool blocked=menu||drag>=0||transfer.id>=0;
     const bool released=!down&&mouse_down;
     const uint32_t source=native_input.capture;
+    /* A panel click uses the exact last displayed token, never a recomputed
+     * index. Consume the entire press/release sequence even on refusal. */
+    if(native_panel_press){
+        if(!down)native_panel_press=false;
+        mouse_down=down;
+        return false;
+    }
+    if(pressed&&!blocked&&!source){
+        const struct nwc_task *task=ndb_task_hit(&native_panel,width,height,legacy_task_count(),mx,my);
+        if(task){
+            bool minimize=!task->minimized&&native_input.focus==task->window_id;
+            if(nwc_task_set_minimized((struct nwc_service *)nwc_global(),task,minimize)==NWC_OK){
+                native_input.focus=minimize?0:task->window_id;
+                native_input.raised=minimize?0:task->window_id;
+                arch_puts(minimize?"STYLEOS DD73 TASK MINIMIZE\n":"STYLEOS DD73 TASK ACTIVATE\n");
+            }
+            native_panel_press=true;native_drag_armed=false;
+            mouse_down=down;current_file_click.id=-1;last_file_click.at=0;
+            return false;
+        }
+    }
     if(pressed){native_press_x=mx;native_press_y=my;native_drag_armed=!blocked;}
     if(blocked)native_drag_armed=false;
     if(ndb_route_pointer((struct nwc_service *)nwc_global(),&native_input,
@@ -1593,6 +1647,7 @@ static void restart_shell(void)
 #ifdef STYLEOS_OWNED_SHELL_865
     native_input=(struct ndb_input){0};
     native_drag_armed=false;
+    native_panel_press=false;
 #endif
     print_pid("STYLEOS SHELL RESTART pid=", new_pid);
 #if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
@@ -1724,6 +1779,8 @@ static void desktop_shell_step(void *opaque)
     struct desk_damage damage = {0};
 #ifdef STYLEOS_OWNED_SHELL_865
     unsigned native_changes=ndb_track_top(nwc_global(),&native_view,width,work_area().h,native_input.raised,&damage);
+    if(ndb_task_panel_update(nwc_global(),&native_panel,width,height,legacy_task_count(),
+                             native_input.focus,&damage))++native_changes;
 #else
     unsigned native_changes = ndb_track(nwc_global(), &native_view,
                                         width, work_area().h, &damage);
@@ -1796,6 +1853,7 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 #ifdef STYLEOS_OWNED_SHELL_865
     native_input=(struct ndb_input){0};
     native_drag_armed=false;
+    native_panel_press=false;
 #endif
     desk_sessions_init(desk_sessions_global());
     desk_draw_init(surface);

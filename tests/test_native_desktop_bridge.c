@@ -233,6 +233,45 @@ int main(void)
     update(1);
     assert(framebuffer[538u*800u+796u]==0x142030);
     assert(nwc_port_count(&ipc)==0);
+    /* Shared panel geometry, bounded at minimum width, and stale displayed
+     * tokens: reuse real registry/session/port, never synthetic UI entries. */
+    uint32_t p4=0,w4=0;
+    struct pr_admission a4={PR_NATIVE_USER,0,64,262144,0,"Panel"};
+    assert(pr_admit(&processes,&a4,&p4)==PR_OK);
+    assert(usr_bind(&sessions,s1,p4,64)==USR_OK);
+    assert(ws_open_app(&windows,&processes,p4,"Panel",(struct ws_bounds){20,20,100,100},&w4)==WS_OK);
+    assert(nwc_claim(&ipc,p4,64,262144,w4)==NWC_OK);
+    struct ndb_task_panel panel={0};struct desk_damage pd={0};
+    assert(ndb_task_panel_update(&ipc,&panel,800,600,5,0,&pd)&&panel.count==1&&panel.slots==6);
+    assert(pd.count&&!pd.all);
+    struct desk_box b=ndb_task_box(800,600,panel.slots,5);
+    assert(b.x>=164&&b.x+b.w<=712&&b.y==548&&b.h==48);
+    const struct nwc_task *token=ndb_task_hit(&panel,800,600,5,b.x,b.y);
+    assert(token&&token->window_id==w4&&token->pid==p4);
+    assert(!ndb_task_hit(&panel,800,600,4,b.x,b.y));
+    assert(!ndb_task_hit(&panel,800,600,5,b.x+b.w,b.y));
+    assert(nwc_task_set_minimized(&ipc,token,true)==NWC_OK);
+    assert(nwc_task_set_minimized(&ipc,token,false)==NWC_STALE);
+    pd=(struct desk_damage){0};
+    assert(ndb_task_panel_update(&ipc,&panel,800,600,5,0,&pd)&&panel.tasks[0].minimized);
+    assert(pd.count&&!pd.all);
+    pd=(struct desk_damage){0};
+    assert(!ndb_task_panel_update(&ipc,&panel,800,600,5,0,&pd)&&!pd.count&&!pd.all);
+    assert(nwc_task_set_minimized(&ipc,&panel.tasks[0],false)==NWC_OK);
+    assert(ndb_task_panel_update(&ipc,&panel,800,600,5,w4,&pd)&&panel.focus==w4);
+    assert(usr_lock(&sessions)==USR_OK);
+    pd=(struct desk_damage){0};
+    assert(ndb_task_panel_update(&ipc,&panel,800,600,5,w4,&pd)&&!panel.count&&!panel.focus);
+    assert(!ndb_task_hit(&panel,800,600,5,b.x,b.y)&&pd.count&&!pd.all);
+    for(unsigned count=5;count<=13;++count){
+        int right=164;
+        for(unsigned i=0;i<count;++i){
+            b=ndb_task_box(800,600,count,i);
+            assert(b.x>=right&&b.w>=23&&b.x+b.w<=712);right=b.x+b.w;
+        }
+    }
+    assert(ndb_task_box(800,600,5,0).w==105);
+    puts("STYLEOS 73 native panel layout / stale token / damage PASS");
     puts("STYLEOS 774 DESKTOP BRIDGE PASS: authentic pixels, clipping, damage, restart, user switch, lock, fault and stale cleanup");
     return 0;
 }

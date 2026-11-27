@@ -51,4 +51,18 @@ bool ndb_route_key(struct nwc_service *,struct ndb_input *,int width,int height,
 enum nwc_status ndb_request_close(struct nwc_service *,const struct ndb_input *,
                                  int width,int height,uint32_t expected_window);
 bool ndb_cycle_focus(const struct nwc_service *,struct ndb_input *,int width,int height);
+/* Panel layout is shared by renderer and hit testing. Keep the historic
+ * five-slot geometry until more slots are needed; never overlap tray. */
+enum { NDB_LEGACY_TASKS=5 };
+struct ndb_task_panel {
+    struct nwc_task tasks[NWC_PORTS];
+    unsigned count,legacy,slots;
+    uint32_t focus;
+};
+struct desk_box ndb_task_box(int width,int height,unsigned slots,unsigned index);
+bool ndb_task_panel_update(const struct nwc_service *,struct ndb_task_panel *,
+                           int width,int height,unsigned legacy,uint32_t focus,
+                           struct desk_damage *);
+const struct nwc_task *ndb_task_hit(const struct ndb_task_panel *,int width,int height,
+                                    unsigned legacy,int x,int y);
 #endif
