@@ -587,3 +587,8 @@ Correct live-volume verifier for CRLF UART and exact input receipt; no kernel ch
 ## StyleFS 42 — Explorer navigation candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_42.md). Main unchanged.
+
+
+## StyleFS 43 — scoped text open candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_43.md). Main unchanged.

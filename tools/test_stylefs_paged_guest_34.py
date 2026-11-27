@@ -161,6 +161,16 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
                 d.key("ret")
                 wait_exact(b"SFS42 ENTER DIRECTORY")
                 wait_exact(b"SFS42 CHILD ROWS")
+                # Open the real nested text file, verify the editor's
+                # content hash, then prove editing is blocked in RO mode.
+                digest=14695981039346656037
+                for byte in b"StyleOS: paged file read test.\nSecond line.\n":
+                    digest=((digest^byte)*1099511628211)&((1<<64)-1)
+                d.key("ret")
+                wait_exact(("SFS43 TEXT OPEN %016x"%digest).encode())
+                d.key("a")
+                wait_exact(b"SFS43 EDIT REFUSED")
+                d.key("f2")
                 d.key("backspace")
                 wait_exact(b"SFS42 UP DIRECTORY")
                 wait_exact(b"SFS42 ROOT ROWS",2)

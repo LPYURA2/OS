@@ -1056,7 +1056,7 @@ void desk_fs_paged_root_draw(const struct dp41_view *v,struct desk_box a){
  desk_text(a.x+67,a.y+SYSTEM_ROW+5,left-6,"Диск данных",TEXT);
  button(a,side+13,91,132,"+ Новая папка",false);
  button(a,side+152,91,105,"+ Текст",false);
- button(a,side+267,91,80,"Открыть",v->count&&v->rows[v->selected].entry.kind==SD64_DIRECTORY);
+ button(a,side+267,91,80,"Открыть",v->count&&(v->rows[v->selected].entry.kind==SD64_DIRECTORY||s43_text_supported(&v->rows[v->selected])));
  int type=right-157,size=right-74;
  desk_text(left+16,a.y+130,type-12,"Имя",DIM);
  desk_text(type,a.y+130,size-8,"Тип",DIM);

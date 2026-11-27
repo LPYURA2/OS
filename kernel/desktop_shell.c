@@ -56,6 +56,10 @@ static bool second_file_click;
 static unsigned current_folder, input_flags;
 static uint32_t data_sectors;
 static char incoming[DESK_STYLEFS_TEXT_LIMIT];
+#ifdef STYLEOS_LIVE_VOLUME_39
+static bool paged_editor_open;
+static char paged_editor_name[SD64_NAME+1];
+#endif
 static bool russian, shell_refreshed;
 /* No synthetic windows are created: the port registry is empty at boot. */
 static struct ndb_tracker native_view;
@@ -382,6 +386,9 @@ static void new_draft(int target)
 {
     open_window(target);
     if (dirty) { notice = "Сначала сохраните текущий текст"; return; }
+#ifdef STYLEOS_LIVE_VOLUME_39
+    if(target==NOTES)paged_editor_open=false;
+#endif
     document = -1;
     doc_folder = filesystem.mode ? filesystem.folder : current_folder;
     length = caret = 0;
@@ -426,6 +433,41 @@ static void open_document(unsigned slot)
 #endif
 }
 
+#ifdef STYLEOS_LIVE_VOLUME_39
+bool s43_open_editor(const struct po64_row *row)
+{
+    struct desk_editor_draft *draft=&desk_sessions_global()->editor;
+    if(draft->dirty){
+        open_window(NOTES);
+        if(active()==NOTES)notice="Сначала сохраните текущий текст";
+        return false;
+    }
+    size_t bytes=0;
+    if(!s43_read_text(row,incoming,sizeof incoming,&bytes))return false;
+    for(size_t off=0;off<bytes;){
+        size_t used=0;uint32_t cp=desk_utf8(incoming+off,bytes-off,&used);
+        if(!used||used>bytes-off||(cp<32&&cp!='\r'&&cp!='\n'&&cp!='\t')||
+           (cp==0xfffd&&used==1))return false;
+        off+=used;
+    }
+    open_window(NOTES);
+    if(active()!=NOTES)return false;
+    for(size_t i=0;i<bytes;i++)content[i]=incoming[i];
+    unsigned n=row->entry.key.length;
+    for(unsigned i=0;i<n;i++)paged_editor_name[i]=(char)row->entry.key.name[i];
+    paged_editor_name[n]=0;
+    paged_editor_open=true;
+    document=-1;doc_folder=0;length=bytes;caret=0;scroll=0;dirty=false;
+    notice="Открыто с диска — только чтение";
+    uint64_t hash=UINT64_C(14695981039346656037);
+    for(size_t i=0;i<bytes;i++){hash^=(uint8_t)content[i];hash*=UINT64_C(1099511628211);}
+    static const char hex[]="0123456789abcdef";
+    arch_puts("SFS43 TEXT OPEN ");
+    for(unsigned i=0;i<16;i++)arch_putc(hex[(hash>>(60-4*i))&15u]);
+    arch_putc('\n');
+    return true;
+}
+#endif
 static void save(void)
 {
     if (!data_writable()) { notice = "Диск данных недоступен для записи"; return; }
@@ -520,6 +562,12 @@ static bool insert_drop(void)
 
 static void replace(size_t lo, size_t hi, uint32_t cp)
 {
+#ifdef STYLEOS_LIVE_VOLUME_39
+    if(active()==NOTES&&paged_editor_open){
+        notice="Файл доступен только для чтения";
+        arch_puts("SFS43 EDIT REFUSED\n");return;
+    }
+#endif
     desk_text_app_replace(current_draft(), lo, hi, cp,
                           filesystem.mode ? DESK_STYLEFS_TEXT_LIMIT : DESK_TEXT_LIMIT);
 }
@@ -867,6 +915,9 @@ static void click(int x, int y)
                     notice = "Перед закрытием сохраните текст";
                 else {
                     if ((id == NOTES || id == NOTE_WINDOW) && modern_shell()) {
+#ifdef STYLEOS_LIVE_VOLUME_39
+                        if(id==NOTES)paged_editor_open=false;
+#endif
                         document = -1;
                         length = caret = 0;
                         scroll = 0;
@@ -994,6 +1045,9 @@ static void draw_window(int id, int top)
             sfs_entry_at(&filesystem.disk, (unsigned)document) : 0;
         const char *label = filesystem.mode ? (entry ? entry->name : "Без имени") :
                                               (document < 0 ? "Без имени" : files[document]);
+#ifdef STYLEOS_LIVE_VOLUME_39
+        if(id==NOTES&&paged_editor_open)label=paged_editor_name;
+#endif
         if (modern_shell()) {
             desk_fill(b.x + 10, b.y + 89, b.w - 20, 1, STROKE);
             desk_round((struct desk_box){b.x + 12, b.y + 94, 236, 29}, 0x4e3c2a);

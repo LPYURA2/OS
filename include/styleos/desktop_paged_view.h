@@ -13,4 +13,9 @@ bool s42_navigate(unsigned key);
 bool s42_select(unsigned row,bool open);
 bool desk_fs_paged_click(const struct dp41_view *,struct desk_box,int x,int y);
 void desk_fs_paged_root_draw(const struct dp41_view *,struct desk_box);
+/* Trusted read-only text handoff. The receiver's buffer is provisional
+ * until CRC, exact byte count and text validation have all succeeded. */
+bool s43_text_supported(const struct po64_row *);
+bool s43_read_text(const struct po64_row *,char *,size_t,size_t *);
+bool s43_open_editor(const struct po64_row *);
 #endif

@@ -226,11 +226,43 @@ static bool s42_page(uint64_t parent,uint64_t first){
  (void)pv64_close(&s34_work.volume);
  arch_puts("SFS42 UNAVAILABLE\n");return true;
 }
+bool s43_text_supported(const struct po64_row *row){
+ if(!row||row->entry.kind!=SD64_FILE||row->bytes>64u*1024u)return false;
+ unsigned n=row->entry.key.length;
+ if(n<4||n>SD64_NAME)return false;
+ const uint8_t *p=row->entry.key.name+n-4;
+ return p[0]=='.'&&(p[1]|32)=='t'&&(p[2]|32)=='x'&&(p[3]|32)=='t';
+}
+struct s43_copy {char *out;size_t cap,used;};
+static bool s43_sink(void *ctx,uint64_t at,const uint8_t *p,size_t n){
+ struct s43_copy *c=ctx;
+ if(at!=c->used||n>c->cap-c->used)return false;
+ for(size_t i=0;i<n;i++)c->out[c->used+i]=(char)p[i];
+ c->used+=n;return true;
+}
+bool s43_read_text(const struct po64_row *row,char *out,size_t cap,size_t *bytes){
+ if(!s41_root_view()||!out||!bytes||!s43_text_supported(row)||row->bytes>cap)return false;
+ struct po64_service *s=&s34_work.volume.objects;
+ struct s43_copy copy={out,cap,0};
+ uint64_t token=0;
+ /* Principal is the trusted diagnostic shell, not an application PID.
+  * Do not expose it or the token to user mode. */
+ if(po64_grant(s,303,&row->entry.key,row->entry.target,row->revision,&token)!=PO64_OK)return false;
+ enum po64_status rc=po64_read(s,303,token,s43_sink,&copy);
+ if(s->active&&po64_revoke(s,303,token)!=PO64_OK)return false;
+ if(rc!=PO64_OK||copy.used!=row->bytes)return false;
+ *bytes=copy.used;return true;
+}
 bool s42_select(unsigned row,bool open){
  struct dp41_view *v=&s34_work.root_view;
  if(!s41_root_view()||row>=v->count)return false;
  v->selected=row;
- if(!open||v->rows[row].entry.kind!=SD64_DIRECTORY)return true;
+ if(!open)return true;
+ if(v->rows[row].entry.kind==SD64_FILE){
+  if(s43_text_supported(&v->rows[row]))(void)s43_open_editor(&v->rows[row]);
+  return true;
+ }
+ if(v->rows[row].entry.kind!=SD64_DIRECTORY)return true;
  if(s34_work.depth>=DC64_PATH_MAX)return true;
  uint64_t id=v->rows[row].entry.target;
  s34_work.ancestors[s34_work.depth++]=v->parent;
