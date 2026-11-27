@@ -17,4 +17,21 @@ void *memcpy(void *dest, const void *source, size_t size)
     return dest;
 }
 
+/* Clang may lower overlapping aggregate assignments to memmove even in
+ * freestanding builds. Keep the diagnostic addition out of the ordinary
+ * kernel ABI. Volatile byte accesses prevent recursive builtin lowering. */
+#ifdef STYLEOS_PAGED_GUEST_34
+#include <stdint.h>
+void *memmove(void *dest,const void *source,size_t size)
+{
+    volatile unsigned char *d=dest;
+    const volatile unsigned char *s=source;
+    if ((uintptr_t)d>(uintptr_t)s && (uintptr_t)d-(uintptr_t)s<size) {
+        for (size_t i=size;i>0;--i) d[i-1]=s[i-1];
+    } else {
+        for (size_t i=0;i<size;++i) d[i]=s[i];
+    }
+    return dest;
+}
+#endif
 #endif /* STYLEOS_TEST_ACPICA_FIRMWARE_823 */

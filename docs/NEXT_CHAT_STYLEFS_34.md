@@ -1,3 +1,7 @@
 # StyleFS 34 — real guest paged profile candidate
 
 Base c6732ac7a0eecee25e4bc2dec82f8fa6c925dc61; 32 host PASS; 33 CI pending at start. Separate terminal --paged-guest-34 owned-root post-EBS profile, exact ATA serial and tag, fixed 4TiB geometry, access restricted to final 512 physical sectors plus read-only tag. Four disjoint grants, whole-page-attested static workspace. No ordinary boot or old profile modification beyond opt-in wiring. Host provisions explicit blank fixture; guest mounts, mkdir, cancels create, streams 1041 bytes, renames, verifies CRC, cold boot reads, independent host export. Four refused-media cases; QMP validates hardware, writes and flush evidence. CI pending; no actual guest success claim before logs. This is diagnostic, not ordinary mounted filesystem; full 100GB+ actual transfer, incremental updates, permissions, process broker and integration still pending. Main/history preserved. Next: fix any CI failures; then ordinary mounted volume/service and scoped operations; Deep Drop file contract, independent apps then standalone Deep Drop.
+
+
+## 34.1
+34 initial CI 46007845275: 7/8, paged guest link failed with undefined memmove from dc64_publish. 32 and 33 both 7/7. Add freestanding overlap-safe memmove only for STYLEOS_PAGED_GUEST_34, volatile byte accesses avoid recursive compiler lowering. Ordinary build unchanged. Rerun full CI; no runtime acceptance yet.
