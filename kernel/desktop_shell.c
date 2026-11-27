@@ -1456,6 +1456,9 @@ static void restart_shell(void)
     desktop_kernel_boundary864();
 #endif
     arch_puts("STYLEOS DESKTOP SHELL RESTART\n");
+#if defined(STYLEOS_OWNED_SHELL_865) && defined(STYLEOS_NATIVE_PINNED_CATALOG)
+    s865_native_request_shell_gap();
+#endif
 }
 
 static bool update_clock(void)
@@ -1503,6 +1506,86 @@ size_t desk_cursor_853(const struct desk_event *event)
 }
 #endif
 
+/* One bounded desktop iteration. Native process dispatch belongs to
+ * the kernel supervisor; no scheduler pump inside the view callback. */
+struct shell_cycle { unsigned tick; bool cursor_proven; };
+static void desktop_shell_step(void *opaque)
+{
+    struct shell_cycle *cycle=opaque;
+    struct desk_event e;
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
+    s863_shell_guard();
+    struct desk_event observed863={0};size_t writes863=0;unsigned batch863=0;
+#endif
+    struct visual old, next;
+    bool captured = false, editor = false, clock = false;
+    for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i) {
+        if (!captured) { take_visual(&old); captured = true; }
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
+        observed863=e;batch863++;
+#endif
+        if (e.mouse) editor |= mouse(&e) &&
+                      (active() == NOTES || active() == NOTE_WINDOW);
+        else editor |= keyboard(e.key, e.modifiers) &&
+                       (active() == NOTES || active() == NOTE_WINDOW);
+    }
+    if (++cycle->tick == 20000) { cycle->tick = 0; clock = update_clock(); }
+#if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
+    if(captured||clock)desktop_kernel_boundary864();
+#endif
+    bool imported = false;
+#ifdef STYLEOS_DESKTOP_UPDATE
+    if (desk_import_active()) imported = desk_import_poll(&filesystem);
+#endif
+    struct desk_damage damage = {0};
+    unsigned native_changes = ndb_track(nwc_global(), &native_view,
+                                        width, work_area().h, &damage);
+    bool process_changed=false;
+#ifdef STYLEOS_OWNED_SHELL_865
+    const bool process_shown=visible(TASKS);
+    bool periodic=false;
+    if(++process_poll==128u){process_poll=0;periodic=true;}
+    if(!process_shown||active()!=TASKS||menu)process_cancel();
+    if(process_shown&&(process_refresh||process_dirty||!process_was_visible||
+        (periodic&&(!process_valid||pr_global()->change_serial!=process_reply.process_serial)))){
+        process_changed=process_sample(process_refresh)||process_refresh||process_dirty||!process_was_visible;
+        if(process_changed)desk_damage_add(&damage,win[TASKS].box);
+    }
+    process_refresh=false;process_dirty=false;process_was_visible=process_shown;
+#endif
+    if (captured || clock || imported || shell_refreshed || native_changes || process_changed) {
+        if (shell_refreshed) { damage.all = true; shell_refreshed = false; }
+        bool cursor_only = false;
+        if (captured) {
+            take_visual(&next);
+            invalidate(&damage, &old, &next, editor, clock);
+            if (old.x != next.x || old.y != next.y) {
+                cursor_only = !damage.all && !damage.count;
+                desk_damage_add(&damage, (struct desk_box){old.x, old.y, CURSOR_W, CURSOR_H});
+                desk_damage_add(&damage, (struct desk_box){next.x, next.y, CURSOR_W, CURSOR_H});
+            }
+        } else if(!process_changed||clock) desk_damage_add(&damage, (struct desk_box){width - 96, panel_box().y + 14, 96, 24});
+        if (imported && visible(FILES)) {
+            desk_damage_add(&damage, win[FILES].box);
+            cursor_only = false;
+        }
+        size_t writes = desk_present(&damage, draw);
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(process_pending&&active()==TASKS&&!menu&&writes)process_confirm_drawn=true;
+#endif
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
+        writes863=writes;
+#endif
+        if (!cycle->cursor_proven && cursor_only && writes && writes <= 2u * CURSOR_W * CURSOR_H) {
+            arch_puts("STYLEOS DESKTOP CURSOR DAMAGE PASS\n");
+            cycle->cursor_proven = true;
+        }
+    }
+#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
+    if(captured)s863_shell_observe(&observed863,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),writes863,input_flags,batch863);
+#endif
+}
+ 
 _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 {
 #if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
@@ -1557,86 +1640,16 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
 #if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     s863_shell_observe(0,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),initial_writes863,input_flags,0);
 #endif
-    unsigned tick = 0;
-    bool cursor_proven = false;
+    struct shell_cycle cycle={0};
+#ifdef STYLEOS_OWNED_SHELL_865
+    s865_native_supervise(desktop_shell_step,&cycle);
+#else
     for (;;) {
-        struct desk_event e;
-#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
-        s863_shell_guard();
-        struct desk_event observed863={0};size_t writes863=0;unsigned batch863=0;
-#endif
-        struct visual old, next;
-        bool captured = false, editor = false, clock = false;
-        for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i) {
-            if (!captured) { take_visual(&old); captured = true; }
-#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
-            observed863=e;batch863++;
-#endif
-            if (e.mouse) editor |= mouse(&e) &&
-                          (active() == NOTES || active() == NOTE_WINDOW);
-            else editor |= keyboard(e.key, e.modifiers) &&
-                           (active() == NOTES || active() == NOTE_WINDOW);
-        }
-        if (++tick == 20000) { tick = 0; clock = update_clock(); }
-#if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
-        if(captured||clock)desktop_kernel_boundary864();
-#endif
-        bool imported = false;
-#ifdef STYLEOS_DESKTOP_UPDATE
-        if (desk_import_active()) imported = desk_import_poll(&filesystem);
-#endif
-        struct desk_damage damage = {0};
-        unsigned native_changes = ndb_track(nwc_global(), &native_view,
-                                            width, work_area().h, &damage);
-        bool process_changed=false;
-#ifdef STYLEOS_OWNED_SHELL_865
-        const bool process_shown=visible(TASKS);
-        bool periodic=false;
-        if(++process_poll==128u){process_poll=0;periodic=true;}
-        if(!process_shown||active()!=TASKS||menu)process_cancel();
-        if(process_shown&&(process_refresh||process_dirty||!process_was_visible||
-            (periodic&&(!process_valid||pr_global()->change_serial!=process_reply.process_serial)))){
-            process_changed=process_sample(process_refresh)||process_refresh||process_dirty||!process_was_visible;
-            if(process_changed)desk_damage_add(&damage,win[TASKS].box);
-        }
-        process_refresh=false;process_dirty=false;process_was_visible=process_shown;
-#endif
-        if (captured || clock || imported || shell_refreshed || native_changes || process_changed) {
-            if (shell_refreshed) { damage.all = true; shell_refreshed = false; }
-            bool cursor_only = false;
-            if (captured) {
-                take_visual(&next);
-                invalidate(&damage, &old, &next, editor, clock);
-                if (old.x != next.x || old.y != next.y) {
-                    cursor_only = !damage.all && !damage.count;
-                    desk_damage_add(&damage, (struct desk_box){old.x, old.y, CURSOR_W, CURSOR_H});
-                    desk_damage_add(&damage, (struct desk_box){next.x, next.y, CURSOR_W, CURSOR_H});
-                }
-            } else if(!process_changed||clock) desk_damage_add(&damage, (struct desk_box){width - 96, panel_box().y + 14, 96, 24});
-            if (imported && visible(FILES)) {
-                desk_damage_add(&damage, win[FILES].box);
-                cursor_only = false;
-            }
-            size_t writes = desk_present(&damage, draw);
-#ifdef STYLEOS_OWNED_SHELL_865
-            if(process_pending&&active()==TASKS&&!menu&&writes)process_confirm_drawn=true;
-#endif
-#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
-            writes863=writes;
-#endif
-            if (!cursor_proven && cursor_only && writes && writes <= 2u * CURSOR_W * CURSOR_H) {
-                arch_puts("STYLEOS DESKTOP CURSOR DAMAGE PASS\n");
-                cursor_proven = true;
-            }
-        }
-#if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
-        if(captured)s863_shell_observe(&observed863,(unsigned)mx,(unsigned)my,(unsigned)active(),russian,desk_sessions_global()->shell_restarts,note_length863(),note_hash863(),note_dirty863(),note_session863(),writes863,input_flags,batch863);
-#endif
-#ifdef STYLEOS_OWNED_SHELL_865
-        s865_native_pump();
-#elif defined(STYLEOS_TEST_DESKTOP_PUMP_863)
+        desktop_shell_step(&cycle);
+#ifdef STYLEOS_TEST_DESKTOP_PUMP_863
         s863_shell_pump();
 #endif
         for (unsigned i = 0; i < 64; ++i) __asm__ volatile("pause");
     }
+#endif
 }

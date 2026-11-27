@@ -21,6 +21,13 @@ enum ps_status s865_native_launch_window(const struct rt865_launch_request *,
 bool s865_native_probe_window_rollback(const struct rt865_launch_request *,uint32_t);
 #endif
 void s865_native_pump(void);
+/* Kernel-owned execution loop, independent of the bounded desktop callback.
+ * A returned step must leave the safe root and interrupt contract intact.
+ * This is a cooperative boundary, not isolation of privileged shell faults. */
+_Noreturn void s865_native_supervise(void (*shell_step)(void *),void *);
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+void s865_native_request_shell_gap(void);
+#endif
 /* Trusted trap continuation on safe root, with exact READY caller identity.
  * Copy only from the admitted private data page, never dereference user VA.
  * On failure leave kernel destination unchanged. Destination is trusted

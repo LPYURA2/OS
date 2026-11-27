@@ -240,3 +240,29 @@ void s865_native_pump(void){
  }
 }
 
+
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+static bool shell_gap_requested;
+void s865_native_request_shell_gap(void){
+ if(pr_snapshot(pr_global(),0,0,true)==2)shell_gap_requested=true;
+}
+#endif
+_Noreturn void s865_native_supervise(void (*shell_step)(void *),void *state){
+ if(!native_ready||!shell_step||!state||!s865_executor_idle()||!native_audit(0))
+  fail("native-supervisor-entry");
+ for(;;){
+  shell_step(state);
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+  if(shell_gap_requested){
+   shell_gap_requested=false;
+   const unsigned slices=16;
+   uint64_t start=runtime860->dispatcher.dispatches;
+   arch_puts("STYLEOS NATIVE SHELL-GAP-BEGIN");field("dispatches",start);arch_putc('\n');
+   for(unsigned i=0;i<slices;++i)s865_native_pump();
+   arch_puts("STYLEOS NATIVE SHELL-GAP-END");field("dispatches",runtime860->dispatcher.dispatches);arch_putc('\n');
+  }
+#endif
+  s865_native_pump();
+  for(unsigned i=0;i<64;++i)__asm__ volatile("pause");
+ }
+}

@@ -88,6 +88,20 @@ def verify_shell_boundary(lines,roots,loop=0x1000000d,focus=False,frame=False):
     if not earlier or f10[0][1]['restarts']!=earlier[-1]['restarts']+1:raise ValueError('shell refresh counter')
     if any(f10[0][1][k]!=earlier[-1][k] for k in ('text','text-hash','text-dirty','note-session')):
         raise ValueError('shell document continuity')
+    if frame:
+        begin=records(lines,b'STYLEOS NATIVE SHELL-GAP-BEGIN',('dispatches',))
+        end=records(lines,b'STYLEOS NATIVE SHELL-GAP-END',('dispatches',))
+        if len(begin)!=1 or len(end)!=1:raise ValueError('supervisor gap evidence')
+        lo,start=begin[0];hi,last=end[0]
+        if not f10[0][0]<lo<hi<first_stop or last['dispatches']-start['dispatches']!=16:
+            raise ValueError('supervisor gap dispatch count/order')
+        gap=records(lines[lo+1:hi],EVENT,EKEY)
+        if len(gap)!=16 or any(e['pid'] not in (1,2) or e['vector']!=0x50 or e['state']!=1 for _,e in gap):
+            raise ValueError('actual application execution during shell gap')
+        if any(sum(e['pid']==pid for _,e in gap)!=8 for pid in (1,2)):
+            raise ValueError('fairness without shell callback')
+        if any(lo<i<hi for i,_ in inputs):
+            raise ValueError('desktop input observed while shell callback suspended')
     # Windows/ports ownership is separately verified by enclosing lifecycle
     # checks at bind, revoke, rebind and final cleanup. No pixel IPC claim.
 
