@@ -109,6 +109,49 @@ enum ps_status s865_native_stop(uint32_t pid,uint64_t generation,bool authorized
  return s865_executor_stop(id,pid,generation,native_roots[id].built.root,
                            authorized,native_audit,native_release,0);
 }
+enum ps_status s865_native_launch_window(const struct rt865_launch_request *request,
+ uint32_t session,const char *title,struct ws_bounds bounds,struct s865_window_launch *out){
+ if(!request||!out||!title||!session)return PS_ARGUMENT;
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
+ struct usr_runtime *u=(struct usr_runtime *)usr_global();
+ struct nwc_service *n=(struct nwc_service *)nwc_global();
+ struct ws_service *w=ws_global();
+ struct pr_table *registry=pr_global();
+ if(!u||!n||!u->ready||!n->ready||u->processes!=registry||u->windows!=w||
+    n->registry!=registry||n->windows!=w||n->sessions!=u)return PS_STATE;
+ const struct usr_session *s=usr_find(u,session);
+ if(!s||s->state!=USR_ACTIVE||u->selected_session!=session)return PS_EVIDENCE;
+ if(bounds.width<=0||bounds.height<=0||bounds.width>8192||bounds.height>8192||
+    bounds.x < -8192||bounds.x>8192||bounds.y < -8192||bounds.y>8192)return PS_ARGUMENT;
+ unsigned len=0;
+ while(len<WS_TITLE_BYTES&&title[len]){
+  unsigned char c=(unsigned char)title[len++];
+  if(c<0x20||c==0x7f)return PS_ARGUMENT;
+ }
+ if(!len||len==WS_TITLE_BYTES)return PS_ARGUMENT;
+ if(!w->next_id||w->next_id==UINT32_MAX)return PS_EXHAUSTED;
+ if(nwc_port_count(n)>=NWC_PORTS||ws_snapshot(w,0,0)>=WS_MAX_WINDOWS)return PS_FULL;
+ uint32_t pid=0,win=0;
+ enum ps_status status=s865_native_launch(request,&pid);
+ if(status!=PS_OK)return status;
+ const struct pr_entry *entry=pr_find(registry,pid);
+ if(!entry||entry->state!=PR_READY||!entry->scheduler_handle)fail("native-window-launch-owner");
+ const uint64_t gen=entry->scheduler_handle,root=entry->page_root;
+ if(usr_bind(u,session,pid,gen)!=USR_OK||
+    ws_open_app(w,registry,pid,title,bounds,&win)!=WS_OK||
+    nwc_claim(n,pid,gen,root,win)!=NWC_OK){
+  if(s865_native_stop(pid,gen,true)!=PS_OK||pr_find(registry,pid)||
+     (win&&ws_find(w,win))||!native_audit(0))fail("native-window-launch-rollback");
+  return PS_EVIDENCE;
+ }
+ if(!s865_executor_idle()||!native_audit(0))fail("native-window-launch-publish");
+ *out=(struct s865_window_launch){pid,win};
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+ arch_puts("STYLEOS NATIVE WINDOW-LAUNCH");field("pid",pid);field("gen",gen);
+ field("root",root);field("session",session);field("window",win);arch_putc('\n');
+#endif
+ return PS_OK;
+}
 enum ps_status s865_native_stop_selected(uint32_t pid){
  if(!native_ready||!s865_executor_idle()||runtime860->dispatcher.current!=-1)return PS_STATE;
  if(!native_audit(0))return PS_EVIDENCE;

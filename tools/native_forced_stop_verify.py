@@ -291,6 +291,14 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
             if any(e[k]!=baseline[k] for _,e in route for k in ('text','text-hash','text-dirty','note-session')):
                 raise ValueError('native focus leaked into legacy editor')
     if window_frame:
+        launch=rec(b'STYLEOS NATIVE WINDOW-LAUNCH',('pid','gen','root','session','window'))
+        rejected=rec(b'STYLEOS NATIVE WINDOW-LAUNCH-REFUSALS',('session',))
+        if len(launch)!=3 or len(rejected)!=1:raise ValueError('windowed launch receipts')
+        sid=rejected[0][1]['session']
+        if not sid or not rejected[0][0]<admissions[0][0]:raise ValueError('preflight refusal ordering')
+        if [tuple(x.values()) for _,x in launch]!=[(1,1,roots[0],sid,b['window']),(2,2,roots[1],sid,b['peer-window']),(33,33,roots[0],sid,n['window'])]:
+            raise ValueError('windowed launch identity')
+        if any(not by_pid[x['pid']][0]<i<per[x['pid']][0][0] for i,x in launch):raise ValueError('window ownership after first dispatch')
         frames=rec(b'STYLEOS NATIVE FRAME',('pid','gen','root','window','va','count','status','first'))
         want=[(2,2,roots[1],0,0x12000ff0,2,1,0),(2,2,roots[1],0,0x12000200,2,0,0x234567),(2,2,roots[1],0,0x12000200,2,1,0)]
         if [tuple(x.values()) for _,x in frames]!=want:raise ValueError('frame acceptance or refusal receipts')

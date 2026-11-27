@@ -53,7 +53,13 @@ static bool grant_owned(uint32_t pid,uint64_t gen,uint32_t *win){
  const struct pr_entry *p=pr_find(pr_global(),pid);
  struct usr_runtime *s=sessions();struct nwc_service *c=channels();
  if(!p||!s||!c||!win||p->scheduler_handle!=gen)return false;
- if(usr_bind(s,stop_session,pid,gen)!=USR_OK||
+ if(frame_probe){
+  struct stop_owned owned;
+  if(!owned_refs(pid,*win,&owned)||owned.owner->session_id!=stop_session||
+     owned.owner->scheduler_handle!=gen||owned.port->owner_pid!=pid||
+     owned.port->scheduler_handle!=gen||owned.port->user_root!=p->page_root||
+     owned.port->length||owned.port->has_tile||owned.port->frame.count)return false;
+ }else if(usr_bind(s,stop_session,pid,gen)!=USR_OK||
     ws_open_app(ws_global(),pr_global(),pid,"Stop fixture",(struct ws_bounds){0,0,160,120},win)!=WS_OK||
     nwc_claim(c,pid,gen,p->page_root,*win)!=NWC_OK)return false;
  /* Nonempty IPC queue and tile must be scrubbed, not just hidden. */
@@ -124,11 +130,16 @@ static bool catalog_valid(unsigned *out){
  for(size_t j=16+count*NC_RECORD;j<sizeof catalog;j++)if(catalog[j])return false;
  *out=count;return true;
 }
-static enum ps_status launch_record(const uint8_t *r,uint32_t *pid){
+static enum ps_status launch_record(const uint8_t *r,uint32_t *pid,uint32_t *win){
  struct rt865_launch_request request={.source={.read=catalog_read,.lba=nc_u32(r),.sectors=4095u,.bytes=nc_u32(r+4)}};
  for(unsigned k=0;k<32;k++)request.source.sha256[k]=r[8+k];
  for(unsigned k=0;k<8;k++)request.name[k]=(char)r[40+k];
- return s865_native_launch(&request,pid);
+ if(!win)return s865_native_launch(&request,pid);
+ struct s865_window_launch result={0};
+ enum ps_status status=s865_native_launch_window(&request,stop_session,"Stop fixture",
+   (struct ws_bounds){0,0,160,120},&result);
+ if(status==PS_OK){*pid=result.pid;*win=result.window;}
+ return status;
 }
 static bool stop_fail(void){
  arch_puts("STYLEOS NATIVE FAIL forced-stop acceptance\n");return false;
@@ -185,7 +196,7 @@ static bool stop_step(void){
  field("peer",peer_pid);field("ports",nwc_port_count(channels()));arch_putc('\n');
  if(stop_phase==1){
   unsigned count=0;uint32_t fresh=0;
-  if(!catalog_valid(&count)||count!=32||launch_record(catalog+16,&fresh)!=PS_OK){
+  if(!catalog_valid(&count)||count!=32||launch_record(catalog+16,&fresh,frame_probe?&stop_window:0)!=PS_OK){
    native_wipe(catalog,sizeof catalog);return stop_fail();
   }
   native_wipe(catalog,sizeof catalog);
@@ -239,10 +250,22 @@ bool s865_native_catalog_request(void){
  frame_probe=forced&&nc_equal(catalog+16+NC_RECORD+40,frame_marker,8);
  focus_probe=frame_probe||(forced&&nc_equal(catalog+16+NC_RECORD+40,focus_marker,8));
  input_probe=focus_probe||(forced&&nc_equal(catalog+16+NC_RECORD+40,input_marker,8));
+ if(frame_probe){
+  uint32_t pid=0xabcdef,win=0x123456;
+  if(launch_record(catalog+16,&pid,&win)!=PS_ARGUMENT||pid!=0xabcdef||win!=0x123456||
+     pr_snapshot(pr_global(),0,0,true)||nwc_port_count(channels())||
+     !sessions()||usr_create(sessions(),UINT64_C(0x865),&stop_session)!=USR_OK||
+     launch_record(catalog+16,&pid,&win)!=PS_EVIDENCE||pid!=0xabcdef||win!=0x123456||
+     pr_snapshot(pr_global(),0,0,true)||nwc_port_count(channels())||
+     usr_select(sessions(),stop_session)!=USR_OK){
+   native_wipe(catalog,sizeof catalog);native_catalog_busy=false;return stop_fail();
+  }
+  arch_puts("STYLEOS NATIVE WINDOW-LAUNCH-REFUSALS");field("session",stop_session);arch_putc('\n');
+ }
  if(valid)for(unsigned j=0;j<count;j++){
   const uint8_t *r=catalog+16+j*NC_RECORD;
   uint32_t pid;
-  if(launch_record(r,&pid)!=PS_OK)break;
+  if(launch_record(r,&pid,frame_probe&&j<2?(j?&peer_window:&stop_window):0)!=PS_OK)break;
   if(forced&&j<2){
    const struct pr_entry *owner=pr_find(pr_global(),pid);
    if(!owner)break;
@@ -254,8 +277,8 @@ bool s865_native_catalog_request(void){
  native_wipe(catalog,sizeof catalog);native_catalog_busy=false;
  arch_puts("STYLEOS NATIVE CATALOG");field("valid",valid);field("requested",count);field("accepted",accepted);field("resident",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');
  if(forced&&accepted==count){
-  if(!sessions()||!channels()||usr_create(sessions(),UINT64_C(0x865),&stop_session)!=USR_OK||
-     usr_select(sessions(),stop_session)!=USR_OK||
+  if(!sessions()||!channels()||(!frame_probe&&(usr_create(sessions(),UINT64_C(0x865),&stop_session)!=USR_OK||
+     usr_select(sessions(),stop_session)!=USR_OK))||
      !grant_owned(stop_pid,stop_gen,&stop_window)||!grant_owned(peer_pid,peer_gen,&peer_window)||
      nwc_port_count(channels())!=2||usr_visible_windows(sessions(),0,0)!=2)return stop_fail();
   arch_puts("STYLEOS NATIVE STOP-OWNERS-BOUND");field("pid",stop_pid);field("window",stop_window);

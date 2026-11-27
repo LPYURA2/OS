@@ -2,12 +2,20 @@
 #define STYLEOS_NATIVE_RUNTIME_865_H
 #include <styleos/runtime_bank_862.h>
 #include <styleos/process_api.h>
+#include <styleos/window_service.h>
 /* Trusted kernel-side application source, not a syscall. Caller must
  * authorize the immutable reader/digest and own request/output storage.
  * No auto-run of arbitrary disk data, no session/window grant.
  * Current native ABI: one code page, one data page, one stack page. */
 #ifdef STYLEOS_OWNED_SHELL_865
 enum ps_status s865_native_launch(const struct rt865_launch_request *,uint32_t *);
+/* Trusted, serialized windowed launch on the safe root. Source and session
+ * must already be authorized by the supervisor. No user dispatch before
+ * process, session, window and channel are established. Outputs unchanged
+ * on refusal. No package installation or untrusted caller entry point. */
+struct s865_window_launch { uint32_t pid,window; };
+enum ps_status s865_native_launch_window(const struct rt865_launch_request *,
+    uint32_t session,const char *title,struct ws_bounds,struct s865_window_launch *);
 void s865_native_pump(void);
 /* Trusted trap continuation on safe root, with exact READY caller identity.
  * Copy only from the admitted private data page, never dereference user VA.
