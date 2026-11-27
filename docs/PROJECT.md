@@ -500,3 +500,8 @@ Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary bo
 ## StyleFS 27 — guarded edits candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_27.md). No ordinary boot or main changes.
+
+
+## StyleFS 28 — packed inode metadata candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_28.md). No ordinary boot or main changes.
