@@ -1,11 +1,30 @@
 name: StyleOS native application acceptance 70
 on:
   push:
-    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70]
+    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
+  deep-drop-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Bounded transfer broker GCC and Clang ASan UBSan
+        run: |
+          set -euo pipefail
+          mkdir -p build/deep-drop
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_deep_drop.c kernel/{deep_drop,process_runtime,window_service,user_session_runtime,native_window_channel}.c -o "build/deep-drop/$cc"
+            "build/deep-drop/$cc" | tee "build/deep-drop/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deep-drop-host
+          path: build/deep-drop/
   stop-host:
     runs-on: ubuntu-24.04
     steps:

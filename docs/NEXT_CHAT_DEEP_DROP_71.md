@@ -1,0 +1,4 @@
+# Deep Drop 71 — continuation
+Accepted 70: 2d2ea034ad8bab981afc3d397562f9acffd8796e, CI https://github.com/LPYURA2/OS/actions/runs/46056299932 (11/11 SUCCESS).
+Ordinary ISO: https://github.com/LPYURA2/OS/actions/runs/46056299932/artifacts/15226363372.
+Branch feature/styleos-deep-drop-71. Read AGENTS.md, docs/PROJECT.md, docs/architecture/DEEP_DROP_71_DESIGN.md, docs/NEXT_CHAT_NATIVE_APPS_70.md. New kernel-only broker and host tests, CI candidate; no runtime integration yet. Verify GCC/Clang and all existing 70 regressions. Next: authenticated CPL3 source/target trap integration and real QEMU transfer; no legacy fallback posing as IPC. Test actual source/target, cancellation and fault cleanup; preserve previous versions. No main update. Optimization remains continuous; full system idle CPU and less than 1 GB guest idle RAM are not yet measured/achieved. After Deep Drop, migrate default applications into independent .tea processes; then network, browser and updates.
