@@ -185,6 +185,14 @@ bool s875_root_build(const struct s842_root *safe,const struct s842_cache *c,
  uint64_t (*tables)[512],uint64_t pa,struct s846_root *out){
  return extents&&build_root(safe,c,a,l,id,g,tables,pa,out,true,extents);
 }
+uint64_t s875_data_pa(const struct s844_arena *a,struct s844_lease lease,
+ struct s846_extent e,uint64_t va,size_t bytes){
+ if(!extent_ok(e)||lease.pages!=e.code+e.data+e.stack||
+    !s844_lease_live(a,lease)||!bytes||va<S846_DATA)return 0;
+ uint64_t length=e.data*P,offset=va-S846_DATA;
+ if(bytes>length||offset>length-bytes)return 0;
+ return lease.pa+e.code*P+offset;
+}
 #endif
 
 #if !(defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))

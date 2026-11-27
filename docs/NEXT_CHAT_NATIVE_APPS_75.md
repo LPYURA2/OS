@@ -9,3 +9,6 @@ Added include/styleos/native_app_image_75.h, kernel/native_app_image_75.c, tests
 
 ## 75 implementation 2
 New s875_root_build/audit constructs and fully audits detached expanded roots using the existing paging code, with trusted per-slot exact extent records and mixed legacy/expanded leases. Tests inspect actual PTEs across all pages, W^X, guards, peer and stale refusal. Previous loader 81084 checks each GCC/Clang; new CI pending. Ordinary runtime still uses three-page APIs. Next wire expanded root metadata through frozen audit/admission and authenticated native data-span/context bounds; then hardware QEMU real multi-page execution and rollback, preserve existing tests. Do not start applications before infrastructure acceptance. Astra handoff above stays valid.
+
+## 75 implementation 3
+Connected ordinary runtime to per-slot trusted extent registry, frozen mixed-size sparse root audit and exact bounded private-data alias calculation. Legacy launch still uses {1,1,1}; rollback/retire clear extent and leases. Expanded staging/root primitives host verified previously; latest runtime changes need fresh CI (all old guest tests). Next implement bank/admission and architecture PC/SP/FP/syscall/timer/fault bounds for expanded layouts, actual multi-page CPL3 proof and cleanup; no new app UI yet. Astra reconcile against latest HEAD; don't restart accepted work.

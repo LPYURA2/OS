@@ -30,32 +30,40 @@ static bool cross(const struct s844_arena *arena,const struct s850_desktop_root 
 static bool sparse(const struct s842_root *base,const struct s842_cache *cache,
  const struct s844_arena *arena,const struct s844_lease leases[S846_ROOT_COUNT],
  const struct s846_guard *guard,const struct s850_desktop_root *desktop,
- const struct s846_root roots[S846_ROOT_COUNT]){
+ const struct s846_root roots[S846_ROOT_COUNT],const struct s846_extent *extents){
  if(!base||!cache||!arena||!leases||!guard||!desktop||!roots)return false;
- unsigned used,n=0;
+ unsigned used,n=0,total=0;
+ if(extents&&((uintptr_t)extents%_Alignof(struct s846_extent)||
+     !apart((uintptr_t)extents,S846_ROOT_COUNT*sizeof *extents,(uintptr_t)arena,sizeof *arena)||
+     !apart((uintptr_t)extents,S846_ROOT_COUNT*sizeof *extents,arena->base,S844_BYTES)||
+     !apart((uintptr_t)extents,S846_ROOT_COUNT*sizeof *extents,(uintptr_t)leases,S846_ROOT_COUNT*sizeof *leases)||
+     !apart((uintptr_t)extents,S846_ROOT_COUNT*sizeof *extents,(uintptr_t)roots,S846_ROOT_COUNT*sizeof *roots)))return false;
  if(!s844_count(arena,&used))return false;
  const struct s846_root *set[S846_ROOT_COUNT];
  for(unsigned i=0;i<S846_ROOT_COUNT;i++){
   if(!leases[i].generation){
-   if(leases[i].pa||leases[i].owner||leases[i].pages)return false;
+   if(leases[i].pa||leases[i].owner||leases[i].pages||
+      (extents&&(extents[i].code||extents[i].data||extents[i].stack)))return false;
    const unsigned char *p=(const void *)&roots[i];
    for(size_t j=0;j<sizeof roots[i];j++)if(p[j])return false;
    continue;
   }
-  if(!s865_root_audit(base,cache,arena,leases,i,guard,&roots[i])||
+  if(!(extents?s875_root_audit(base,cache,arena,leases,extents,i,guard,&roots[i]):
+                 s865_root_audit(base,cache,arena,leases,i,guard,&roots[i]))||
      !apart((uintptr_t)roots,S846_ROOT_COUNT*sizeof *roots,
             (uintptr_t)roots[i].plan.tables,PG_TABLE_BYTES))return false;
   for(unsigned j=0;j<n;j++)if(!tables_apart(&roots[i].plan,&set[j]->plan))return false;
+  total+=leases[i].pages;
   set[n++]=&roots[i];
  }
- return used==3*n&&cross(arena,desktop,set,n);
+ return used==total&&cross(arena,desktop,set,n);
 }
 bool rt865_roots_audit_sparse(const struct s842_root *base,const struct s850_gop_request *req,
  const struct s844_arena *arena,const struct s844_lease leases[S846_ROOT_COUNT],
  const struct s846_guard *guard,const struct s850_desktop_root *desktop,
  const struct s846_root roots[S846_ROOT_COUNT]){
  return base&&req&&arena&&leases&&guard&&desktop&&roots&&
-  s850_desktop_audit_guarded(base,req,guard,desktop)&&sparse(base,req->cache,arena,leases,guard,desktop,roots);
+  s850_desktop_audit_guarded(base,req,guard,desktop)&&sparse(base,req->cache,arena,leases,guard,desktop,roots,0);
 }
 bool rt864_roots_audit_set(const struct s842_root *base,const struct s850_gop_request *req,
  const struct s844_arena *arena,const struct s844_lease leases[S846_ROOT_COUNT],
@@ -71,7 +79,11 @@ bool rt864_roots_audit_set(const struct s842_root *base,const struct s850_gop_re
 #if (defined(STYLEOS_TEST_FOUR_GUEST_864) || defined(STYLEOS_OWNED_SHELL_865))
 bool rt865_roots_audit_sparse_frozen(const struct s842_root *base,const struct s842_cache *cache,const struct s850_gop_plan *proof,const struct boot_memory_evidence *e,const struct s844_arena *arena,const struct s844_lease leases[S846_ROOT_COUNT],const struct s846_guard *guard,const struct s850_desktop_root *desktop,const struct s846_root roots[S846_ROOT_COUNT]){
  return base&&cache&&proof&&e&&arena&&leases&&guard&&desktop&&roots&&
-  s850_desktop_audit_frozen_861(base,cache,proof,e,guard,desktop)&&sparse(base,cache,arena,leases,guard,desktop,roots);
+  s850_desktop_audit_frozen_861(base,cache,proof,e,guard,desktop)&&sparse(base,cache,arena,leases,guard,desktop,roots,0);
+}
+bool rt875_roots_audit_sparse_frozen(const struct s842_root *base,const struct s842_cache *cache,const struct s850_gop_plan *proof,const struct boot_memory_evidence *e,const struct s844_arena *arena,const struct s844_lease leases[S846_ROOT_COUNT],const struct s846_extent extents[S846_ROOT_COUNT],const struct s846_guard *guard,const struct s850_desktop_root *desktop,const struct s846_root roots[S846_ROOT_COUNT]){
+ return base&&cache&&proof&&e&&arena&&leases&&extents&&guard&&desktop&&roots&&
+  s850_desktop_audit_frozen_861(base,cache,proof,e,guard,desktop)&&sparse(base,cache,arena,leases,guard,desktop,roots,extents);
 }
 bool rt864_roots_audit_frozen(const struct s842_root *base,const struct s842_cache *cache,const struct s850_gop_plan *proof,const struct boot_memory_evidence *e,const struct s844_arena *arena,const struct s844_lease leases[S846_ROOT_COUNT],const struct s846_guard *guard,const struct s850_desktop_root *desktop,const struct s846_root roots[S846_ROOT_COUNT]){
  if(!base||!cache||!proof||!e||!arena||!leases||!guard||!desktop||!roots||

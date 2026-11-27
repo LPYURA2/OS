@@ -61,6 +61,23 @@ int main(void){
  CHECK(s875_root_audit(&safe,&c,&arena,leases,sizes,0,&guard,&a));
  CHECK(s875_root_audit(&safe,&c,&arena,leases,sizes,1,&guard,&b));
  verify(&a,0);verify(&b,1);
+ /* Exact data alias: across internal page boundaries is legal, never
+  * across the full data extent, never into code, stack or a stale lease. */
+ const uint64_t data_pa=leases[0].pa+8*P;
+ CHECK(s875_data_pa(&arena,leases[0],sizes[0],S846_DATA,16*P)==data_pa);
+ CHECK(s875_data_pa(&arena,leases[0],sizes[0],S846_DATA+P-1,2)==data_pa+P-1);
+ CHECK(s875_data_pa(&arena,leases[0],sizes[0],S846_DATA+16*P-1,1)==data_pa+16*P-1);
+ CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA+16*P-1,2));
+ CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA+16*P,1));
+ CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA-1,1));
+ CHECK(!s875_data_pa(&arena,leases[0],sizes[0],UINT64_MAX,1));
+ CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA,SIZE_MAX));
+ CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA,0));
+ CHECK(!s875_data_pa(&arena,leases[1],sizes[0],S846_DATA,1));
+ struct s844_lease stale=leases[0];stale.generation++;
+ CHECK(!s875_data_pa(&arena,stale,sizes[0],S846_DATA,1));
+ CHECK(s875_data_pa(&arena,leases[1],sizes[1],S846_DATA+P-1,1)==leases[1].pa+2*P-1);
+ CHECK(!s875_data_pa(&arena,leases[1],sizes[1],S846_DATA+P-1,2));
  for(unsigned i=0;i<3;i++){
   uint64_t va=S846_IST+3*i*P;
   CHECK(*find(&a,va)==(guard.pa[i]|3|NX));CHECK(absent(&a,va-P));CHECK(absent(&a,va+P));
@@ -83,6 +100,7 @@ int main(void){
  CHECK(s875_root_audit(&safe,&c,&arena,leases,sizes,0,&guard,&a));
  /* Retirement: old root cannot pass even if its tables remain intact. */
  CHECK(s844_release(&arena,leases[0].owner,leases[0]));
+ CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA,1));
  CHECK(!s875_root_audit(&safe,&c,&arena,leases,sizes,0,&guard,&a));
  memset(&leases[0],0,sizeof leases[0]);memset(&sizes[0],0,sizeof sizes[0]);
  CHECK(s875_root_audit(&safe,&c,&arena,leases,sizes,1,&guard,&b));

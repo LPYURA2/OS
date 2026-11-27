@@ -17,6 +17,9 @@ bool rt864_roots_audit_set(const struct s842_root *,const struct s850_gop_reques
 bool rt865_roots_audit_sparse_frozen(const struct s842_root *,const struct s842_cache *,const struct s850_gop_plan *,const struct boot_memory_evidence *,
  const struct s844_arena *,const struct s844_lease [S846_ROOT_COUNT],const struct s846_guard *,
  const struct s850_desktop_root *,const struct s846_root [S846_ROOT_COUNT]);
+bool rt875_roots_audit_sparse_frozen(const struct s842_root *,const struct s842_cache *,const struct s850_gop_plan *,const struct boot_memory_evidence *,
+ const struct s844_arena *,const struct s844_lease [S846_ROOT_COUNT],const struct s846_extent [S846_ROOT_COUNT],
+ const struct s846_guard *,const struct s850_desktop_root *,const struct s846_root [S846_ROOT_COUNT]);
 bool rt864_roots_audit_frozen(const struct s842_root *,const struct s842_cache *,const struct s850_gop_plan *,const struct boot_memory_evidence *,
  const struct s844_arena *,const struct s844_lease [S846_ROOT_COUNT],const struct s846_guard *,
  const struct s850_desktop_root *,const struct s846_root [S846_ROOT_COUNT]);

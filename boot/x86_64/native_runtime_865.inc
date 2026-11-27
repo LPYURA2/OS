@@ -5,6 +5,7 @@
 #include <styleos/native_runtime_865.h>
 static struct s846_root native_roots[S846_ROOT_COUNT];
 static struct s844_lease native_leases[S846_ROOT_COUNT];
+static struct s846_extent native_extents[S846_ROOT_COUNT];
 static struct s844_arena *native_arena;
 static const struct boot_memory_evidence *native_evidence;
 static struct s846_guard native_guard;
@@ -15,24 +16,26 @@ static void native_wipe(void *p,size_t n){volatile unsigned char *b=p;while(n--)
 static bool native_audit(void *unused){
  (void)unused;
  return native_arena&&native_evidence&&read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(&native_cache)&&
-  rt865_roots_audit_sparse_frozen(base861,&native_cache,&frozen861,native_evidence,native_arena,native_leases,&native_guard,&composed,native_roots);
+  rt875_roots_audit_sparse_frozen(base861,&native_cache,&frozen861,native_evidence,native_arena,native_leases,native_extents,&native_guard,&composed,native_roots);
 }
 volatile uint8_t *s865_native_data_span(unsigned id,uint32_t pid,uint64_t gen,uint64_t root,
                                         uint64_t va,size_t bytes){
- if(!native_ready||!bytes||bytes>4096u||va<S846_DATA||
-    va-S846_DATA>4096u-bytes||id>=S846_ROOT_COUNT||!runtime860||
-    runtime860->dispatcher.current!=-1||!native_audit(0))return 0;
+ if(!native_ready||!bytes||va<S846_DATA||id>=S846_ROOT_COUNT||!runtime860||
+    runtime860->dispatcher.current!=-1)return 0;
+ /* Reject malformed spans before the costly tree audit. No authority is
+  * inferred from this address calculation. */
+ const struct s846_extent extent=native_extents[id];
+ if(!extent.data||extent.data>16u||bytes>(size_t)extent.data*4096u||
+    va-S846_DATA>(size_t)extent.data*4096u-bytes)return 0;
  const struct pr_entry *caller=pr_find(pr_global(),pid);
  const struct s844_lease lease=native_leases[id];
  if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=gen||caller->page_root!=root||
     bank862.slots[id].pid!=pid||bank862.slots[id].handle!=gen||bank862.slots[id].root!=root||
     !native_roots[id].ready||native_roots[id].built.root!=root||
-    lease.generation!=gen||lease.pages!=3||lease.owner!=S846_OWNER_A+id||
-    !s844_lease_live(native_arena,lease))return 0;
- /* native_audit verifies the real detached PTEs and identity mapped
-  * safe-root arena, with this exact live generation and three-page lease.
-  * The data page is the second page; the user VA itself is never accessed. */
- return (volatile uint8_t *)(uintptr_t)(lease.pa+4096u+(va-S846_DATA));
+    lease.generation!=gen||lease.owner!=S846_OWNER_A+id||!native_audit(0))return 0;
+ /* The audit verifies every PTE and all live leases; never dereference
+  * the user VA. Only the caller's private RW/NX span may be aliased. */
+ return (volatile uint8_t *)(uintptr_t)s875_data_pa(native_arena,lease,extent,va,bytes);
 }
 bool s865_native_copy_data(unsigned id,uint32_t pid,uint64_t gen,uint64_t root,
                            uint64_t va,void *out,size_t bytes){
@@ -52,6 +55,7 @@ static bool native_release(void *unused,unsigned id,uint64_t root,uint64_t gener
  native_wipe(child_tables861[id],sizeof child_tables861[id]);
  if(!s844_release(native_arena,lease.owner,lease))return false;
  native_wipe(&native_leases[id],sizeof native_leases[id]);
+ native_wipe(&native_extents[id],sizeof native_extents[id]);
  return native_audit(0);
 }
 static bool native_boot(struct pg_experiment *p,const struct s842_cache *cache,const struct s846_guard *guard,struct s844_arena *arena){
@@ -70,12 +74,14 @@ enum ps_status s865_native_launch(const struct rt865_launch_request *request,uin
  while(id<S846_ROOT_COUNT&&native_leases[id].generation)++id;
  if(id==S846_ROOT_COUNT)return PS_FULL;
  if(!s844_acquire(native_arena,S846_OWNER_A+id,3,&native_leases[id]))return PS_FULL;
- if(!s865_root_build(base861,&native_cache,native_arena,native_leases,id,&native_guard,child_tables861[id],
+ native_extents[id]=(struct s846_extent){1,1,1};
+ if(!s875_root_build(base861,&native_cache,native_arena,native_leases,native_extents,id,&native_guard,child_tables861[id],
     (uintptr_t)child_tables861[id],&native_roots[id])){
   native_wipe(&native_roots[id],sizeof native_roots[id]);
   native_wipe(child_tables861[id],sizeof child_tables861[id]);
   if(!s844_release(native_arena,native_leases[id].owner,native_leases[id]))fail("native-build-rollback");
   native_wipe(&native_leases[id],sizeof native_leases[id]);
+  native_wipe(&native_extents[id],sizeof native_extents[id]);
   if(!native_audit(0))fail("native-build-audit");
   return PS_EVIDENCE;
  }

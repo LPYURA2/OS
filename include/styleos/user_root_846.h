@@ -54,6 +54,11 @@ bool s875_root_build(const struct s842_root *,const struct s842_cache *,const st
 bool s875_root_audit(const struct s842_root *,const struct s842_cache *,const struct s844_arena *,
  const struct s844_lease [S846_ROOT_COUNT],const struct s846_extent [S846_ROOT_COUNT],
  unsigned,const struct s846_guard *,const struct s846_root *);
+/* Internal safe-root alias calculation. Caller must separately prove live
+ * process identity, serialized safe CR3, and full page-table audit.
+ * The output is not a user pointer or an authority to copy. */
+uint64_t s875_data_pa(const struct s844_arena *,struct s844_lease,
+                     struct s846_extent,uint64_t va,size_t bytes);
 #endif
 /* Verify all four detached roots in the wide host profile. */
 #if (defined(STYLEOS_TEST_WIDE_ROOTS_864) || defined(STYLEOS_OWNED_SHELL_865))
