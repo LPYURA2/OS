@@ -11,7 +11,9 @@ TAG=b"STYLEOS-SFS39-PRIVATE-V1".ljust(512,b"\0")
 SERIAL="STYLEOS-SFS39-DATA"
 def main():
     p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True)
-    out=p.parse_args().output.resolve();out.mkdir(parents=True,exist_ok=False)
+    p.add_argument("--waiting-stop-only",action="store_true")
+    args=p.parse_args()
+    out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     require(subprocess.check_output(["qemu-system-x86_64","--version"],text=True).startswith("QEMU emulator version 8.2.2 "), "unvalidated QEMU")
     fw=(firmware_path("OVMF_CODE","OVMF_CODE"),firmware_path("OVMF_VARS","OVMF_VARS"))
     require(all(fw),"OVMF missing")
@@ -27,7 +29,7 @@ def main():
         "kernel/stylefs_paged_volume64.c" in manifest["sources"],"profile proof")
     iso=folder/"x86_64/StyleOS-owned-shell-865.iso"
     results=[]
-    for name,serial,tag,receipt in (("live",SERIAL,TAG,"SFS39 MOUNT PASS"),("foreign-tag",SERIAL,b"X"*512,"SFS39 REFUSE tag")):
+    for name,serial,tag,receipt in (() if args.waiting_stop_only else (("live",SERIAL,TAG,"SFS39 MOUNT PASS"),("foreign-tag",SERIAL,b"X"*512,"SFS39 REFUSE tag"))):
         raw=out/(name+".raw");fixture(raw,N,volume,tag)
         before=hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest()
         results.append(boot(out/name,iso,raw,N,serial,receipt,0,fw,live=True))
@@ -41,13 +43,26 @@ def main():
     damaged=out/"damaged.tea"
     payload=bytearray(package.read_bytes());payload[len(payload)//2]^=1
     damaged.write_bytes(payload)
-    for name,source,valid in (("tea-valid",package,True),("tea-invalid",damaged,False)):
+    cases=(("tea-waiting-stop",package,True),) if args.waiting_stop_only else (("tea-valid",package,True),("tea-invalid",damaged,False))
+    for name,source,valid in cases:
         volume=out/(name+"-volume.raw");run(tool,"newtea69",volume,source)
         raw=out/(name+".raw");fixture(raw,N,volume,TAG)
         before=hashlib.sha256(volume.read_bytes()).digest()
-        results.append(boot(out/name,iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid))
+        try:
+            results.append(boot(out/name,iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only))
+        except Exception:
+            # Bounded diagnostic tail in the job log even if upload fails.
+            uart=out/name/"debug.log"
+            if uart.exists():
+                with uart.open("rb") as stream:
+                    stream.seek(max(0,uart.stat().st_size-16384))
+                    print(stream.read().decode("ascii",errors="replace"),flush=True)
+            raise
         require(read_sector(raw,0)==TAG and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"TEA volume changed")
         raw.unlink();volume.unlink()
     (out/"results.json").write_text(json.dumps(results,indent=2)+"\n")
-    print("STYLEFS 39 LIVE VOLUME PASS: mount, desktop ready, input-boundary read, foreign media refusal, zero writes")
+    if args.waiting_stop_only:
+        print("TEA70 WAITING STOP PASS: fresh native application, confirmed UI stop, resource retirement, zero writes")
+    else:
+        print("STYLEFS 39 LIVE VOLUME PASS: mount, desktop ready, input-boundary read, foreign media refusal, zero writes")
 if __name__=="__main__":main()

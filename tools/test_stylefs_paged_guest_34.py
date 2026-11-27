@@ -78,7 +78,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -241,100 +241,103 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         seen_windows=set()
                         timings=[]
                         expected=[]
-                        idle={"before_cycles":host_idle_sample(proc,60)}
-                        for cycle in range(1,101):
-                            if cycle>1:
-                                # F2 clears stale native focus and restores Explorer.
-                                d.key("f2")
-                            started=time.monotonic_ns()
-                            d.key("ret")
-                            file=wait_prefix(b"STYLEOS TEA69 STYLEFS id=",cycle)
-                            require(b" id=0x0000000000000006 " in file and b" revision=0x0000000000000001 " in file,"exact selected file")
-                            launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ",cycle)
-                            frame=wait_prefix(b"STYLEOS NATIVE FRAME ",cycle)
-                            pid=launch.split()[3]
-                            pid_num=int(pid.split(b"=")[1],16)
-                            window=launch.split()[-1]
-                            require(pid in frame.split() and pid_num not in seen_pids and window not in seen_windows,"fresh application identity")
-                            seen_pids.add(pid_num);seen_windows.add(window)
-                            wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*cycle-1)
-                            observed=events(complete_lines(uart.read_bytes()))
-                            require(bool(observed),"guest pointer coordinates unavailable")
-                            d.x,d.y=observed[-1]["x"],observed[-1]["y"]
-                            count=len(observed)
-                            d.click(350,130)
-                            deadline=time.monotonic()+40
-                            while time.monotonic()<deadline and proc.poll() is None:
+                        if not tea_stop_only:
+                            idle={"before_cycles":host_idle_sample(proc,60)}
+                            for cycle in range(1,101):
+                                if cycle>1:
+                                    # F2 clears stale native focus and restores Explorer.
+                                    d.key("f2")
+                                started=time.monotonic_ns()
+                                d.key("ret")
+                                file=wait_prefix(b"STYLEOS TEA69 STYLEFS id=",cycle)
+                                require(b" id=0x0000000000000006 " in file and b" revision=0x0000000000000001 " in file,"exact selected file")
+                                launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ",cycle)
+                                frame=wait_prefix(b"STYLEOS NATIVE FRAME ",cycle)
+                                pid=launch.split()[3]
+                                pid_num=int(pid.split(b"=")[1],16)
+                                window=launch.split()[-1]
+                                require(pid in frame.split() and pid_num not in seen_pids and window not in seen_windows,"fresh application identity")
+                                seen_pids.add(pid_num);seen_windows.add(window)
+                                wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*cycle-1)
                                 observed=events(complete_lines(uart.read_bytes()))
-                                if len(observed)>count and (observed[-1]["x"],observed[-1]["y"])==(350,130) and not observed[-1]["buttons"]:
-                                    break
-                                time.sleep(.05)
-                            else:
-                                raise RuntimeError("native focus click receipt missing")
-                            if cycle in (1,100):
-                                visible=d.screen("tea69-file-visible" if cycle==1 else "tea70-file-visible-last")
-                                visible.check(281,81,"976332");visible.check(439,199,"976332")
-                            input_ready=time.monotonic_ns()
-                            if cycle==1:
-                                def received(kind,code):
-                                    deadline=time.monotonic()+40
-                                    while time.monotonic()<deadline and proc.poll() is None:
-                                        rows=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 INPUT-COUNTS",
-                                            ("pid","gen","empty","delivered","other","kind","code"))
-                                        matches=[v for _,v in rows if v["pid"]==pid_num and v["kind"]==kind and v["code"]==code]
-                                        if matches:return matches[-1]
-                                        time.sleep(.05)
-                                    raise RuntimeError("missing authenticated input counter")
-                                # Actual consumption of pointer release, not merely QMP submission.
-                                poll_before=received(3,0)
-                                poll_start=time.monotonic_ns()
-                                idle["one_app_no_input"]=host_idle_sample(proc,10)
-                            closed_start=time.monotonic_ns()
-                            d.key("q")
-                            retired=wait_prefix(b"STYLEOS TEA69 RETIRED ",cycle)
-                            require(pid in retired.split() and window in retired.split(),"exact process retirement")
-                            wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*cycle)
-                            ended=time.monotonic_ns()
-                            if cycle==1:
-                                poll_after=received(1,0x10)
-                                require(poll_after["gen"]==poll_before["gen"] and
-                                        poll_after["empty"]>=poll_before["empty"] and
-                                        poll_after["delivered"]==poll_before["delivered"]+1 and
-                                        poll_after["other"]==poll_before["other"],"idle input counters")
-                                elapsed=(ended-poll_start)/1e9
-                                delta=poll_after["empty"]-poll_before["empty"]
-                                require(delta<=1,"more than one empty request during event wait")
-                                lines=complete_lines(uart.read_bytes())
-                                parks=records(lines,b"STYLEOS TEA70 PARK",("pid","gen"))
-                                wakes=records(lines,b"STYLEOS TEA70 WAKE",("pid","gen"))
-                                require(any(v["pid"]==pid_num for _,v in parks) and any(v["pid"]==pid_num for _,v in wakes),"actual park/wake receipts missing")
-                                idle["guest_input_poll_baseline"]={"before":poll_before,"after":poll_after,
-                                    "empty_requests":delta,"host_observed_seconds":elapsed,
-                                    "empty_requests_per_host_second":delta/elapsed,
-                                    "scope":"same process between consumed release and Q, includes host boundary overhead; not guest CPU usage"}
-                            expected.extend([(1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)])
-                            resources=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 RESOURCES",
-                                ("phase","pid","resident","pages","owners","windows","ports"))
-                            require([tuple(v.values()) for _,v in resources]==expected,"StyleFS TEA resource release")
-                            timings.append({"cycle":cycle,"launch_to_input_ms":(input_ready-started)/1e6,
-                                            "close_to_release_ms":(ended-closed_start)/1e6})
-                        idle["after_cycles"]=host_idle_sample(proc,60)
-                        (folder/"host-idle-baseline.json").write_text(json.dumps({
-                            "scope":"Linux host QEMU TCG process only; not guest CPU or RAM; no input during samples",
-                            "samples":idle},indent=2)+"\n")
-                        def stats(key):
-                            values=sorted(t[key] for t in timings)
-                            return {"median":median(values),"p95":values[94],"max":values[-1]}
-                        (folder/"native-resource-accounting.json").write_text(json.dumps({
-                            "scope":"native leased user pages only; QEMU host timing includes QMP/input and occasional screenshot",
-                            "page_bytes":4096,"cycles":100,"snapshots":[v for _,v in resources],
-                            "timings":timings,"launch_to_input_ms":stats("launch_to_input_ms"),
-                            "close_to_release_ms":stats("close_to_release_ms")},indent=2)+"\n")
+                                require(bool(observed),"guest pointer coordinates unavailable")
+                                d.x,d.y=observed[-1]["x"],observed[-1]["y"]
+                                count=len(observed)
+                                d.click(350,130)
+                                deadline=time.monotonic()+40
+                                while time.monotonic()<deadline and proc.poll() is None:
+                                    observed=events(complete_lines(uart.read_bytes()))
+                                    if len(observed)>count and (observed[-1]["x"],observed[-1]["y"])==(350,130) and not observed[-1]["buttons"]:
+                                        break
+                                    time.sleep(.05)
+                                else:
+                                    raise RuntimeError("native focus click receipt missing")
+                                if cycle in (1,100):
+                                    visible=d.screen("tea69-file-visible" if cycle==1 else "tea70-file-visible-last")
+                                    visible.check(281,81,"976332");visible.check(439,199,"976332")
+                                input_ready=time.monotonic_ns()
+                                if cycle==1:
+                                    def received(kind,code):
+                                        deadline=time.monotonic()+40
+                                        while time.monotonic()<deadline and proc.poll() is None:
+                                            rows=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 INPUT-COUNTS",
+                                                ("pid","gen","empty","delivered","other","kind","code"))
+                                            matches=[v for _,v in rows if v["pid"]==pid_num and v["kind"]==kind and v["code"]==code]
+                                            if matches:return matches[-1]
+                                            time.sleep(.05)
+                                        raise RuntimeError("missing authenticated input counter")
+                                    # Actual consumption of pointer release, not merely QMP submission.
+                                    poll_before=received(3,0)
+                                    poll_start=time.monotonic_ns()
+                                    idle["one_app_no_input"]=host_idle_sample(proc,10)
+                                closed_start=time.monotonic_ns()
+                                d.key("q")
+                                retired=wait_prefix(b"STYLEOS TEA69 RETIRED ",cycle)
+                                require(pid in retired.split() and window in retired.split(),"exact process retirement")
+                                wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*cycle)
+                                ended=time.monotonic_ns()
+                                if cycle==1:
+                                    poll_after=received(1,0x10)
+                                    require(poll_after["gen"]==poll_before["gen"] and
+                                            poll_after["empty"]>=poll_before["empty"] and
+                                            poll_after["delivered"]==poll_before["delivered"]+1 and
+                                            poll_after["other"]==poll_before["other"],"idle input counters")
+                                    elapsed=(ended-poll_start)/1e9
+                                    delta=poll_after["empty"]-poll_before["empty"]
+                                    require(delta<=1,"more than one empty request during event wait")
+                                    lines=complete_lines(uart.read_bytes())
+                                    parks=records(lines,b"STYLEOS TEA70 PARK",("pid","gen"))
+                                    wakes=records(lines,b"STYLEOS TEA70 WAKE",("pid","gen"))
+                                    require(any(v["pid"]==pid_num for _,v in parks) and any(v["pid"]==pid_num for _,v in wakes),"actual park/wake receipts missing")
+                                    idle["guest_input_poll_baseline"]={"before":poll_before,"after":poll_after,
+                                        "empty_requests":delta,"host_observed_seconds":elapsed,
+                                        "empty_requests_per_host_second":delta/elapsed,
+                                        "scope":"same process between consumed release and Q, includes host boundary overhead; not guest CPU usage"}
+                                expected.extend([(1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)])
+                                resources=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 RESOURCES",
+                                    ("phase","pid","resident","pages","owners","windows","ports"))
+                                require([tuple(v.values()) for _,v in resources]==expected,"StyleFS TEA resource release")
+                                timings.append({"cycle":cycle,"launch_to_input_ms":(input_ready-started)/1e6,
+                                                "close_to_release_ms":(ended-closed_start)/1e6})
+                            idle["after_cycles"]=host_idle_sample(proc,60)
+                            (folder/"host-idle-baseline.json").write_text(json.dumps({
+                                "scope":"Linux host QEMU TCG process only; not guest CPU or RAM; no input during samples",
+                                "samples":idle},indent=2)+"\n")
+                            def stats(key):
+                                values=sorted(t[key] for t in timings)
+                                return {"median":median(values),"p95":values[94],"max":values[-1]}
+                            (folder/"native-resource-accounting.json").write_text(json.dumps({
+                                "scope":"native leased user pages only; QEMU host timing includes QMP/input and occasional screenshot",
+                                "page_bytes":4096,"cycles":100,"snapshots":[v for _,v in resources],
+                                "timings":timings,"launch_to_input_ms":stats("launch_to_input_ms"),
+                                "close_to_release_ms":stats("close_to_release_ms")},indent=2)+"\n")
                         # A separate 101st application is forcibly stopped
                         # while parked, through the actual two-step Processes UI.
                         # Keep the 100 normal lifecycle measurements intact.
-                        d.key("f2");d.key("ret")
-                        launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ",101)
+                        prior_cycles=0 if tea_stop_only else 100
+                        if prior_cycles:d.key("f2")
+                        d.key("ret")
+                        launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ",prior_cycles+1)
                         pid_num=int(launch.split()[3].split(b"=")[1],16)
                         gen=int(launch.split()[4].split(b"=")[1],16)
                         require(pid_num not in seen_pids,"fresh stop-test PID")
@@ -367,8 +370,8 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         d.key("ret")
                         stop=wait_prefix(b"STYLEOS PROCESSES STOP ")
                         require(stop==f"STYLEOS PROCESSES STOP pid={pid_num} status=0 remaining=0".encode(),"waiting process stop refusal")
-                        wait_prefix(b"STYLEOS TEA69 RETIRED ",101)
-                        wait_prefix(b"STYLEOS TEA70 RESOURCES ",202)
+                        wait_prefix(b"STYLEOS TEA69 RETIRED ",prior_cycles+1)
+                        wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*(prior_cycles+1))
                         lines=complete_lines(uart.read_bytes())
                         resources=records(lines,b"STYLEOS TEA70 RESOURCES",("phase","pid","resident","pages","owners","windows","ports"))
                         require([tuple(v.values()) for _,v in resources]==expected+[(1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)],"forced waiting cleanup")

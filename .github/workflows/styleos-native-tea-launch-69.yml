@@ -183,6 +183,31 @@ jobs:
             !build/tea-stylefs-live/**/*.raw
           if-no-files-found: warn
 
+  waiting-stop-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          set -euo pipefail
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Isolated waiting process UI stop
+        run: python3 tools/test_stylefs_live_volume_39.py --waiting-stop-only --output build/tea-waiting-stop
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styleos-tea-waiting-stop
+          path: |
+            build/tea-waiting-stop/
+            !build/tea-waiting-stop/*.raw
+            !build/tea-waiting-stop/**/*.raw
+          if-no-files-found: warn
+
   fault-acceptance:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
