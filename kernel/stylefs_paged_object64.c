@@ -293,3 +293,66 @@ enum po64_status po64_change_file(struct po64_service *s,struct po64_snapshot sn
   s->runs,s->run_cap,snap.sequence,&e,old->revision,&next);
  return edit_finish(s,pr,&next);
 }
+
+enum po64_status po64_mkdir(struct po64_service *s,struct po64_snapshot snap,
+ const struct sd64_key *key,uint64_t id){
+ enum po64_status rc=edit_ready(s,snap);
+ if(rc!=PO64_OK)return rc;
+ if(id<=1||!span(s,key,sizeof *key)||!sd64_key_valid(key))return PO64_INVALID;
+ if(!edit_parent(s,key->parent))return PO64_DENIED;
+ for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
+  if(s->nodes[i].id==id)return PO64_DENIED;
+ if(s->work->pair.dir.count>=s->node_cap)return PO64_FULL;
+ uint64_t found=0;uint8_t kind=0;
+ rc=edit_lookup(s,key,&found,&kind);
+ if(rc!=PO64_END)return rc==PO64_OK?PO64_DENIED:rc;
+ struct dc64_edit e={.op=DC64_CREATE,.entry={*key,id,SD64_DIRECTORY}};
+ struct pp64_pair next;
+ s->busy=true;
+ enum pp64_status pr=pp64_edit(s->block,&s->layout,s->work,s->nodes,s->node_cap,
+  s->runs,s->run_cap,snap.sequence,&e,0,&next);
+ return edit_finish(s,pr,&next);
+}
+/* The selected graph is already validated and sorted. Check ancestry
+ * before staging, including empty-directory removal. Lower layers repeat
+ * full graph validation including the depth of all moved descendants. */
+static bool directory_cycle(struct po64_service *s,uint64_t parent,uint64_t id){
+ for(unsigned depth=0;depth<=DC64_PATH_MAX;depth++){
+  if(parent==id)return true;
+  if(parent==1)return false;
+  bool found=false;
+  for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
+   if(s->nodes[i].id==parent&&s->nodes[i].kind==SD64_DIRECTORY){
+    parent=s->nodes[i].parent;found=true;break;
+   }
+  if(!found)return true;
+ }
+ return true;
+}
+enum po64_status po64_change_directory(struct po64_service *s,struct po64_snapshot snap,
+ const struct po64_row *old,const struct sd64_key *dest){
+ enum po64_status rc=edit_ready(s,snap);
+ if(rc!=PO64_OK)return rc;
+ if(!span(s,old,sizeof *old)||old->entry.kind!=SD64_DIRECTORY||
+    old->entry.target<=1||old->revision||old->bytes||!sd64_key_valid(&old->entry.key)||
+    (dest&&(!span(s,dest,sizeof *dest)||!sd64_key_valid(dest))))return PO64_INVALID;
+ uint64_t id=0;uint8_t kind=0;
+ rc=edit_lookup(s,&old->entry.key,&id,&kind);
+ if(rc!=PO64_OK)return rc==PO64_END?PO64_STALE:rc;
+ if(id!=old->entry.target||kind!=SD64_DIRECTORY)return PO64_STALE;
+ struct dc64_edit e={.op=dest?DC64_RENAME:DC64_REMOVE,.entry=old->entry};
+ if(dest){
+  if(!edit_parent(s,dest->parent)||directory_cycle(s,dest->parent,id))return PO64_DENIED;
+  rc=edit_lookup(s,dest,&id,&kind);
+  if(rc!=PO64_END)return rc==PO64_OK?PO64_DENIED:rc;
+  e.destination=*dest;
+ }else{
+  for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
+   if(s->nodes[i].parent==id)return PO64_DENIED;
+ }
+ struct pp64_pair next;
+ s->busy=true;
+ enum pp64_status pr=pp64_edit(s->block,&s->layout,s->work,s->nodes,s->node_cap,
+  s->runs,s->run_cap,snap.sequence,&e,0,&next);
+ return edit_finish(s,pr,&next);
+}

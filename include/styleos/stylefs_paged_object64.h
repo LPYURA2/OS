@@ -69,4 +69,11 @@ enum po64_status po64_create_empty(struct po64_service *,struct po64_snapshot,
  const struct sd64_key *,uint64_t new_id);
 enum po64_status po64_change_file(struct po64_service *,struct po64_snapshot,
  const struct po64_row *,const struct sd64_key *destination);
+/* Supervisor-only directory operations, same snapshot and authorization
+ * contract as file operations. No recursive deletion. Caller allocates a
+ * lifetime-unique ID. Destination NULL means empty rmdir. */
+enum po64_status po64_mkdir(struct po64_service *,struct po64_snapshot,
+ const struct sd64_key *,uint64_t new_id);
+enum po64_status po64_change_directory(struct po64_service *,struct po64_snapshot,
+ const struct po64_row *,const struct sd64_key *destination);
 #endif
