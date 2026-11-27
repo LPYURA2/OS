@@ -558,3 +558,8 @@ Correct test compilation warning and add corrupted-file rejection check; CI pend
 ## StyleFS 37 — scoped object guest candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_37.md). Main unchanged.
+
+
+## StyleFS 38 — mounted volume lifetime candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_38.md). Main unchanged.
