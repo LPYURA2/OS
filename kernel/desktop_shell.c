@@ -214,7 +214,7 @@ static bool process_has_pid(uint32_t pid)
     if(!process_valid||!pid)return false;
     for(unsigned i=0;i<process_reply.returned;++i)
         if(process_rows[i].pid==pid&&process_rows[i].type==PR_NATIVE_USER&&
-           process_rows[i].state==PR_READY)return true;
+           (process_rows[i].state==PR_READY||process_rows[i].state==PR_WAITING))return true;
     return false;
 }
 static void process_cancel(void)

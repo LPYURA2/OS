@@ -327,6 +327,50 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             "page_bytes":4096,"cycles":100,"snapshots":[v for _,v in resources],
                             "timings":timings,"launch_to_input_ms":stats("launch_to_input_ms"),
                             "close_to_release_ms":stats("close_to_release_ms")},indent=2)+"\n")
+                        # A separate 101st application is forcibly stopped
+                        # while parked, through the actual two-step Processes UI.
+                        # Keep the 100 normal lifecycle measurements intact.
+                        d.key("f2");d.key("ret")
+                        launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ",101)
+                        pid_num=int(launch.split()[3].split(b"=")[1],16)
+                        gen=int(launch.split()[4].split(b"=")[1],16)
+                        require(pid_num not in seen_pids,"fresh stop-test PID")
+                        deadline=time.monotonic()+40
+                        while time.monotonic()<deadline and proc.poll() is None:
+                            lines=complete_lines(uart.read_bytes())
+                            parks=records(lines,b"STYLEOS TEA70 PARK",("pid","gen"))
+                            if any(v=={"pid":pid_num,"gen":gen} for _,v in parks):break
+                            time.sleep(.05)
+                        else:raise RuntimeError("stop-test app never parked")
+                        snapshot_count=sum(x==b"STYLEOS PROCESSES END" for x in lines)
+                        d.key("f8");wait_exact(b"STYLEOS PROCESSES END",snapshot_count+1)
+                        from native_process_view_02 import decimal,ROW,HEADER,END
+                        lines=complete_lines(uart.read_bytes())
+                        end=max(i for i,x in enumerate(lines) if x==END)
+                        start=max(i for i,x in enumerate(lines[:end]) if x.startswith(HEADER+b" "))
+                        values=[decimal(x,ROW,(b"pid",b"group",b"state",b"ticks",b"bytes")) for x in lines[start+1:end]]
+                        require(len(values)==1 and values[0][0]==pid_num and values[0][2]==3,"Processes must show actual waiting PID")
+                        d.key("down");d.key("delete")
+                        arm=wait_prefix(b"STYLEOS PROCESSES ARM ")
+                        require(arm==f"STYLEOS PROCESSES ARM pid={pid_num}".encode(),"confirmation target mismatch")
+                        # Wait for the Delete input/render boundary before Enter.
+                        deadline=time.monotonic()+40
+                        while time.monotonic()<deadline and proc.poll() is None:
+                            lines=complete_lines(uart.read_bytes())
+                            ev=events(lines)
+                            if ev and ev[-1]["key"]==0x153 and ev[-1]["writes"]>0:break
+                            time.sleep(.05)
+                        else:raise RuntimeError("stop confirmation not rendered")
+                        d.key("ret")
+                        stop=wait_prefix(b"STYLEOS PROCESSES STOP ")
+                        require(stop==f"STYLEOS PROCESSES STOP pid={pid_num} status=0 remaining=0".encode(),"waiting process stop refusal")
+                        wait_prefix(b"STYLEOS TEA69 RETIRED ",101)
+                        wait_prefix(b"STYLEOS TEA70 RESOURCES ",202)
+                        lines=complete_lines(uart.read_bytes())
+                        resources=records(lines,b"STYLEOS TEA70 RESOURCES",("phase","pid","resident","pages","owners","windows","ports"))
+                        require([tuple(v.values()) for _,v in resources]==expected+[(1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)],"forced waiting cleanup")
+                        require(not any(v["pid"]==pid_num for _,v in records(lines,b"STYLEOS TEA70 WAKE",("pid","gen"))),"stop-test app woke unexpectedly")
+                        (folder/"waiting-stop.json").write_text(json.dumps({"pid":pid_num,"gen":gen,"state_before":3,"status":0,"resources":[v for _,v in resources[-2:]]},indent=2)+"\n")
                     else:
                         d.key("ret")
                         wait_exact(b"STYLEOS TEA69 STYLEFS REFUSED")
