@@ -453,6 +453,13 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
  if(!s865_executor_idle()||runtime860->dispatcher.current!=-1)return PS_STATE;
  if(!audit(opaque))return PS_EVIDENCE;
  const uint64_t safe=root848();
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+ const struct pr_entry *target=pr_find(runtime860->dispatcher.registry,pid);
+ const bool parked=target&&target->state==PR_WAITING;
+ if(parked&&(input_wait70[id].generation!=generation||
+             target->scheduler_handle!=generation||target->page_root!=child))
+  return PS_EVIDENCE;
+#endif
  enum ps_status status=rt865_bank_stop_ready(&bank862,runtime860,safe,id,pid,
                                              generation,child,authorized);
  if(status!=PS_OK)return status;
@@ -461,6 +468,16 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
  /* Cleanup identity only; dispatch zero is not a trap or dispatch ticket. */
  const struct rt862_selection identity={id,0,pid,generation,child,safe};
  retire865_identity(&identity,audit,retire,opaque);
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+ /* Retire broker state synchronously, even when there are no surviving
+  * processes and the next supervisor poll would take its empty fast path. */
+ input_wait70[id].generation=0;input_wait70[id].window=0;
+ if(parked){
+  arch_puts("STYLEOS TEA70 WAIT-RETIRED");fld848("pid",pid);
+  fld848("gen",generation);fld848("wait-gen",input_wait70[id].generation);
+  fld848("wait-window",input_wait70[id].window);arch_putc('\n');
+ }
+#endif
  if(!s865_executor_idle())fail848("865-stop-return");
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  arch_puts("STYLEOS NATIVE FORCED-STOP");fld848("slot",id);fld848("pid",pid);
