@@ -145,3 +145,135 @@ enum sp64_status sp64_provision(struct bs_service *b,const struct sp64_layout *l
  rc=publish(b,l,&s,&v);if(rc==SP64_OK)*out=v;return rc;
 }
 #endif
+
+/* All receipt invalidations are complete sector writes + flush + readback.
+ * Once an I/O failure occurs the block service quarantines the device. */
+static enum sp64_status clear_receipt(struct bs_service *b,uint64_t owner,uint64_t token,uint64_t at){
+ uint8_t blank[512]={0},check[512];
+ if(bs_write_sector(b,owner,token,at,blank)!=BS_OK||
+    bs_read_sector(b,owner,token,at,check)!=BS_OK||!zero(check,512))return SP64_UNCERTAIN;
+ return SP64_OK;
+}
+static enum sp64_status from_dir(enum dc64_status rc){
+ switch(rc){
+ case DC64_OK:return SP64_OK;
+ case DC64_FULL:return SP64_FULL;
+ case DC64_IO:return SP64_IO;
+ case DC64_UNCERTAIN:return SP64_UNCERTAIN;
+ case DC64_CORRUPT:return SP64_CORRUPT;
+ case DC64_CANCELLED:return SP64_CANCELLED;
+ default:return SP64_INVALID;
+ }
+}
+static enum sp64_status from_data(enum sj_status rc){
+ switch(rc){
+ case SJ_OK:return SP64_OK;
+ case SJ_FULL:return SP64_FULL;
+ case SJ_IO:return SP64_IO;
+ case SJ_UNCERTAIN:return SP64_UNCERTAIN;
+ case SJ_CORRUPT:case SJ_SIGNATURE:return SP64_CORRUPT;
+ default:return SP64_INVALID;
+ }
+}
+enum sp64_status sp64_prepare(struct bs_service *b,const struct sp64_layout *l,struct sp64_workspace *w,
+ struct dc64_node *a,size_t cap,struct sp64_pair *out){
+ struct spans s;
+ if(!args(b,l,w,a,cap,out)||!layout(b,l,true,&s)||
+    !grant(b,l->owner,l->dir,l->dir_sectors,true)||!grant(b,l->owner,l->data,l->data_sectors,true))return SP64_INVALID;
+ struct sp64_pair selected,other;
+ enum sp64_status rc=sp64_mount(b,l,w,a,cap,&selected);
+ if(rc!=SP64_OK)return rc;
+ /* Read all evidence before the first recovery write. */
+ uint8_t p[512];unsigned other_slot=selected.slot^1u;
+ if(bs_read_sector(b,l->owner,l->receipt,other_slot,p)!=BS_OK)return SP64_IO;
+ bool clear_pair=false;
+ if(decode(p,l,&s,other_slot,&other)){
+  if(other.sequence>selected.sequence){
+   if(other.sequence-selected.sequence!=1||other.dir_epoch<selected.dir_epoch||
+      other.data_epoch<selected.data_epoch||other.dir_epoch-selected.dir_epoch>1||
+      other.data_epoch-selected.data_epoch>1)return SP64_CORRUPT;
+   clear_pair=true;
+  }else{
+   if(other.sequence==selected.sequence||selected.sequence-other.sequence!=1||
+      other.dir_epoch>selected.dir_epoch||other.data_epoch>selected.data_epoch||
+      selected.dir_epoch-other.dir_epoch>1||selected.data_epoch-other.data_epoch>1)return SP64_CORRUPT;
+  }
+ }else if(!zero(p,512))clear_pair=true;
+ struct dc64_state latest;
+ enum dc64_status dr=dc64_mount(&latest,b,l->owner,l->dir,l->dir_sectors,&w->dw.publish);
+ if(dr!=DC64_OK)return from_dir(dr);
+ if(latest.epoch<selected.dir_epoch||latest.epoch-selected.dir_epoch>1||
+    (latest.epoch>selected.dir_epoch&&latest.active==w->dir.active))return SP64_CORRUPT;
+ bool clear_dir=latest.epoch>selected.dir_epoch;
+ unsigned data_bank=w->data.active^1u;uint64_t data_epoch=w->data.generation[data_bank];
+ if(data_epoch>selected.data_epoch&&data_epoch-selected.data_epoch>1)return SP64_CORRUPT;
+ bool clear_data=data_epoch>selected.data_epoch;
+ /* First retire any dangling global receipt so it cannot become valid again
+  * if an abandoned epoch number is reused. The selected receipt remains. */
+ if(clear_pair&&(rc=clear_receipt(b,l->owner,l->receipt,other_slot))!=SP64_OK)return rc;
+ if(clear_dir&&(rc=clear_receipt(b,l->owner,l->dir,latest.active))!=SP64_OK)return rc;
+ if(clear_data&&(rc=clear_receipt(b,l->owner,l->data,1+(uint64_t)data_bank*(1+SFS64_BANK_SECTORS)))!=SP64_OK)return rc;
+ /* Re-open and independently check both raw latest versions match selected. */
+ struct sp64_pair check;
+ rc=sp64_mount(b,l,w,a,cap,&check);
+ if(rc!=SP64_OK)return rc;
+ if(check.sequence!=selected.sequence||check.slot!=selected.slot||check.dir_epoch!=selected.dir_epoch||
+    check.data_epoch!=selected.data_epoch)return SP64_CORRUPT;
+ dr=dc64_mount(&latest,b,l->owner,l->dir,l->dir_sectors,&w->dw.publish);
+ if(dr!=DC64_OK)return from_dir(dr);
+ if(latest.epoch!=check.dir_epoch||latest.active!=w->dir.active||
+    w->data.generation[w->data.active^1u]>check.data_epoch)return SP64_CORRUPT;
+ *out=check;return SP64_OK;
+}
+enum sp64_status sp64_put_file(struct bs_service *b,const struct sp64_layout *l,struct sp64_put_workspace *w,
+ struct dc64_node *a,size_t cap,const struct sd64_key *key,uint64_t id,uint64_t revision,uint64_t bytes,
+ sp64_source read,void *ctx,struct sp64_pair *out){
+ if(!w||!cap||cap>SIZE_MAX/sizeof *a||!sd64_key_valid(key)||id<=1||
+    revision==UINT64_MAX||(bytes&&!read)||
+    !sep(w,sizeof *w,b,sizeof *b)||!sep(w,sizeof *w,l,sizeof *l)||
+    !sep(w,sizeof *w,a,cap*sizeof *a)||!sep(w,sizeof *w,out,sizeof *out)||
+    !sep(key,sizeof *key,w,sizeof *w)||!sep(key,sizeof *key,a,cap*sizeof *a)||
+    !sep(key,sizeof *key,b,sizeof *b)||!sep(key,sizeof *key,l,sizeof *l)||
+    !sep(key,sizeof *key,out,sizeof *out)||w->stream.active)return SP64_INVALID;
+ struct sp64_pair current;
+ enum sp64_status rc=sp64_prepare(b,l,&w->pair,a,cap,&current);
+ if(rc!=SP64_OK)return rc;
+ if(current.sequence==UINT64_MAX||current.data_epoch==UINT64_MAX||
+    (!revision&&current.dir_epoch==UINT64_MAX))return SP64_FULL;
+ struct dc64_state *d=&w->pair.dir;struct sfs64_journal *j=&w->pair.data;
+ bool parent=key->parent==1,used=false;
+ for(size_t i=0;i<(size_t)d->count;i++){
+  if(a[i].id==id)used=true;
+  if(a[i].id==key->parent&&a[i].kind==SD64_DIRECTORY)parent=true;
+ }
+ if(!parent||used!= (revision!=0))return SP64_INVALID;
+ uint64_t found=0;uint8_t kind=0;
+ enum sd64_status lookup=d->count?sd64_lookup(b,l->owner,l->dir,&d->root,key,w->pair.dw.page,&found,&kind):SD64_MISSING;
+ if(lookup!=SD64_MISSING&&lookup!=SD64_OK)return lookup==SD64_IO?SP64_IO:SP64_CORRUPT;
+ if(revision){
+  if(lookup!=SD64_OK||found!=id||kind!=SD64_FILE)return SP64_INVALID;
+  struct sfs64_file f;if(sfs64_stream_stat(j,id,&f)!=SJ_OK||f.revision!=revision)return SP64_INVALID;
+ }else{
+  if(lookup!=SD64_MISSING)return SP64_INVALID;
+  if(d->count>=cap)return SP64_FULL;
+ }
+ enum sj_status jr=sfs64_stream_begin(&w->stream,j,id,revision,bytes);
+ if(jr!=SJ_OK)return from_data(jr);
+ for(uint64_t at=0;at<bytes;){
+  uint64_t left=bytes-at;size_t n=left>sizeof w->transfer?sizeof w->transfer:(size_t)left;
+  if(!read(ctx,at,w->transfer,n)){sfs64_stream_cancel(&w->stream);return SP64_CANCELLED;}
+  jr=sfs64_stream_append(&w->stream,w->transfer,n);
+  if(jr!=SJ_OK){sfs64_stream_cancel(&w->stream);return from_data(jr);}
+  at+=n;
+ }
+ jr=sfs64_stream_finish(&w->stream);
+ if(jr!=SJ_OK){sfs64_stream_cancel(&w->stream);return from_data(jr);}
+ uint64_t dir_epoch=current.dir_epoch;
+ if(!revision){
+  struct dc64_edit edit={.op=DC64_CREATE,.entry={*key,id,SD64_FILE}};
+  enum dc64_status dr=dc64_hierarchy_apply(d,&w->pair.dw,a,cap,&edit);
+  if(dr!=DC64_OK)return from_dir(dr);
+  dir_epoch=d->epoch;
+ }
+ return sp64_commit(b,l,&w->pair,a,cap,current.sequence,dir_epoch,current.data_epoch+1,out);
+}

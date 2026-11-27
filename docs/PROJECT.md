@@ -490,3 +490,8 @@ Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary bo
 ## StyleFS 25 — paired snapshot visibility candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_25.md). Separate receipt; no production claim or main change.
+
+
+## StyleFS 26 — guarded recovery candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_26.md). No ordinary boot or main changes.

@@ -10,7 +10,7 @@
  * Do not restage, allocate or use standalone latest mounts after uncertain
  * results. Recovery here is read-only; repair/retry supervisor is future.
  * Directory/inode format unchanged; no automatic format or data GC. */
-enum sp64_status { SP64_OK,SP64_INVALID,SP64_CORRUPT,SP64_IO,SP64_FULL,SP64_UNCERTAIN };
+enum sp64_status { SP64_OK,SP64_INVALID,SP64_CORRUPT,SP64_IO,SP64_FULL,SP64_UNCERTAIN,SP64_CANCELLED };
 struct sp64_layout {uint64_t owner,receipt,dir,data,dir_sectors,data_sectors,data_start;};
 struct sp64_pair {uint64_t sequence,dir_epoch,data_epoch;unsigned slot;};
 struct sp64_workspace {
@@ -28,6 +28,30 @@ enum sp64_status sp64_mount(struct bs_service *,const struct sp64_layout *,
 enum sp64_status sp64_commit(struct bs_service *,const struct sp64_layout *,
  struct sp64_workspace *,struct dc64_node *,size_t cap,
  uint64_t expected_sequence,uint64_t dir_epoch,uint64_t data_epoch,struct sp64_pair *);
+/* Serialized recovery/preparation gate. Discard uncommitted newer component
+ * receipts (never the selected pair), invalidate a dangling newer global
+ * receipt before reusing its epochs. Refuse jumps greater than one epoch.
+ * No data sectors erased; allocation may reclaim abandoned extents.
+ * On uncertainty stop and cold reopen; never retry in the same session.
+ * Call only with sole RW grants for all three slices, no active raw writer.
+ */
+enum sp64_status sp64_prepare(struct bs_service *,const struct sp64_layout *,
+ struct sp64_workspace *,struct dc64_node *,size_t cap,struct sp64_pair *);
+/* Single synchronous guarded create/replace. Source fills exact requested
+ * chunk, false cancels before publication. Callbacks cannot reenter storage.
+ * Caller provides disjoint workspace, stream and 32KiB transfer buffer.
+ * Zero revision creates; existing revision replaces exact key and object.
+ * Failed operations may leave unpublished staging; next prepare discards it.
+ */
+typedef bool (*sp64_source)(void *,uint64_t offset,uint8_t *,size_t);
+struct sp64_put_workspace {
+ struct sp64_workspace pair;
+ struct sfs64_stream stream;
+ uint8_t transfer[SFS64_WINDOW_BYTES];
+};
+enum sp64_status sp64_put_file(struct bs_service *,const struct sp64_layout *,
+ struct sp64_put_workspace *,struct dc64_node *,size_t cap,const struct sd64_key *,
+ uint64_t id,uint64_t revision,uint64_t bytes,sp64_source,void *,struct sp64_pair *);
 #ifdef STYLEFS_HOST_FORMAT
 enum sp64_status sp64_provision(struct bs_service *,const struct sp64_layout *,
  struct sp64_workspace *,struct dc64_node *,size_t cap,struct sp64_pair *);
