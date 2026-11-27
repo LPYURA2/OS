@@ -539,3 +539,8 @@ Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary bo
 
 ### StyleFS 34.1
 Initial guest link failure corrected in diagnostic-only runtime. Recheck CI before accepting.
+
+
+## StyleFS 35 — scoped object service candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_35.md). Main unchanged.

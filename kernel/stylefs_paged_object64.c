@@ -1,0 +1,128 @@
+#include <styleos/stylefs_paged_object64.h>
+static bool sep(const void *a,size_t n,const void *b,size_t m){
+ return a&&b&&n<=UINTPTR_MAX-(uintptr_t)a&&m<=UINTPTR_MAX-(uintptr_t)b&&
+ ((uintptr_t)a+n<=(uintptr_t)b||(uintptr_t)b+m<=(uintptr_t)a);
+}
+static enum po64_status status(enum pp64_status rc){
+ switch(rc){
+ case PP64_OK:return PO64_OK;
+ case PP64_FULL:return PO64_FULL;
+ case PP64_IO:case PP64_UNCERTAIN:return PO64_IO;
+ case PP64_CORRUPT:return PO64_CORRUPT;
+ case PP64_CANCELLED:return PO64_CANCELLED;
+ default:return PO64_STALE;
+ }
+}
+static void clear(struct po64_service *s){
+ for(unsigned i=0;i<PO64_HANDLES;i++)s->handles[i]=(struct po64_handle){0};
+ s->active=false;
+}
+static bool ro(struct bs_service *b,const struct pp64_layout *l){
+ const uint64_t tokens[]={l->receipt,l->dir,l->inode,l->data};
+ for(unsigned i=0;i<4;i++){
+  bool found=false;
+  for(unsigned j=0;j<BS_GRANTS;j++){
+   const struct bs_grant *g=&b->grants[j];
+   if(g->token==tokens[i]&&g->owner==l->owner&&g->rights==BS_READ&&g->token){
+    found=true;break;
+   }
+  }
+  if(!found)return false;
+ }
+ return true;
+}
+static bool span(struct po64_service *s,const void *p,size_t n){
+ return sep(p,n,s,sizeof *s)&&sep(p,n,s->block,sizeof *s->block)&&
+ sep(p,n,s->work,sizeof *s->work)&&sep(p,n,s->nodes,s->node_cap*sizeof *s->nodes)&&
+ sep(p,n,s->runs,s->run_cap*sizeof *s->runs);
+}
+enum po64_status po64_mount(struct po64_service *s,struct bs_service *b,const struct pp64_layout *l,
+ struct pp64_stream_workspace *w,struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap){
+ if(!s)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(s->active||!cap||!rcap||cap>SIZE_MAX/sizeof *a||rcap>SIZE_MAX/sizeof *runs)return PO64_INVALID;
+ const void *p[]={s,b,l,w,a,runs};size_t n[]={sizeof *s,sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *runs};
+ for(unsigned i=0;i<6;i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PO64_INVALID;
+ if(!ro(b,l))return PO64_DENIED;
+ struct pp64_pair pair;
+ enum pp64_status rc=pp64_mount(b,l,&w->pair,a,cap,runs,rcap,&pair);
+ if(rc!=PP64_OK)return status(rc);
+ clear(s);s->block=b;s->layout=*l;s->pair=pair;s->work=w;s->nodes=a;s->node_cap=cap;s->runs=runs;s->run_cap=rcap;
+ s->active=true;return PO64_OK;
+}
+enum po64_status po64_unmount(struct po64_service *s){
+ if(!s)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ clear(s);return PO64_OK;
+}
+static enum po64_status live(struct po64_service *s){
+ if(!s->active)return PO64_STALE;
+ if(!ro(s->block,&s->layout)){clear(s);return PO64_STALE;}
+ struct pp64_pair p;
+ enum pp64_status rc=pp64_mount(s->block,&s->layout,&s->work->pair,s->nodes,s->node_cap,s->runs,s->run_cap,&p);
+ if(rc!=PP64_OK){clear(s);return status(rc);}
+ if(p.sequence!=s->pair.sequence||p.dir_epoch!=s->pair.dir_epoch||p.inode_epoch!=s->pair.inode_epoch||p.slot!=s->pair.slot){
+  clear(s);return PO64_STALE;
+ }
+ return PO64_OK;
+}
+enum po64_status po64_grant(struct po64_service *s,uint64_t principal,const struct sd64_key *key,uint64_t id,uint64_t rev,uint64_t *token){
+ if(!s||!principal||id<=1||!rev)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ if(!span(s,key,sizeof *key)||!span(s,token,sizeof *token)||!sep(key,sizeof *key,token,sizeof *token)||!sd64_key_valid(key))return PO64_INVALID;
+ enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
+ struct dc64_state *d=&s->work->pair.dir;uint64_t found=0;uint8_t kind=0;
+ enum sd64_status dr=d->count?sd64_lookup(s->block,s->layout.owner,s->layout.dir,&d->root,key,s->work->pair.dw.page,&found,&kind):SD64_MISSING;
+ if(dr==SD64_IO){clear(s);return PO64_IO;}
+ if(dr==SD64_CORRUPT){clear(s);return PO64_CORRUPT;}
+ if(dr!=SD64_OK||found!=id||kind!=SD64_FILE)return PO64_DENIED;
+ struct sfs64_file f;
+ enum ip64_status ir=ip64_stat(s->block,s->layout.owner,s->layout.inode,&s->work->pair.inode.root,id,&s->work->pair.iw,&f);
+ if(ir==IP64_IO){clear(s);return PO64_IO;}
+ if(ir!=IP64_OK){clear(s);return PO64_CORRUPT;}
+ if(f.revision!=rev)return PO64_STALE;
+ for(unsigned i=0;i<PO64_HANDLES;i++)if(!s->handles[i].token){
+  if(s->serial==UINT64_MAX)return PO64_FULL;
+  uint64_t t=++s->serial;
+  s->handles[i]=(struct po64_handle){t,principal,id,rev,*key};
+  *token=t;return PO64_OK;
+ }
+ return PO64_FULL;
+}
+static struct po64_handle *find(struct po64_service *s,uint64_t principal,uint64_t token){
+ for(unsigned i=0;i<PO64_HANDLES;i++)if(s->handles[i].token==token&&s->handles[i].principal==principal)return &s->handles[i];
+ return 0;
+}
+enum po64_status po64_revoke(struct po64_service *s,uint64_t principal,uint64_t token){
+ if(!s||!principal||!token)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ struct po64_handle *h=find(s,principal,token);if(!h)return PO64_DENIED;
+ *h=(struct po64_handle){0};return PO64_OK;
+}
+enum po64_status po64_revoke_owner(struct po64_service *s,uint64_t principal){
+ if(!s||!principal)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ for(unsigned i=0;i<PO64_HANDLES;i++)if(s->handles[i].principal==principal)s->handles[i]=(struct po64_handle){0};
+ return PO64_OK;
+}
+enum po64_status po64_read(struct po64_service *s,uint64_t principal,uint64_t token,pp64_sink sink,void *ctx){
+ if(!s||!principal||!token||!sink)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ struct po64_handle *h=find(s,principal,token);if(!h)return PO64_DENIED;
+ enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
+ /* Key copied to local trusted span; callback reentry cannot revoke or
+  * change token. The raw service is never exposed to applications. */
+ struct po64_handle copy=*h;
+ s->busy=true;
+ enum pp64_status pr=pp64_get(s->block,&s->layout,s->work,s->nodes,s->node_cap,s->runs,s->run_cap,
+  s->pair.sequence,&copy.key,copy.id,copy.revision,sink,ctx);
+ s->busy=false;
+ rc=status(pr);
+ if(rc!=PO64_OK&&rc!=PO64_CANCELLED)clear(s);
+ return rc;
+}
