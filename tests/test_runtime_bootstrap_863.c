@@ -78,7 +78,15 @@ int main(int argc,char **argv){
    OK(usr_create(users,1,&sid)==USR_OK&&usr_select(users,sid)==USR_OK);
    OK(dpr_admit(runtime,0,999,0x90000,0,"ipc",&pid)==PS_OK&&usr_bind(users,sid,pid,999)==USR_OK);
    OK(ws_open_app(w,p,pid,"ipc",(struct ws_bounds){0,0,400,300},&win)==WS_OK&&nwc_claim(channel,pid,999,0x90000,win)==NWC_OK);
+   /* A parked context retains its existing port, window and session.
+    * This tests only the service graph, not hardware context admission. */
+   OK(pr_transition(p,pid,999,PR_WAITING)==PR_OK&&rt864_shell_boundary(e.root,&v));
    OK(nwc_send_key(channel,win,65,0,true)==NWC_OK&&rt864_shell_boundary(e.root,&v));
+   uint64_t handle_saved=channel->ports[0].scheduler_handle;
+   channel->ports[0].scheduler_handle^=1;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].scheduler_handle=handle_saved;
+   unsigned waiting_slot=99;uint32_t waiting_pid=0;
+   OK(dpr_dispatch(runtime,&waiting_slot,&waiting_pid)==PS_EMPTY);
+   OK(pr_transition(p,pid,999,PR_READY)==PR_OK&&rt864_shell_boundary(e.root,&v));
    OK(nwc_send_pointer(channel,win,-1,7,1,0)==NWC_OK&&rt864_shell_boundary(e.root,&v));
    struct nwc_event pointer=channel->ports[0].events[1];
    channel->ports[0].events[1].size=7;NO(rt864_shell_boundary(e.root,&v));channel->ports[0].events[1]=pointer;

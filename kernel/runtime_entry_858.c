@@ -61,6 +61,10 @@ bool rt858_start(const struct rt858_expected *e,const struct rt858_live *v){
 }
 bool rt858_ready(uint64_t root){return phase==2&&root==active_root&&rt863_bootstrap_ready(root);}
 
+/* A parked native context remains live and retains its existing capabilities.
+ * The bank and architecture separately attest saved context and actual wait
+ * conditions. RUNNING is never permitted at this quiescent boundary. */
+static bool boundary_live(enum pr_state s){return s==PR_READY||s==PR_WAITING;}
 /* Shared ongoing service-graph validation. The root comes from the trusted
  * architecture, not from an app. Unlike initial-ready this allows admitted
  * native tasks and completed lifecycle counters. It never activates a root,
@@ -81,13 +85,13 @@ bool rt864_services_boundary(uint64_t live_root){
   const struct pr_entry *p=pr_find(ps->registry,s->pid);
   if(!p||p->type!=PR_NATIVE_USER||!s->handle||!page(s->user_root)||s->user_root==live_root||
      p->scheduler_handle!=s->handle||p->page_root!=s->user_root||
-     (p->state!=PR_READY&&p->state!=PR_EXITED&&p->state!=PR_FAULTED))return 0;
+     (!boundary_live(p->state)&&p->state!=PR_EXITED&&p->state!=PR_FAULTED))return 0;
   for(unsigned j=0;j<i;j++)if(ps->slots[j].pid&&(ps->slots[j].pid==s->pid||ps->slots[j].handle==s->handle||ps->slots[j].user_root==s->user_root))return 0;
  }
  for(unsigned i=0;i<PR_MAX_PROCESSES;i++){
   const struct pr_entry *p=&ps->registry->processes[i];if(p->state==PR_UNUSED)continue;
   unsigned matches=0;for(unsigned j=0;j<PS_MAX_SLOTS;j++)if(ps->slots[j].pid==p->pid&&p->pid)matches++;
-  if(matches!=1||p->type!=PR_NATIVE_USER||p->state==PR_RUNNING||p->state==PR_WAITING)return 0;
+  if(matches!=1||p->type!=PR_NATIVE_USER||(!boundary_live(p->state)&&p->state!=PR_EXITED&&p->state!=PR_FAULTED))return 0;
   for(unsigned j=0;j<i;j++)if(ps->registry->processes[j].state!=PR_UNUSED&&ps->registry->processes[j].pid==p->pid)return 0;
  }
  /* Validate existing user/window capabilities at every safe point. A missing
@@ -105,7 +109,7 @@ bool rt864_services_boundary(uint64_t live_root){
   const struct usr_owner *o=&u->owners[i];
   if(!o->pid){if(o->session_id||o->scheduler_handle)return false;continue;}
   const struct pr_entry *p=pr_find(ps->registry,o->pid);
-  if(!p||p->state!=PR_READY||p->scheduler_handle!=o->scheduler_handle||!usr_find(u,o->session_id))return false;
+  if(!p||!boundary_live(p->state)||p->scheduler_handle!=o->scheduler_handle||!usr_find(u,o->session_id))return false;
   for(unsigned j=0;j<i;j++)if(u->owners[j].pid&&(u->owners[j].pid==o->pid||u->owners[j].scheduler_handle==o->scheduler_handle))return false;
  }
  for(unsigned i=0;i<NWC_PORTS;i++){
@@ -113,7 +117,7 @@ bool rt864_services_boundary(uint64_t live_root){
   if(!q->window_id){if(!zero_bytes(q,sizeof *q))return false;continue;}
   const struct pr_entry *p=pr_find(ps->registry,q->owner_pid);
   const struct ws_window *w=ws_find(n->windows,q->window_id);
-  if(!p||p->state!=PR_READY||p->page_root!=q->user_root||p->scheduler_handle!=q->scheduler_handle||!w||w->role!=WS_APP_WINDOW||w->owner_pid!=q->owner_pid||!q->next_sequence||q->head>=NWC_EVENTS||q->length>NWC_EVENTS||q->length>=q->next_sequence)return false;
+  if(!p||!boundary_live(p->state)||p->page_root!=q->user_root||p->scheduler_handle!=q->scheduler_handle||!w||w->role!=WS_APP_WINDOW||w->owner_pid!=q->owner_pid||!q->next_sequence||q->head>=NWC_EVENTS||q->length>NWC_EVENTS||q->length>=q->next_sequence)return false;
   unsigned matches=0;
   for(unsigned j=0;j<PR_MAX_PROCESSES;j++)if(u->owners[j].pid==q->owner_pid&&u->owners[j].session_id==q->session_id&&u->owners[j].scheduler_handle==q->scheduler_handle)++matches;
   if(matches!=1)return false;
