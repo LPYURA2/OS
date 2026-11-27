@@ -15,7 +15,8 @@ static bool sink(void *c,uint64_t at,const uint8_t *p,size_t n){return fwrite(p,
 int main(int argc,char **argv){
  if(argc!=3&&argc!=4)return 1;
  bool create=!strcmp(argv[1],"new");
- if((create&&argc!=3)||(!create&&(argc!=4||strcmp(argv[1],"get"))))return 1;
+ bool object=!strcmp(argv[1],"get37");
+ if((create&&argc!=3)||(!create&&(argc!=4||(!object&&strcmp(argv[1],"get")))))return 1;
  int fd=open(argv[2],create?O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW:O_RDONLY|O_NOFOLLOW,0600);
  if(fd<0)return 1;
  struct stat st;
@@ -33,7 +34,7 @@ int main(int argc,char **argv){
  pp64_provision(&b,&l,&w.pair,nodes,32,runs,32,&pair)==PP64_OK;
  if(ok&&!create){
   FILE *out=fopen(argv[3],"wbx");struct sd64_key k={.parent=2,.length=1,.name={'b'}};
-  ok=out&&pp64_get(&b,&l,&w,nodes,32,runs,32,4,&k,3,1,sink,out)==PP64_OK;
+  ok=out&&pp64_get(&b,&l,&w,nodes,32,runs,32,object?5:4,&k,3,object?2:1,sink,out)==PP64_OK;
   if(out){if(fclose(out))ok=false;if(!ok)unlink(argv[3]);}
  }
  if(close(fd))ok=false;

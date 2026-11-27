@@ -9,8 +9,14 @@
 #define S34_I UINT64_C(66)
 #define S34_F (S34_CAP-2-S34_D-S34_I)
 #define S34_BYTES 1041u
+#ifdef STYLEOS_OBJECT_GUEST_37
+#include <styleos/stylefs_paged_object64.h>
+#define S34_SERIAL "STYLEOS-SFS37-DATA  "
+#define S34_TAG "STYLEOS-SFS37-PRIVATE-V1"
+#else
 #define S34_SERIAL "STYLEOS-SFS34-DATA  "
 #define S34_TAG "STYLEOS-SFS34-PRIVATE-V1"
+#endif
 enum s34_action { S34_IDENT,S34_READ,S34_WRITE,S34_FLUSH };
 struct s34_guard {
  struct ata857_live *live; struct ata_runtime_48 ata;
@@ -96,6 +102,9 @@ struct s34_work {
  struct pp64_stream_workspace stream;
  struct dc64_node nodes[32];
  struct sfs64_run current[32],previous[32];
+#ifdef STYLEOS_OBJECT_GUEST_37
+ struct po64_service object;
+#endif
 };
 static _Alignas(4096) union {
  struct s34_work value;
@@ -123,6 +132,44 @@ static bool s34_check(struct bs_service *svc,const struct pp64_layout *l){
  struct sd64_key k=s34_key(2,'b');uint64_t seen=0;
  return pp64_get(svc,l,&s34_work.stream,s34_work.nodes,32,s34_work.current,32,4,&k,3,1,s34_sink,&seen)==PP64_OK&&seen==S34_BYTES;
 }
+#ifdef STYLEOS_OBJECT_GUEST_37
+static bool s37_source(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ (void)ctx;for(size_t i=0;i<n;i++)p[i]=s34_byte(at+i)^0xffu;return true;
+}
+static bool s37_sink(void *ctx,uint64_t at,const uint8_t *p,size_t n){
+ uint64_t *seen=ctx;if(*seen!=at)return false;
+ for(size_t i=0;i<n;i++)if(p[i]!=(uint8_t)(s34_byte(at+i)^0xffu))return false;
+ *seen+=n;return true;
+}
+static void s37_mount(struct bs_service *svc,const struct pp64_layout *l){
+ if(po64_mount_rw(&s34_work.object,svc,l,&s34_work.stream,s34_work.nodes,32,
+  s34_work.current,s34_work.previous,32)!=PO64_OK)fail("sfs37-mount");
+}
+static void s37_read_new(void){
+ struct po64_service *s=&s34_work.object;struct sd64_key k=s34_key(2,'b');
+ uint64_t t=0,seen=0;
+ if(po64_grant(s,101,&k,3,2,&t)!=PO64_OK||
+    po64_read(s,202,t,s37_sink,&seen)!=PO64_DENIED||seen||
+    po64_read(s,101,t,s37_sink,&seen)!=PO64_OK||seen!=S34_BYTES||
+    po64_revoke_owner(s,101)!=PO64_OK||po64_read(s,101,t,s37_sink,&seen)!=PO64_DENIED)fail("sfs37-read-new");
+}
+static void s37_replace(struct bs_service *svc,const struct pp64_layout *l){
+ s37_mount(svc,l);
+ struct po64_service *s=&s34_work.object;struct sd64_key k=s34_key(2,'b');
+ uint64_t t=0,ro=0,seen=0;
+ if(po64_grant(s,202,&k,3,1,&ro)!=PO64_OK||
+    po64_grant_access(s,101,&k,3,1,PO64_READ|PO64_WRITE,&t)!=PO64_OK||
+    po64_write(s,202,ro,S34_BYTES,s37_source,0)!=PO64_DENIED||
+    po64_write(s,202,t,S34_BYTES,s37_source,0)!=PO64_DENIED||
+    po64_read(s,101,t,s34_sink,&seen)!=PO64_OK||seen!=S34_BYTES||
+    po64_write(s,101,t,S34_BYTES,s34_cancel,0)!=PO64_CANCELLED||
+    po64_write(s,101,t,S34_BYTES,s37_source,0)!=PO64_OK||
+    po64_read(s,202,ro,s34_sink,&seen)!=PO64_DENIED||
+    po64_grant(s,101,&k,3,1,&t)!=PO64_STALE)fail("sfs37-replace");
+ s37_read_new();
+ if(po64_unmount(s)!=PO64_OK)fail("sfs37-unmount");
+}
+#endif
 static _Noreturn void s34_run(void){
  s863_shell_guard();
  struct s34_guard g={.live=&disk863.s.live};
@@ -147,7 +194,15 @@ static _Noreturn void s34_run(void){
  enum pp64_status rc=pp64_mount(svc,&l,&s34_work.stream.pair,s34_work.nodes,32,s34_work.current,32,&pair);
  if(rc==PP64_CORRUPT)s34_end("SFS34 REFUSE metadata");
  if(rc!=PP64_OK)fail("sfs34-mount");
+#ifdef STYLEOS_OBJECT_GUEST_37
+ if(pair.sequence==5){
+  s37_mount(svc,&l);s37_read_new();
+  if(po64_unmount(&s34_work.object)!=PO64_OK)fail("sfs37-cold-unmount");
+  s34_end("SFS34 OBJECT COLD PASS");
+ }
+#else
  if(pair.sequence==4&&s34_check(svc,&l))s34_end("SFS34 COLD PASS");
+#endif
  if(pair.sequence!=1||s34_work.stream.pair.dir.count||s34_work.stream.pair.inode.root.files) s34_end("SFS34 REFUSE nonblank");
  struct dc64_edit e={.op=DC64_CREATE,.entry={s34_key(1,'d'),2,SD64_DIRECTORY}};
  if(pp64_edit(svc,&l,&s34_work.stream,s34_work.nodes,32,s34_work.current,32,1,&e,0,&pair)!=PP64_OK)fail("sfs34-mkdir");
@@ -156,5 +211,9 @@ static _Noreturn void s34_run(void){
  if(pp64_put(svc,&l,&s34_work.stream,s34_work.nodes,32,s34_work.current,s34_work.previous,32,2,&k,3,0,S34_BYTES,s34_source,0,&pair)!=PP64_OK)fail("sfs34-put");
  e=(struct dc64_edit){.op=DC64_RENAME,.entry={k,3,SD64_FILE},.destination=s34_key(2,'b')};
  if(pp64_edit(svc,&l,&s34_work.stream,s34_work.nodes,32,s34_work.current,32,3,&e,1,&pair)!=PP64_OK||!s34_check(svc,&l))fail("sfs34-rename-read");
+#ifdef STYLEOS_OBJECT_GUEST_37
+ s37_replace(svc,&l);s863_shell_guard();s34_end("SFS34 OBJECT WRITE PASS");
+#else
  s863_shell_guard();s34_end("SFS34 WRITE PASS");
+#endif
 }

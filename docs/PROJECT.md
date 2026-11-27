@@ -553,3 +553,8 @@ Correct test compilation warning and add corrupted-file rejection check; CI pend
 ## StyleFS 36 — scoped object write candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_36.md). Main unchanged.
+
+
+## StyleFS 37 — scoped object guest candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_37.md). Main unchanged.
