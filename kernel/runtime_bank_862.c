@@ -34,7 +34,11 @@ static bool binding(const struct rt862_bank *b,const struct dpr_service *d){
   const struct rt862_bank_slot *c=&b->slots[i];const struct ps_slot *slot=&s->slots[i];const struct pr_entry *p=pr_find(s->registry,c->pid);
   if(!c->pid){if(seen[i]||c->handle||c->root||!zero(&c->context,sizeof c->context)||slot->pid||slot->handle||slot->user_root||s->current==(int)i)return false;continue;}
   if(seen[i]!=1||!c->pid||!c->handle||!root(c->root)||c->root==b->safe||slot->pid!=c->pid||slot->handle!=c->handle||slot->user_root!=c->root||!p||p->type!=PR_NATIVE_USER||p->scheduler_handle!=c->handle||p->page_root!=c->root||((p->state==PR_RUNNING)!=(s->current==(int)i)))return false;
-  if(p->state==PR_READY||p->state==PR_RUNNING){if(!context(b,&c->context))return false;}
+  if(p->state==PR_READY||p->state==PR_RUNNING
+#ifdef STYLEOS_OWNED_SHELL_865
+     ||p->state==PR_WAITING
+#endif
+    ){if(!context(b,&c->context))return false;}
   else if(p->state==PR_EXITED||p->state==PR_FAULTED){if(!zero(&c->context,sizeof c->context))return false;}
   else return false;
  }
@@ -138,6 +142,22 @@ enum ps_status rt862_bank_admit(struct rt862_bank *b,struct dpr_service *d,uint6
  *pid=assigned;return PS_OK;
 }
 #ifdef STYLEOS_OWNED_SHELL_865
+/* Only a trusted, serialized supervisor may change the state of a saved
+ * context. Caller independently proves the wait condition or wake event.
+ * This API does not acquire an event, consume a queue or accept a user pointer. */
+enum ps_status rt865_bank_wait_state(struct rt862_bank *b,struct dpr_service *d,
+ uint64_t live,unsigned slot,uint32_t pid,uint64_t handle,uint64_t child,bool waiting){
+ if(!layout(b,d,0,0,1,0,0,1)||!binding(b,d)||live!=b->safe||
+    slot>=PS_MAX_SLOTS||!pid||!handle)return PS_EVIDENCE;
+ if(d->dispatcher.current!=-1)return PS_STATE;
+ const struct rt862_bank_slot *c=&b->slots[slot];
+ const struct pr_entry *p=pr_find(d->dispatcher.registry,pid);
+ if(!p||c->pid!=pid||c->handle!=handle||c->root!=child)return PS_EVIDENCE;
+ if(p->state!=(waiting?PR_READY:PR_WAITING))return PS_STATE;
+ /* Leave sufficient serial space for wake and terminal cleanup. */
+ if(d->dispatcher.registry->change_serial>UINT32_MAX-3u)return PS_EXHAUSTED;
+ return pr_transition(d->dispatcher.registry,pid,handle,waiting?PR_WAITING:PR_READY)==PR_OK?PS_OK:PS_REGISTRY_ERROR;
+}
 enum ps_status rt865_bank_stop_ready(struct rt862_bank *b,struct dpr_service *d,
  uint64_t live,unsigned slot,uint32_t pid,uint64_t handle,uint64_t child,bool authorized){
  if(!authorized||!layout(b,d,0,0,1,0,0,1)||!binding(b,d)||
@@ -146,7 +166,7 @@ enum ps_status rt865_bank_stop_ready(struct rt862_bank *b,struct dpr_service *d,
  struct rt862_bank_slot *c=&b->slots[slot];
  const struct pr_entry *p=pr_find(d->dispatcher.registry,pid);
  if(!p||c->pid!=pid||c->handle!=handle||c->root!=child)return PS_EVIDENCE;
- if(p->state!=PR_READY)return PS_STATE;
+ if(p->state!=PR_READY&&p->state!=PR_WAITING)return PS_STATE;
  if(d->dispatcher.registry->change_serial>UINT32_MAX-2u)return PS_EXHAUSTED;
  if(pr_transition(d->dispatcher.registry,pid,handle,PR_EXITED)!=PR_OK)
   return PS_REGISTRY_ERROR;

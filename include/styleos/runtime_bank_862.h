@@ -21,8 +21,12 @@ bool rt862_bank_open(struct rt862_bank *,struct dpr_service *,uint64_t,uint16_t,
 enum ps_status rt862_bank_admit(struct rt862_bank *,struct dpr_service *,uint64_t,unsigned,uint64_t,uint64_t,const char *,uint32_t *);
 #ifdef STYLEOS_OWNED_SHELL_865
 /* Trusted supervisor only; architecture proves safe CR3, IF=0, live lease
- * and quiescence. No fabricated dispatch or trap. READY only. */
+ * and quiescence. No fabricated dispatch or trap. READY or WAITING. */
 enum ps_status rt865_bank_stop_ready(struct rt862_bank *,struct dpr_service *,
+ uint64_t,unsigned,uint32_t,uint64_t,uint64_t,bool);
+/* Kernel-only saved context transition, exact slot/PID/generation/root.
+ * Does not prove or consume a wake event. No user ABI. */
+enum ps_status rt865_bank_wait_state(struct rt862_bank *,struct dpr_service *,
  uint64_t,unsigned,uint32_t,uint64_t,uint64_t,bool);
 #endif
 /* Architecture must first revoke/scrub mappings, lease and FP state. */
