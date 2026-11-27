@@ -23,6 +23,24 @@ def require(ok, why):
         raise RuntimeError(why)
 def run(*args):
     subprocess.run(list(map(str, args)), check=True)
+def host_idle_sample(proc,seconds):
+    # Linux /proc counts the entire QEMU process, not guest CPU time or RAM.
+    import os
+    def sample():
+        require(proc.poll() is None,"QEMU exited during idle sample")
+        stat=Path(f"/proc/{proc.pid}/stat").read_text().rsplit(")",1)[1].split()
+        return time.monotonic_ns(),int(stat[11])+int(stat[12]),int(stat[21])
+    hz=os.sysconf("SC_CLK_TCK")
+    page=os.sysconf("SC_PAGE_SIZE")
+    before=sample()
+    time.sleep(seconds)
+    after=sample()
+    wall=(after[0]-before[0])/1e9
+    cpu=(after[1]-before[1])/hz
+    require(wall>=seconds and cpu>=0,"host timing accounting")
+    return {"wall_seconds":wall,"qemu_cpu_seconds":cpu,
+            "qemu_cpu_percent_one_host_core":100*cpu/wall,
+            "qemu_rss_before_bytes":before[2]*page,"qemu_rss_after_bytes":after[2]*page}
 def marker(slot):
     return bytes((i*37+slot*91+13)&255 for i in range(512))
 def read_sector(p, lba):
@@ -220,6 +238,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         seen_windows=set()
                         timings=[]
                         expected=[]
+                        idle={"before_cycles":host_idle_sample(proc,60)}
                         for cycle in range(1,101):
                             if cycle>1:
                                 # F2 clears stale native focus and restores Explorer.
@@ -252,6 +271,9 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             if cycle in (1,100):
                                 visible=d.screen("tea69-file-visible" if cycle==1 else "tea70-file-visible-last")
                                 visible.check(281,81,"976332");visible.check(439,199,"976332")
+                            input_ready=time.monotonic_ns()
+                            if cycle==1:
+                                idle["one_app_no_input"]=host_idle_sample(proc,10)
                             closed_start=time.monotonic_ns()
                             d.key("q")
                             retired=wait_prefix(b"STYLEOS TEA69 RETIRED ",cycle)
@@ -262,8 +284,12 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             resources=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 RESOURCES",
                                 ("phase","pid","resident","pages","owners","windows","ports"))
                             require([tuple(v.values()) for _,v in resources]==expected,"StyleFS TEA resource release")
-                            timings.append({"cycle":cycle,"launch_to_input_ms":(closed_start-started)/1e6,
+                            timings.append({"cycle":cycle,"launch_to_input_ms":(input_ready-started)/1e6,
                                             "close_to_release_ms":(ended-closed_start)/1e6})
+                        idle["after_cycles"]=host_idle_sample(proc,60)
+                        (folder/"host-idle-baseline.json").write_text(json.dumps({
+                            "scope":"Linux host QEMU TCG process only; not guest CPU or RAM; no input during samples",
+                            "samples":idle},indent=2)+"\n")
                         def stats(key):
                             values=sorted(t[key] for t in timings)
                             return {"median":median(values),"p95":values[94],"max":values[-1]}

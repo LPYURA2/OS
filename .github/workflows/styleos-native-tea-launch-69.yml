@@ -177,3 +177,33 @@ jobs:
           name: styleos-tea-stylefs-live
           path: build/tea-stylefs-live/
           if-no-files-found: warn
+
+  fault-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        probe: [divide, execute-nx, single-step, forbidden-int]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          set -euo pipefail
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Verify exact QEMU version
+        run: qemu-system-x86_64 --version | head -n1 | grep '^QEMU emulator version 8\.2\.2 '
+      - name: NX trace parser positive and negative contract
+        run: python3 tools/test_native_nx_trace.py
+      - name: Real CPL3 fault isolation and retirement
+        run: python3 tools/test_desktop_storage_service_863.py --tasks --mixed --four --iso --provisioned --integrated --owned-shell --native-catalog --native-fault-probe ${{ matrix.probe }} --output build/fault-probe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-fault-70-${{ matrix.probe }}
+          path: build/fault-probe/
+          if-no-files-found: warn
