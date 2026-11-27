@@ -1232,6 +1232,11 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
 #endif
 #endif
  shell_boundary863();
+#ifdef STYLEOS_FILE_GUEST_45
+ /* Terminal file diagnostic needs the existing native runtime before
+  * the guarded storage entry. Ordinary boot ordering stays unchanged. */
+ if(!native_boot(p,cache,guard,allocator858))fail("sfs45-native-boot");
+#endif
 #if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
  disk_admit863();
 #endif
@@ -1255,7 +1260,9 @@ static _Noreturn void s851_switch(struct pg_experiment *p,const struct s842_cach
  arch_puts("STYLEOS S863 POLICY q35-tcg=yes polled-input=yes storage=no clock=no reset=no dma-grant=no production-cr3=deny\n");
 #endif
  #ifdef STYLEOS_OWNED_SHELL_865
+#ifndef STYLEOS_FILE_GUEST_45
  if(!native_boot(p,cache,guard,allocator858))fail("native-runtime-boot");
+#endif
  arch_puts("STYLEOS S865 SHELL-ONLY fixture-launch=deny\n");
  #endif
  desktop_v0_run(s);

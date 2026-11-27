@@ -310,7 +310,7 @@ enum ps_status rt863_bank_syscall(struct rt862_bank *b,struct dpr_service *d,
  if(status!=PS_OK)return status;
  b->slots[t->slot].context=saved;return PS_OK;
 }
-#ifdef STYLEOS_TEST_FILE_SYSCALL_43
+#if defined(STYLEOS_TEST_FILE_SYSCALL_43) || defined(STYLEOS_FILE_GUEST_45)
 #include <styleos/stylefs_file_syscall43.h>
 /* The trusted architecture adapter has to prove the actual leaf, lease,
  * identity-mapped backing and safe-root lifetime before calling. This

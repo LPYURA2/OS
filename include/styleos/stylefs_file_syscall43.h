@@ -20,7 +20,7 @@ struct fs43_binding {
  bool (*audit)(void *,const struct rt862_selection *,const uint8_t *);
  void *context;
 };
-#ifdef STYLEOS_TEST_FILE_SYSCALL_43
+#if defined(STYLEOS_TEST_FILE_SYSCALL_43) || defined(STYLEOS_FILE_GUEST_45)
 enum ps_status rt43_file_read(struct rt862_bank *,struct dpr_service *,
  const struct rt862_selection *,uint64_t,uint64_t,const struct s847_raw *,uint64_t,uint64_t,const struct fs43_binding *);
 #endif

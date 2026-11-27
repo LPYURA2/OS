@@ -1,3 +1,6 @@
+## StyleFS 45 — native CPL3 file-read guest candidate
+44 CI 8/8 SUCCESS. Separate guest profile uses actual native executor, guarded volume and selected-file broker. [Handoff](NEXT_CHAT_STYLEFS_45.md). CI pending; ordinary boot unchanged.
+
 ## StyleFS 44 — concrete page-table and lease audit candidate
 42 CI 8/8, 43 host SUCCESS. Reuse existing root audit and lease checks with file read adapter. [Handoff](NEXT_CHAT_STYLEFS_44.md). CI pending, no actual CPL3 proof. Main unchanged.
 

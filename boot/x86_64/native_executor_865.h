@@ -2,6 +2,11 @@
 #define STYLEOS_X64_NATIVE_EXECUTOR_865_H
 #include <styleos/runtime_bank_862.h>
 #include <styleos/runtime_entry_858.h>
+#ifdef STYLEOS_FILE_GUEST_45
+#include <styleos/stylefs_file_syscall43.h>
+enum ps_status s45_file_event(const struct rt862_selection *,const struct rt860_tick *,uint64_t);
+bool s45_file_cleanup(void);
+#endif
 /* Internal privileged single-CPU adapter. Caller owns descriptor setup,
  * admitted LAPIC, mapping audit and serialized safe-root state. */
 struct desc848 {uint16_t limit;uint64_t base;}__attribute__((packed));

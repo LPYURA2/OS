@@ -187,6 +187,11 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   .handle=ticket->handle,.child_root=ticket->child_root,.safe_root=root848(),
   .frame_va=frame860,.vector=pending860.vector,.isr=pending860.vector==V,
   .eoi=pending860.vector==V,.safe_flags=flags848(),.frame=pending860};
+#ifdef STYLEOS_FILE_GUEST_45
+ if(kind==RT865_SYSCALL&&pending860.vector==128&&pending860.gpr[0]==FS43_CALL_READ){
+  if(s45_file_event(ticket,&t,cr2862)!=PS_OK)fail848("sfs45-file-event");
+ }else
+#endif
  if(rt863_bank_event(&bank862,runtime860,ticket,safe,&t,cr2862)!=PS_OK)fail848("863-event-commit");
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  arch_puts("STYLEOS NATIVE EVENT");fld848("slot",id);fld848("pid",ticket->pid);fld848("root",ticket->child_root);
@@ -247,6 +252,9 @@ static void retire865_identity(const struct rt862_selection *t,bool (*audit)(voi
   fail848("865-terminal-owner");
  for(unsigned i=0;i<WS_MAX_WINDOWS;i++)if(runtime860->windows->windows[i].id&&
     runtime860->windows->windows[i].owner_pid==t->pid)fail848("865-terminal-window");
+#ifdef STYLEOS_FILE_GUEST_45
+ if(!s45_file_cleanup())fail848("sfs45-file-cleanup");
+#endif
  if(!s865_fx_retire(id,t->child_root,t->handle,t->safe_root)||
     !retire(opaque,id,t->child_root,t->handle)||
     rt862_bank_release(&bank862,runtime860,t->safe_root,id,t->pid,t->handle,t->child_root)!=PS_OK||

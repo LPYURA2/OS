@@ -127,3 +127,34 @@ void s865_native_pump(void){
  }
 }
 
+
+#ifdef STYLEOS_FILE_GUEST_45
+#include <styleos/stylefs_file_syscall43.h>
+static const struct pf64_service *file_service45;
+static struct vm64_mount *file_mount45;
+static struct wv64_workspace *file_work45;
+static bool file_audit45(void *unused,const struct rt862_selection *t,const uint8_t *page){
+ (void)unused;
+ if(!t||t->slot>=S846_ROOT_COUNT||!native_audit(0)||t->safe_root!=read_cr3()||
+    t->child_root!=native_roots[t->slot].built.root)return false;
+ const struct s844_lease l=native_leases[t->slot];
+ if(l.generation!=t->handle||l.owner!=S846_OWNER_A+t->slot||l.pages!=3||
+    !s844_lease_live(native_arena,l)||(uintptr_t)page!=l.pa+PG_PAGE)return false;
+ /* Native audit already reconstructs both actual child and composed
+  * desktop root, including supervisor-only arena identity mapping. */
+ return identity(l.pa+PG_PAGE,PG_WRITE);
+}
+enum ps_status s45_file_event(const struct rt862_selection *t,const struct rt860_tick *event,uint64_t cr2){
+ if(!file_service45||!file_mount45||!file_work45||!t||!event||
+    t->slot>=S846_ROOT_COUNT||event->vector!=128||event->isr||event->eoi||
+    event->slot!=t->slot||event->pid!=t->pid||event->handle!=t->handle||
+    event->dispatch!=t->dispatch||event->child_root!=t->child_root||
+    event->safe_root!=read_cr3())return PS_EVIDENCE;
+ const struct fs43_binding b={file_service45,file_mount45,file_work45,
+ (uint8_t *)(uintptr_t)(native_leases[t->slot].pa+PG_PAGE),file_audit45,0};
+ return rt43_file_read(&bank862,runtime860,t,read_cr3(),flags(),&event->frame,event->frame_va,cr2,&b);
+}
+bool s45_file_cleanup(void){
+ return !file_service45||pf64_sweep(file_service45)==WV64_OK;
+}
+#endif
