@@ -220,7 +220,21 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         pid=launch.split()[3]
                         require(pid in frame.split(),"frame belongs to launched PID")
                         # Subsequent input boundary lets the compositor draw.
+                        from native_desktop_acceptance import events
+                        from uart_receipts import complete_lines
+                        observed=events(complete_lines(uart.read_bytes()))
+                        require(bool(observed),"guest pointer coordinates unavailable")
+                        d.x,d.y=observed[-1]["x"],observed[-1]["y"]
+                        count=len(observed)
                         d.click(350,130)
+                        deadline=time.monotonic()+40
+                        while time.monotonic()<deadline and proc.poll() is None:
+                            observed=events(complete_lines(uart.read_bytes()))
+                            if len(observed)>count and (observed[-1]["x"],observed[-1]["y"])==(350,130) and not observed[-1]["buttons"]:
+                                break
+                            time.sleep(.05)
+                        else:
+                            raise RuntimeError("native focus click receipt missing")
                         visible=d.screen("tea69-file-visible")
                         visible.check(281,81,"976332");visible.check(439,199,"976332")
                         d.key("q")
