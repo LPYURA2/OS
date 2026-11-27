@@ -19,6 +19,15 @@ void native_drop_gesture(uint32_t from,uint32_t to)
     if (dd_ipc_gesture(&ipc,from,to,ticks(),DD_LIFETIME_TSC)==DD_OK)
         arch_puts("STYLEOS DD72 GESTURE\n");
 }
+bool native_drop_task_gesture(uint32_t from,const struct nwc_task *target)
+{
+    if (!ipc.broker.channel && dd_init(&ipc.broker,(struct nwc_service *)nwc_global())!=DD_OK)
+        return false;
+    if (dd_ipc_task_gesture(&ipc,from,target,ticks(),DD_LIFETIME_TSC)!=DD_OK)
+        return false;
+    arch_puts("STYLEOS DD73 TASK-GESTURE\n");
+    return true;
+}
 void native_drop_reconcile(void)
 {
     if ((ipc.gesture.id || ipc.broker.active.phase!=DD_IDLE) && dd_ipc_reconcile(&ipc,ticks()))

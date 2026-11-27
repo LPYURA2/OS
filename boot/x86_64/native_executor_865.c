@@ -287,10 +287,13 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    if(poll[id].generation!=ticket->handle){
     poll[id].generation=ticket->handle;poll[id].empty=0;poll[id].delivered=0;poll[id].other=0;
    }
-   if(pixel==NWC_EMPTY){
-    ++poll[id].empty;
-    /* Preserve the existing EMPTY return value. For the two approved
-     * retry-loop samples only, defer its return until the queue changes.
+   const bool visibility_wait=dst&&pixel==NWC_DENIED&&
+    nwc_wait_condition((struct nwc_service *)nwc_global(),ticket->pid,ticket->handle,
+                       ticket->child_root,pending860.gpr[1])==NWC_WAIT_BLOCKED;
+   if(pixel==NWC_EMPTY||visibility_wait){
+    if(pixel==NWC_EMPTY)++poll[id].empty;else ++poll[id].other;
+    /* Preserve the original EMPTY or DENIED result for the approved retry
+     * loop clients. Hidden but authentic ports are not revocations.
      * Single CPU + IF=0 serialize receive, park, enqueue and wake scan. */
     if(s865_sample_wait_allowed(ticket->pid,ticket->handle,ticket->child_root)){
      if(rt865_bank_wait_state(&bank862,runtime860,safe,id,ticket->pid,ticket->handle,ticket->child_root,true)!=PS_OK)
@@ -503,9 +506,9 @@ void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uin
  if(!pr_snapshot(runtime860->dispatcher.registry,0,0,true))return;
  if(!audit(opaque))fail848("native-poll-audit");
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
- /* Queue readiness is checked after the shell's trusted event producer,
-  * before choosing a runnable context. A revoked/hidden port wakes the
-  * waiter too, so it can observe the normal refusal on its next receive. */
+ /* Queue readiness is checked after the trusted producer. An exact live
+  * port with a hidden window/locked session stays parked; restore plus
+  * deliverable input wakes it. Revocation still wakes to observe refusal. */
  for(unsigned j=0;j<PS_MAX_SLOTS;++j){
   const struct rt862_bank_slot *s=&bank862.slots[j];
   if(!input_wait70[j].generation)continue;
@@ -514,7 +517,9 @@ void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uin
   }
   const struct pr_entry *p=pr_find(runtime860->dispatcher.registry,s->pid);
   if(!p||p->state!=PR_WAITING)fail848("70-wait-identity");
-  if(nwc_input_ready((struct nwc_service *)nwc_global(),s->pid,s->handle,s->root,input_wait70[j].window)==NWC_EMPTY)continue;
+  const enum nwc_wait_condition condition=nwc_wait_condition((struct nwc_service *)nwc_global(),
+                                         s->pid,s->handle,s->root,input_wait70[j].window);
+  if(condition==NWC_WAIT_EMPTY||condition==NWC_WAIT_BLOCKED)continue;
   if(rt865_bank_wait_state(&bank862,runtime860,bank862.safe,j,s->pid,s->handle,s->root,false)!=PS_OK)
    fail848("70-input-wake");
   input_wait70[j].generation=0;input_wait70[j].window=0;

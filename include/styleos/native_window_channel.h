@@ -115,6 +115,11 @@ bool nwc_frame_valid(const struct nwc_port *,const struct ws_window *);
 /* Read-only condition for a trusted serialized wait broker. Same authority
  * checks as receive; no event consumption or output pointer. */
 enum nwc_status nwc_input_ready(struct nwc_service *,uint32_t,uint64_t,uint64_t,uint64_t);
+/* Scheduler-only classification; never authorizes input or discloses a
+ * hidden session to user mode. A live exact waiter may stay parked across
+ * minimization/lock/session switch; actual input permission is unchanged. */
+enum nwc_wait_condition { NWC_WAIT_REVOKED=0, NWC_WAIT_EMPTY, NWC_WAIT_BLOCKED, NWC_WAIT_EVENT };
+enum nwc_wait_condition nwc_wait_condition(struct nwc_service *,uint32_t,uint64_t,uint64_t,uint64_t);
 #define NWC_INPUT_BYTES 64u
 enum nwc_status nwc_receive_wire(struct nwc_service *,uint32_t,uint64_t,uint64_t,
                                   uint64_t window,uint8_t out[NWC_INPUT_BYTES]);
