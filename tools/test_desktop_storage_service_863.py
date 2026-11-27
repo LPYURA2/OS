@@ -215,7 +215,7 @@ def verify_four_storage(lines,raw,data,site,ref,folder,write,*,provisioned=False
     return root,events
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--native-shell-boundary',action='store_true');p.add_argument('--native-window-ipc',action='store_true');p.add_argument('--native-window-tile',action='store_true');p.add_argument('--native-window-input',action='store_true');p.add_argument('--native-window-focus',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');p.add_argument('--process-stop',action='store_true');p.add_argument('--block-service',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--cold',action='store_true');p.add_argument('--tasks',action='store_true');p.add_argument('--build-from',type=Path);p.add_argument('--mixed',action='store_true');p.add_argument('--four',action='store_true');p.add_argument('--iso',action='store_true');p.add_argument('--provisioned',action='store_true');p.add_argument('--integrated',action='store_true');p.add_argument('--owned-shell',action='store_true');p.add_argument('--native-catalog',action='store_true');p.add_argument('--native-timer-load',action='store_true');p.add_argument('--native-bad-rsp',action='store_true');p.add_argument('--native-fault-probe',choices=('divide','execute-nx','single-step','forbidden-int'));p.add_argument('--native-hang',action='store_true');p.add_argument('--native-forced-stop',action='store_true');p.add_argument('--native-shell-boundary',action='store_true');p.add_argument('--native-window-ipc',action='store_true');p.add_argument('--native-window-tile',action='store_true');p.add_argument('--native-window-input',action='store_true');p.add_argument('--native-window-focus',action='store_true');p.add_argument('--native-window-frame',action='store_true');p.add_argument('--extended-desktop',action='store_true');p.add_argument('--process-view',action='store_true');p.add_argument('--process-stop',action='store_true');p.add_argument('--block-service',action='store_true');args=p.parse_args();tasks=args.tasks;cold=args.cold or tasks;mixed=args.mixed
     if args.four and not (tasks and mixed):p.error('--four requires --tasks --mixed')
     if mixed and not tasks:p.error('--mixed requires --tasks')
     if args.iso and not args.four:p.error('--iso requires --four --tasks --mixed')
@@ -229,6 +229,7 @@ def main():
     if args.native_fault_probe and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp):p.error('fault probe requires separate catalog')
     if args.native_hang and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe):p.error('hang requires separate catalog')
     if args.native_forced_stop and (not args.native_catalog or args.native_timer_load or args.native_bad_rsp or args.native_fault_probe or args.native_hang):p.error('forced stop requires separate native catalog')
+    if args.native_window_frame and not args.native_window_focus:p.error('frame requires focus fixture')
     if args.native_window_focus and not args.native_window_input:p.error('focus requires window input')
     if args.native_window_input and not args.native_window_tile:p.error('input requires window tile')
     if args.native_window_tile and not args.native_window_ipc:p.error('tile requires window IPC')
@@ -247,7 +248,7 @@ def main():
     catalog_digest=None
     if args.native_catalog:
         from native_catalog_865_verify import provision_catalog
-        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,forced_stop=args.native_forced_stop,packages=out/'packages' if args.native_shell_boundary else None,window_ipc=args.native_window_ipc,window_tile=args.native_window_tile,window_input=args.native_window_input,window_focus=args.native_window_focus)
+        catalog_digest=provision_catalog(base,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,forced_stop=args.native_forced_stop,packages=out/'packages' if args.native_shell_boundary else None,window_ipc=args.native_window_ipc,window_tile=args.native_window_tile,window_input=args.native_window_input,window_focus=args.native_window_focus,window_frame=args.native_window_frame)
     q=shutil.which('qemu-system-x86_64');img=shutil.which('qemu-img');code=firmware_path('OVMF_CODE','OVMF_CODE');vars=firmware_path('OVMF_VARS','OVMF_VARS')
     if not(q and img and code and vars):raise RuntimeError('real QEMU mandatory')
     if not subprocess.check_output([q,'--version'],text=True).startswith('QEMU emulator version 8.2.2 '):raise RuntimeError('unvalidated fixture')
@@ -581,7 +582,7 @@ def main():
                 from native_catalog_865_verify import verify_catalog
                 if args.native_forced_stop:
                     from native_forced_stop_verify import verify_forced_stop
-                    events=verify_forced_stop(lines,data.decode('ascii'),obs,shell_boundary=args.native_shell_boundary,window_ipc=args.native_window_ipc,window_tile=args.native_window_tile,window_input=args.native_window_input,window_focus=args.native_window_focus)
+                    events=verify_forced_stop(lines,data.decode('ascii'),obs,shell_boundary=args.native_shell_boundary,window_ipc=args.native_window_ipc,window_tile=args.native_window_tile,window_input=args.native_window_input,window_focus=args.native_window_focus,window_frame=args.native_window_frame)
                 else:
                     events=verify_catalog(lines,data.decode('ascii'),obs,timer_load=args.native_timer_load,bad_rsp=args.native_bad_rsp,fault_probe=args.native_fault_probe,hang_load=args.native_hang,ui_stop=args.process_stop)
                 if stats['rd_operations']<4+32*9:raise ValueError('native catalog actual disk reads')
@@ -629,16 +630,19 @@ def main():
                 refreshed=Frame(folder/'native-live-shell-refresh.ppm')
                 stopped=Frame(folder/'after-denied-fixture.ppm')
                 side=2 if args.native_window_tile else 1
-                for y in range(side):
-                    for x in range(side):
-                        rgb=f'{0xc10002+((y*2+x)<<8):06x}' if args.native_window_tile else 'b10002' if args.native_window_ipc else 'a00002'
+                fw,fh=(160,120) if args.native_window_frame else (side,side)
+                for y in range(fh):
+                    for x in range(fw):
+                        if args.native_window_frame:
+                            rgb='89abcd' if 20<=x<70 and 30<=y<70 else '234567'
+                        else:rgb=f'{0xc10002+((y*2+x)<<8):06x}' if args.native_window_tile else 'b10002' if args.native_window_ipc else 'a00002'
                         live.check(x,y,rgb)
                         refreshed.check(x,y,rgb)
                         a=3*(before.w*y+x);b=3*(stopped.w*y+x)
-                        if before.pixels[a:a+3]!=stopped.pixels[b:b+3] or before.pixels[a:a+3]==live.pixels[a:a+3]:
+                        if before.pixels[a:a+3]!=stopped.pixels[b:b+3] or (not args.native_window_frame and before.pixels[a:a+3]==live.pixels[a:a+3]):
                             raise ValueError('native ownership tile did not retire to original background')
-                before.expect_changes_in(live,[(0,0,side,side)])
-                refreshed.expect_changes_in(stopped,[(0,0,side,side)])
+                before.expect_changes_in(live,[(0,0,fw,fh)])
+                refreshed.expect_changes_in(stopped,[(0,0,fw,fh)])
             else:
                 unchanged_frame('note','after-denied-fixture')
         elif args.four:

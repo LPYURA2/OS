@@ -216,6 +216,12 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
       ticket->child_root,pending860.gpr[2],rect,(size_t)count*sizeof rect[0]))
     pixel=nwc_publish_frame((struct nwc_service *)nwc_global(),ticket->pid,ticket->handle,
       ticket->child_root,pending860.gpr[1],rect,(unsigned)count);
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+   arch_puts("STYLEOS NATIVE FRAME");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+   fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
+   fld848("va",pending860.gpr[2]);fld848("count",count);fld848("status",pixel);
+   fld848("first",pixel==NWC_OK?rect[0].rgb:0);arch_putc('\n');
+#endif
    volatile unsigned char *wipe=(void *)rect;
    for(size_t j=0;j<sizeof rect;++j)wipe[j]=0;
   }else if(pending860.gpr[0]==NWC_CALL_INPUT){

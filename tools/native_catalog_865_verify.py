@@ -49,7 +49,37 @@ def focus_payload(code):
     for off in failures:struct.pack_into('<i',code,off,fail-(off+4))
     return bytes(code)
 
-def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False,window_tile=False,window_input=False,window_focus=False):
+# PID2 replaces its tile after the verified real input sequence with a
+# complete 160x120 retained frame. Refused requests must not change it.
+FRAME_RETURNS=(0x307,0x326,0x34b)
+FRAME_LOOP=0x356
+def frame_payload(code):
+    assert len(code)==FOCUS_LOOP+4 and code[FOCUS_LOOP:]==b'\xeb\xfe\x0f\x0b'
+    code=bytearray(code)
+    code[FOCUS_LOOP:FOCUS_LOOP+2]=b'\xeb\x02'
+    code+=b'\xbf'+struct.pack('<I',0x12000200)
+    for j,value in enumerate((0,0,160,120,0x234567,20,30,50,40,0x89abcd)):
+        code+=(b'\xc7\x07' if not j else b'\xc7\x47'+bytes([4*j]))+struct.pack('<I',value)
+    fixups=[]
+    def call(va,ret,status):
+        nonlocal code
+        code+=b'\xbb\0\0\0\0\xb9'+struct.pack('<I',va)+b'\xba\x02\0\0\0\xb8\x03\x01\0\0\xcd\x80'
+        assert len(code)==ret
+        code+=(b'\x85\xc0' if not status else b'\x83\xf8'+bytes([status]))+b'\x0f\x85'
+        fixups.append(len(code));code+=b'\0'*4
+    call(0x12000ff0,FRAME_RETURNS[0],1)
+    call(0x12000200,FRAME_RETURNS[1],0)
+    code+=b'\xc7\x47\x08'+struct.pack('<I',159)
+    call(0x12000200,FRAME_RETURNS[2],1)
+    code+=b'\x31\xc0'
+    assert len(code)==FRAME_LOOP
+    code+=b'\xeb\xfe'
+    fail=len(code);code+=b'\x0f\x0b'
+    for off in fixups:struct.pack_into('<i',code,off,fail-(off+4))
+    return bytes(code)
+
+def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False,window_tile=False,window_input=False,window_focus=False,window_frame=False):
+    if window_frame and not window_focus:raise ValueError('frame requires focus fixture')
     if window_focus and not window_input:raise ValueError('focus requires input fixture')
     if window_input and not window_tile:raise ValueError('input requires tile fixture')
     if window_tile and not window_ipc:raise ValueError('tile requires IPC fixture')
@@ -122,6 +152,7 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                         for off in fixups:struct.pack_into('<i',code,off,fail-(off+4))
                         code=bytes(code)
                         if window_focus and i==1:code=focus_payload(code)
+                        if window_frame and i==1:code=frame_payload(code)
                 elif window_ipc and i<2:
                     # Real CPL3 register-only call. Failed return faults;
                     # success loops with RAX=0 at code offset 0x24.
