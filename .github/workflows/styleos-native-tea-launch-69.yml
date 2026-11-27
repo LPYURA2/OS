@@ -1,7 +1,7 @@
 name: StyleOS native apps and Deep Drop acceptance
 on:
   push:
-    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72]
+    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72, feature/styleos-deep-drop-73]
   workflow_dispatch:
 permissions:
   contents: read

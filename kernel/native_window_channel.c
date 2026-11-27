@@ -55,6 +55,41 @@ static bool selected(const struct nwc_service *s,const struct nwc_port *p)
     return sess && sess->state==USR_ACTIVE && win &&
            win->visible && !win->minimized;
 }
+static bool task_allowed(const struct nwc_service *s,const struct nwc_port *p)
+{
+    if(!valid_port(s,p)||s->sessions->selected_session!=p->session_id)return false;
+    const struct usr_session *u=usr_find(s->sessions,p->session_id);
+    const struct ws_window *w=ws_find(s->windows,p->window_id);
+    return u&&u->state==USR_ACTIVE&&w&&w->visible;
+}
+size_t nwc_task_snapshot(const struct nwc_service *s,struct nwc_task *out,size_t cap)
+{
+    if(!consistent(s)||(cap&&!out))return 0;
+    size_t n=0;
+    for(unsigned i=0;i<NWC_PORTS;++i){
+        const struct nwc_port *p=&s->ports[i];
+        if(!task_allowed(s,p))continue;
+        const struct ws_window *w=ws_find(s->windows,p->window_id);
+        if(n<cap)out[n]=(struct nwc_task){.window_id=p->window_id,.pid=p->owner_pid,
+            .session_id=p->session_id,.generation=p->scheduler_handle,.root=p->user_root,
+            .minimized=w->minimized};
+        ++n;
+    }
+    return n;
+}
+enum nwc_status nwc_task_set_minimized(struct nwc_service *s,const struct nwc_task *t,bool minimized)
+{
+    if(!consistent(s))return NWC_NOT_READY;
+    if(!t||!t->window_id||!t->pid||!t->session_id||!t->generation||!t->root)return NWC_INVALID;
+    const struct nwc_port *p=find_port(s,t->window_id);
+    if(!task_allowed(s,p))return NWC_DENIED;
+    const struct ws_window *w=ws_find(s->windows,t->window_id);
+    if(p->owner_pid!=t->pid||p->session_id!=t->session_id||
+       p->scheduler_handle!=t->generation||p->user_root!=t->root||
+       w->minimized!=t->minimized)return NWC_STALE;
+    return ws_set_minimized(s->sessions->windows,t->pid,t->window_id,minimized)==WS_OK?
+        NWC_OK:NWC_DENIED;
+}
 static bool authentic(const struct nwc_port *p,uint32_t pid,uint64_t handle,
                       uint64_t root)
 {

@@ -124,6 +124,18 @@ enum nwc_status nwc_publish_pixel(struct nwc_service *,uint32_t,uint64_t,uint64_
                                   uint64_t window,uint64_t rgb);
 enum nwc_status nwc_visible_tile(const struct nwc_service *,uint32_t window_id,
                                  struct nwc_tile *kernel_output);
+/* Trusted panel only. Snapshot includes minimized windows, never foreign,
+ * locked, hidden or dead owners. Identity is internal (never user ABI).
+ * Slots may move after close; use the entire observed token, not an index. */
+struct nwc_task {
+    uint32_t window_id,pid,session_id;
+    uint64_t generation,root;
+    bool minimized;
+};
+size_t nwc_task_snapshot(const struct nwc_service *,struct nwc_task *,size_t capacity);
+/* Serialized safe-root compositor action; exact snapshot and current session
+ * required, including the old minimized bit. No focus or event mutation. */
+enum nwc_status nwc_task_set_minimized(struct nwc_service *,const struct nwc_task *,bool);
 /* Discard stale ports after the process/window service reconciles exit/fault;
  * do not kill a process, delete a window or free physical RAM here. */
 size_t nwc_reconcile(struct nwc_service *);

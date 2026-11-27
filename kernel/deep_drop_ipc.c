@@ -49,6 +49,27 @@ enum dd_status dd_ipc_gesture(struct dd_ipc *s,uint32_t from,uint32_t to,
     s->last_gesture=id;
     return DD_OK;
 }
+enum dd_status dd_ipc_task_gesture(struct dd_ipc *s,uint32_t from,const struct nwc_task *t,
+                                   uint64_t now,uint64_t lifetime)
+{
+    if(!s||!s->broker.channel||!t||!now||!lifetime||lifetime>UINT64_MAX-now)return DD_INVALID;
+    struct nwc_task observed=*t;
+    struct dd_endpoint a=endpoint(s->broker.channel,from);
+    if(!dd_endpoint_valid(&s->broker,a)||a.pid==observed.pid)return DD_DENIED;
+    /* Reconcile before touching visibility, so a busy live transfer cannot
+     * activate unrelated windows. Existing visible-only IPC checks stay intact. */
+    dd_ipc_reconcile(s,now);
+    if(s->gesture.id||s->broker.active.phase!=DD_IDLE)return DD_BUSY;
+    if(s->last_gesture==UINT64_MAX)return DD_EXHAUSTED;
+    enum nwc_status v=nwc_task_set_minimized(s->broker.channel,&observed,false);
+    if(v!=NWC_OK)return v==NWC_STALE?DD_STALE:DD_DENIED;
+    enum dd_status status=dd_ipc_gesture(s,from,observed.window_id,now,lifetime);
+    if(status!=DD_OK&&observed.minimized){
+        observed.minimized=false;
+        if(nwc_task_set_minimized(s->broker.channel,&observed,true)!=NWC_OK)return DD_STALE;
+    }
+    return status;
+}
 enum dd_status dd_ipc_call(struct dd_ipc *s,struct dd_endpoint caller,unsigned op,
                            uint64_t id,uint8_t *span,size_t size,uint64_t now,uint64_t *result)
 {

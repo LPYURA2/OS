@@ -110,6 +110,53 @@ int main(void)
     ev.code=3;CHECK(!nwc_drop_event_valid(&ev));ev.code=DD_REQUEST_TEXT;
     ev.size=7;CHECK(!nwc_drop_event_valid(&ev));ev.size=8;
     ev.bytes[0]=0;CHECK(!nwc_drop_event_valid(&ev));
+    /* 73: taskbar identity remains valid for minimized windows, but their
+     * normal input/data permissions remain denied until trusted restoration. */
+    struct nwc_task tasks[NWC_PORTS], tok={0};
+    CHECK(nwc_task_snapshot(&channel,tasks,NWC_PORTS)==3);
+    CHECK(nwc_task_snapshot(&channel,0,0)==3);
+    CHECK(nwc_task_snapshot(&channel,0,1)==0);
+    for(size_t i=0;i<3;++i)if(tasks[i].window_id==b.window)tok=tasks[i];
+    CHECK(tok.pid==b.pid&&tok.generation==b.generation&&tok.root==b.root&&tok.session_id==sid&&!tok.minimized);
+    CHECK(nwc_task_set_minimized(&channel,&tok,true)==NWC_OK);
+    CHECK(nwc_task_set_minimized(&channel,&tok,false)==NWC_STALE);
+    CHECK(nwc_input_ready(&channel,b.pid,b.generation,b.root,b.window)==NWC_DENIED);
+    CHECK(nwc_task_snapshot(&channel,tasks,NWC_PORTS)==3);
+    for(size_t i=0;i<3;++i)if(tasks[i].window_id==b.window)tok=tasks[i];
+    CHECK(tok.minimized);
+    struct nwc_task forged=tok;forged.root+=4096;
+    CHECK(dd_ipc_task_gesture(&ipc,a.window,&forged,130,20)==DD_STALE);
+    CHECK(ws_find(&windows,b.window)->minimized);
+    CHECK(dd_ipc_gesture(&ipc,a.window,b.window,131,20)==DD_DENIED);
+    /* Source queue full: restoration must roll back, no request published. */
+    for(unsigned i=0;i<NWC_EVENTS;++i)CHECK(nwc_send_key(&channel,a.window,1,0,true)==NWC_OK);
+    CHECK(dd_ipc_task_gesture(&ipc,a.window,&tok,132,20)==DD_BUSY);
+    CHECK(ws_find(&windows,b.window)->minimized);idle();
+    for(unsigned i=0;i<NWC_EVENTS;++i)CHECK(nwc_receive(&channel,a.pid,a.generation,a.root,a.window,&ev)==NWC_OK);
+    CHECK(dd_ipc_task_gesture(&ipc,a.window,&tok,133,20)==DD_OK);
+    CHECK(!ws_find(&windows,b.window)->minimized);
+    CHECK(dd_ipc_task_gesture(&ipc,a.window,&tok,133,20)==DD_BUSY);
+    g=event(a,DD_REQUEST_TEXT);
+    CHECK(dd_ipc_call(&ipc,a,DD_CALL_OFFER,g,input,sizeof input,134,&n)==DD_OK);
+    last=n;CHECK(event(b,DD_TEXT_OFFER)==last);
+    CHECK(dd_ipc_call(&ipc,b,DD_CALL_ACCEPT,last,0,0,135,&n)==DD_OK);
+    CHECK(dd_ipc_call(&ipc,b,DD_CALL_READ,last,output,DD_TEXT_MAX,135,&n)==DD_OK&&n==sizeof input);
+    CHECK(!memcmp(input,output,sizeof input));
+    CHECK(dd_ipc_call(&ipc,b,DD_CALL_FINISH,last,0,0,135,&n)==DD_OK);idle();
+    CHECK(nwc_task_set_minimized(&channel,&tok,true)==NWC_STALE);
+    tok.minimized=false;CHECK(nwc_task_set_minimized(&channel,&tok,true)==NWC_OK);tok.minimized=true;
+    CHECK(usr_lock(&users)==USR_OK);CHECK(nwc_task_snapshot(&channel,tasks,NWC_PORTS)==0);
+    CHECK(nwc_task_set_minimized(&channel,&tok,false)==NWC_DENIED);
+    CHECK(usr_select(&users,other)==USR_OK);CHECK(nwc_task_snapshot(&channel,tasks,NWC_PORTS)==0);
+    CHECK(nwc_task_set_minimized(&channel,&tok,false)==NWC_DENIED);
+    CHECK(usr_select(&users,sid)==USR_OK);
+    CHECK(ws_compositor_restart(&windows)==2);
+    CHECK(nwc_task_set_minimized(&channel,&tok,false)==NWC_OK);
+    tok.minimized=false;
+    CHECK(ws_close_app(&windows,b.pid,b.window)==WS_OK);
+    CHECK(dd_ipc_task_gesture(&ipc,a.window,&tok,136,20)==DD_DENIED);
+    CHECK(nwc_task_snapshot(&channel,tasks,NWC_PORTS)==2);
+    idle();
     printf("Deep Drop IPC: %u checks PASS; %zu bytes persistent incl. %u payload bytes\n",
            checks,sizeof ipc,DD_TEXT_MAX);
 }
