@@ -592,29 +592,37 @@ def main():
                     from native_forced_stop_verify import records
                     from irq_trace_accept_859 import HEADER
                     admitted=records(lines,b'STYLEOS NATIVE SHELL-CONTROLLER',('pid','gen','root','epoch'))
-                    if len(admitted)!=15 or len({a['root'] for _,a in admitted})!=1:raise ValueError('ordinary controller root receipt')
-                    child=admitted[0][1]['root']
+                    apps=records(lines,b'STYLEOS TEA69 LAUNCHED',('pid','gen','root','window'))
+                    if len(admitted)!=16 or len(apps)!=2:raise ValueError('ordinary controller/app receipts')
+                    children={a['root'] for _,a in apps}
+                    if len(children)!=2 or {a['root'] for _,a in admitted}!=children:
+                        raise ValueError('ordinary isolated root count')
                     trace_text=data.decode('ascii');headers=list(HEADER.finditer(trace_text))
-                    syscalls=[]
+                    syscalls={child:[] for child in children}
                     for j,m in enumerate(headers):
                         block=trace_text[m.start():headers[j+1].start() if j+1<len(headers) else len(trace_text)]
                         cr3=re.findall(r'\bCR3=([0-9a-fA-F]+)\b',block)
                         if len(cr3)!=1:raise ValueError('ordinary trace root')
-                        if int(cr3[0],16)==child:
+                        child=int(cr3[0],16)
+                        if child in children:
                             vec,err,soft,cpl,cs,rip,pc,ss,sp=map(lambda x:int(x,16),m.groups()[1:])
-                            if cpl!=3 or cs!=0x5b or ss!=0x63 or err:raise ValueError('ordinary isolated controller trap')
+                            if cpl!=3 or cs!=0x5b or ss!=0x63 or err:raise ValueError('ordinary isolated trap')
                             if vec==128:
                                 ax=re.findall(r'\bRAX=([0-9a-fA-F]+)\b',block)
                                 if len(ax)!=1 or not soft:raise ValueError('ordinary syscall evidence')
-                                syscalls.append(int(ax[0],16))
-                            elif vec!=0x50:raise ValueError('unexpected ordinary controller trap')
-                        elif int(cr3[0],16)==root and int(m[2],16)!=0x50:
+                                syscalls[child].append(int(ax[0],16))
+                            elif vec!=0x50:raise ValueError('unexpected ordinary child trap')
+                        elif child==root and int(m[2],16)!=0x50:
                             raise ValueError('unexpected safe root interrupt')
-                    prefix=[0x105,0x106,2]*15
-                    if syscalls[:len(prefix)]!=prefix:raise ValueError('ordinary controller raw syscall sequence')
-                    app=syscalls[len(prefix):]
-                    if len(app)<3 or app[0]!=0x103 or app[-1]!=2 or any(x!=0x102 for x in app[1:-1]):
-                        raise ValueError('ordinary TEA raw frame/input/exit proof')
+                    for _,a in apps:
+                        child=a['root']
+                        n=sum(c['root']==child for _,c in admitted)
+                        prefix=[0x105,0x106,2]*n
+                        seq=syscalls[child]
+                        if seq[:len(prefix)]!=prefix:raise ValueError('ordinary controller raw syscall sequence')
+                        app=seq[len(prefix):]
+                        if len(app)<3 or app[0]!=0x103 or app[-1]!=2 or any(x!=0x102 for x in app[1:-1]):
+                            raise ValueError('ordinary TEA raw frame/input/exit proof')
                 else:
                     for m in re.finditer(r'\bCR3=([0-9a-fA-F]+)\b',data.decode('ascii')):
                         if int(m[1],16)==root:raise ValueError('unsolicited interrupt under ordinary safe root')

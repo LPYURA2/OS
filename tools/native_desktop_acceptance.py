@@ -117,14 +117,29 @@ def exercise(d,proc,serial,folder,wait):
     move(100,100)
     sample=d.screen('extended-tea-live')
     sample.check(81,81,'2579a1');sample.check(239,199,'2579a1')
+    d.key('f7');wait(proc,serial,b'STYLEOS TEA69 LAUNCHED',2)
+    wait(proc,serial,b'STYLEOS NATIVE FRAME',2)
+    wait(proc,serial,b'STYLEOS SHELL ACTION RENDERED',15)
+    move(100,101)
+    both=d.screen('extended-tea-both')
+    both.check(81,81,'2579a1');both.check(281,81,'976332')
     d.button(True);d.button(False);d.key('q')
     wait(proc,serial,b'STYLEOS TEA69 RETIRED',1)
+    move(300,100)
+    peer=d.screen('extended-tea-peer')
+    peer.check(281,81,'976332');peer.check(439,199,'976332')
+    if peer.pixels[3*(peer.w*81+81):3*(peer.w*81+81)+3]==sample.pixels[3*(sample.w*81+81):3*(sample.w*81+81)+3]:
+        raise ValueError('first app retained after retirement')
+    d.button(True);d.button(False);d.key('q')
+    wait(proc,serial,b'STYLEOS TEA69 RETIRED',2)
     move(55,435)
     ended=d.screen('extended-tea-retired')
+    if ended.pixels[3*(ended.w*81+281):3*(ended.w*81+281)+3]==peer.pixels[3*(peer.w*81+281):3*(peer.w*81+281)+3]:
+        raise ValueError('peer pixels retained')
     if ended.pixels==sample.pixels:raise ValueError('native app retirement not rendered')
     if ended.pixels[3*(ended.w*81+81):3*(ended.w*81+81)+3]==sample.pixels[3*(sample.w*81+81):3*(sample.w*81+81)+3]:
         raise ValueError('native app pixels retained')
-    (folder/'extended-desktop.json').write_text(json.dumps({'cursor':mv,'menu':opened,'closed':closed,'processes':procs,'restart':restart,'language':lang,'restored':restored,'frames':{x:hashlib.sha256((folder/(x+'.ppm')).read_bytes()).hexdigest() for x in ('extended-cursor-start','extended-cursor-end','extended-menu','extended-menu-closed','extended-processes','extended-window-max','extended-window-restore','extended-window-drag','extended-window-min','extended-window-taskbar','extended-window-close','extended-about','extended-about-close','extended-restart','extended-tea-live','extended-tea-retired')}},indent=2)+'\n')
+    (folder/'extended-desktop.json').write_text(json.dumps({'cursor':mv,'menu':opened,'closed':closed,'processes':procs,'restart':restart,'language':lang,'restored':restored,'frames':{x:hashlib.sha256((folder/(x+'.ppm')).read_bytes()).hexdigest() for x in ('extended-cursor-start','extended-cursor-end','extended-menu','extended-menu-closed','extended-processes','extended-window-max','extended-window-restore','extended-window-drag','extended-window-min','extended-window-taskbar','extended-window-close','extended-about','extended-about-close','extended-restart','extended-tea-live','extended-tea-both','extended-tea-peer','extended-tea-retired')}},indent=2)+'\n')
 
 def verify(folder,lines,root):
     from native_process_view_02 import verify_snapshot
@@ -143,15 +158,16 @@ def verify(folder,lines,root):
     actions=records(lines,b'STYLEOS NATIVE SHELL-ACTION',('epoch','action'))
     submits=records(lines,b'STYLEOS NATIVE SHELL-SUBMIT',('key',))
     renders=[i for i,x in enumerate(lines) if x==b'STYLEOS SHELL ACTION RENDERED']
-    if (len(admitted),len(calls),len(applied),len(retired),len(actions),len(submits),len(renders))!=(15,30,1,15,14,15,14):
+    if (len(admitted),len(calls),len(applied),len(retired),len(actions),len(submits),len(renders))!=(16,32,1,16,15,16,15):
         raise ValueError('ordinary controller lifecycle count')
-    keys=(0x3e,0x3e,0x42,0x146,0x146,0x17e,0x16e,0x201,0x119,0x3e,0x302,0x101,0x309,0x44,0x30c)
-    if [x['key'] for _,x in submits]!=list(keys) or [tuple(x.values()) for _,x in actions]!=[(i,a) for i,a in enumerate((2,2,3,5,5,7,6,8,4,2,10,4,17,0,20),1) if a]:
+    keys=(0x3e,0x3e,0x42,0x146,0x146,0x17e,0x16e,0x201,0x119,0x3e,0x302,0x101,0x309,0x44,0x30c,0x30c)
+    if [x['key'] for _,x in submits]!=list(keys) or [tuple(x.values()) for _,x in actions]!=[(i,a) for i,a in enumerate((2,2,3,5,5,7,6,8,4,2,10,4,17,0,20,20),1) if a]:
         raise ValueError('ordinary command policy')
     for j,(i,a) in enumerate(admitted):
         pid,gen,child,epoch=a.values()
-        if (pid,gen,epoch)!=(j+1,j+1,j+1) or child==root or not child:raise ValueError('ordinary controller identity')
-        if [tuple(x.values()) for _,x in calls[2*j:2*j+2]]!=[(pid,gen,child,0x105,(epoch<<32)|keys[j]),(pid,gen,child,0x106,epoch)] or tuple(retired[j][1].values())!=(pid,epoch,0):
+        expected_pid=j+1 if j<15 else 17
+        if (pid,gen,epoch)!=(expected_pid,expected_pid,j+1) or child==root or not child:raise ValueError('ordinary controller identity')
+        if [tuple(x.values()) for _,x in calls[2*j:2*j+2]]!=[(pid,gen,child,0x105,(epoch<<32)|keys[j]),(pid,gen,child,0x106,epoch)] or tuple(retired[j][1].values())!=(pid,epoch,int(j==15)):
             raise ValueError('ordinary controller syscall and cleanup')
         if not submits[j][0]<i<calls[2*j][0]<calls[2*j+1][0]:raise ValueError('ordinary controller order')
         if j<13 and not calls[2*j+1][0]<retired[j][0]<actions[j][0]<renders[j]<submits[j+1][0]:
@@ -161,13 +177,19 @@ def verify(folder,lines,root):
     launch=records(lines,b'STYLEOS TEA69 LAUNCHED',('pid','gen','root','window'))
     frame=records(lines,b'STYLEOS NATIVE FRAME',('pid','gen','root','window','va','count','status','first'))
     end=records(lines,b'STYLEOS TEA69 RETIRED',('pid','window'))
-    if len(launch)!=1 or len(frame)!=1 or len(end)!=1:raise ValueError('TEA lifecycle')
-    i,l=launch[0];pid,gen,child,win=l.values()
-    if (pid,gen,win)!=(16,16,1) or child==root or not child:raise ValueError('TEA identity')
-    if tuple(frame[0][1].values())!=(pid,gen,child,0,0x12000000,1,0,0x2579a1) or tuple(end[0][1].values())!=(pid,win):
-        raise ValueError('TEA frame and cleanup evidence')
-    if not calls[29][0]<retired[14][0]<actions[-1][0]<i<frame[0][0]<end[0][0]:
-        raise ValueError('TEA explicit launch ordering')
+    if len(launch)!=2 or len(frame)!=2 or len(end)!=2:raise ValueError('TEA lifecycle')
+    roots=set()
+    for k,(i,l) in enumerate(launch):
+        pid,gen,child,win=l.values()
+        if (pid,gen,win)!=(16+2*k,16+2*k,1+k) or child==root or not child:raise ValueError('TEA identity')
+        roots.add(child)
+        color=(0x2579a1,0x976332)[k]
+        if tuple(frame[k][1].values())!=(pid,gen,child,0,0x12000000,1,0,color) or tuple(end[k][1].values())!=(pid,win):
+            raise ValueError('TEA frame and cleanup evidence')
+        if not calls[29+2*k][0]<retired[14+k][0]<actions[-2+k][0]<i<frame[k][0]<end[k][0]:
+            raise ValueError('TEA explicit launch ordering')
+    if len(roots)!=2 or not frame[0][0]<launch[1][0]<frame[1][0]<end[0][0]<end[1][0]:
+        raise ValueError('TEA coexistence')
     if lines.count(b'STYLEOS SHELL PROVIDER READY')!=1:raise ValueError('ordinary provider readiness')
     if not any(x==b'STYLEOS DESKTOP CURSOR DAMAGE PASS' for x in lines):raise ValueError('cursor proof missing')
     for name,expected in data['frames'].items():

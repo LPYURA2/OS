@@ -458,36 +458,61 @@ void s865_native_request_shell_gap(void){
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
 #include "shell_controller_66.h"
 #include "native_sample_69.h"
-static uint32_t sample69_pid,sample69_window,sample69_session;
+/* Immutable, individually approved preinstalled packages. No shared user
+ * address spaces, mutable package bytes or retained stack reader state. */
+struct sample69_entry {
+ const uint8_t *package;
+ size_t bytes;
+ struct nts_pin pin;
+ const char *name;
+ struct ws_bounds bounds;
+};
+#define SAMPLE69(n,label,x,y) {sample69_##n##_package,sizeof sample69_##n##_package, \
+ {sample69_##n##_pkg_hash,sample69_##n##_elf_hash,sample69_##n##_manifest, \
+ sizeof sample69_##n##_manifest,sizeof sample69_##n##_package},label,{x,y,160,120}}
+static const struct sample69_entry sample69_catalog[]={
+ SAMPLE69(0,"Native-sample",80,80),SAMPLE69(1,"Native-peer",280,80)
+};
+#undef SAMPLE69
+#define SAMPLE69_COUNT (sizeof sample69_catalog/sizeof sample69_catalog[0])
+static struct s865_window_launch sample69_live[SAMPLE69_COUNT];
+static uint32_t sample69_session;
 bool s865_launch_native_sample(void){
- if(sample69_pid||!native_ready||!s865_executor_idle()||!native_audit(0))return false;
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
+ unsigned index=0;
+ while(index<SAMPLE69_COUNT&&sample69_live[index].pid)++index;
+ if(index==SAMPLE69_COUNT)return false;
  struct usr_runtime *u=(struct usr_runtime *)usr_global();
  if(!u||!u->ready)return false;
- /* Current ordinary desktop has no login screen. Establish only a local
-  * transient session, on explicit launch. Never unlock an existing session. */
+ /* No login yet: local transient session, created only once. Never unlock
+  * or substitute another user's selected session. */
  if(!u->selected_session){
   if(sample69_session||u->next_session!=1)return false;
   if(usr_create(u,1,&sample69_session)!=USR_OK||
      usr_select(u,sample69_session)!=USR_OK)return false;
  }
- const struct nts_pin pin={.package_sha=sample69_pkg_hash,.elf_sha=sample69_elf_hash,
-  .manifest=sample69_manifest,.manifest_bytes=sizeof sample69_manifest,
-  .package_bytes=sizeof sample69_package};
+ if(u->selected_session!=sample69_session)return false;
+ const struct sample69_entry *a=&sample69_catalog[index];
  struct s865_window_launch out={0};
- if(s865_native_launch_tea(sample69_package,sizeof sample69_package,&pin,
-  u->selected_session,"Native sample",(struct ws_bounds){80,80,160,120},&out)!=PS_OK)return false;
+ if(s865_native_launch_tea(a->package,a->bytes,&a->pin,sample69_session,
+  a->name,a->bounds,&out)!=PS_OK)return false;
  const struct pr_entry *e=pr_find(pr_global(),out.pid);
  if(!e||!e->scheduler_handle||!e->page_root)fail("sample69-owner");
- sample69_pid=out.pid;sample69_window=out.window;
+ sample69_live[index]=out;
  arch_puts("STYLEOS TEA69 LAUNCHED");field("pid",out.pid);field("gen",e->scheduler_handle);
  field("root",e->page_root);field("window",out.window);arch_putc('\n');return true;
 }
 static void sample69_reconcile(void){
- if(sample69_pid&&!pr_find(pr_global(),sample69_pid)){
-  if(ws_find(ws_global(),sample69_window)||nwc_port_count(nwc_global())||!native_audit(0))
-   fail("sample69-retire");
-  arch_puts("STYLEOS TEA69 RETIRED");field("pid",sample69_pid);field("window",sample69_window);arch_putc('\n');
-  sample69_pid=0;sample69_window=0;
+ for(unsigned i=0;i<SAMPLE69_COUNT;++i){
+  struct s865_window_launch *a=&sample69_live[i];
+  if(!a->pid||pr_find(pr_global(),a->pid))continue;
+  const struct nwc_service *n=nwc_global();
+  if(ws_find(ws_global(),a->window)||!n||!native_audit(0))fail("sample69-retire");
+  for(unsigned j=0;j<NWC_PORTS;++j)
+   if(n->ports[j].window_id==a->window||n->ports[j].owner_pid==a->pid)
+    fail("sample69-port-retire");
+  arch_puts("STYLEOS TEA69 RETIRED");field("pid",a->pid);field("window",a->window);arch_putc('\n');
+  *a=(struct s865_window_launch){0};
  }
 }
 static bool shell66_read(void *opaque,uint32_t sector,uint8_t out[512]){
