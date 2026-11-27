@@ -23,7 +23,7 @@ def make(folder,index,name,color):
     emit(b'\x83\x7f\x10\x10');jump(b'\x0f\x85','poll') # Q
     emit(b'\xb8\x02\x00\x00\x00\xcd\x80')
     mark('fail');emit(b'\x0f\x0b')
-    for off,name in fix:struct.pack_into('<i',code,off,labels[name]-(off+4))
+    for off,target in fix:struct.pack_into('<i',code,off,labels[target]-(off+4))
     blob=bytearray(4096)+code
     blob[:7]=b'\x7fELF\x02\x01\x01'
     struct.pack_into('<HHIQQQIHHHHHH',blob,16,2,62,1,0x10000000,64,0,0,64,56,1,0,0,0)

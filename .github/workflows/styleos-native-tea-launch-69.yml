@@ -28,6 +28,8 @@ jobs:
           sudo apt-get "${opts[@]}" install -y clang lld
       - name: Canonical TEA parser and runtime ELF reader
         run: python3 tools/test_native_tea_769_host.py --output build/native-tea-69
+      - name: Distinct reproducible ordinary TEA executables
+        run: python3 tools/test_native_sample_69.py --output build/native-tea-69/samples
       - name: Window capability refusal and lifecycle tests
         run: python3 tools/test_native_window_channel.py --output build/window-channel-69
       - name: Runtime boundary recognizes valid pointer events and rejects malformed records
