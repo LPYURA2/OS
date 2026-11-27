@@ -1,3 +1,7 @@
 # StyleFS 35 — scoped read-only object service candidate
 
 Base 8767b6455ce7cd6278f7420de4c4be0f6d496400; 34.1 guest job 140538666382 in run 46008797528 SUCCESS with real high-LBA write, cold reopen, host export and four refusals; full CI pending at start. New kernel-only read-only object broker borrows four supervisor-supplied read-only grants and scratch, exact paired epoch, immutable object ID/revision, principal-bound monotonic revocable tokens, 16 simultaneous handles, deny cross-principal, deny callback reentry, revoke on loss of grant/unmount. Provisional sink must discard on CRC failure. Host test two files, mismatched ID/revision, cross-principal access, cancellation, full table, revoke owner, remount monotonic tokens, stale grant and zero writes. CI pending. Not wired to syscalls/desktop or normal guest; no writable service/ACL policy, authenticated process identity integration, scoped write/copy or Deep Drop UI. Trusted supervisor must derive principal and authorize grants; no application-supplied PID. Read-only mount cannot coexist with RW grants for same range. Next: guarded writable volume service and process-scoped broker, actual integration; preserve main/history, first VM target 4GB/20GB.
+
+
+## 35.1
+Initial run 46009195068 host failed due to unused test array saved under -Werror; paged guest passed. Remove unused array and add corrupt-data CRC rejection and handle invalidation test. No production code change. Rerun CI before acceptance.

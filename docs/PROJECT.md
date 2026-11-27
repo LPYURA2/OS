@@ -544,3 +544,7 @@ Initial guest link failure corrected in diagnostic-only runtime. Recheck CI befo
 ## StyleFS 35 — scoped object service candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_35.md). Main unchanged.
+
+
+### StyleFS 35.1
+Correct test compilation warning and add corrupted-file rejection check; CI pending.

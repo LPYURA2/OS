@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 enum {D=2+16*8,I=2+16*8,F=300,N=2+D+I+F};
-static uint8_t disk[N][512],durable[N][512],saved[N][512];
+static uint8_t disk[N][512],durable[N][512];
 static struct bs_service b;static struct pp64_layout l;
 static struct pp64_stream_workspace w;
 static struct dc64_node nodes[128];
@@ -46,6 +46,9 @@ static enum pp64_status put(char name,uint64_t id,uint64_t rev,uint64_t bytes,st
 static void check(char name,uint64_t id,uint64_t rev,uint64_t bytes,uint8_t seed){
  struct sd64_key k=key(name);struct pattern s={seed,UINT64_MAX,0};
  assert(pp64_get(&b,&l,&w,nodes,128,current,128,pair.sequence,&k,id,rev,sink,&s)==PP64_OK&&s.seen==bytes);
+}
+static bool accept(void *ctx,uint64_t at,const uint8_t *p,size_t n){
+ (void)ctx;(void)at;(void)p;(void)n;return true;
 }
 static struct po64_service service;
 static uint64_t token;
@@ -100,6 +103,20 @@ int main(void){
  assert(bs_revoke(&b,7,l.data)==BS_OK);
  assert(po64_read(&service,10,tmp,sink,&p)==PO64_STALE&&!service.active);
  assert(writes==before);
+ /* Restore the grant using a cold attach. A valid metadata snapshot with
+  * damaged file contents must not return a successful read. */
+ reopen();read_only();
+ assert(po64_mount(&service,&b,&l,&w,nodes,128,current,128)==PO64_OK);
+ assert(po64_grant(&service,10,&a,2,1,&tmp)==PO64_OK);
+ size_t len=0;struct sfs64_map m;
+ assert(ip64_export(&b,7,l.inode,&w.pair.inode.root,2,&w.source,&len)==IP64_OK);
+ assert(sfs64_map_decode(w.source.map,len,F,1,&m));
+ struct sfs_extent64 extent;uint64_t local;size_t take;
+ assert(sfs64_map_chunk(&m,0,1,&extent,&local,&take));
+ disk[2+D+I+extent.first][0]^=1;
+ assert(po64_read(&service,10,tmp,accept,0)==PO64_CORRUPT&&!service.active);
+ assert(po64_read(&service,10,tmp,accept,0)==PO64_STALE);
+ assert(writes==0);
  puts("STYLEFS 35 OBJECT SERVICE PASS: exact revision, principal isolation, revoke, reentry, stale grant, readonly media");
  return 0;
 }
