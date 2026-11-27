@@ -17,5 +17,10 @@ void desk_fs_paged_root_draw(const struct dp41_view *,struct desk_box);
  * until CRC, exact byte count and text validation have all succeeded. */
 bool s43_text_supported(const struct po64_row *);
 bool s43_read_text(const struct po64_row *,char *,size_t,size_t *);
+#ifdef STYLEOS_LIVE_VOLUME_44
+bool s44_writable(void);
+/* Exact opened revision only. True means durable commit, not merely staging. */
+bool s44_save_text(struct po64_row *,const char *,size_t);
+#endif
 bool s43_open_editor(const struct po64_row *);
 #endif

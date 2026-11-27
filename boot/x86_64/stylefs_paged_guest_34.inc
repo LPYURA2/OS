@@ -12,8 +12,13 @@
 #ifdef STYLEOS_LIVE_VOLUME_39
 #include <styleos/stylefs_paged_volume64.h>
 #include <styleos/desktop_paged_view.h>
+#ifdef STYLEOS_LIVE_VOLUME_44
+#define S34_SERIAL "STYLEOS-SFS44-DATA  "
+#define S34_TAG "STYLEOS-SFS44-PRIVATE-V1"
+#else
 #define S34_SERIAL "STYLEOS-SFS39-DATA  "
 #define S34_TAG "STYLEOS-SFS39-PRIVATE-V1"
+#endif
 #elif defined(STYLEOS_OBJECT_GUEST_37)
 #include <styleos/stylefs_paged_object64.h>
 #define S34_SERIAL "STYLEOS-SFS37-DATA  "
@@ -253,6 +258,45 @@ bool s43_read_text(const struct po64_row *row,char *out,size_t cap,size_t *bytes
  if(rc!=PO64_OK||copy.used!=row->bytes)return false;
  *bytes=copy.used;return true;
 }
+#ifdef STYLEOS_LIVE_VOLUME_44
+bool s44_writable(void){
+ struct po64_service *s=&s34_work.volume.objects;
+ return s41_root_view()&&s->writable;
+}
+struct s44_source_ctx {const char *text;size_t bytes;};
+static bool s44_source(void *ctx,uint64_t at,uint8_t *out,size_t n){
+ const struct s44_source_ctx *c=ctx;
+ if(at>c->bytes||n>c->bytes-at)return false;
+ for(size_t i=0;i<n;i++)out[i]=(uint8_t)c->text[(size_t)at+i];
+ return true;
+}
+bool s44_save_text(struct po64_row *row,const char *text,size_t bytes){
+ if(!s44_writable()||!row||!text||bytes>64u*1024u||
+    !s43_text_supported(row)||row->revision==UINT64_MAX)return false;
+ struct po64_service *s=&s34_work.volume.objects;
+ struct s44_source_ctx source={text,bytes};
+ uint64_t token=0;
+ if(po64_grant_access(s,303,&row->entry.key,row->entry.target,row->revision,
+                     PO64_WRITE,&token)!=PO64_OK)return false;
+ enum po64_status rc=po64_write(s,303,token,bytes,s44_source,&source);
+ if(rc!=PO64_OK){
+  if(s->active)(void)po64_revoke(s,303,token);
+  else (void)pv64_close(&s34_work.volume);
+  return false;
+ }
+ /* A durable commit invalidates every old token. Reauthorize the independent
+  * diagnostic object and rebuild the Explorer snapshot, never reuse a grant. */
+ row->revision++;row->bytes=bytes;
+ struct sd64_key k=s34_key(1,'a');
+ uint64_t parent=s34_work.root_view.parent,first=s34_work.root_view.first;
+ if(po64_grant(s,101,&k,2,1,&s34_work.token)!=PO64_OK||
+    !s42_load(parent,first)){
+  (void)pv64_close(&s34_work.volume);
+  arch_puts("SFS44 POSTCOMMIT VIEW UNAVAILABLE\n");
+ }
+ return true;
+}
+#endif
 bool s42_select(unsigned row,bool open){
  struct dp41_view *v=&s34_work.root_view;
  if(!s41_root_view()||row>=v->count)return false;
@@ -301,11 +345,17 @@ static void s39_admit(void){
  }
  g->tagged=true;
  struct bs_service *svc=&disk863.s.block;
+#ifdef STYLEOS_LIVE_VOLUME_44
+ const bool writable=true;
+ const struct bs_backend backend={g,UINT64_C(0x701080862844),S34_CAP,true,false,s34_read,s34_write,s34_flush};
+#else
+ const bool writable=false;
  const struct bs_backend backend={g,UINT64_C(0x701080862839),S34_CAP,false,false,s34_read,0,0};
+#endif
  const struct pv64_geometry geometry={0,S34_CAP,S34_D,S34_I,1};
  if(bs_attach(svc,&backend,&gen)!=BS_OK){arch_puts("SFS39 REFUSE attach\n");return;}
- if(pv64_mount(&s34_work.volume,svc,gen,BLOCK_SHELL_OWNER,&geometry,false,&s34_work.stream,
-    s34_work.nodes,32,s34_work.current,0,32)!=PO64_OK){
+ if(pv64_mount(&s34_work.volume,svc,gen,BLOCK_SHELL_OWNER,&geometry,writable,&s34_work.stream,
+    s34_work.nodes,32,s34_work.current,writable?s34_work.previous:0,32)!=PO64_OK){
   (void)bs_detach(svc,gen);arch_puts("SFS39 REFUSE metadata\n");return;
  }
  struct sd64_key k=s34_key(1,'a');

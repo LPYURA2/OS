@@ -60,7 +60,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -164,12 +164,18 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
                 # Open the real nested text file, verify the editor's
                 # content hash, then prove editing is blocked in RO mode.
                 digest=14695981039346656037
-                for byte in b"StyleOS: paged file read test.\nSecond line.\n":
+                original=b"StyleOS: paged file read test.\nSecond line.\n"
+                for byte in (b"a"+original if cold44 else original):
                     digest=((digest^byte)*1099511628211)&((1<<64)-1)
                 d.key("ret")
                 wait_exact(("SFS43 TEXT OPEN %016x"%digest).encode())
-                d.key("a")
-                wait_exact(b"SFS43 EDIT REFUSED")
+                if save44:
+                    d.key("a")
+                    d.key("ctrl-s")
+                    wait_exact(b"SFS44 SAVE PASS")
+                elif not cold44:
+                    d.key("a")
+                    wait_exact(b"SFS43 EDIT REFUSED")
                 d.key("f2")
                 d.key("backspace")
                 wait_exact(b"SFS42 UP DIRECTORY")
@@ -189,9 +195,10 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
                 require(b"STYLEOS DESKTOP READY" in uart.read_bytes() and b"STYLEOS NATIVE RUNTIME READY" in uart.read_bytes(),"live desktop missing")
             require(b"STYLEOS S863S DMA-AFTER " in uart.read_bytes() and b"STYLEOS S863S BAR4 " in uart.read_bytes(), "missing owned-root DMA admission receipts")
             require(not any(b" FAIL " in x for x in uart.read_bytes().splitlines()),"kernel failure receipt")
-            require(final["wr_bytes"]-start["wr_bytes"]==expected_writes, "write byte count")
+            written=final["wr_bytes"]-start["wr_bytes"]
+            require(written>0 if save44 else written==expected_writes, "write byte count")
             require(final["unmap_bytes"]==start["unmap_bytes"], "unexpected unmap")
-            if expected_writes:
+            if expected_writes or save44:
                 require(final["flush_operations"]-start["flush_operations"]>=2, "flush evidence")
             for k in ("failed_wr_operations","invalid_wr_operations","failed_flush_operations","invalid_flush_operations"):
                 require(final.get(k,0)==start.get(k,0), k)
@@ -201,7 +208,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
             d.ready.close()
             if proc.poll() is None:
                 proc.kill(); proc.wait()
-    return {"receipt":receipt,"written_bytes":expected_writes,"sectors":n}
+    return {"receipt":receipt,"written_bytes":written,"sectors":n}
 
 def main():
     p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True)

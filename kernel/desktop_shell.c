@@ -59,6 +59,9 @@ static char incoming[DESK_STYLEFS_TEXT_LIMIT];
 #ifdef STYLEOS_LIVE_VOLUME_39
 static bool paged_editor_open;
 static char paged_editor_name[SD64_NAME+1];
+#ifdef STYLEOS_LIVE_VOLUME_44
+static struct po64_row paged_editor_row;
+#endif
 #endif
 static bool russian, shell_refreshed;
 /* No synthetic windows are created: the port registry is empty at boot. */
@@ -136,6 +139,9 @@ static bool modern_shell(void)
 static const char *data_description(void)
 {
 #ifdef STYLEOS_LIVE_VOLUME_39
+#ifdef STYLEOS_LIVE_VOLUME_44
+    if(s44_writable())return "StyleFS — чтение и запись";
+#endif
     return s41_root_view()?"StyleFS — только чтение":"Диск данных не подключён";
 #elif defined(STYLEOS_DESKTOP_UPDATE)
     if (!data_sectors) return "Диск данных не обнаружен";
@@ -462,7 +468,12 @@ bool s43_open_editor(const struct po64_row *row)
     paged_editor_name[n]=0;
     paged_editor_open=true;
     document=-1;doc_folder=0;length=bytes;caret=0;scroll=0;dirty=false;
+#ifdef STYLEOS_LIVE_VOLUME_44
+    paged_editor_row=*row;
+    notice=s44_writable()?"Открыто с диска":"Открыто с диска — только чтение";
+#else
     notice="Открыто с диска — только чтение";
+#endif
     uint64_t hash=UINT64_C(14695981039346656037);
     for(size_t i=0;i<bytes;i++){hash^=(uint8_t)content[i];hash*=UINT64_C(1099511628211);}
     static const char hex[]="0123456789abcdef";
@@ -474,6 +485,17 @@ bool s43_open_editor(const struct po64_row *row)
 #endif
 static void save(void)
 {
+#ifdef STYLEOS_LIVE_VOLUME_44
+    /* Never fall through to the legacy slot backend in this profile. */
+    if(active()!=NOTES||!paged_editor_open){notice="Сначала откройте текстовый файл";return;}
+    if(!dirty)return;
+    if(!s44_save_text(&paged_editor_row,content,length)){
+        notice="Не удалось сохранить — текст сохранён в редакторе";
+        arch_puts("SFS44 SAVE REFUSED\n");return;
+    }
+    dirty=false;notice="Сохранено на диске";
+    arch_puts("SFS44 SAVE PASS\n");return;
+#endif
     if (!data_writable()) { notice = "Диск данных недоступен для записи"; return; }
     int slot = document;
     bool saved;
@@ -567,9 +589,18 @@ static bool insert_drop(void)
 static void replace(size_t lo, size_t hi, uint32_t cp)
 {
 #ifdef STYLEOS_LIVE_VOLUME_39
-    if(active()==NOTES&&paged_editor_open){
+    if(active()==NOTES&&paged_editor_open
+#ifdef STYLEOS_LIVE_VOLUME_44
+       &&!s44_writable()
+#endif
+       ){
         notice="Файл доступен только для чтения";
         arch_puts("SFS43 EDIT REFUSED\n");return;
+    }
+#endif
+#ifdef STYLEOS_LIVE_VOLUME_44
+    if(active()==NOTES&&paged_editor_open){
+        desk_text_app_replace(current_draft(),lo,hi,cp,DESK_STYLEFS_TEXT_LIMIT);return;
     }
 #endif
     desk_text_app_replace(current_draft(), lo, hi, cp,
