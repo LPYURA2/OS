@@ -8,6 +8,7 @@
 #include <styleos/user_preempt_848.h>
 #include <styleos/user_session_runtime.h>
 #include <styleos/native_window_channel.h>
+#include <styleos/native_runtime_865.h>
 #endif
 #define V 0x50u
 #define BIT 0x10000u
@@ -191,7 +192,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
 #ifdef STYLEOS_OWNED_SHELL_865
  /* Only after actual CPL3 trap, safe-root return, scheduler commit and
   * full mapping audit. Never accept caller-supplied PID/root/generation. */
- if(kind==RT865_SYSCALL && pending860.gpr[0]==NWC_CALL_PIXEL){
+ if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
@@ -199,14 +200,34 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
      slot->handle!=ticket->handle||slot->root!=ticket->child_root||
      runtime860->dispatcher.current!=-1||root848()!=safe||(flags848()&0x200))
    fail848("865-pixel-owner");
-  enum nwc_status pixel=nwc_publish_pixel((struct nwc_service *)nwc_global(),
+  enum nwc_status pixel=NWC_INVALID;
+  if(pending860.gpr[0]==NWC_CALL_PIXEL){
+   pixel=nwc_publish_pixel((struct nwc_service *)nwc_global(),
     ticket->pid,ticket->handle,ticket->child_root,pending860.gpr[1],pending860.gpr[2]);
-  slot->context.gpr[0]=(uint64_t)pixel;
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
-  arch_puts("STYLEOS NATIVE PIXEL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
-  fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
-  fld848("rgb",pending860.gpr[2]);fld848("status",pixel);arch_putc('\n');
+   arch_puts("STYLEOS NATIVE PIXEL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+   fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
+   fld848("rgb",pending860.gpr[2]);fld848("status",pixel);arch_putc('\n');
 #endif
+  }else{
+   uint64_t shape=pending860.gpr[3];
+   unsigned w=(unsigned)(shape&65535u),h=(unsigned)((shape>>16)&65535u);
+   uint32_t pixels[NWC_TILE_PIXELS]={0};
+   if(!(shape>>32)&&w&&h&&w<=NWC_TILE_WIDTH&&h<=NWC_TILE_HEIGHT&&
+      s865_native_copy_data(id,ticket->pid,ticket->handle,ticket->child_root,
+                           pending860.gpr[2],pixels,(size_t)w*h*sizeof pixels[0]))
+    pixel=nwc_publish_block((struct nwc_service *)nwc_global(),ticket->pid,
+       ticket->handle,ticket->child_root,pending860.gpr[1],pixels,w,h);
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+   arch_puts("STYLEOS NATIVE TILE");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+   fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
+   fld848("va",pending860.gpr[2]);fld848("shape",shape);fld848("status",pixel);
+   fld848("first",pixel==NWC_OK?pixels[0]:0);arch_putc('\n');
+#endif
+   volatile uint32_t *wipe_pixels=pixels;
+   for(size_t j=0;j<NWC_TILE_PIXELS;++j)wipe_pixels[j]=0;
+  }
+  slot->context.gpr[0]=(uint64_t)pixel;
  }
 #endif
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG

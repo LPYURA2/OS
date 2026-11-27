@@ -76,6 +76,12 @@ enum nwc_status nwc_publish_tile(struct nwc_service *,uint32_t pid,uint64_t hand
  * Only the architecture's authenticated trap dispatcher supplies identity.
  * No raw pointers, no implicit window creation, no cross-owner authority. */
 #define NWC_CALL_PIXEL UINT64_C(0x100)
+/* RAX=0x101, RBX=window, RCX=user data VA, RDX=height<<16|width.
+ * 1..16 pixels per dimension, row-major little-endian RGB24 in u32.
+ * The architecture copies the complete bounded buffer before calling. */
+#define NWC_CALL_TILE UINT64_C(0x101)
+enum nwc_status nwc_publish_block(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+                                  uint64_t window,const uint32_t *,unsigned,unsigned);
 enum nwc_status nwc_publish_pixel(struct nwc_service *,uint32_t,uint64_t,uint64_t,
                                   uint64_t window,uint64_t rgb);
 enum nwc_status nwc_visible_tile(const struct nwc_service *,uint32_t window_id,

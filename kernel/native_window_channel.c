@@ -165,11 +165,14 @@ enum nwc_status nwc_publish_tile(struct nwc_service *s,uint32_t pid,
     p->tile=tile;p->has_tile=true;
     return NWC_OK;
 }
-enum nwc_status nwc_publish_pixel(struct nwc_service *s,uint32_t pid,uint64_t handle,
-                                  uint64_t root,uint64_t window,uint64_t rgb)
+enum nwc_status nwc_publish_block(struct nwc_service *s,uint32_t pid,uint64_t handle,
+                                  uint64_t root,uint64_t window,const uint32_t *pixels,
+                                  unsigned w,unsigned h)
 {
-    if(!pid || !handle || !root || (root&4095u) ||
-       window>UINT32_MAX || rgb>UINT32_C(0x00ffffff))return NWC_INVALID;
+    if(!pid || !handle || !root || (root&4095u) || !pixels ||
+       window>UINT32_MAX || !w || !h || w>NWC_TILE_WIDTH || h>NWC_TILE_HEIGHT)return NWC_INVALID;
+    for(size_t i=0;i<(size_t)w*h;++i)
+        if(pixels[i]>UINT32_C(0x00ffffff))return NWC_INVALID;
     if(!consistent(s))return NWC_NOT_READY;
     uint32_t win=(uint32_t)window;
     if(!win){
@@ -181,8 +184,14 @@ enum nwc_status nwc_publish_pixel(struct nwc_service *s,uint32_t pid,uint64_t ha
         }
         if(!win)return NWC_DENIED;
     }
+    return nwc_publish_tile(s,pid,handle,root,win,pixels,w,h);
+}
+enum nwc_status nwc_publish_pixel(struct nwc_service *s,uint32_t pid,uint64_t handle,
+                                  uint64_t root,uint64_t window,uint64_t rgb)
+{
+    if(rgb>UINT32_C(0x00ffffff))return NWC_INVALID;
     uint32_t pixel=(uint32_t)rgb;
-    return nwc_publish_tile(s,pid,handle,root,win,&pixel,1,1);
+    return nwc_publish_block(s,pid,handle,root,window,&pixel,1,1);
 }
 enum nwc_status nwc_visible_tile(const struct nwc_service *s,uint32_t win,
                                  struct nwc_tile *out)

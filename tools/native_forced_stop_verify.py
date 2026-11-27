@@ -85,7 +85,7 @@ def verify_shell_boundary(lines,roots,loop=0x1000000d):
     # Windows/ports ownership is separately verified by enclosing lifecycle
     # checks at bind, revoke, rebind and final cleanup. No pixel IPC claim.
 
-def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False):
+def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,window_tile=False):
     safe=obs['active']['root']
     def rec(tag,keys):return records(lines,tag,keys)
     admissions=rec(ADMIT,AKEY)
@@ -143,8 +143,9 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False):
         seq=[e for _,e in per[pid]]
         if pid in (1,2,33):
             prefix=[(128,0x1000000d,1,1)]
-            if window_ipc:prefix.append((128,0x1000001e,0x100,1))
-            loop=0x10000024 if window_ipc else 0x1000000d
+            if window_tile:prefix.extend([(128,0x10000043,0x101,1),(128,0x1000005e,0x101,1)])
+            elif window_ipc:prefix.append((128,0x1000001e,0x100,1))
+            loop=0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d
             actual=[(e['vector'],e['rip'],e['rax'],e['state']) for e in seq]
             if actual[:len(prefix)]!=prefix or len(seq)<len(prefix)+4 or any(x!=(0x50,loop,0,1) for x in actual[len(prefix):]):raise ValueError('real loop preemption')
             if not end<stop_by_pid[pid]:raise ValueError('release before successful stop')
@@ -193,6 +194,9 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False):
         if one(r'^RIP=[0-9a-fA-F]+ RFL=([0-9a-fA-F]+)\b')!=e['flags'] or one(r'\bRAX=([0-9a-fA-F]+)\b')!=e['rax'] or one(r'\bR12=([0-9a-fA-F]+)\b')!=e['slot']+1:raise ValueError('raw CPU registers')
         if window_ipc and e['vector']==128 and e['rax']==0x100:
             if one(r'\bRBX=([0-9a-fA-F]+)\b')!=0 or one(r'\bRCX=([0-9a-fA-F]+)\b')!=0xb10000+e['slot']+1:raise ValueError('raw pixel arguments')
+        if window_tile and e['vector']==128 and e['rax']==0x101:
+            want=0x12000ff8 if e['rip']==0x10000043 else 0x12000000
+            if one(r'\bRBX=([0-9a-fA-F]+)\b')!=0 or one(r'\bRCX=([0-9a-fA-F]+)\b')!=want or one(r'\bRDX=([0-9a-fA-F]+)\b')!=0x20002:raise ValueError('raw tile arguments')
         result.append((int(m[1]),e))
     if not started or idx!=len(events) or di!=len(drains):raise ValueError('raw CPU count')
     fields=('root','n','batch','mouse','key','dx','dy','buttons','modifiers','x','y','active','ru','restarts','text','text-hash','text-dirty','note-session','writes')
@@ -200,12 +204,27 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False):
     if sum(e['key']==0x43 for _,e in inputs)!=3 or len(inputs)<2:raise ValueError('three trusted request inputs')
     (i,prev),(j,lang)=inputs[-2:]
     if not done[0][0]<i<j or (prev['key'],lang['key'])!=(0x58,0x40) or lang['root']!=safe or lang['ru']==prev['ru'] or not lang['writes']:raise ValueError('responsive shell after forced stop')
-    if window_ipc:
+    if window_tile:
+        tiles=rec(b'STYLEOS NATIVE TILE',('pid','gen','root','window','va','shape','status','first'))
+        expected=[]
+        for pid,idx in ((1,0),(2,1),(33,0)):
+            expected.extend([(pid,pid,roots[idx],0,0x12000ff8,0x20002,1,0),
+                             (pid,pid,roots[idx],0,0x12000000,0x20002,0,0xc10001+idx)])
+        # Scheduler interleaves the initial two peers' calls. Verify each
+        # caller's exact ordered receipts, then match global trap order.
+        if len(tiles)!=6:raise ValueError('tile receipt count')
+        for pid in (1,2,33):
+            if [tuple(x.values()) for _,x in tiles if x['pid']==pid]!=[x for x in expected if x[0]==pid]:
+                raise ValueError('tile acceptance or cross-page refusal')
+        calls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x101]
+        if len(calls)!=6 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(tiles,calls)):
+            raise ValueError('tile receipt not adjacent to authenticated trap')
+    elif window_ipc:
         pixels=rec(b'STYLEOS NATIVE PIXEL',('pid','gen','root','window','rgb','status'))
         if len(pixels)!=3 or [tuple(x.values()) for _,x in pixels]!=[(1,1,roots[0],0,0xb10001,0),(2,2,roots[1],0,0xb10002,0),(33,33,roots[0],0,0xb10001,0)]:
             raise ValueError('authenticated pixel receipts')
         calls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x100]
         if len(calls)!=3 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(pixels,calls)):
             raise ValueError('pixel receipt not adjacent to authenticated trap')
-    if shell_boundary:verify_shell_boundary(lines,roots,0x10000024 if window_ipc else 0x1000000d)
+    if shell_boundary:verify_shell_boundary(lines,roots,0x10000064 if window_tile else 0x10000024 if window_ipc else 0x1000000d)
     return result

@@ -17,6 +17,26 @@ static bool native_audit(void *unused){
  return native_arena&&native_evidence&&read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(&native_cache)&&
   rt865_roots_audit_sparse_frozen(base861,&native_cache,&frozen861,native_evidence,native_arena,native_leases,&native_guard,&composed,native_roots);
 }
+bool s865_native_copy_data(unsigned id,uint32_t pid,uint64_t gen,uint64_t root,
+                           uint64_t va,void *out,size_t bytes){
+ if(!native_ready||!out||!bytes||bytes>4096u||va<S846_DATA||
+    va-S846_DATA>4096u-bytes||id>=S846_ROOT_COUNT||!runtime860||
+    runtime860->dispatcher.current!=-1||!native_audit(0))return false;
+ const struct pr_entry *caller=pr_find(pr_global(),pid);
+ const struct s844_lease lease=native_leases[id];
+ if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=gen||caller->page_root!=root||
+    bank862.slots[id].pid!=pid||bank862.slots[id].handle!=gen||bank862.slots[id].root!=root||
+    !native_roots[id].ready||native_roots[id].built.root!=root||
+    lease.generation!=gen||lease.pages!=3||lease.owner!=S846_OWNER_A+id||
+    !s844_lease_live(native_arena,lease))return false;
+ /* native_audit verifies the real detached PTEs and identity mapped
+  * safe-root arena, with this exact live generation and three-page lease.
+  * The data page is the second page; the user VA itself is never accessed. */
+ const volatile uint8_t *src=(const volatile uint8_t *)(uintptr_t)(lease.pa+4096u+(va-S846_DATA));
+ uint8_t *dst=out;
+ for(size_t i=0;i<bytes;++i)dst[i]=src[i];
+ return true;
+}
 static bool native_release(void *unused,unsigned id,uint64_t root,uint64_t generation){
  (void)unused;
  if(id>=S846_ROOT_COUNT||!native_audit(0)||native_roots[id].built.root!=root||

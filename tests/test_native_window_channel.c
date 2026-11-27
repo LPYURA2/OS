@@ -81,8 +81,17 @@ int main(void)
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==2);
     assert(nwc_publish_pixel(&ipc,pid_a,16,65536,0,0x123456)==NWC_OK);
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==3 && tile.pixel[0]==0x123456);
-    assert(ws_compositor_restart(&windows)==2);
+    const uint32_t block[4]={0x102030,0x405060,0x708090,0xa0b0c0};
+    const uint32_t bad[4]={0,0,0,0x1000000};
+    assert(nwc_publish_block(&ipc,pid_a,16,65536,0,bad,2,2)==NWC_INVALID);
+    assert(nwc_publish_block(&ipc,pid_a,16,65536,0,block,17,2)==NWC_INVALID);
+    assert(nwc_publish_block(&ipc,pid_b,32,131072,win_a,block,2,2)==NWC_DENIED);
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==3);
+    assert(nwc_publish_block(&ipc,pid_a,16,65536,0,block,2,2)==NWC_OK);
+    assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==4 &&
+           tile.width==2 && tile.height==2 && !memcmp(tile.pixel,block,sizeof block) && tile.pixel[4]==0);
+    assert(ws_compositor_restart(&windows)==2);
+    assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==4);
     assert(ws_set_minimized(&windows,pid_a,win_a,true)==WS_OK);
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_DENIED);
     assert(nwc_send_key(&ipc,win_a,'X',0,true)==NWC_DENIED);

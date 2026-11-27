@@ -14,7 +14,8 @@ FAULT_PROBES={
     'forbidden-int':(b'\xcd\x81',13,0x1000000d,0x40a,0),
 }
 
-def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False):
+def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,hang_load=False,forced_stop=False,packages=None,window_ipc=False,window_tile=False):
+    if window_tile and not window_ipc:raise ValueError('tile requires IPC fixture')
     if window_ipc and (not forced_stop or packages is None):raise ValueError('window IPC requires separate package fixture')
     if packages is not None:
         if not forced_stop:raise ValueError('package fixture requires forced-stop profile')
@@ -38,7 +39,21 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
             code+=b'\xb8\x01\x00\x00\x00\xcd\x80'
             if (hang_load and i==0) or (forced_stop and i<2):
                 # Valid user context, no syscall/fault/exit after yield.
-                if window_ipc and i<2:
+                if window_tile and i<2:
+                    # Write four distinct pixels to the real private data page.
+                    code+=b'\xbf'+struct.pack('<I',0x12000000)
+                    for j in range(4):
+                        code+=(b'\xc7\x07' if not j else b'\xc7\x47'+bytes([4*j]))+struct.pack('<I',0xc10000+i+1+(j<<8))
+                    def tile_call(va):
+                        return b'\xbb\x00\x00\x00\x00\xb9'+struct.pack('<I',va)+b'\xba\x02\x00\x02\x00\xb8\x01\x01\x00\x00\xcd\x80'
+                    code+=tile_call(0x12000ff8)
+                    assert len(code)==0x43
+                    code+=b'\x83\xf8\x01\x75\x1e'
+                    code+=tile_call(0x12000000)
+                    assert len(code)==0x5e
+                    code+=b'\x85\xc0\x75\x04\x31\xc0\xeb\xfe\x0f\x0b'
+                    assert len(code)==0x68
+                elif window_ipc and i<2:
                     # Real CPL3 register-only call. Failed return faults;
                     # success loops with RAX=0 at code offset 0x24.
                     code+=b'\xbb\x00\x00\x00\x00\xb9'+struct.pack('<I',0xb10000+i+1)+b'\xb8\x00\x01\x00\x00\xcd\x80\x85\xc0\x75\x04\x31\xc0\xeb\xfe\x0f\x0b'
