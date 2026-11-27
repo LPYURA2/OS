@@ -651,6 +651,13 @@ static bool keyboard(unsigned key, unsigned mods)
 {
     last_file_click.at = 0;
     current_file_click.id = -1;
+#ifdef STYLEOS_LIVE_VOLUME_46
+    if(active()!=FILES||menu)s46_cancel();
+    else if(s46_input(key,mods,character(key,(mods&DESK_SHIFT)!=0),
+                      paged_editor_open?paged_editor_row.entry.target:0)){
+        ++filesystem.revision;return true;
+    }
+#endif
 #ifdef STYLEOS_OWNED_SHELL_865
     if(active()==TASKS&&!menu&&!mods){
         if(key==0x14b||key==0x14d){
@@ -883,6 +890,9 @@ static void maximize(int id)
 
 static void click(int x, int y)
 {
+#ifdef STYLEOS_LIVE_VOLUME_46
+    s46_cancel();
+#endif
 #ifdef STYLEOS_OWNED_SHELL_865
     if(!menu&&window_at(x,y)==TASKS){
         struct desk_box b=win[TASKS].box;

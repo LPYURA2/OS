@@ -22,5 +22,11 @@ bool s44_writable(void);
 /* Exact opened revision only. True means durable commit, not merely staging. */
 bool s44_save_text(struct po64_row *,const char *,size_t);
 #endif
+#ifdef STYLEOS_LIVE_VOLUME_46
+bool s46_input(unsigned key,unsigned mods,uint32_t cp,uint64_t protected_id);
+bool s46_begin_create(void);
+void s46_cancel(void);
+const char *s46_footer(void);
+#endif
 bool s43_open_editor(const struct po64_row *);
 #endif

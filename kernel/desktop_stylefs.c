@@ -1032,6 +1032,9 @@ bool desk_fs_paged_click(const struct dp41_view *v,struct desk_box a,int x,int y
  if(!v||!v->valid)return false;
  int side=sidebar(a),left=a.x+side,right=a.x+a.w-14;
  if(x>=a.x+12&&x<a.x+115&&y>=a.y+48&&y<a.y+77)return s42_navigate(0x0e);
+#ifdef STYLEOS_LIVE_VOLUME_46
+ if(x>=left+152&&x<left+257&&y>=a.y+91&&y<a.y+119)return s46_begin_create();
+#endif
  if(x>=left+267&&x<left+347&&y>=a.y+91&&y<a.y+119)return s42_select(v->selected,true);
  if(x<left+10||x>=right||y<a.y+FILE_TOP||y>=a.y+a.h-FOOT)return false;
  unsigned row=(unsigned)(y-a.y-FILE_TOP)/ROW_H;
@@ -1055,7 +1058,11 @@ void desk_fs_paged_root_draw(const struct dp41_view *v,struct desk_box a){
  desk_icon(a.x+36,a.y+SYSTEM_ROW+4,22,DESK_DRIVE,DIM);
  desk_text(a.x+67,a.y+SYSTEM_ROW+5,left-6,"Диск данных",TEXT);
  button(a,side+13,91,132,"+ Новая папка",false);
+#ifdef STYLEOS_LIVE_VOLUME_46
+ button(a,side+152,91,105,"+ Текст",s44_writable());
+#else
  button(a,side+152,91,105,"+ Текст",false);
+#endif
  button(a,side+267,91,80,"Открыть",v->count&&(v->rows[v->selected].entry.kind==SD64_DIRECTORY||s43_text_supported(&v->rows[v->selected])));
  int type=right-157,size=right-74;
  desk_text(left+16,a.y+130,type-12,"Имя",DIM);
@@ -1081,7 +1088,11 @@ void desk_fs_paged_root_draw(const struct dp41_view *v,struct desk_box a){
  }
  if(!v->count)desk_text(left+20,a.y+FILE_TOP+10,right,"Папка пуста",DIM);
  desk_fill(left+12,a.y+a.h-34,right-left-12,1,LINE);
+#ifdef STYLEOS_LIVE_VOLUME_46
+ desk_text(left+14,a.y+a.h-26,right,s46_footer(),DIM);
+#else
  desk_text(left+14,a.y+a.h-26,right,v->more||v->first?"Только чтение — PgUp/PgDn":"Только чтение — Enter / Backspace",DIM);
+#endif
  static bool reported;
  if(shown&&!reported){reported=true;arch_puts("SFS41 EXPLORER ROWS\n");}
  static uint64_t last_parent;

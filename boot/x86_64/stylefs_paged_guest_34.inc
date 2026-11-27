@@ -12,7 +12,10 @@
 #ifdef STYLEOS_LIVE_VOLUME_39
 #include <styleos/stylefs_paged_volume64.h>
 #include <styleos/desktop_paged_view.h>
-#ifdef STYLEOS_LIVE_VOLUME_44
+#ifdef STYLEOS_LIVE_VOLUME_46
+#define S34_SERIAL "STYLEOS-SFS46-DATA  "
+#define S34_TAG "STYLEOS-SFS46-PRIVATE-V1"
+#elif defined(STYLEOS_LIVE_VOLUME_44)
 #define S34_SERIAL "STYLEOS-SFS44-DATA  "
 #define S34_TAG "STYLEOS-SFS44-PRIVATE-V1"
 #else
@@ -295,6 +298,87 @@ bool s44_save_text(struct po64_row *row,const char *text,size_t bytes){
   arch_puts("SFS44 POSTCOMMIT VIEW UNAVAILABLE\n");
  }
  return true;
+}
+#endif
+#ifdef STYLEOS_LIVE_VOLUME_46
+/* Private diagnostic fixture: IDs 1..4 provisioned; new IDs use the
+ * high half and next committed sequence. Not a general rollback-safe allocator. */
+static struct {
+ unsigned op,n;
+ uint64_t parent;
+ struct po64_snapshot snap;
+ struct po64_row row;
+ char name[SD64_NAME+1];
+ const char *message;
+} s46;
+void s46_cancel(void){s46.op=0;s46.n=0;s46.name[0]=0;s46.message=0;}
+const char *s46_footer(void){
+ if(s46.op==3)return "Удалить файл? Enter — да, Esc — отмена";
+ if(s46.op==1||s46.op==2)return s46.n?s46.name:"Введите имя — Enter / Esc";
+ return s46.message?s46.message:"Ctrl+N — создать / Ctrl+R — имя / Del";
+}
+static bool s46_begin(unsigned op){
+ const struct dp41_view *v=s41_root_view();
+ if(!v||!s44_writable())return false;
+ s46_cancel();
+ if(op!=1&&(!v->count||v->selected>=v->count||
+    v->rows[v->selected].entry.kind!=SD64_FILE||v->rows[v->selected].entry.target==2)){
+  s46.message="Выберите обычный файл";return true;
+ }
+ if(po64_snapshot(&s34_work.volume.objects,&s46.snap)!=PO64_OK)return false;
+ s46.parent=v->parent;
+ if(op!=1)s46.row=v->rows[v->selected];
+ s46.op=op;
+ return true;
+}
+bool s46_begin_create(void){return s46_begin(1);}
+static bool s46_commit(uint64_t protected_id){
+ struct po64_service *s=&s34_work.volume.objects;
+ unsigned op=s46.op;
+ enum po64_status rc=PO64_DENIED;
+ if(!s44_writable()||s34_work.root_view.parent!=s46.parent||
+    (op!=1&&s46.row.entry.target==protected_id)){
+  s46_cancel();s46.message="Операция запрещена";arch_puts("SFS46 REFUSED\n");return true;
+ }
+ struct sd64_key key={.parent=s46.parent,.length=(uint16_t)s46.n};
+ for(unsigned i=0;i<s46.n;i++)key.name[i]=(uint8_t)s46.name[i];
+ if(op==1){
+  if(s46.snap.sequence<UINT64_C(0x7fffffffffffffff)&&sd64_key_valid(&key))
+   rc=po64_create_empty(s,s46.snap,&key,UINT64_C(0x8000000000000000)|(s46.snap.sequence+1));
+ }else if(op==2&&sd64_key_valid(&key)){
+  rc=po64_change_file(s,s46.snap,&s46.row,&key);
+ }else if(op==3)rc=po64_change_file(s,s46.snap,&s46.row,0);
+ uint64_t parent=s46.parent;
+ s46_cancel();
+ if(rc!=PO64_OK){
+  if(!s->active)(void)pv64_close(&s34_work.volume);
+  s46.message="Операция не выполнена";arch_puts("SFS46 REFUSED\n");return true;
+ }
+ struct sd64_key diagnostic=s34_key(1,'a');
+ if(po64_grant(s,101,&diagnostic,2,1,&s34_work.token)!=PO64_OK||
+    !s42_load(parent,0)){
+  (void)pv64_close(&s34_work.volume);
+  arch_puts("SFS46 POSTCOMMIT VIEW UNAVAILABLE\n");
+ }
+ s46.message=op==1?"Файл создан":op==2?"Имя изменено":"Файл удалён";
+ arch_puts(op==1?"SFS46 CREATE PASS\n":op==2?"SFS46 RENAME PASS\n":"SFS46 DELETE PASS\n");
+ return true;
+}
+bool s46_input(unsigned key,unsigned mods,uint32_t cp,uint64_t protected_id){
+ if(s46.op){
+  if(key==0x01){s46_cancel();return true;}
+  if(!mods&&(key==0x1c||key==0x11c))return s46_commit(protected_id);
+  if(s46.op==3)return true;
+  if(!mods&&key==0x0e){if(s46.n)s46.name[--s46.n]=0;return true;}
+  if(!(mods&(DESK_CTRL|DESK_ALT))&&cp>=32&&cp<127&&cp!='/'&&cp!='\\'&&s46.n<SD64_NAME){
+   s46.name[s46.n++]=(char)cp;s46.name[s46.n]=0;
+  }
+  return true;
+ }
+ if(mods==DESK_CTRL&&key==0x31)return s46_begin(1);
+ if(mods==DESK_CTRL&&key==0x13)return s46_begin(2);
+ if(!mods&&key==0x153)return s46_begin(3);
+ return false;
 }
 #endif
 bool s42_select(unsigned row,bool open){
