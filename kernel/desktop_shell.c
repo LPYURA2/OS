@@ -66,6 +66,9 @@ static struct po64_row paged_editor_row;
 static bool russian, shell_refreshed;
 /* No synthetic windows are created: the port registry is empty at boot. */
 static struct ndb_tracker native_view;
+#ifdef STYLEOS_OWNED_SHELL_865
+static struct ndb_input native_input;
+#endif
 static void native_plot(void *unused,int x,int y,uint32_t rgb)
 { (void)unused;desk_fill(x,y,1,1,rgb); }
 
@@ -651,6 +654,14 @@ static bool keyboard(unsigned key, unsigned mods)
 {
     last_file_click.at = 0;
     current_file_click.id = -1;
+#ifdef STYLEOS_OWNED_SHELL_865
+    /* Global shell shortcuts retain precedence; selecting a legacy window
+     * clears native keyboard focus. The driver currently emits key presses. */
+    const bool system_key=(key>=0x3bu&&key<=0x44u)||key==0x57u||key==0x58u||
+                          key==DESK_KEY_LANGUAGE||key==0x15bu;
+    if(ndb_route_key((struct nwc_service *)nwc_global(),&native_input,
+                     width,work_area().h,key,mods,menu||system_key))return false;
+#endif
 #ifdef STYLEOS_LIVE_VOLUME_46
     if(active()!=FILES||menu)s46_cancel();
     else if(s46_input(key,mods,character(key,(mods&DESK_SHIFT)!=0),
@@ -1311,6 +1322,15 @@ static bool mouse(const struct desk_event *event)
     my = clamp(my + event->dy, 0, height - 1);
     bool down = (event->buttons & 1) != 0;
     bool pressed = down && !mouse_down;
+#ifdef STYLEOS_OWNED_SHELL_865
+    if(ndb_route_pointer((struct nwc_service *)nwc_global(),&native_input,
+                         width,work_area().h,mx,my,event->buttons,event->modifiers,
+                         pressed,!down&&mouse_down,menu||drag>=0||transfer.id>=0)){
+        mouse_down=down;
+        current_file_click.id=-1;last_file_click.at=0;
+        return false;
+    }
+#endif
     bool inserted = false;
     if (current_file_click.id >= 0 &&
         (mx - current_file_click.x > 5 || current_file_click.x - mx > 5 ||
@@ -1426,6 +1446,9 @@ static void restart_shell(void)
     process_offset=0;process_tab_report=false;process_dirty=true;
 #endif
     shell_refreshed = true;
+#ifdef STYLEOS_OWNED_SHELL_865
+    native_input=(struct ndb_input){0};
+#endif
     print_pid("STYLEOS SHELL RESTART pid=", new_pid);
 #if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     desktop_kernel_boundary864();
@@ -1496,6 +1519,9 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     mx = width / 2;
     my = height * 3 / 4;
     native_view=(struct ndb_tracker){0};
+#ifdef STYLEOS_OWNED_SHELL_865
+    native_input=(struct ndb_input){0};
+#endif
     desk_sessions_init(desk_sessions_global());
     desk_draw_init(surface);
     data_sectors = desk_ata_probe();

@@ -89,3 +89,58 @@ unsigned ndb_paint(const struct nwc_service *ipc,int width,int height,
     }
     return painted;
 }
+
+/* Reuse snapshot instead of a second, inconsistent definition of the
+ * visible region. Later painted entries are in front. */
+uint32_t ndb_hit(const struct nwc_service *ipc,int width,int height,int x,int y)
+{
+    struct ndb_seen seen[NWC_PORTS]={0};
+    unsigned n=snapshot(ipc,width,height,seen);
+    while(n){
+        const struct ndb_seen *v=&seen[--n];
+        if(x>=v->rect.x&&y>=v->rect.y&&(int64_t)x-v->rect.x<v->rect.w&&(int64_t)y-v->rect.y<v->rect.h)
+            return v->window_id;
+    }
+    return 0;
+}
+static bool focus_visible(const struct nwc_service *ipc,int width,int height,uint32_t id)
+{
+    struct ndb_seen seen[NWC_PORTS]={0};
+    unsigned n=snapshot(ipc,width,height,seen);
+    for(unsigned i=0;i<n;++i)if(seen[i].window_id==id)return true;
+    return false;
+}
+bool ndb_route_pointer(struct nwc_service *ipc,struct ndb_input *input,int width,int height,
+                        int x,int y,uint32_t buttons,uint32_t modifiers,
+                        bool pressed,bool released,bool blocked)
+{
+    if(!input)return false;
+    if(pressed){
+        input->focus=blocked?0:ndb_hit(ipc,width,height,x,y);
+        input->capture=input->focus;
+    }
+    uint32_t id=input->capture;
+    if(!id)return false;
+    if(!blocked&&focus_visible(ipc,width,height,id)){
+        const struct ws_window *w=ws_find(ipc->windows,id);
+        if(w){
+            int64_t rx=(int64_t)x-w->bounds.x,ry=(int64_t)y-w->bounds.y;
+            if(rx>=INT32_MIN&&rx<=INT32_MAX&&ry>=INT32_MIN&&ry<=INT32_MAX)
+                (void)nwc_send_pointer(ipc,id,(int32_t)rx,(int32_t)ry,buttons,modifiers);
+        }
+    }else if(input->focus==id)input->focus=0;
+    if(released)input->capture=0;
+    return true;
+}
+bool ndb_route_key(struct nwc_service *ipc,struct ndb_input *input,int width,int height,
+                    uint32_t key,uint32_t modifiers,bool blocked)
+{
+    if(!input)return false;
+    if(blocked){input->focus=0;return false;}
+    uint32_t id=input->focus;
+    if(!id)return false;
+    if(!focus_visible(ipc,width,height,id))input->focus=0;
+    else (void)nwc_send_key(ipc,id,key,modifiers,true);
+    /* A full queue or revoked port must not reroute this key to a legacy app. */
+    return true;
+}

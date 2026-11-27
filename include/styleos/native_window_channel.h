@@ -17,7 +17,7 @@ enum { NWC_PORTS = 8, NWC_EVENTS = 4, NWC_TEXT_BYTES = 32,
 enum nwc_status { NWC_OK = 0, NWC_INVALID, NWC_NOT_READY,
                   NWC_DENIED, NWC_MISSING, NWC_FULL, NWC_EMPTY,
                   NWC_STALE, NWC_OVERFLOW };
-enum nwc_event_kind { NWC_KEY = 1, NWC_TEXT = 2 };
+enum nwc_event_kind { NWC_KEY = 1, NWC_TEXT = 2, NWC_POINTER = 3 };
 struct nwc_event {
     uint32_t sequence, window_id;
     enum nwc_event_kind kind;
@@ -61,6 +61,11 @@ enum nwc_status nwc_send_key(struct nwc_service *,uint32_t window_id,
                              uint32_t keycode,uint32_t modifiers,bool pressed);
 enum nwc_status nwc_send_text(struct nwc_service *,uint32_t window_id,
                               const uint8_t *kernel_copy,size_t size);
+/* Trusted pointer producer: code = button mask, down = primary button,
+ * size = 8, payload = two little-endian signed 32-bit window-relative
+ * coordinates (may be outside the window during capture). */
+enum nwc_status nwc_send_pointer(struct nwc_service *,uint32_t,int32_t,int32_t,
+                                 uint32_t buttons,uint32_t modifiers);
 /* Trusted CPL3 trap layer must authenticate all PID/handle/root parameters
  * against the actual CPU context; this API does NOT establish trap identity. */
 enum nwc_status nwc_receive(struct nwc_service *,uint32_t pid,uint64_t handle,

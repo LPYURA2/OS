@@ -25,4 +25,16 @@ unsigned ndb_track(const struct nwc_service *ipc, struct ndb_tracker *tracker,
 /* Clip to BOTH the owner window's bounds and the actual desktop work area. */
 unsigned ndb_paint(const struct nwc_service *ipc, int width, int height,
                    ndb_pixel_plot plot, void *opaque);
+/* Input follows the same clipped tile and paint order as presentation.
+ * Only a primary press selects a new native target. Capture owns the
+ * subsequent motion/release even after leaving its tile. No click-through
+ * when the target queue is full or the captured window has disappeared.
+ * Shell passes blocked for menus, panel, or an existing shell drag. */
+struct ndb_input { uint32_t focus,capture; };
+uint32_t ndb_hit(const struct nwc_service *,int width,int height,int x,int y);
+bool ndb_route_pointer(struct nwc_service *,struct ndb_input *,int width,int height,
+                        int x,int y,uint32_t buttons,uint32_t modifiers,
+                        bool pressed,bool released,bool blocked);
+bool ndb_route_key(struct nwc_service *,struct ndb_input *,int width,int height,
+                    uint32_t key,uint32_t modifiers,bool blocked);
 #endif

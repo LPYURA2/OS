@@ -168,6 +168,17 @@ static void wire_u32(uint8_t *p,uint32_t v)
 {
     for(unsigned i=0;i<4;++i)p[i]=(uint8_t)(v>>(8*i));
 }
+enum nwc_status nwc_send_pointer(struct nwc_service *s,uint32_t win,int32_t x,int32_t y,
+                                 uint32_t buttons,uint32_t modifiers)
+{
+    if(!win || (buttons&~7u) || (modifiers&~15u))return NWC_INVALID;
+    struct nwc_event ev={0};
+    ev.kind=NWC_POINTER;ev.code=buttons;ev.modifiers=modifiers;
+    ev.down=(buttons&1u)!=0;ev.size=8;
+    wire_u32(ev.bytes,(uint32_t)x);
+    wire_u32(ev.bytes+4,(uint32_t)y);
+    return enqueue(s,win,&ev);
+}
 enum nwc_status nwc_receive_wire(struct nwc_service *s,uint32_t pid,uint64_t handle,
                                  uint64_t root,uint64_t window,uint8_t out[NWC_INPUT_BYTES])
 {

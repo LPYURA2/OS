@@ -65,6 +65,33 @@ int main(void)
     assert(framebuffer[539u*800u+799u]==0x446688);
     assert(framebuffer[540u*800u+799u]==0);
     update(0);
+    struct ndb_input input={0};
+    struct nwc_event ev={0};
+    assert(ndb_hit(&ipc,800,540,799,539)==w1);
+    assert(!ndb_hit(&ipc,800,540,800,539));
+    assert(!ndb_hit(&ipc,800,540,799,540));
+    assert(!ndb_route_pointer(&ipc,&input,800,540,799,539,1,0,true,false,true));
+    assert(!input.focus&&!input.capture);
+    assert(ndb_route_pointer(&ipc,&input,800,540,799,539,1,0,true,false,false));
+    assert(input.focus==w1&&input.capture==w1);
+    assert(ndb_route_pointer(&ipc,&input,800,540,790,530,0,0,false,true,false));
+    assert(input.focus==w1&&!input.capture);
+    assert(ndb_route_key(&ipc,&input,800,540,0x1e,1,false));
+    assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_OK&&ev.kind==NWC_POINTER&&ev.down&&ev.size==8&&ev.bytes[0]==3&&ev.bytes[4]==1);
+    assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_OK&&ev.kind==NWC_POINTER&&!ev.down&&ev.bytes[0]==250&&ev.bytes[3]==255&&ev.bytes[4]==248);
+    assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_OK&&ev.kind==NWC_KEY&&ev.code==0x1e&&ev.modifiers==1);
+    assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_EMPTY);
+    assert(ndb_route_key(&ipc,&input,800,540,0x30,0,false));
+    assert(ndb_route_key(&ipc,&input,800,540,0x30,0,false));
+    assert(ndb_route_key(&ipc,&input,800,540,0x30,0,false));
+    assert(ndb_route_key(&ipc,&input,800,540,0x30,0,false));
+    assert(ndb_route_key(&ipc,&input,800,540,0x2e,0,false)); /* full, still consumed */
+    for(unsigned n=0;n<NWC_EVENTS;++n)
+        assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_OK&&ev.code==0x30);
+    assert(nwc_receive(&ipc,p1,16,65536,w1,&ev)==NWC_EMPTY);
+    assert(!ndb_route_pointer(&ipc,&input,800,540,700,500,1,0,true,false,false));
+    assert(!input.focus&&!input.capture);
+    assert(!ndb_route_key(&ipc,&input,800,540,0x1e,0,false));
     /* Wrong owner cannot replace a displayed native tile. */
     pattern[0]=0x112233;
     assert(nwc_publish_tile(&ipc,p1,999,65536,w1,pattern,16,16)==NWC_DENIED);
@@ -96,7 +123,12 @@ int main(void)
     assert(nwc_publish_tile(&ipc,p2,32,131072,w2,pattern,16,16)==NWC_OK);
     update(1);
     assert(framebuffer[16u*800u+10u]==0xabcdef);
+    assert(ndb_route_pointer(&ipc,&input,800,540,10,16,1,0,true,false,false));
+    assert(input.focus==w2);
     assert(usr_lock(&sessions)==USR_OK);
+    assert(ndb_route_pointer(&ipc,&input,800,540,10,16,0,0,false,true,false));
+    assert(!input.focus&&!input.capture);
+    assert(!ndb_hit(&ipc,800,540,10,16));
     update(1);
     assert(framebuffer[16u*800u+10u]==0x142030);
     assert(usr_select(&sessions,s2)==USR_OK);
