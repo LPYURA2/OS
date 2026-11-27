@@ -510,3 +510,8 @@ Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary bo
 ## StyleFS 29 — durable paged inode root candidate
 
 [Continuation](NEXT_CHAT_STYLEFS_29.md). No ordinary boot or main changes.
+
+
+## StyleFS 30 — paged pair candidate
+
+[Continuation](NEXT_CHAT_STYLEFS_30.md). Main unchanged.
