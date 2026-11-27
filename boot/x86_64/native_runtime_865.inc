@@ -517,6 +517,35 @@ static bool sample69_session_ready(void){
 }
 /* Count actual native leases, not VM RAM or estimated process sizes.
  * Kernel image, reserved tables, graphics and caches are outside this metric. */
+/* Boot map is diagnostic: conventional candidates have NOT been granted
+ * to a general allocator. Protected ranges may include MMIO and firmware.
+ * Only report non-overlapping, independently attested image/arena extents. */
+static void sample70_memory(unsigned phase,uint32_t pid,unsigned used){
+ const struct boot_memory_map *m=native_evidence->map;
+ struct boot_range image=native_evidence->live.image;
+ const uint64_t mask=BOOT_MEMORY_PAGE-1;
+ if(!m||image.end<=image.start||image.end>UINT64_MAX-mask||used>S844_PAGES||
+    native_arena->base>UINT64_MAX-S844_BYTES)fail("sample70-memory-map");
+ image.start&=~mask;image.end=(image.end+mask)&~mask;
+ uint64_t arena_end=native_arena->base+S844_BYTES;
+ if(image.start<arena_end&&native_arena->base<image.end)fail("sample70-memory-overlap");
+ uint64_t candidates=0;
+ if(m->nr_candidates>BOOT_MEMORY_RANGE_MAX)fail("sample70-memory-count");
+ for(size_t i=0;i<m->nr_candidates;++i){
+  struct boot_range x=m->candidates[i];
+  if(x.end<=x.start||(x.start&mask)||(x.end&mask)||
+     (i&&x.start<m->candidates[i-1].end)||
+     candidates>UINT64_MAX-(x.end-x.start)||
+     (x.start<image.end&&image.start<x.end)||
+     (x.start<arena_end&&native_arena->base<x.end))fail("sample70-memory-candidates");
+  candidates+=x.end-x.start;
+ }
+ arch_puts("STYLEOS TEA70 MEMORY");field("phase",phase);field("pid",pid);
+ field("image",image.end-image.start);field("arena",S844_BYTES);
+ field("leased",(uint64_t)used*BOOT_MEMORY_PAGE);
+ field("arena-free",(uint64_t)(S844_PAGES-used)*BOOT_MEMORY_PAGE);
+ field("ungranted",candidates);arch_putc('\n');
+}
 static void sample70_resources(unsigned phase,uint32_t pid){
  unsigned used=0,owners=0;
  const struct usr_runtime *u=usr_global();
@@ -529,6 +558,7 @@ static void sample70_resources(unsigned phase,uint32_t pid){
  arch_puts("STYLEOS TEA70 RESOURCES");field("phase",phase);field("pid",pid);
  field("resident",resident);field("pages",used);field("owners",owners);
  field("windows",ws_snapshot(windows,0,0));field("ports",nwc_port_count(ports));arch_putc('\n');
+ sample70_memory(phase,pid,used);
 }
 static bool sample69_publish(unsigned index,struct s865_window_launch out){
  const struct pr_entry *e=pr_find(pr_global(),out.pid);

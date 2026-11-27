@@ -223,6 +223,17 @@ def verify(folder,lines,root):
     (folder/'native-resource-accounting.json').write_text(json.dumps({
         'scope':'native leased user pages only; excludes kernel, tables, surfaces and caches',
         'page_bytes':4096,'snapshots':[v for _,v in resources]},indent=2)+'\n')
+    memory=records(lines,b'STYLEOS TEA70 MEMORY',('phase','pid','image','arena','leased','arena-free','ungranted'))
+    if len(memory)!=len(resources):raise ValueError('native memory receipt count')
+    fixed=None
+    for (_,m),(_,r) in zip(memory,resources):
+        base=(m['image'],m['arena'],m['ungranted'])
+        if fixed is None:fixed=base
+        if (m['phase'],m['pid'])!=(r['phase'],r['pid']) or base!=fixed or not m['image'] or not m['ungranted'] or any(x%4096 for x in base) or m['arena']!=96*4096 or m['leased']!=r['pages']*4096 or m['leased']+m['arena-free']!=m['arena']:
+            raise ValueError('native memory extent reconciliation')
+    (folder/'native-memory-extents.json').write_text(json.dumps({
+        'scope':'disjoint attested boot image and native arena; ungranted conventional candidates are not free allocator RAM; excludes unclassified firmware/MMIO and other mappings',
+        'snapshots':[m for _,m in memory]},indent=2)+'\n')
     if lines.count(b'STYLEOS SHELL PROVIDER READY')!=1:raise ValueError('ordinary provider readiness')
     if not any(x==b'STYLEOS DESKTOP CURSOR DAMAGE PASS' for x in lines):raise ValueError('cursor proof missing')
     for name,expected in data['frames'].items():
