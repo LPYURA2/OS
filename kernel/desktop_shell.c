@@ -615,6 +615,11 @@ static bool keyboard(unsigned key, unsigned mods)
         return true;
     }
 #endif
+#ifdef STYLEOS_LIVE_VOLUME_39
+    if (active()==FILES&&!menu&&!mods&&s41_root_view()&&s42_navigate(key)){
+        ++filesystem.revision;return true;
+    }
+#endif
     if (filesystem.mode && active() == FILES && key != 0x3d && !menu) {
         int item = desk_fs_key(&filesystem, win[FILES].box, key, mods,
                                character(key, (mods & DESK_SHIFT) != 0), protected_file_entry());
@@ -877,6 +882,10 @@ static void click(int x, int y)
                 w->minimized = true;
                 arch_puts("STYLEOS DESKTOP WINDOW MINIMIZE\n");
             } else if (!w->maximized) { drag = id; drag_x = dx; drag_y = dy; drag_moved = false; }
+#ifdef STYLEOS_LIVE_VOLUME_39
+        } else if(id==FILES&&s41_root_view()){
+            if(desk_fs_paged_click(s41_root_view(),b,x,y))++filesystem.revision;
+#endif
         } else if (id == FILES && filesystem.mode) {
             int item = desk_fs_click(&filesystem, b, x, y, protected_file_entry());
             if (item == DESK_FS_NEW_TEXT) new_document();

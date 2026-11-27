@@ -1021,10 +1021,28 @@ static void size41(int x,int y,int right,uint64_t bytes){
  text[n]=0;
  x=desk_text(x,y,right,text,DIM);desk_text(x,y,right,unit,DIM);
 }
+static unsigned shown42(struct desk_box a){
+ return a.h>FILE_TOP+FOOT?(unsigned)(a.h-FILE_TOP-FOOT)/ROW_H:0;
+}
+static unsigned first42(const struct dp41_view *v,struct desk_box a){
+ unsigned n=shown42(a);
+ return n&&v->selected>=n?v->selected-n+1:0;
+}
+bool desk_fs_paged_click(const struct dp41_view *v,struct desk_box a,int x,int y){
+ if(!v||!v->valid)return false;
+ int side=sidebar(a),left=a.x+side,right=a.x+a.w-14;
+ if(x>=a.x+12&&x<a.x+115&&y>=a.y+48&&y<a.y+77)return s42_navigate(0x0e);
+ if(x>=left+267&&x<left+347&&y>=a.y+91&&y<a.y+119)return s42_select(v->selected,true);
+ if(x<left+10||x>=right||y<a.y+FILE_TOP||y>=a.y+a.h-FOOT)return false;
+ unsigned row=(unsigned)(y-a.y-FILE_TOP)/ROW_H;
+ if(row>=shown42(a))return false;
+ return s42_select(first42(v,a)+row,false);
+}
 void desk_fs_paged_root_draw(const struct dp41_view *v,struct desk_box a){
  if(!v||!v->valid||v->count>DP41_ROWS)return;
  int side=sidebar(a),left=a.x+side,right=a.x+a.w-14,footer=a.y+a.h-FOOT;
- desk_text(a.x+151,a.y+53,right,"Данные",TEXT);
+ desk_text(a.x+16,a.y+53,a.x+133,"Вверх",v->parent!=1?TEXT:DISABLED);
+ desk_text(a.x+151,a.y+53,right,v->parent==1?"Данные":"Данные / Папка",TEXT);
  desk_fill(a.x+1,a.y+83,a.w-2,1,LINE);
  desk_fill(left,a.y+84,1,a.h-85,LINE);
  desk_text(a.x+16,a.y+94,left-6,"Быстрый доступ",TEXT);
@@ -1038,21 +1056,23 @@ void desk_fs_paged_root_draw(const struct dp41_view *v,struct desk_box a){
  desk_text(a.x+67,a.y+SYSTEM_ROW+5,left-6,"Диск данных",TEXT);
  button(a,side+13,91,132,"+ Новая папка",false);
  button(a,side+152,91,105,"+ Текст",false);
- button(a,side+267,91,80,"Открыть",false);
+ button(a,side+267,91,80,"Открыть",v->count&&v->rows[v->selected].entry.kind==SD64_DIRECTORY);
  int type=right-157,size=right-74;
  desk_text(left+16,a.y+130,type-12,"Имя",DIM);
  desk_text(type,a.y+130,size-8,"Тип",DIM);
  desk_text(size,a.y+130,right,"Размер",DIM);
  desk_fill(left+12,a.y+152,right-left-12,1,LINE);
  unsigned shown=0;
- for(unsigned i=0;i<v->count;i++){
-  int y=a.y+FILE_TOP+(int)i*ROW_H;if(y+ROW_H>footer)break;
+ unsigned first=first42(v,a);
+ for(unsigned i=first;i<v->count;i++){
+  int y=a.y+FILE_TOP+(int)(i-first)*ROW_H;if(y+ROW_H>footer)break;
   const struct po64_row *row=&v->rows[i];
   char name[SD64_NAME+1];unsigned n=row->entry.key.length;
   if(!n||n>SD64_NAME)continue;
   for(unsigned j=0;j<n;j++)name[j]=(char)row->entry.key.name[j];
   name[n]=0;
   bool dir=row->entry.kind==SD64_DIRECTORY;
+  if(i==v->selected)active_row(left+10,y,right-left-10,ROW_H-1);
   desk_icon(left+20,y+4,22,dir?DESK_FOLDER:DESK_PAPER,dir?AMBER:TEXT);
   desk_text(left+55,y+5,type-12,name,TEXT);
   desk_text(type,y+5,size-8,dir?"Папка":"Файл",DIM);
@@ -1061,8 +1081,13 @@ void desk_fs_paged_root_draw(const struct dp41_view *v,struct desk_box a){
  }
  if(!v->count)desk_text(left+20,a.y+FILE_TOP+10,right,"Папка пуста",DIM);
  desk_fill(left+12,a.y+a.h-34,right-left-12,1,LINE);
- desk_text(left+14,a.y+a.h-26,right,v->more||shown<v->count?"Только чтение — часть списка":"Только чтение",DIM);
+ desk_text(left+14,a.y+a.h-26,right,v->more||v->first?"Только чтение — PgUp/PgDn":"Только чтение — Enter / Backspace",DIM);
  static bool reported;
  if(shown&&!reported){reported=true;arch_puts("SFS41 EXPLORER ROWS\n");}
+ static uint64_t last_parent;
+ if(shown&&last_parent!=v->parent){
+  last_parent=v->parent;
+  arch_puts(v->parent==1?"SFS42 ROOT ROWS\n":"SFS42 CHILD ROWS\n");
+ }
 }
 #endif

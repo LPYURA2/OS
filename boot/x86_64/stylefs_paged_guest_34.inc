@@ -113,6 +113,8 @@ struct s34_work {
  uint64_t token;
  unsigned observations;
  struct dp41_view root_view;
+ uint64_t ancestors[DC64_PATH_MAX+1];
+ unsigned depth;
 #endif
 #ifdef STYLEOS_OBJECT_GUEST_37
  struct po64_service object;
@@ -202,21 +204,57 @@ static void s39_read(void){
 const struct dp41_view *s41_root_view(void){
  return s34_work.volume.objects.active&&s34_work.root_view.valid?&s34_work.root_view:0;
 }
-static bool s41_load_root(void){
+static bool s42_load(uint64_t parent,uint64_t first){
  struct dp41_view *v=&s34_work.root_view;
  struct po64_service *s=&s34_work.volume.objects;
  struct po64_snapshot snap;
- v->valid=false;v->count=0;v->more=false;
+ v->valid=false;v->count=0;v->more=false;v->selected=0;v->parent=parent;v->first=first;
  if(po64_snapshot(s,&snap)!=PO64_OK)return false;
  for(unsigned i=0;i<=DP41_ROWS;i++){
   struct po64_row row;
-  enum po64_status rc=po64_child_at(s,snap,1,i,&row);
+  if(first>UINT64_MAX-i)return false;
+  enum po64_status rc=po64_child_at(s,snap,parent,first+i,&row);
   if(rc==PO64_END){v->valid=true;return true;}
   if(rc!=PO64_OK)return false;
   if(i==DP41_ROWS){v->more=true;v->valid=true;return true;}
   v->rows[v->count++]=row;
  }
  return false;
+}
+static bool s42_page(uint64_t parent,uint64_t first){
+ if(s42_load(parent,first))return true;
+ (void)pv64_close(&s34_work.volume);
+ arch_puts("SFS42 UNAVAILABLE\n");return true;
+}
+bool s42_select(unsigned row,bool open){
+ struct dp41_view *v=&s34_work.root_view;
+ if(!s41_root_view()||row>=v->count)return false;
+ v->selected=row;
+ if(!open||v->rows[row].entry.kind!=SD64_DIRECTORY)return true;
+ if(s34_work.depth>=DC64_PATH_MAX)return true;
+ uint64_t id=v->rows[row].entry.target;
+ s34_work.ancestors[s34_work.depth++]=v->parent;
+ bool changed=s42_page(id,0);
+ if(v->valid)arch_puts("SFS42 ENTER DIRECTORY\n");
+ return changed;
+}
+bool s42_navigate(unsigned key){
+ struct dp41_view *v=&s34_work.root_view;
+ if(!s41_root_view())return false;
+ switch(key){
+ case 0x148:if(v->selected)v->selected--;return true;
+ case 0x150:if(v->selected+1<v->count)v->selected++;return true;
+ case 0x1c:case 0x11c:return s42_select(v->selected,true);
+ case 0x0e:
+  if(!s34_work.depth)return false;
+  {uint64_t parent=s34_work.ancestors[--s34_work.depth];
+   bool changed=s42_page(parent,0);
+   if(v->valid)arch_puts("SFS42 UP DIRECTORY\n");
+   return changed;}
+ case 0x149:if(v->first>=DP41_ROWS)return s42_page(v->parent,v->first-DP41_ROWS);return false;
+ case 0x151:if(v->more&&v->first<=UINT64_MAX-DP41_ROWS)return s42_page(v->parent,v->first+DP41_ROWS);return false;
+ default:return false;
+ }
 }
 static void s39_admit(void){
  struct s34_guard *g=&s34_work.guard;
@@ -242,7 +280,7 @@ static void s39_admit(void){
  if(po64_grant(&s34_work.volume.objects,101,&k,2,1,&s34_work.token)!=PO64_OK){
   (void)pv64_close(&s34_work.volume);(void)bs_detach(svc,gen);arch_puts("SFS39 REFUSE object\n");return;
  }
- if(!s41_load_root()){
+ if(!s42_load(1,0)){
   (void)pv64_close(&s34_work.volume);(void)bs_detach(svc,gen);
   arch_puts("SFS39 REFUSE directory\n");return;
  }

@@ -39,6 +39,10 @@ int main(int argc,char **argv){
  if(ok&&live){
   struct sd64_key k={.parent=1,.length=1,.name={'a'}};
   ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,1,&k,2,0,1041,source39,0,&pair)==PP64_OK;
+  struct dc64_edit e={.op=DC64_CREATE,.entry={{.parent=1,.length=1,.name={'d'}},3,SD64_DIRECTORY}};
+  if(ok)ok=pp64_edit(&b,&l,&w,nodes,32,runs,32,pair.sequence,&e,0,&pair)==PP64_OK;
+  k=(struct sd64_key){.parent=3,.length=1,.name={'x'}};
+  if(ok)ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,4,0,513,source39,0,&pair)==PP64_OK;
  }
  if(ok&&!create){
   FILE *out=fopen(argv[3],"wbx");struct sd64_key k={.parent=2,.length=1,.name={'b'}};

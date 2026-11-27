@@ -147,6 +147,23 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False):
                     time.sleep(.05)
                 else:
                     raise RuntimeError("Explorer did not render mounted file rows")
+                def wait_exact(marker, count=1):
+                    deadline=time.monotonic()+40
+                    while time.monotonic()<deadline and proc.poll() is None:
+                        lines=uart.read_bytes().splitlines()
+                        require(not any(b" FAIL " in x for x in lines),"guest failure navigating Explorer")
+                        if lines.count(marker)>=count:
+                            return
+                        time.sleep(.05)
+                    raise RuntimeError("missing navigation marker "+repr(marker))
+                wait_exact(b"SFS42 ROOT ROWS")
+                d.key("down")
+                d.key("ret")
+                wait_exact(b"SFS42 ENTER DIRECTORY")
+                wait_exact(b"SFS42 CHILD ROWS")
+                d.key("backspace")
+                wait_exact(b"SFS42 UP DIRECTORY")
+                wait_exact(b"SFS42 ROOT ROWS",2)
             d.call("stop")
             o, final = snapshot("final")
             verify_ready(o)
