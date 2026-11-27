@@ -480,3 +480,8 @@ A separate terminal diagnostic observes trusted QEMU/OVMF RSDP/XSDT/MADT without
 ## StyleFS 23 — namespace edit candidate
 
 Stage 22 CI 7/7 SUCCESS. See [continuation](NEXT_CHAT_STYLEFS_23.md). No production claim or change to main.
+
+
+## StyleFS 24 — checked hierarchy candidate
+
+Stage 23 CI 7/7 SUCCESS. [Continuation](NEXT_CHAT_STYLEFS_24.md). No ordinary boot or main changes.

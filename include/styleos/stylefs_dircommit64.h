@@ -55,4 +55,22 @@ enum dc64_status dc64_entry_at(struct dc64_state *,uint64_t ordinal,
                                 struct dc64_edit_workspace *,struct sd64_record *);
 enum dc64_status dc64_apply(struct dc64_state *,struct dc64_edit_workspace *,
                              const struct dc64_edit *);
+
+/* Checked hierarchy profile. Root ID 1 is implicit and reserved; each
+ * nonroot object has one entry (no hard links in this profile).
+ * Caller-owned bounded node scratch: one node per entry, plus one on create.
+ * Maximum 64 path components. Raw snapshot APIs remain diagnostic only;
+ * trusted supervisor serializes all operations and uses checked profile.
+ * No inode allocation, ACL or data deletion is performed by these APIs. */
+enum { DC64_PATH_MAX=64 };
+struct dc64_node {uint64_t id,parent;uint8_t kind;};
+struct dc64_path_part {uint16_t length;uint8_t name[SD64_NAME];};
+enum dc64_status dc64_hierarchy_check(struct dc64_state *,struct dc64_edit_workspace *,
+                                      struct dc64_node *,size_t capacity);
+enum dc64_status dc64_hierarchy_apply(struct dc64_state *,struct dc64_edit_workspace *,
+                                      struct dc64_node *,size_t capacity,const struct dc64_edit *);
+enum dc64_status dc64_resolve(struct dc64_state *,struct dc64_edit_workspace *,
+                              struct dc64_node *,size_t capacity,
+                              const struct dc64_path_part *,unsigned count,
+                              uint64_t *object,uint8_t *kind);
 #endif
