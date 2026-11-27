@@ -91,6 +91,11 @@ static unsigned note_session863(void){return desk_sessions_pid(desk_sessions_glo
 #if (defined(STYLEOS_TEST_DESKTOP_STORAGE_SERVICE_863) || defined(STYLEOS_OWNED_SHELL_865))
 extern void s863_storage_document(bool,unsigned,const char *,size_t);
 #endif
+#ifdef STYLEOS_LIVE_VOLUME_39
+/* Access actual member names before the legacy editor alias macros. */
+static bool s43_editor_dirty(void){return desk_sessions_global()->editor.dirty;}
+static unsigned s43_name_length(const struct po64_row *row){return row->entry.key.length;}
+#endif
 #define document (current_draft()->document)
 #define doc_folder (current_draft()->doc_folder)
 #define content (current_draft()->content)
@@ -436,8 +441,7 @@ static void open_document(unsigned slot)
 #ifdef STYLEOS_LIVE_VOLUME_39
 bool s43_open_editor(const struct po64_row *row)
 {
-    struct desk_editor_draft *draft=&desk_sessions_global()->editor;
-    if(draft->dirty){
+    if(s43_editor_dirty()){
         open_window(NOTES);
         if(active()==NOTES)notice="Сначала сохраните текущий текст";
         return false;
@@ -453,7 +457,7 @@ bool s43_open_editor(const struct po64_row *row)
     open_window(NOTES);
     if(active()!=NOTES)return false;
     for(size_t i=0;i<bytes;i++)content[i]=incoming[i];
-    unsigned n=row->entry.key.length;
+    unsigned n=s43_name_length(row);
     for(unsigned i=0;i<n;i++)paged_editor_name[i]=(char)row->entry.key.name[i];
     paged_editor_name[n]=0;
     paged_editor_open=true;
