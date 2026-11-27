@@ -602,12 +602,21 @@ def main():
                 if (a.w,a.h,a.pixels)!=(b.w,b.h,b.pixels):
                     raise ValueError('F9 changed shell frame: '+before+' -> '+after)
             if args.native_shell_boundary:
-                # F10 intentionally resets layout/z-order. Retain strict
-                # F9 pixel invariance separately on each side of that action.
-                # The independent native verifier still checks every CPU
-                # event, shell refresh marker and document state.
-                unchanged_frame('note','native-before-shell-refresh')
-                unchanged_frame('native-live-shell-refresh','after-denied-fixture')
+                # The forced-stop ownership fixture publishes two 1x1 tiles
+                # at (0,0), with PID2 on top (0xa00002). F9 admits/removes
+                # those windows; this is the sole permitted pixel change.
+                # F10 may reset legacy shell geometry; compare F9 intervals
+                # separately and require the exact live tile across F10.
+                before=Frame(folder/'note.ppm')
+                live=Frame(folder/'native-before-shell-refresh.ppm')
+                refreshed=Frame(folder/'native-live-shell-refresh.ppm')
+                stopped=Frame(folder/'after-denied-fixture.ppm')
+                live.check(0,0,'a00002')
+                refreshed.check(0,0,'a00002')
+                before.expect_changes_in(live,[(0,0,1,1)])
+                refreshed.expect_changes_in(stopped,[(0,0,1,1)])
+                if before.pixels[:3]!=stopped.pixels[:3] or before.pixels[:3]==live.pixels[:3]:
+                    raise ValueError('native ownership tile did not retire to original background')
             else:
                 unchanged_frame('note','after-denied-fixture')
         elif args.four:
