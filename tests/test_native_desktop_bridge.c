@@ -248,13 +248,23 @@ int main(void)
     assert(b.x>=164&&b.x+b.w<=712&&b.y==548&&b.h==48);
     const struct nwc_task *token=ndb_task_hit(&panel,800,600,5,b.x,b.y);
     assert(token&&token->window_id==w4&&token->pid==p4);
+    struct nwc_task capture={0};
+    assert(ndb_task_get(&ipc,w4,&capture)&&ndb_task_equal(&capture,token));
+    assert(ndb_task_current(&ipc,&capture)&&!ndb_task_current(&ipc,0));
+    assert(desk_box_equal(ndb_task_hover_box(&panel,800,600,&capture),b));
+    struct nwc_task forged=capture;forged.root+=4096;
+    assert(!ndb_task_current(&ipc,&forged)&&!ndb_task_hover_box(&panel,800,600,&forged).w);
     assert(!ndb_task_hit(&panel,800,600,4,b.x,b.y));
     assert(!ndb_task_hit(&panel,800,600,5,b.x+b.w,b.y));
     assert(nwc_task_set_minimized(&ipc,token,true)==NWC_OK);
+    assert(!ndb_task_current(&ipc,&capture));
     assert(nwc_task_set_minimized(&ipc,token,false)==NWC_STALE);
     pd=(struct desk_damage){0};
     assert(ndb_task_panel_update(&ipc,&panel,800,600,5,0,&pd)&&panel.tasks[0].minimized);
     assert(pd.count&&!pd.all);
+    assert(!ndb_task_hover_box(&panel,800,600,&capture).w);
+    assert(ndb_task_get(&ipc,w4,&capture)&&capture.minimized&&ndb_task_current(&ipc,&capture));
+    assert(desk_box_equal(ndb_task_hover_box(&panel,800,600,&capture),b));
     pd=(struct desk_damage){0};
     assert(!ndb_task_panel_update(&ipc,&panel,800,600,5,0,&pd)&&!pd.count&&!pd.all);
     assert(nwc_task_set_minimized(&ipc,&panel.tasks[0],false)==NWC_OK);
@@ -263,6 +273,7 @@ int main(void)
     pd=(struct desk_damage){0};
     assert(ndb_task_panel_update(&ipc,&panel,800,600,5,w4,&pd)&&!panel.count&&!panel.focus);
     assert(!ndb_task_hit(&panel,800,600,5,b.x,b.y)&&pd.count&&!pd.all);
+    assert(!ndb_task_current(&ipc,&capture)&&!ndb_task_hover_box(&panel,800,600,&capture).w);
     for(unsigned count=5;count<=13;++count){
         int right=164;
         for(unsigned i=0;i<count;++i){

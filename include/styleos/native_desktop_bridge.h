@@ -65,4 +65,11 @@ bool ndb_task_panel_update(const struct nwc_service *,struct ndb_task_panel *,
                            struct desk_damage *);
 const struct nwc_task *ndb_task_hit(const struct ndb_task_panel *,int width,int height,
                                     unsigned legacy,int x,int y);
+/* Exact live token comparison for an in-progress trusted pointer capture.
+ * The source must be visible, the target may be minimized. */
+bool ndb_task_get(const struct nwc_service *,uint32_t window,struct nwc_task *);
+bool ndb_task_equal(const struct nwc_task *,const struct nwc_task *);
+bool ndb_task_current(const struct nwc_service *,const struct nwc_task *);
+struct desk_box ndb_task_hover_box(const struct ndb_task_panel *,int,int,
+                                    const struct nwc_task *);
 #endif

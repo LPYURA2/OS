@@ -266,9 +266,9 @@ struct desk_box ndb_task_box(int width,int height,unsigned slots,unsigned index)
     if(step>160)step=160;
     return (struct desk_box){164+(int)index*step,height-52,step-4,48};
 }
-static bool task_equal(const struct nwc_task *a,const struct nwc_task *b)
+bool ndb_task_equal(const struct nwc_task *a,const struct nwc_task *b)
 {
-    return a->window_id==b->window_id&&a->pid==b->pid&&
+    return a&&b&&a->window_id&&a->window_id==b->window_id&&a->pid==b->pid&&
            a->session_id==b->session_id&&a->generation==b->generation&&
            a->root==b->root&&a->minimized==b->minimized;
 }
@@ -292,7 +292,7 @@ bool ndb_task_panel_update(const struct nwc_service *ipc,struct ndb_task_panel *
         changed=true;
     }else{
         for(unsigned i=0;i<panel->count||i<next.count;++i){
-            if(i<panel->count&&i<next.count&&task_equal(&panel->tasks[i],&next.tasks[i])&&
+            if(i<panel->count&&i<next.count&&ndb_task_equal(&panel->tasks[i],&next.tasks[i])&&
                (panel->focus==panel->tasks[i].window_id)==(next.focus==next.tasks[i].window_id))continue;
             desk_damage_add(damage,ndb_task_box(width,height,next.slots,legacy+i));
             changed=true;
@@ -311,4 +311,28 @@ const struct nwc_task *ndb_task_hit(const struct ndb_task_panel *panel,int width
             return &panel->tasks[i];
     }
     return 0;
+}
+
+bool ndb_task_get(const struct nwc_service *ipc,uint32_t window,struct nwc_task *out)
+{
+    if(!window||!out)return false;
+    struct nwc_task tasks[NWC_PORTS];
+    size_t n=nwc_task_snapshot(ipc,tasks,NWC_PORTS);
+    if(n>NWC_PORTS)return false;
+    for(size_t i=0;i<n;++i)if(tasks[i].window_id==window){*out=tasks[i];return true;}
+    return false;
+}
+bool ndb_task_current(const struct nwc_service *ipc,const struct nwc_task *token)
+{
+    struct nwc_task current;
+    return token&&ndb_task_get(ipc,token->window_id,&current)&&ndb_task_equal(token,&current);
+}
+struct desk_box ndb_task_hover_box(const struct ndb_task_panel *panel,int width,int height,
+                                    const struct nwc_task *token)
+{
+    if(!panel||panel->count>NWC_PORTS||!token||!token->window_id)return (struct desk_box){0};
+    for(unsigned i=0;i<panel->count;++i)
+        if(ndb_task_equal(&panel->tasks[i],token))
+            return ndb_task_box(width,height,panel->slots,panel->legacy+i);
+    return (struct desk_box){0};
 }

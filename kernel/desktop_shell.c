@@ -72,6 +72,14 @@ static bool native_drag_armed;
 static int native_press_x,native_press_y;
 static struct ndb_task_panel native_panel;
 static bool native_panel_press;
+static struct nwc_task native_drag_source,native_drag_hover;
+static struct desk_box native_hover_drawn;
+static void native_drag_cancel(void)
+{
+    native_drag_armed=false;
+    native_drag_source=(struct nwc_task){0};
+    native_drag_hover=(struct nwc_task){0};
+}
 #endif
 static void native_plot(void *unused,int x,int y,uint32_t rgb)
 { (void)unused;desk_fill(x,y,1,1,rgb); }
@@ -696,7 +704,9 @@ static bool keyboard(unsigned key, unsigned mods)
         (void)s865_shell_submit_command(0x30b);return false;
     }
 #endif
-    if(key==0x01u)native_drag_armed=false;
+    /* Cancel only the not-yet-published mouse gesture; Esc can still reach
+     * a client and cancel its already published 72 transfer. */
+    if(key==0x01u||key==0x44u)native_drag_cancel();
     /* Global shell shortcuts retain precedence; selecting a legacy window
      * clears native keyboard focus. The driver currently emits key presses. */
     const bool system_key=(key>=0x3bu&&key<=0x44u)||key==0x57u||key==0x58u||
@@ -1451,6 +1461,8 @@ static void draw(void)
         const struct ws_window *w=ws_find(ws_global(),task->window_id);
         if(w&&w->owner_pid==task->pid&&b.w>=70)
             desk_text(b.x+45,b.y+14,b.x+b.w-3,w->title,color);
+        if(native_drag_armed&&ndb_task_equal(task,&native_drag_hover))
+            desk_outline(b,GOLD);
     }
 #endif
     struct desk_box lang = language_box();
@@ -1508,22 +1520,47 @@ static bool mouse(const struct desk_event *event)
                 native_input.raised=minimize?0:task->window_id;
                 arch_puts(minimize?"STYLEOS DD73 TASK MINIMIZE\n":"STYLEOS DD73 TASK ACTIVATE\n");
             }
-            native_panel_press=true;native_drag_armed=false;
+            native_panel_press=true;native_drag_cancel();
             mouse_down=down;current_file_click.id=-1;last_file_click.at=0;
             return false;
         }
     }
-    if(pressed){native_press_x=mx;native_press_y=my;native_drag_armed=!blocked;}
-    if(blocked)native_drag_armed=false;
+    if(pressed){native_drag_cancel();native_press_x=mx;native_press_y=my;}
+    if(blocked)native_drag_cancel();
     if(ndb_route_pointer((struct nwc_service *)nwc_global(),&native_input,
                          width,work_area().h,mx,my,event->buttons,event->modifiers,
                          pressed,released,blocked)){
-        if(released && native_drag_armed && native_input.focus==source &&
-           (mx-native_press_x>5||native_press_x-mx>5||my-native_press_y>5||native_press_y-my>5)){
-            uint32_t target=ndb_hit_top(nwc_global(),width,work_area().h,native_input.raised,mx,my);
-            if(target && target!=source)native_drop_gesture(source,target);
+        if(pressed&&!blocked&&native_input.capture&&
+           ndb_task_get(nwc_global(),native_input.capture,&native_drag_source)&&
+           !native_drag_source.minimized)
+            native_drag_armed=true;
+        if(native_drag_armed&&(!ndb_task_current(nwc_global(),&native_drag_source)||
+           native_input.focus!=native_drag_source.window_id))native_drag_cancel();
+        const bool moved=mx-native_press_x>5||native_press_x-mx>5||
+                         my-native_press_y>5||native_press_y-my>5;
+        if(native_drag_armed&&moved&&source==native_drag_source.window_id){
+            const struct nwc_task *target=ndb_task_hit(&native_panel,width,height,
+                                                       legacy_task_count(),mx,my);
+            if(down&&!pressed){
+                /* Retain exact last observed hover; no activation on hover. */
+                native_drag_hover=(struct nwc_task){0};
+                if(target&&target->pid!=native_drag_source.pid&&
+                   ndb_task_current(nwc_global(),target))native_drag_hover=*target;
+            }else if(released){
+                if(target){
+                    if(ndb_task_equal(target,&native_drag_hover)&&
+                       ndb_task_current(nwc_global(),target)&&
+                       native_drop_task_gesture(source,target)){
+                        native_input.focus=target->window_id;
+                        native_input.raised=target->window_id;
+                    }
+                }else if(!contains(panel_box(),mx,my)){
+                    uint32_t win_id=ndb_hit_top(nwc_global(),width,work_area().h,native_input.raised,mx,my);
+                    if(win_id&&win_id!=source)native_drop_gesture(source,win_id);
+                }
+            }
         }
-        if(released)native_drag_armed=false;
+        if(released)native_drag_cancel();
         mouse_down=down;
         current_file_click.id=-1;last_file_click.at=0;
         return false;
@@ -1631,6 +1668,11 @@ static void restart_shell(void)
     order[3] = NOTES; order[4] = FILES;
     menu = false;
     drag = -1;
+#ifdef STYLEOS_OWNED_SHELL_865
+    /* F10 must not reinterpret a still-held physical button as a fresh
+     * press after losing native capture. Consume motion until release. */
+    const bool held_native=mouse_down&&(native_input.capture||native_panel_press);
+#endif
     mouse_down = false;
     second_file_click = false;
     last_file_click.at = 0;
@@ -1646,8 +1688,9 @@ static void restart_shell(void)
     shell_refreshed = true;
 #ifdef STYLEOS_OWNED_SHELL_865
     native_input=(struct ndb_input){0};
-    native_drag_armed=false;
-    native_panel_press=false;
+    native_drag_cancel();
+    native_panel_press=held_native;
+    mouse_down=held_native;
 #endif
     print_pid("STYLEOS SHELL RESTART pid=", new_pid);
 #if defined(STYLEOS_DESKTOP_V0) || (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
@@ -1785,6 +1828,21 @@ static void desktop_shell_step(void *opaque)
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
     if(ndb_task_panel_update(nwc_global(),&native_panel,width,height,legacy_task_count(),
                              native_input.focus,&damage))++native_changes;
+    if(native_drag_armed&&(!ndb_task_current(nwc_global(),&native_drag_source)||
+       native_input.capture!=native_drag_source.window_id))native_drag_cancel();
+    if(native_drag_hover.window_id){
+        const struct nwc_task *hit=ndb_task_hit(&native_panel,width,height,legacy_task_count(),mx,my);
+        /* A changed layout/identity while the pointer stands still cannot
+         * retarget an already observed hover. Cancel until a new press. */
+        if(!ndb_task_equal(hit,&native_drag_hover)||
+           !ndb_task_current(nwc_global(),&native_drag_hover))native_drag_cancel();
+    }
+    struct desk_box hover=ndb_task_hover_box(&native_panel,width,height,&native_drag_hover);
+    if(!desk_box_equal(hover,native_hover_drawn)){
+        if(native_hover_drawn.w)desk_damage_add(&damage,native_hover_drawn);
+        if(hover.w)desk_damage_add(&damage,hover);
+        native_hover_drawn=hover;++native_changes;
+    }
 #endif
 #else
     unsigned native_changes = ndb_track(nwc_global(), &native_view,
@@ -1857,8 +1915,9 @@ _Noreturn void desktop_v0_run(const struct desktop_surface *surface)
     native_view=(struct ndb_tracker){0};
 #ifdef STYLEOS_OWNED_SHELL_865
     native_input=(struct ndb_input){0};
-    native_drag_armed=false;
+    native_drag_cancel();
     native_panel_press=false;
+    native_hover_drawn=(struct desk_box){0};
 #endif
     desk_sessions_init(desk_sessions_global());
     desk_draw_init(surface);
