@@ -660,11 +660,20 @@ static bool keyboard(unsigned key, unsigned mods)
     last_file_click.at = 0;
     current_file_click.id = -1;
 #ifdef STYLEOS_OWNED_SHELL_865
+#ifndef STYLEOS_NATIVE_PINNED_CATALOG
+    /* Until native close/activation IPC exists, do not close or switch
+     * a legacy window behind a focused native one. Keep native focus on
+     * the global language chord, which belongs to the input service. */
+    if(key==DESK_KEY_LANGUAGE||key==0x40){toggle_language();return true;}
+    if(native_input.focus&&((key==0x3eu&&mods==DESK_ALT)||
+                            (key==0x0fu&&mods==DESK_ALT)))return false;
+#endif
     /* Global shell shortcuts retain precedence; selecting a legacy window
      * clears native keyboard focus. The driver currently emits key presses. */
     const bool system_key=(key>=0x3bu&&key<=0x44u)||key==0x57u||key==0x58u||
                           key==DESK_KEY_LANGUAGE||key==0x15bu||
-                          (key==0x01u&&mods==(DESK_CTRL|DESK_SHIFT));
+                          (key==0x01u&&mods==(DESK_CTRL|DESK_SHIFT))||
+                          (key==0x0fu&&mods==DESK_ALT);
     if(ndb_route_key((struct nwc_service *)nwc_global(),&native_input,
                      width,work_area().h,key,mods,menu||system_key))return false;
 #endif
@@ -705,6 +714,9 @@ static bool keyboard(unsigned key, unsigned mods)
      * Escape in the Ctrl+Shift chord is not a plain Escape. */
     if(key==0x01u&&mods==(DESK_CTRL|DESK_SHIFT)){
         if(s865_shell_submit_command(0x42))return false;
+    }
+    if(key==0x0fu&&mods==DESK_ALT){
+        if(s865_shell_submit_command(0x309))return false;
     }
     if(key==0x3eu&&mods==DESK_ALT){
         int id=active();
@@ -1617,7 +1629,7 @@ static void desktop_shell_step(void *opaque)
     if(shell_action==2){menu=!menu;shell_refreshed=true;}
     else if(shell_action==3){open_window(TASKS);shell_refreshed=true;}
     else if(shell_action>=4&&shell_action<=8){apply_window_action(shell_action);shell_refreshed=true;}
-    else if(shell_action>=9&&shell_action<=16){
+    else if(shell_action>=9&&shell_action<=17){
         menu=false;
         if(shell_action==9)show_folder(DESK_ROOT);
         else if(shell_action==10)open_window(ABOUT);
@@ -1626,6 +1638,13 @@ static void desktop_shell_step(void *opaque)
         else if(shell_action==13)open_window(NOTES);
         else if(shell_action==14)toggle_language();
         else if(shell_action==16)show_folder(DESK_PROJECTS);
+        else if(shell_action==17){
+            int current=active();
+            for(int n=WINDOWS-1;n>=0;--n){
+                int id=order[n];
+                if(id!=current&&visible(id)){front(id);break;}
+            }
+        }
         shell_refreshed=true;
     }
 #endif
