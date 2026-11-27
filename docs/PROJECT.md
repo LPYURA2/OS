@@ -1,3 +1,6 @@
+## StyleFS 40 — explicit mount lifetime candidate
+39 guest SUCCESS, host compile-only flag failure; fix Clang command and add exact four-grant mount lifetime adapter. [Handoff](NEXT_CHAT_STYLEFS_40.md). Full CI pending. Main unchanged.
+
 ## StyleFS 39 — guest runtime integration correction
 37 CI 7/7 SUCCESS. Stage 38 CI 7/8: unresolved __chkstk and memmove at EFI link. Move listing to attested workspace and add tested overlap-safe runtime move only for diagnostic. [Handoff](NEXT_CHAT_STYLEFS_39.md). CI pending.
 
