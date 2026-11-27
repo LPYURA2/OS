@@ -227,10 +227,56 @@ enum pa_status s865_native_snapshot(const struct pa_request *q,struct pa_row *ro
  if(r==PA_OK||r==PA_TRUNCATED)reply->measurement_flags=PA_MEASURE_CPU_TICKS|PA_MEASURE_MEMORY_BYTES;
  return r;
 }
+static struct { uint32_t pid;uint64_t gen,root,epoch; } shell_controller;
+static uint64_t shell_epoch,shell_redraw;
+static void shell_controller_reconcile(void){
+ if(shell_controller.pid){
+  const struct pr_entry *e=pr_find(pr_global(),shell_controller.pid);
+  if(!e||e->scheduler_handle!=shell_controller.gen||e->page_root!=shell_controller.root||
+     !pr_is_live(pr_global(),shell_controller.pid))
+   native_wipe(&shell_controller,sizeof shell_controller);
+ }
+}
+enum ps_status s865_shell_controller_launch(const struct rt865_launch_request *request,uint32_t *out){
+ if(!request||!out)return PS_ARGUMENT;
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
+ shell_controller_reconcile();
+ if(shell_controller.pid)return PS_STATE;
+ if(shell_epoch==UINT64_MAX)return PS_EXHAUSTED;
+ uint32_t pid=0;
+ enum ps_status status=s865_native_launch(request,&pid);
+ if(status!=PS_OK)return status;
+ const struct pr_entry *e=pr_find(pr_global(),pid);
+ if(!e||e->state!=PR_READY||!e->scheduler_handle||!e->page_root)fail("shell-controller-admit");
+ shell_controller.pid=pid;shell_controller.gen=e->scheduler_handle;
+ shell_controller.root=e->page_root;shell_controller.epoch=++shell_epoch;
+ *out=pid;
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+ arch_puts("STYLEOS NATIVE SHELL-CONTROLLER");field("pid",pid);field("gen",e->scheduler_handle);
+ field("root",e->page_root);field("epoch",shell_epoch);arch_putc('\n');
+#endif
+ return PS_OK;
+}
+uint64_t s865_shell_controller_request(uint32_t pid,uint64_t gen,uint64_t root){
+ if(!pid||!gen||!root||pid!=shell_controller.pid||gen!=shell_controller.gen||
+    root!=shell_controller.root||!shell_controller.epoch||!native_audit(0))return 0;
+ const struct pr_entry *e=pr_find(pr_global(),pid);
+ if(!e||e->state!=PR_READY||e->scheduler_handle!=gen||e->page_root!=root)return 0;
+ shell_redraw=shell_controller.epoch;return shell_redraw;
+}
+uint64_t s865_shell_take_redraw(void){
+ uint64_t epoch=shell_redraw;shell_redraw=0;
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+ if(epoch){arch_puts("STYLEOS NATIVE SHELL-REDRAW");field("epoch",epoch);arch_putc('\n');}
+#endif
+ return epoch;
+}
 void s865_native_pump(void){
  if(!native_ready)fail("native-runtime-not-ready");
+ shell_controller_reconcile();
  if(!pr_snapshot(pr_global(),0,0,true))return;
  s865_executor_poll(native_audit,native_release,0);
+ shell_controller_reconcile();
  if(!pr_snapshot(pr_global(),0,0,true)){
   unsigned used;
   if(!s844_count(native_arena,&used)||used||!native_audit(0))fail("native-empty");
@@ -260,6 +306,7 @@ _Noreturn void s865_native_supervise(void (*shell_step)(void *),void *state){
    arch_puts("STYLEOS NATIVE SHELL-GAP-BEGIN");field("dispatches",start);arch_putc('\n');
    for(unsigned i=0;i<slices;++i)s865_native_pump();
    arch_puts("STYLEOS NATIVE SHELL-GAP-END");field("dispatches",runtime860->dispatcher.dispatches);arch_putc('\n');
+   if(!s865_native_probe_shell_controller())fail("shell-controller-probe");
   }
 #endif
   s865_native_pump();

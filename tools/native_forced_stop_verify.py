@@ -70,7 +70,7 @@ def verify_shell_boundary(lines,roots,loop=0x1000000d,focus=False,frame=False):
     at=marks[0]
     stops=records(lines,FORCED,FKEY)
     retired=records(lines,RETIRE,RKEY)
-    if len(stops)!=3 or len(retired)!=33:raise ValueError('boundary lifecycle')
+    if len(stops)!=3 or len(retired)!=(35 if frame else 33):raise ValueError('boundary lifecycle')
     first_stop=stops[0][0]
     if not retired[29][0]<at<first_stop:raise ValueError('refresh must occur while both original peers alive')
     for pid in (1,2):
@@ -122,7 +122,7 @@ def verify_rollback_probe(lines):
     if records(part,EVENT,EKEY) or records(part,IRQ,('slot','root','initial','current','lvt','isr','irr')):
         raise ValueError('unpublished rollback process dispatched')
     for j,((ai,a),(li,l),(ri,r),(si,s),(pi,phase)) in enumerate(zip(admits,leases,retires,stops,phases),1):
-        pid=33+j
+        pid=35+j
         if tuple(a.values())!=(0,pid,pid,admits[0][1]['root'],0x10000000) or tuple(l.values())!=(pid,pid,leases[0][1]['pa'],3):
             raise ValueError('rollback fresh identity and reused lease')
         if tuple(r.values())!=(0,a['root'],pid) or tuple(s.values())!=(0,pid,pid,a['root']):
@@ -138,6 +138,7 @@ def verify_rollback_probe(lines):
 
 def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,window_tile=False,window_input=False,window_focus=False,window_frame=False):
     if window_frame:lines=verify_rollback_probe(lines)
+    fresh_pid=35 if window_frame else 33
     safe=obs['active']['root']
     def rec(tag,keys):return records(lines,tag,keys)
     admissions=rec(ADMIT,AKEY)
@@ -146,7 +147,7 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
     leases=rec(LEASE,('pid','gen','pa','pages'))
     refusals=rec(REFUSE,('pid','gen'));restarts=rec(RESTART,XKEY)
     done=rec(DONE,('resident','dispatches'))
-    if (len(admissions),len(batches),len(retired),len(stops),len(leases),len(refusals),len(restarts),len(done))!=(33,1,33,3,33,2,1,1):raise ValueError('forced stop evidence counts')
+    if (len(admissions),len(batches),len(retired),len(stops),len(leases),len(refusals),len(restarts),len(done))!=(fresh_pid,1,fresh_pid,3,fresh_pid,2,1,1):raise ValueError('forced stop evidence counts')
     if tuple(batches[0][1].values())!=(1,32,32,32) or not admissions[31][0]<batches[0][0]<events[0][0]:raise ValueError('initial residency')
     initial=[a for _,a in admissions[:32]]
     roots=[a['root'] for a in initial]
@@ -154,7 +155,9 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
         if tuple(a.values())!=(i,i+1,i+1,roots[i],0x10000000) or not roots[i] or roots[i]&4095:raise ValueError('initial identity')
     if len(set(roots))!=32 or safe in roots:raise ValueError('distinct roots')
     ai,fresh=admissions[-1]
-    if tuple(fresh.values())!=(0,33,33,roots[0],0x10000000):raise ValueError('fresh PID/generation and reused root')
+    if tuple(fresh.values())!=(0,fresh_pid,fresh_pid,roots[0],0x10000000):raise ValueError('fresh PID/generation and reused root')
+    if window_frame and [tuple(a.values()) for _,a in admissions[32:34]]!=[(2,33,33,roots[2],0x10000000),(2,34,34,roots[2],0x10000000)]:
+        raise ValueError('fresh controller identity and same slot')
     by_pid={a['pid']:(i,a) for i,a in admissions}
     for (i,a),(j,l) in zip(admissions,leases):
         if i>=j or (l['pid'],l['gen'],l['pages'])!=(a['pid'],a['gen'],3) or not l['pa'] or l['pa']&4095:raise ValueError('lease identity')
@@ -162,10 +165,10 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
         if any(abs(l['pa']-x['pa'])<3*4096 for _,x in leases[:k]):raise ValueError('initial leases overlap')
     if leases[-1][1]['pa']!=leases[0][1]['pa']:raise ValueError('same physical lease not reused')
     r0,r1,r2=stops
-    if [tuple(s.values()) for _,s in stops]!=[(0,1,1,roots[0]),(0,33,33,roots[0]),(1,2,2,roots[1])]:raise ValueError('forced stop identity')
+    if [tuple(s.values()) for _,s in stops]!=[(0,1,1,roots[0]),(0,fresh_pid,fresh_pid,roots[0]),(1,2,2,roots[1])]:raise ValueError('forced stop identity')
     ri,restart=restarts[0]
-    if (restart['old-pid'],restart['old-gen'],restart['pid'],restart['gen'],restart['root'],restart['peer'])!=(1,1,33,33,roots[0],2):raise ValueError('restart identity')
-    if [tuple(r.values()) for _,r in refusals]!=[(1,1),(33,33)] or not refusals[0][0]<r0[0]<ai<ri<refusals[1][0]<r1[0]<r2[0]<done[0][0]:raise ValueError('stop and restart ordering')
+    if (restart['old-pid'],restart['old-gen'],restart['pid'],restart['gen'],restart['root'],restart['peer'])!=(1,1,fresh_pid,fresh_pid,roots[0],2):raise ValueError('restart identity')
+    if [tuple(r.values()) for _,r in refusals]!=[(1,1),(fresh_pid,fresh_pid)] or not refusals[0][0]<r0[0]<ai<ri<refusals[1][0]<r1[0]<r2[0]<done[0][0]:raise ValueError('stop and restart ordering')
     if tuple(done[0][1].values())!=(0,len(events)):raise ValueError('empty registry or dispatch accounting')
     bound=rec(b'STYLEOS NATIVE STOP-OWNERS-BOUND',('pid','window','peer','peer-window','ports'))
     revoked=rec(b'STYLEOS NATIVE STOP-OWNERS-REVOKED',('pid','window','peer','ports'))
@@ -174,12 +177,12 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
     if (len(bound),len(revoked),len(rebound),len(emptied))!=(1,2,1,1):raise ValueError('ownership evidence count')
     bi,b=bound[0];vi,v=revoked[0];wi,w=revoked[1];ni,n=rebound[0];zi,z=emptied[0]
     if (b['pid'],b['peer'],b['ports'])!=(1,2,2) or not b['window'] or not b['peer-window'] or b['window']==b['peer-window']:raise ValueError('initial ownership')
-    if tuple(v.values())!=(1,b['window'],2,1) or (n['pid'],n['old-window'],n['ports'])!=(33,b['window'],2) or not n['window'] or n['window'] in (b['window'],b['peer-window']):raise ValueError('revoked and fresh ownership')
-    if tuple(w.values())!=(33,n['window'],2,1) or tuple(z.values())!=(2,b['peer-window'],0):raise ValueError('final ownership')
+    if tuple(v.values())!=(1,b['window'],2,1) or (n['pid'],n['old-window'],n['ports'])!=(fresh_pid,b['window'],2) or not n['window'] or n['window'] in (b['window'],b['peer-window']):raise ValueError('revoked and fresh ownership')
+    if tuple(w.values())!=(fresh_pid,n['window'],2,1) or tuple(z.values())!=(2,b['peer-window'],0):raise ValueError('final ownership')
     if not batches[0][0]<bi<events[0][0] or not r0[0]<vi<ai<ni<ri<r1[0]<wi<r2[0]<zi<done[0][0]:raise ValueError('ownership lifecycle order')
     if any(x.startswith(b'STYLEOS NATIVE EMPTY ') for x in lines):raise ValueError('unexpected empty pump')
     retire_by_gen={r['gen']:(i,r) for i,r in retired}
-    if len(retire_by_gen)!=33:raise ValueError('duplicate retirement')
+    if len(retire_by_gen)!=fresh_pid:raise ValueError('duplicate retirement')
     stop_by_pid={s['pid']:i for i,s in stops}
     per={pid:[] for pid in by_pid}
     for i,e in events:
@@ -193,7 +196,7 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
         end,r=retire_by_gen[a['gen']]
         if (r['id'],r['root'])!=(a['slot'],a['root']) or not per[pid]:raise ValueError('retirement owner')
         seq=[e for _,e in per[pid]]
-        if pid in (1,2,33):
+        if pid in (1,2,fresh_pid):
             prefix=[(128,0x1000000d,1,1)]
             if window_tile:prefix.extend([(128,0x10000043,0x101,1),(128,0x1000005e,0x101,1)])
             elif window_ipc:prefix.append((128,0x1000001e,0x100,1))
@@ -220,10 +223,13 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
             if not end<stop_by_pid[pid]:raise ValueError('release before successful stop')
         else:
             actual=[(e['vector'],e['rip'],e['rax'],e['state']) for e in seq]
-            expected=[(128,0x1000000d,1,1),(6,0x1000000d,0,5) if a['slot']%8==7 else (128,0x10000014,2,4)]
+            if window_frame and pid in (3,33,34):
+                expected=[(128,0x1000000d,1,1),(128,0x10000014,0x104,1),
+                          (6,0x10000020,1,5) if pid==33 else (128,0x10000020,2,4)]
+            else:expected=[(128,0x1000000d,1,1),(6,0x1000000d,0,5) if a['slot']%8==7 else (128,0x10000014,2,4)]
             if actual!=expected or end>=r0[0]:raise ValueError('peer completion')
     last_normal=max(retire_by_gen[k][0] for k in range(3,33))
-    if any(ticks(lines,pid,last_normal)<4 for pid in (1,2)) or ticks(lines,33,ri)<4 or sum(i>ri and i<r2[0] and e['vector']==0x50 for i,e in per[2])<4:raise ValueError('peer not independently preempted')
+    if any(ticks(lines,pid,last_normal)<4 for pid in (1,2)) or ticks(lines,fresh_pid,ri)<4 or sum(i>ri and i<r2[0] and e['vector']==0x50 for i,e in per[2])<4:raise ValueError('peer not independently preempted')
     if restart['peer-ticks']!=sum(i<r0[0] and e['vector']==0x50 for i,e in per[2]):raise ValueError('peer tick accounting')
     irqs=rec(IRQ,('slot','root','initial','current','lvt','isr','irr'))
     expected=[(i,e) for i,e in events if e['vector']==0x50]
@@ -282,13 +288,13 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
     if window_tile:
         tiles=rec(b'STYLEOS NATIVE TILE',('pid','gen','root','window','va','shape','status','first'))
         expected=[]
-        for pid,idx in ((1,0),(2,1),(33,0)):
+        for pid,idx in ((1,0),(2,1),(fresh_pid,0)):
             expected.extend([(pid,pid,roots[idx],0,0x12000ff8,0x20002,1,0),
                              (pid,pid,roots[idx],0,0x12000000,0x20002,0,0xc10001+idx)])
         # Scheduler interleaves the initial two peers' calls. Verify each
         # caller's exact ordered receipts, then match global trap order.
         if len(tiles)!=6:raise ValueError('tile receipt count')
-        for pid in (1,2,33):
+        for pid in (1,2,fresh_pid):
             if [tuple(x.values()) for _,x in tiles if x['pid']==pid]!=[x for x in expected if x[0]==pid]:
                 raise ValueError('tile acceptance or cross-page refusal')
         calls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x101]
@@ -296,14 +302,14 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
             raise ValueError('tile receipt not adjacent to authenticated trap')
     elif window_ipc:
         pixels=rec(b'STYLEOS NATIVE PIXEL',('pid','gen','root','window','rgb','status'))
-        if len(pixels)!=3 or [tuple(x.values()) for _,x in pixels]!=[(1,1,roots[0],0,0xb10001,0),(2,2,roots[1],0,0xb10002,0),(33,33,roots[0],0,0xb10001,0)]:
+        if len(pixels)!=3 or [tuple(x.values()) for _,x in pixels]!=[(1,1,roots[0],0,0xb10001,0),(2,2,roots[1],0,0xb10002,0),(fresh_pid,fresh_pid,roots[0],0,0xb10001,0)]:
             raise ValueError('authenticated pixel receipts')
         calls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x100]
         if len(calls)!=3 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(pixels,calls)):
             raise ValueError('pixel receipt not adjacent to authenticated trap')
     if window_input:
         receipts=rec(b'STYLEOS NATIVE INPUT',('pid','gen','root','window','va','bytes','status','seq'))
-        for pid,idx in ((1,0),(2,1),(33,0)):
+        for pid,idx in ((1,0),(2,1),(fresh_pid,0)):
             want=[(pid,pid,roots[idx],0,0x12000fe0,64,1,0),(pid,pid,roots[idx],0,0x12000100,64,0,1)]
             got=[tuple(x.values()) for _,x in receipts if x['pid']==pid]
             if got[:2]!=want:raise ValueError('input destination preflight or event consumption')
@@ -337,12 +343,29 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
             if any(e[k]!=baseline[k] for _,e in route for k in ('text','text-hash','text-dirty','note-session')):
                 raise ValueError('native focus leaked into legacy editor')
     if window_frame:
+        controllers=rec(b'STYLEOS NATIVE SHELL-CONTROLLER',('pid','gen','root','epoch'))
+        completed=rec(b'STYLEOS NATIVE SHELL-CONTROLLER-RETIRED',('pid','epoch','resident'))
+        calls=rec(b'STYLEOS NATIVE SHELL-CALL',('pid','gen','root','epoch'))
+        redraw=rec(b'STYLEOS NATIVE SHELL-REDRAW',('epoch',))
+        if [tuple(x.values()) for _,x in controllers]!=[(33,33,roots[2],1),(34,34,roots[2],2)] or [tuple(x.values()) for _,x in completed]!=[(33,1,2),(34,2,2)]:
+            raise ValueError('controller lifecycle evidence')
+        if [tuple(x.values()) for _,x in calls]!=[(3,3,roots[2],0),(33,33,roots[2],1),(34,34,roots[2],2)] or len(redraw)!=1 or redraw[0][1]['epoch']!=2:
+            raise ValueError('controller authorization and redraw')
+        syscalls=[(i,e) for i,e in events if e['vector']==128 and e['rax']==0x104]
+        if len(syscalls)!=3 or any(j+1!=i or x['pid']!=e['pid'] for (j,x),(i,e) in zip(calls,syscalls)):
+            raise ValueError('controller receipt not adjacent to actual trap')
+        gap=rec(b'STYLEOS NATIVE SHELL-GAP-END',('dispatches',))
+        if len(gap)!=1 or not gap[0][0]<controllers[0][0]<per[33][0][0]<retire_by_gen[33][0]<completed[0][0]<controllers[1][0]<per[34][0][0]<retire_by_gen[34][0]<completed[1][0]<redraw[0][0]<r0[0]:
+            raise ValueError('fault then fresh controller launch and redraw ordering')
+        for pid in (1,2):
+            if not any(controllers[0][0]<i<completed[1][0] and e['vector']==0x50 for i,e in per[pid]):
+                raise ValueError('application stopped during controller recovery')
         launch=rec(b'STYLEOS NATIVE WINDOW-LAUNCH',('pid','gen','root','session','window'))
         rejected=rec(b'STYLEOS NATIVE WINDOW-LAUNCH-REFUSALS',('session',))
         if len(launch)!=3 or len(rejected)!=1:raise ValueError('windowed launch receipts')
         sid=rejected[0][1]['session']
         if not sid or not rejected[0][0]<admissions[0][0]:raise ValueError('preflight refusal ordering')
-        if [tuple(x.values()) for _,x in launch]!=[(1,1,roots[0],sid,b['window']),(2,2,roots[1],sid,b['peer-window']),(33,33,roots[0],sid,n['window'])]:
+        if [tuple(x.values()) for _,x in launch]!=[(1,1,roots[0],sid,b['window']),(2,2,roots[1],sid,b['peer-window']),(fresh_pid,fresh_pid,roots[0],sid,n['window'])]:
             raise ValueError('windowed launch identity')
         if any(not by_pid[x['pid']][0]<i<per[x['pid']][0][0] for i,x in launch):raise ValueError('window ownership after first dispatch')
         frames=rec(b'STYLEOS NATIVE FRAME',('pid','gen','root','window','va','count','status','first'))

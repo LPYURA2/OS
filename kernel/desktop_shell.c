@@ -1512,6 +1512,9 @@ struct shell_cycle { unsigned tick; bool cursor_proven; };
 static void desktop_shell_step(void *opaque)
 {
     struct shell_cycle *cycle=opaque;
+#ifdef STYLEOS_OWNED_SHELL_865
+    if(s865_shell_take_redraw())shell_refreshed=true;
+#endif
     struct desk_event e;
 #if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
     s863_shell_guard();

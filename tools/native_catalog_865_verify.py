@@ -158,6 +158,11 @@ def provision_catalog(path,*,timer_load=False,bad_rsp=False,fault_probe=None,han
                     # success loops with RAX=0 at code offset 0x24.
                     code+=b'\xbb\x00\x00\x00\x00\xb9'+struct.pack('<I',0xb10000+i+1)+b'\xb8\x00\x01\x00\x00\xcd\x80\x85\xc0\x75\x04\x31\xc0\xeb\xfe\x0f\x0b'
                 else:code+=b'\xeb\xfe'
+            elif window_frame and i==2:
+                # Ordinary launch is refused (epoch 0); trusted controller
+                # instance 1 faults at 0x20, instance 2 exits cleanly.
+                code+=b'\xb8\x04\x01\x00\x00\xcd\x80\x83\xf8\x01\x74\x07\xb8\x02\x00\x00\x00\xcd\x80\x0f\x0b'
+                assert len(code)==0x22
             elif fault_probe and i==0:
                 code+=FAULT_PROBES[fault_probe][0]+b'\x0f\x0b'
             elif bad_rsp and i<3:

@@ -20,6 +20,14 @@ enum ps_status s865_native_launch_window(const struct rt865_launch_request *,
 /* Acceptance-only fault injection; requires empty resident registry. */
 bool s865_native_probe_window_rollback(const struct rt865_launch_request *,uint32_t);
 #endif
+/* Trusted provider may admit one isolated shell controller. Exact identity
+ * grants only a coalesced redraw request; no framebuffer or kernel pointer.
+ * Return 0 from the controller syscall on refusal, nonzero instance epoch
+ * on success. Controller exit/fault does not revoke application ownership. */
+#define S865_CALL_SHELL_REDRAW 0x104u
+enum ps_status s865_shell_controller_launch(const struct rt865_launch_request *,uint32_t *);
+uint64_t s865_shell_controller_request(uint32_t,uint64_t,uint64_t);
+uint64_t s865_shell_take_redraw(void);
 void s865_native_pump(void);
 /* Kernel-owned execution loop, independent of the bounded desktop callback.
  * A returned step must leave the safe root and interrupt contract intact.
@@ -27,6 +35,7 @@ void s865_native_pump(void);
 _Noreturn void s865_native_supervise(void (*shell_step)(void *),void *);
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
 void s865_native_request_shell_gap(void);
+bool s865_native_probe_shell_controller(void);
 #endif
 /* Trusted trap continuation on safe root, with exact READY caller identity.
  * Copy only from the admitted private data page, never dereference user VA.

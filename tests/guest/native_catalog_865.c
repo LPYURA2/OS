@@ -145,6 +145,39 @@ static enum ps_status launch_record(const uint8_t *r,uint32_t *pid,uint32_t *win
  if(status==PS_OK){*pid=result.pid;*win=result.window;}
  return status;
 }
+/* Run the same externally pinned executable twice, with actual user
+ * fault then fresh launch. The initial ordinary admission of record 2
+ * attempts the same syscall without controller authority. */
+bool s865_native_probe_shell_controller(void){
+ if(!frame_probe)return true;
+ unsigned count=0;
+ if(pr_snapshot(pr_global(),0,0,true)!=2||!catalog_valid(&count)||count!=32)return false;
+ struct rt865_launch_request request=record_request(catalog+16+2*NC_RECORD);
+ native_wipe(catalog,sizeof catalog);
+ struct stop_owned target,peer;
+ if(!owned_refs(stop_pid,stop_window,&target)||!owned_refs(peer_pid,peer_window,&peer))return false;
+ static unsigned char target_owner[sizeof(struct usr_owner)],target_window[sizeof(struct ws_window)],target_port[sizeof(struct nwc_port)];
+ copy_bytes(target_owner,target.owner,sizeof target_owner);
+ copy_bytes(target_window,target.window,sizeof target_window);
+ copy_bytes(target_port,target.port,sizeof target_port);
+ save_peer(&peer);
+ uint32_t previous=0;
+ for(unsigned epoch=1;epoch<=2;++epoch){
+  uint32_t pid=0;
+  if(s865_shell_controller_launch(&request,&pid)!=PS_OK||pid==previous||pid==stop_pid||pid==peer_pid)return false;
+  uint32_t denied=0xabcdef;
+  if(s865_shell_controller_launch(&request,&denied)!=PS_STATE||denied!=0xabcdef)return false;
+  for(unsigned step=0;step<32&&pr_find(pr_global(),pid);++step)s865_native_pump();
+  if(pr_find(pr_global(),pid)||pr_snapshot(pr_global(),0,0,true)!=2||
+     !same_peer(&peer)||!same_bytes(target.owner,target_owner,sizeof target_owner)||
+     !same_bytes(target.window,target_window,sizeof target_window)||
+     !same_bytes(target.port,target_port,sizeof target_port))return false;
+  arch_puts("STYLEOS NATIVE SHELL-CONTROLLER-RETIRED");field("pid",pid);field("epoch",epoch);
+  field("resident",2);arch_putc('\n');
+  previous=pid;
+ }
+ return true;
+}
 static bool stop_fail(void){
  arch_puts("STYLEOS NATIVE FAIL forced-stop acceptance\n");return false;
 }

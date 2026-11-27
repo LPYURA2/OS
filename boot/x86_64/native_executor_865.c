@@ -192,6 +192,23 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
 #ifdef STYLEOS_OWNED_SHELL_865
  /* Only after actual CPL3 trap, safe-root return, scheduler commit and
   * full mapping audit. Never accept caller-supplied PID/root/generation. */
+ if(kind==RT865_SYSCALL && pending860.gpr[0]==S865_CALL_SHELL_REDRAW){
+  const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
+  struct rt862_bank_slot *slot=&bank862.slots[id];
+  if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
+     caller->page_root!=ticket->child_root||slot->pid!=ticket->pid||
+     slot->handle!=ticket->handle||slot->root!=ticket->child_root||
+     runtime860->dispatcher.current!=-1||root848()!=safe||(flags848()&0x200))
+   fail848("865-shell-controller-owner");
+  uint64_t epoch=0;
+  if(!pending860.gpr[1]&&!pending860.gpr[2]&&!pending860.gpr[3])
+   epoch=s865_shell_controller_request(ticket->pid,ticket->handle,ticket->child_root);
+  slot->context.gpr[0]=epoch;
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+  arch_puts("STYLEOS NATIVE SHELL-CALL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+  fld848("root",ticket->child_root);fld848("epoch",epoch);arch_putc('\n');
+#endif
+ }
  if(kind==RT865_SYSCALL && (pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
