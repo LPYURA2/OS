@@ -213,3 +213,83 @@ enum po64_status po64_child_at(struct po64_service *s,struct po64_snapshot snap,
  }
  *out=row;return PO64_OK;
 }
+
+/* Namespace calls are trusted supervisor requests, never token operations. */
+static enum po64_status edit_ready(struct po64_service *s,struct po64_snapshot snap){
+ if(!s||!snap.mount||!snap.sequence)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ if(!s->writable)return PO64_DENIED;
+ if(snap.mount!=s->mount_id||snap.sequence!=s->pair.sequence)return PO64_STALE;
+ return live(s);
+}
+static bool edit_parent(struct po64_service *s,uint64_t parent){
+ if(parent==1)return true;
+ for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
+  if(s->nodes[i].id==parent)return s->nodes[i].kind==SD64_DIRECTORY;
+ return false;
+}
+static enum po64_status edit_lookup(struct po64_service *s,const struct sd64_key *key,
+ uint64_t *id,uint8_t *kind){
+ struct dc64_state *d=&s->work->pair.dir;
+ if(!d->count)return PO64_END;
+ enum sd64_status r=sd64_lookup(s->block,s->layout.owner,s->layout.dir,&d->root,key,
+  s->work->pair.dw.page,id,kind);
+ if(r==SD64_OK)return PO64_OK;
+ if(r==SD64_MISSING)return PO64_END;
+ clear(s);return r==SD64_IO?PO64_IO:PO64_CORRUPT;
+}
+static enum po64_status edit_finish(struct po64_service *s,enum pp64_status pr,
+ const struct pp64_pair *next){
+ s->busy=false;
+ if(pr==PP64_OK){s->pair=*next;forget(s);return PO64_OK;}
+ /* Staging may have changed an unpublished root. Fail closed, requiring
+  * supervisor recovery rather than retaining tokens or silently retrying. */
+ clear(s);return status(pr);
+}
+enum po64_status po64_create_empty(struct po64_service *s,struct po64_snapshot snap,
+ const struct sd64_key *key,uint64_t id){
+ enum po64_status rc=edit_ready(s,snap);
+ if(rc!=PO64_OK)return rc;
+ if(id<=1||!span(s,key,sizeof *key)||!sd64_key_valid(key))return PO64_INVALID;
+ if(!edit_parent(s,key->parent))return PO64_DENIED;
+ for(size_t i=0;i<(size_t)s->work->pair.dir.count;i++)
+  if(s->nodes[i].id==id)return PO64_DENIED;
+ uint64_t found=0;uint8_t kind=0;
+ rc=edit_lookup(s,key,&found,&kind);
+ if(rc!=PO64_END)return rc==PO64_OK?PO64_DENIED:rc;
+ struct sd64_key copy=*key;struct pp64_pair next;
+ s->busy=true;
+ enum pp64_status pr=pp64_put(s->block,&s->layout,s->work,s->nodes,s->node_cap,
+  s->runs,s->previous,s->run_cap,snap.sequence,&copy,id,0,0,0,0,&next);
+ return edit_finish(s,pr,&next);
+}
+enum po64_status po64_change_file(struct po64_service *s,struct po64_snapshot snap,
+ const struct po64_row *old,const struct sd64_key *dest){
+ enum po64_status rc=edit_ready(s,snap);
+ if(rc!=PO64_OK)return rc;
+ if(!span(s,old,sizeof *old)||old->entry.kind!=SD64_FILE||old->entry.target<=1||
+    !old->revision||!sd64_key_valid(&old->entry.key)||
+    (dest&&(!span(s,dest,sizeof *dest)||!sd64_key_valid(dest))))return PO64_INVALID;
+ uint64_t id=0;uint8_t kind=0;
+ rc=edit_lookup(s,&old->entry.key,&id,&kind);
+ if(rc!=PO64_OK)return rc==PO64_END?PO64_STALE:rc;
+ if(id!=old->entry.target||kind!=SD64_FILE)return PO64_STALE;
+ struct sfs64_file file;
+ enum ip64_status ir=ip64_stat(s->block,s->layout.owner,s->layout.inode,
+  &s->work->pair.inode.root,id,&s->work->pair.iw,&file);
+ if(ir!=IP64_OK){clear(s);return ir==IP64_IO?PO64_IO:PO64_CORRUPT;}
+ if(file.revision!=old->revision||file.bytes!=old->bytes)return PO64_STALE;
+ struct dc64_edit e={.op=dest?DC64_RENAME:DC64_REMOVE,.entry=old->entry};
+ if(dest){
+  if(!edit_parent(s,dest->parent))return PO64_DENIED;
+  rc=edit_lookup(s,dest,&id,&kind);
+  if(rc!=PO64_END)return rc==PO64_OK?PO64_DENIED:rc;
+  e.destination=*dest;
+ }
+ struct pp64_pair next;
+ s->busy=true;
+ enum pp64_status pr=pp64_edit(s->block,&s->layout,s->work,s->nodes,s->node_cap,
+  s->runs,s->run_cap,snap.sequence,&e,old->revision,&next);
+ return edit_finish(s,pr,&next);
+}

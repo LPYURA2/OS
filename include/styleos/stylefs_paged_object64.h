@@ -59,4 +59,14 @@ struct po64_row {
 enum po64_status po64_snapshot(struct po64_service *,struct po64_snapshot *);
 enum po64_status po64_child_at(struct po64_service *,struct po64_snapshot,
  uint64_t parent,uint64_t ordinal,struct po64_row *);
+/* Supervisor-only namespace mutation. Caller authorizes both directories
+ * and supplies a lifetime-unique new ID (persistent allocator not here).
+ * Exact mount/sequence and old file revision; no overwrite, no implicit
+ * directory authority from a file token. All tokens expire on commit.
+ * New file is empty. Destination NULL means unlink, otherwise move/rename.
+ * No output or user ABI. */
+enum po64_status po64_create_empty(struct po64_service *,struct po64_snapshot,
+ const struct sd64_key *,uint64_t new_id);
+enum po64_status po64_change_file(struct po64_service *,struct po64_snapshot,
+ const struct po64_row *,const struct sd64_key *destination);
 #endif
