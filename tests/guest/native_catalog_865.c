@@ -379,6 +379,25 @@ bool s865_native_catalog_request(void){
   }
   arch_puts("STYLEOS NATIVE WINDOW-LAUNCH-CAPACITY");field("resident",32);arch_putc('\n');
  }
+ /* Before the first dispatch, require the real supervisor process API to
+  * report both expanded leases and the legacy peer's actual allocation.
+  * This path is limited to the explicit three-record fixture. */
+ if(valid&&count==3&&accepted==3&&wide_record(catalog+16)&&wide_record(catalog+16+NC_RECORD)){
+  static struct pa_row rows[PA_MAX_ROWS];
+  struct pa_reply reply={0};
+  const struct pa_request query={.version=PA_VERSION,.order=PI_BY_PID};
+  if(s865_native_snapshot(&query,rows,PA_MAX_ROWS,&reply)!=PA_OK||
+     reply.returned!=3||reply.total!=3||
+     reply.measurement_flags!=(PA_MEASURE_CPU_TICKS|PA_MEASURE_MEMORY_BYTES)||
+     rows[0].resident_bytes!=7u*4096u||rows[1].resident_bytes!=7u*4096u||
+     rows[2].resident_bytes!=3u*4096u){
+   native_wipe(catalog,sizeof catalog);native_catalog_busy=false;
+   arch_puts("STYLEOS WIDE75 FAIL process accounting\n");return false;
+  }
+  arch_puts("STYLEOS WIDE75 ACCOUNT");field("first",rows[0].resident_bytes);
+  field("second",rows[1].resident_bytes);field("peer",rows[2].resident_bytes);
+  field("flags",reply.measurement_flags);arch_putc('\n');
+ }
  native_wipe(catalog,sizeof catalog);native_catalog_busy=false;
  arch_puts("STYLEOS NATIVE CATALOG");field("valid",valid);field("requested",count);field("accepted",accepted);field("resident",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');
  if(forced&&accepted==count){

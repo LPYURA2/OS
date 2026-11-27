@@ -84,7 +84,7 @@ bool s865_native_probe_shell_controller(void);
 bool s865_native_shell_probe_available(void);
 #endif
 /* Trusted trap continuation on safe root, with exact READY caller identity.
- * Copy only from the admitted private data page, never dereference user VA.
+ * Copy only from the admitted private data extent, never dereference user VA.
  * On failure leave kernel destination unchanged. Destination is trusted
  * separate kernel scratch, not caller controlled. */
 bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,size_t);
@@ -100,7 +100,7 @@ bool native_drop_task_gesture(uint32_t source_window,const struct nwc_task *targ
 volatile uint8_t *s865_native_data_span(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,size_t);
 /* Read-only snapshot for a trusted supervisor on the owned root, IF=0.
  * No CPL3 entry. CPU ticks are accepted LAPIC preemptions, not elapsed time;
- * resident_bytes counts the three leased user pages, not total system memory. */
+ * resident_bytes counts exact leased user pages, not total system memory. */
 enum pa_status s865_native_snapshot(const struct pa_request *,struct pa_row *,size_t,
                                    struct pa_reply *);
 /* Trusted supervisor authenticates request, not a user syscall. */

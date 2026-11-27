@@ -907,8 +907,7 @@ static void shell_boundary863(void){
  s863_shell_guard();unsigned used;
 #ifdef STYLEOS_OWNED_SHELL_865
  if(native_ready){
-  if(!s865_executor_idle()||!s844_count(native_arena,&used)||
-     used!=3*pr_snapshot(pr_global(),0,0,true))fail("native-shell-boundary");
+  if(!native_accounting())fail("native-shell-boundary");
   return;
  }
 #endif

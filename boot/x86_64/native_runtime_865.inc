@@ -36,6 +36,45 @@ static bool native_audit(void *unused){
  return native_extent_binding()&&native_arena&&native_evidence&&read_cr3()==composed.built.root&&!(flags()&0x200)&&same_cache(&native_cache)&&
   rt875_roots_audit_sparse_frozen(base861,&native_cache,&frozen861,native_evidence,native_arena,native_leases,native_extents,&native_guard,&composed,native_roots);
 }
+/* Quiescent published-process accounting, distinct from the transitional
+ * detached-root audit. No partial admission or terminal lease retirement
+ * can cross the shell boundary. Validate the arena once, then compare
+ * exact descriptors in its validated slots rather than re-scanning it
+ * once per process. This is a metadata check, not a PTE audit substitute. */
+static bool native_accounting(void){
+ if(!native_ready||!s865_executor_idle()||!native_arena||
+    !runtime860||runtime860->dispatcher.registry!=pr_global()||
+    runtime860->dispatcher.current!=-1)return false;
+ unsigned used=0,total=0,count=0;
+ if(!s844_count(native_arena,&used)||!native_extent_binding())return false;
+ for(unsigned i=0;i<S846_ROOT_COUNT;++i){
+  const struct rt862_bank_slot *slot=&bank862.slots[i];
+  const struct s844_lease l=native_leases[i];
+  const struct s846_extent e=native_extents[i];
+  if(!slot->pid){
+   if(l.pa||l.owner||l.generation||l.pages||e.code||e.data||e.stack||
+      native_roots[i].ready)return false;
+   continue;
+  }
+  const struct pr_entry *p=pr_find(pr_global(),slot->pid);
+  if(!p||p->type!=PR_NATIVE_USER||
+     (p->state!=PR_READY&&p->state!=PR_WAITING)||
+     p->scheduler_handle!=slot->handle||p->page_root!=slot->root||
+     !e.code||e.code>NAI75_CODE_PAGES||!e.data||e.data>NAI75_DATA_PAGES||
+     !e.stack||e.stack>NAI75_STACK_PAGES||l.pages!=e.code+e.data+e.stack||
+     !l.generation||l.owner!=S846_OWNER_A+i||
+     l.pa<native_arena->base||l.pa-native_arena->base>=S844_BYTES||
+     (l.pa&4095u)||p->resident_bytes!=(uint64_t)l.pages*4096u||
+     !native_roots[i].ready)return false;
+  const struct s844_lease live=native_arena->slots[(l.pa-native_arena->base)/4096u];
+  if(live.pa!=l.pa||live.pages!=l.pages||live.owner!=l.owner||
+     live.generation!=l.generation)return false;
+  for(unsigned j=0;j<i;++j)if(bank862.slots[j].pid==slot->pid||
+     (native_leases[j].generation&&native_leases[j].generation==l.generation))return false;
+  total+=l.pages;++count;
+ }
+ return total==used&&count==pr_snapshot(pr_global(),0,0,true);
+}
 volatile uint8_t *s865_native_data_span(unsigned id,uint32_t pid,uint64_t gen,uint64_t root,
                                         uint64_t va,size_t bytes){
  if(!native_ready||!bytes||va<S846_DATA||id>=S846_ROOT_COUNT||!runtime860||
@@ -315,22 +354,9 @@ enum ps_status s865_native_stop_selected(uint32_t pid){
 }
 enum pa_status s865_native_snapshot(const struct pa_request *q,struct pa_row *rows,
                                     size_t capacity,struct pa_reply *reply){
- if(!native_ready||!s865_executor_idle()||!native_audit(0)||
-    runtime860->dispatcher.current!=-1)return PA_DENIED;
- /* Verify provenance of every live row before publishing measurement validity.
-  * No fake system tasks or CPU percentages. Reject unaccounted registry rows. */
- const struct pr_table *p=runtime860->dispatcher.registry;
- if(!p||p!=pr_global())return PA_DENIED;
- for(unsigned i=0;i<PR_MAX_PROCESSES;i++){
-  const struct pr_entry *e=&p->processes[i];
-  if(e->state!=PR_READY&&e->state!=PR_RUNNING&&e->state!=PR_WAITING)continue;
-  if(e->type!=PR_NATIVE_USER||e->state==PR_RUNNING||e->resident_bytes!=3*4096u)return PA_DENIED;
-  unsigned id=0;
-  while(id<S846_ROOT_COUNT&&bank862.slots[id].pid!=e->pid)++id;
-  if(id==S846_ROOT_COUNT||bank862.slots[id].handle!=e->scheduler_handle||
-     native_leases[id].generation!=e->scheduler_handle||native_leases[id].pages!=3||
-     native_roots[id].built.root!=e->page_root||!s844_lease_live(native_arena,native_leases[id]))return PA_DENIED;
- }
+ /* Exact live per-process page accounting and full actual PTE audit
+  * before publishing measurements. Never fabricate CPU percentages. */
+ if(!native_accounting()||!native_audit(0))return PA_DENIED;
  enum pa_status r=dpr_supervisor_snapshot(runtime860,q,rows,capacity,reply);
  if(r==PA_OK||r==PA_TRUNCATED)reply->measurement_flags=PA_MEASURE_CPU_TICKS|PA_MEASURE_MEMORY_BYTES;
  return r;

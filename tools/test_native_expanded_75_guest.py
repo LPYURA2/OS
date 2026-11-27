@@ -138,6 +138,8 @@ def run(out):
             r=Run(desktop,serial,out);r.line(b'STYLEOS DESKTOP READY')
             desktop.screen('before')
             r.mark();desktop.key('f9')
+            r.receipt(b'STYLEOS WIDE75 ACCOUNT',('first','second','peer','flags'),
+                      first=7*P,second=7*P,peer=3*P,flags=3)
             r.receipt(b'STYLEOS NATIVE CATALOG',('valid','requested','accepted','resident'),valid=1,requested=3,accepted=3,resident=3)
             r.receipt(b'STYLEOS NATIVE EMPTY',('used','dispatches'),used=0)
             desktop.screen('after');desktop.call('stop')
