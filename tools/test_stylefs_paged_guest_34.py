@@ -202,54 +202,78 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                     # exactly one individually pinned package.
                     d.key("down");d.key("down");d.key("ret")
                     wait_exact(b"SFS42 ENTER DIRECTORY",2)
-                    d.key("ret")
-                    def wait_prefix(marker):
+                    def wait_prefix(marker,count=1):
                         deadline=time.monotonic()+40
                         while time.monotonic()<deadline and proc.poll() is None:
                             rows=uart.read_bytes().splitlines()
                             require(not any(b" FAIL " in x for x in rows),"TEA guest failure")
                             matches=[x for x in rows if x.startswith(marker)]
-                            if matches:return matches[0]
+                            if len(matches)>=count:return matches[count-1]
                             time.sleep(.05)
                         raise RuntimeError("missing TEA receipt "+repr(marker))
                     if tea69:
-                        file=wait_prefix(b"STYLEOS TEA69 STYLEFS id=")
-                        require(b" id=0x0000000000000006 " in file and b" revision=0x0000000000000001 " in file,"exact selected file")
-                        launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ")
-                        frame=wait_prefix(b"STYLEOS NATIVE FRAME ")
-                        pid=launch.split()[3]
-                        require(pid in frame.split(),"frame belongs to launched PID")
-                        # Subsequent input boundary lets the compositor draw.
                         from native_desktop_acceptance import events
                         from uart_receipts import complete_lines
-                        observed=events(complete_lines(uart.read_bytes()))
-                        require(bool(observed),"guest pointer coordinates unavailable")
-                        d.x,d.y=observed[-1]["x"],observed[-1]["y"]
-                        count=len(observed)
-                        d.click(350,130)
-                        deadline=time.monotonic()+40
-                        while time.monotonic()<deadline and proc.poll() is None:
-                            observed=events(complete_lines(uart.read_bytes()))
-                            if len(observed)>count and (observed[-1]["x"],observed[-1]["y"])==(350,130) and not observed[-1]["buttons"]:
-                                break
-                            time.sleep(.05)
-                        else:
-                            raise RuntimeError("native focus click receipt missing")
-                        visible=d.screen("tea69-file-visible")
-                        visible.check(281,81,"976332");visible.check(439,199,"976332")
-                        d.key("q")
-                        retired=wait_prefix(b"STYLEOS TEA69 RETIRED ")
-                        require(pid in retired.split(),"exact process retirement")
                         from native_forced_stop_verify import records
-                        resources=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 RESOURCES",
-                            ("phase","pid","resident","pages","owners","windows","ports"))
-                        pid_num=int(pid.split(b"=")[1],16)
-                        require([tuple(v.values()) for _,v in resources]==[
-                            (1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)],"StyleFS TEA resource release")
+                        from statistics import median
+                        seen_pids=set()
+                        seen_windows=set()
+                        timings=[]
+                        expected=[]
+                        for cycle in range(1,101):
+                            if cycle>1:
+                                # F2 clears stale native focus and restores Explorer.
+                                d.key("f2")
+                            started=time.monotonic_ns()
+                            d.key("ret")
+                            file=wait_prefix(b"STYLEOS TEA69 STYLEFS id=",cycle)
+                            require(b" id=0x0000000000000006 " in file and b" revision=0x0000000000000001 " in file,"exact selected file")
+                            launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ",cycle)
+                            frame=wait_prefix(b"STYLEOS NATIVE FRAME ",cycle)
+                            pid=launch.split()[3]
+                            pid_num=int(pid.split(b"=")[1],16)
+                            window=launch.split()[-1]
+                            require(pid in frame.split() and pid_num not in seen_pids and window not in seen_windows,"fresh application identity")
+                            seen_pids.add(pid_num);seen_windows.add(window)
+                            wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*cycle-1)
+                            observed=events(complete_lines(uart.read_bytes()))
+                            require(bool(observed),"guest pointer coordinates unavailable")
+                            d.x,d.y=observed[-1]["x"],observed[-1]["y"]
+                            count=len(observed)
+                            d.click(350,130)
+                            deadline=time.monotonic()+40
+                            while time.monotonic()<deadline and proc.poll() is None:
+                                observed=events(complete_lines(uart.read_bytes()))
+                                if len(observed)>count and (observed[-1]["x"],observed[-1]["y"])==(350,130) and not observed[-1]["buttons"]:
+                                    break
+                                time.sleep(.05)
+                            else:
+                                raise RuntimeError("native focus click receipt missing")
+                            if cycle in (1,100):
+                                visible=d.screen("tea69-file-visible" if cycle==1 else "tea70-file-visible-last")
+                                visible.check(281,81,"976332");visible.check(439,199,"976332")
+                            closed_start=time.monotonic_ns()
+                            d.key("q")
+                            retired=wait_prefix(b"STYLEOS TEA69 RETIRED ",cycle)
+                            require(pid in retired.split() and window in retired.split(),"exact process retirement")
+                            wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*cycle)
+                            ended=time.monotonic_ns()
+                            expected.extend([(1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)])
+                            resources=records(complete_lines(uart.read_bytes()),b"STYLEOS TEA70 RESOURCES",
+                                ("phase","pid","resident","pages","owners","windows","ports"))
+                            require([tuple(v.values()) for _,v in resources]==expected,"StyleFS TEA resource release")
+                            timings.append({"cycle":cycle,"launch_to_input_ms":(closed_start-started)/1e6,
+                                            "close_to_release_ms":(ended-closed_start)/1e6})
+                        def stats(key):
+                            values=sorted(t[key] for t in timings)
+                            return {"median":median(values),"p95":values[94],"max":values[-1]}
                         (folder/"native-resource-accounting.json").write_text(json.dumps({
-                            "scope":"native leased user pages only","page_bytes":4096,
-                            "snapshots":[v for _,v in resources]},indent=2)+"\n")
+                            "scope":"native leased user pages only; QEMU host timing includes QMP/input and occasional screenshot",
+                            "page_bytes":4096,"cycles":100,"snapshots":[v for _,v in resources],
+                            "timings":timings,"launch_to_input_ms":stats("launch_to_input_ms"),
+                            "close_to_release_ms":stats("close_to_release_ms")},indent=2)+"\n")
                     else:
+                        d.key("ret")
                         wait_exact(b"STYLEOS TEA69 STYLEFS REFUSED")
                         # Another ordinary input must still be processed.
                         d.key("backspace");wait_exact(b"SFS42 UP DIRECTORY",2)
