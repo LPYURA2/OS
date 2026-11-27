@@ -30,4 +30,29 @@ enum dc64_status dc64_provision(struct bs_service *,uint64_t owner,uint64_t toke
  * On I/O uncertainty remount is required. No live page is overwritten. */
 enum dc64_status dc64_publish(struct dc64_state *,struct dc64_workspace *,
                                uint64_t count,dc64_next,void *);
+
+/* A single trusted namespace operation, not a path/ACL/inode service.
+ * CREATE requires unused key; REMOVE/RENAME require exact old object and kind.
+ * RENAME keeps object identity and refuses replacement of an existing key.
+ * Directory moves/removals are deliberately refused until parent integrity
+ * and cycle/emptiness checks exist. Creation of entries does not allocate IDs.
+ */
+enum dc64_edit_op { DC64_CREATE=1, DC64_REMOVE, DC64_RENAME };
+struct dc64_edit {
+ enum dc64_edit_op op;
+ struct sd64_record entry;
+ struct sd64_key destination;
+};
+struct dc64_edit_workspace {
+ struct dc64_workspace publish;
+ uint8_t page[SD64_PAGE];
+ struct sd64_record records[SD64_FANOUT];
+};
+/* Enumeration is indexed by ordinal in the mounted snapshot; caller serializes
+ * and does not retain a snapshot across publication. No result on error.
+ * Return DC64_INVALID for ordinal outside count. */
+enum dc64_status dc64_entry_at(struct dc64_state *,uint64_t ordinal,
+                                struct dc64_edit_workspace *,struct sd64_record *);
+enum dc64_status dc64_apply(struct dc64_state *,struct dc64_edit_workspace *,
+                             const struct dc64_edit *);
 #endif

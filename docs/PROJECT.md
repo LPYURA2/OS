@@ -475,3 +475,8 @@ A separate terminal diagnostic observes trusted QEMU/OVMF RSDP/XSDT/MADT without
 Решение владельца 24.11.2026: после завершения реализации фундамента — отдельная комплексная приёмка всего ядра по [KERNEL_FINAL_ACCEPTANCE.md](architecture/KERNEL_FINAL_ACCEPTANCE.md). До её PASS фундамент окончательно не принят; файловую систему не начинать.
 
 После успешной комплексной приёмки ядра и до файловой системы — отдельное обсуждение владельцем [технического уровня, оптимизации, производительности и системных требований](architecture/POST_ACCEPTANCE_PERFORMANCE_REVIEW.md). Числа не утверждены; решение об объёме дальнейшей оптимизации принимает владелец.
+
+
+## StyleFS 23 — namespace edit candidate
+
+Stage 22 CI 7/7 SUCCESS. See [continuation](NEXT_CHAT_STYLEFS_23.md). No production claim or change to main.

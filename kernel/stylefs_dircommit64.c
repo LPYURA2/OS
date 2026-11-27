@@ -136,6 +136,15 @@ enum dc64_status dc64_publish(struct dc64_state *s,struct dc64_workspace *w,uint
     !separate(s,sizeof *s,s->block,sizeof *s->block)||
     !separate(w,sizeof *w,s->block,sizeof *s->block)||
     !grant(s->block,s->owner,s->token,s->sectors,true)||(count&&!next))return DC64_INVALID;
+ /* Reject a stale mounted writer before any destructive inactive-bank reuse.
+  * A single serialized supervisor must still own the grant for this call. */
+ struct dc64_state live;
+ enum dc64_status fresh=dc64_mount(&live,s->block,s->owner,s->token,s->sectors,w);
+ if(fresh!=DC64_OK){s->valid=false;return fresh;}
+ if(live.epoch!=s->epoch||live.active!=s->active||live.count!=s->count||
+    live.root.sector!=s->root.sector||live.root.region_start!=s->root.region_start||
+    live.root.region_sectors!=s->root.region_sectors||live.root.level!=s->root.level||
+    live.root.epoch!=s->root.epoch){s->valid=false;return DC64_INVALID;}
  struct plan p;
  if(s->epoch==UINT64_MAX||!plan(count,bank_size(s->sectors)/8,&p))return DC64_FULL;
  unsigned target=s->active^1u;uint64_t epoch=s->epoch+1,start=base(s->sectors,target);
