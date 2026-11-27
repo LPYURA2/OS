@@ -164,21 +164,14 @@ bool s865_native_probe_shell_controller(void){
  copy_bytes(target_window,target.window,sizeof target_window);
  copy_bytes(target_port,target.port,sizeof target_port);
  save_peer(&peer);
- uint32_t previous=0;
- for(unsigned epoch=1;epoch<=2;++epoch){
-  uint32_t pid=0;
-  if(s865_shell_controller_launch(&request,&pid)!=PS_OK||pid==previous||pid==stop_pid||pid==peer_pid)return false;
-  uint32_t denied=0xabcdef;
-  if(s865_shell_controller_launch(&request,&denied)!=PS_STATE||denied!=0xabcdef)return false;
-  for(unsigned step=0;step<32&&pr_find(pr_global(),pid);++step)s865_native_pump();
-  if(pr_find(pr_global(),pid)||pr_snapshot(pr_global(),0,0,true)!=2||
-     !same_peer(&peer)||!same_bytes(target.owner,target_owner,sizeof target_owner)||
-     !same_bytes(target.window,target_window,sizeof target_window)||
-     !same_bytes(target.port,target_port,sizeof target_port))return false;
-  arch_puts("STYLEOS NATIVE SHELL-CONTROLLER-RETIRED");field("pid",pid);field("epoch",epoch);
-  field("resident",2);arch_putc('\n');
-  previous=pid;
- }
+ if(s865_shell_configure_recovery(&request)!=PS_OK||
+    s865_shell_configure_recovery(&request)!=PS_STATE)return false;
+ for(unsigned step=0;step<96&&s865_shell_recovery_busy();++step)s865_native_pump();
+ if(s865_shell_recovery_busy()||s865_shell_recovery_exhausted()||
+    pr_snapshot(pr_global(),0,0,true)!=2||
+    !same_peer(&peer)||!same_bytes(target.owner,target_owner,sizeof target_owner)||
+    !same_bytes(target.window,target_window,sizeof target_window)||
+    !same_bytes(target.port,target_port,sizeof target_port))return false;
  return true;
 }
 static bool stop_fail(void){

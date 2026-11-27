@@ -34,6 +34,12 @@ uint64_t s865_shell_controller_event(uint32_t,uint64_t,uint64_t);
 uint64_t s865_shell_controller_decide(uint32_t,uint64_t,uint64_t,uint64_t,uint64_t);
 uint64_t s865_shell_take_refresh(void);
 enum ps_status s865_shell_controller_launch(const struct rt865_launch_request *,uint32_t *);
+/* Install a copied, trusted immutable source capability before submitting
+ * a refresh. Source reader and opaque storage must outlive this registration.
+ * Bounded recovery operates in dispatch opportunities, not wall time. */
+enum ps_status s865_shell_configure_recovery(const struct rt865_launch_request *);
+bool s865_shell_recovery_busy(void);
+bool s865_shell_recovery_exhausted(void);
 uint64_t s865_shell_controller_request(uint32_t,uint64_t,uint64_t);
 uint64_t s865_shell_take_redraw(void);
 void s865_native_pump(void);

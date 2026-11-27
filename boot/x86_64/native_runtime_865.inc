@@ -230,6 +230,14 @@ enum pa_status s865_native_snapshot(const struct pa_request *q,struct pa_row *ro
 static struct { uint32_t pid;uint64_t gen,root,epoch; } shell_controller;
 static uint64_t shell_epoch,shell_redraw,shell_refresh_commit;
 static bool shell_refresh_pending;
+enum { SHELL_ATTEMPTS=3, SHELL_SLICE_LIMIT=32 };
+static struct {
+ struct rt865_launch_request request;
+ bool configured,exhausted;
+ unsigned attempts,delay,slices;
+ uint32_t pid;
+ uint64_t gen;
+} shell_recovery;
 static void shell_controller_reconcile(void){
  if(shell_controller.pid){
   const struct pr_entry *e=pr_find(pr_global(),shell_controller.pid);
@@ -268,10 +276,20 @@ uint64_t s865_shell_controller_request(uint32_t pid,uint64_t gen,uint64_t root){
  if(!shell_controller_auth(pid,gen,root))return 0;
  shell_redraw=shell_controller.epoch;return shell_redraw;
 }
+enum ps_status s865_shell_configure_recovery(const struct rt865_launch_request *request){
+ if(!request||!request->source.read)return PS_ARGUMENT;
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
+ if(shell_recovery.configured||shell_controller.pid||shell_refresh_commit)return PS_STATE;
+ shell_recovery.request=*request;shell_recovery.configured=true;
+ return PS_OK;
+}
+bool s865_shell_recovery_busy(void){return shell_recovery.configured&&!shell_recovery.exhausted&&(shell_refresh_pending||shell_recovery.pid);}
+bool s865_shell_recovery_exhausted(void){return shell_recovery.exhausted;}
 bool s865_shell_submit_refresh(void){
  if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
  shell_controller_reconcile();
- if(!shell_controller.pid){
+ if(shell_recovery.exhausted)return true;
+ if(!shell_controller.pid&&!shell_recovery.configured){
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
   if(!s865_native_shell_probe_available())return false;
 #else
@@ -279,6 +297,7 @@ bool s865_shell_submit_refresh(void){
 #endif
  }
  if(!shell_refresh_pending&&!shell_refresh_commit){
+  shell_recovery.attempts=0;shell_recovery.delay=0;
   shell_refresh_pending=true;
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
   arch_puts("STYLEOS NATIVE SHELL-SUBMIT");field("key",0x44);arch_putc('\n');
@@ -312,9 +331,45 @@ uint64_t s865_shell_take_redraw(void){
 #endif
  return epoch;
 }
+/* Recovery policy is trusted and bounded; never re-enter a failed user
+ * context. Retire a timed-out exact identity through the normal stop path.
+ * A committed request does not need another instance. */
+static void shell_recovery_tick(void){
+ if(!shell_recovery.configured||shell_recovery.exhausted)return;
+ if(shell_recovery.pid){
+  if(!pr_find(pr_global(),shell_recovery.pid)){
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+   arch_puts("STYLEOS NATIVE SHELL-CONTROLLER-RETIRED");field("pid",shell_recovery.pid);
+   field("epoch",shell_epoch);field("resident",pr_snapshot(pr_global(),0,0,true));arch_putc('\n');
+#endif
+   shell_recovery.pid=0;shell_recovery.gen=0;shell_recovery.slices=0;
+   shell_recovery.delay=2u*shell_recovery.attempts;
+  }else if(++shell_recovery.slices>=SHELL_SLICE_LIMIT){
+   if(s865_native_stop(shell_recovery.pid,shell_recovery.gen,true)!=PS_OK)fail("shell-recovery-timeout");
+   shell_controller_reconcile();
+   return;
+  }else return;
+ }
+ if(!shell_refresh_pending)return;
+ if(shell_recovery.delay){--shell_recovery.delay;return;}
+ if(shell_recovery.attempts>=SHELL_ATTEMPTS){
+  shell_recovery.exhausted=true;
+  arch_puts("STYLEOS SHELL RECOVERY EXHAUSTED\n");return;
+ }
+ ++shell_recovery.attempts;
+ uint32_t pid=0;
+ enum ps_status status=s865_shell_controller_launch(&shell_recovery.request,&pid);
+ if(status!=PS_OK){shell_recovery.delay=2u*shell_recovery.attempts;return;}
+ shell_recovery.pid=pid;shell_recovery.gen=shell_controller.gen;shell_recovery.slices=0;
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+ arch_puts("STYLEOS NATIVE SHELL-RECOVERY");field("pid",pid);field("attempt",shell_recovery.attempts);
+ field("dispatches",runtime860->dispatcher.dispatches);arch_putc('\n');
+#endif
+}
 void s865_native_pump(void){
  if(!native_ready)fail("native-runtime-not-ready");
  shell_controller_reconcile();
+ shell_recovery_tick();
  if(!pr_snapshot(pr_global(),0,0,true))return;
  s865_executor_poll(native_audit,native_release,0);
  shell_controller_reconcile();

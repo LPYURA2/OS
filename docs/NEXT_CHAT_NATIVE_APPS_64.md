@@ -1,0 +1,7 @@
+# Automatic shell recovery 64 candidate
+
+Accepted 63 e99475e7a7c10882ba9e479fea6a82c9a32d18d5, CI 46038761972 4/4 SUCCESS, guest 15218952349, source 15218672404. Owner: finish shell logic migration and acceptance, then Deep Drop, then system applications, network/browser/updates, Beta, sound/VPN. Preserve main and previous versions.
+
+64 adds trusted copied immutable controller source registration and kernel-owned demand recovery in native pump. For pending F10, at most 3 attempts, delay 2*attempt dispatch opportunities, 32-pump timeout for exact controller identity; timeout retires through real stop path. Failed uncommitted request remains pending; exhausted recovery does not silently execute it in legacy shell. Completed commit consumed once. No recovery restart when there is no pending request. Fixture configures the provider once and observes progress, no direct per-instance launch. Existing actual #UD then successful new controller, raw CPU, retained windows, screenshots and rollback evidence remain mandatory. New receipts prove two automatic launches and retry delay with peer execution.
+
+CI pending. Limits: timing is pump-count not wall clock; actual timeout/exhaustion paths still need negative guest tests; source registration exercised only through pinned diagnostic provider; legacy desktop and built-in app logic remain privileged. No claim of final acceptance. Next: genuine timeout/exhaustion test, ordinary verified source and remaining shell command migration. Deep Drop after independence acceptance. No UI redesign or merge/release.

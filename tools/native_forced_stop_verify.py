@@ -357,6 +357,13 @@ def verify_forced_stop(lines,trace,obs,*,shell_boundary=False,window_ipc=False,w
     if window_frame:
         controllers=rec(b'STYLEOS NATIVE SHELL-CONTROLLER',('pid','gen','root','epoch'))
         completed=rec(b'STYLEOS NATIVE SHELL-CONTROLLER-RETIRED',('pid','epoch','resident'))
+        recovery=rec(b'STYLEOS NATIVE SHELL-RECOVERY',('pid','attempt','dispatches'))
+        if len(recovery)!=2 or [(x['pid'],x['attempt']) for _,x in recovery]!=[(33,1),(34,2)]:
+            raise ValueError('supervisor recovery attempts')
+        if not controllers[0][0]<recovery[0][0]<completed[0][0]<controllers[1][0]<recovery[1][0]<completed[1][0]:
+            raise ValueError('automatic recovery lifecycle')
+        if recovery[1][1]['dispatches']-recovery[0][1]['dispatches']<5 or sum(completed[0][0]<i<controllers[1][0] for i,e in events)<2:
+            raise ValueError('bounded retry delay with application progress')
         calls=rec(b'STYLEOS NATIVE SHELL-CALL',('pid','gen','root','op','reply'))
         submitted=rec(b'STYLEOS NATIVE SHELL-SUBMIT',('key',))
         applied=rec(b'STYLEOS NATIVE SHELL-APPLY',('epoch',))
