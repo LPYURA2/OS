@@ -28,6 +28,13 @@ jobs:
           sudo apt-get "${opts[@]}" install -y clang lld
       - name: Canonical TEA parser and runtime ELF reader
         run: python3 tools/test_native_tea_769_host.py --output build/native-tea-69
+      - name: StyleFS scoped TEA source and refusal (GCC and Clang)
+        run: |
+          set -euo pipefail
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_native_tea_stylefs.c kernel/{native_tea_stylefs,native_tea_package,native_tea_elf,stylefs_paged_object64,stylefs_paged_stream64,stylefs_paged_pair64,stylefs_inode_root64,stylefs_inode_pages64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service}.c -o "build/native-tea-69/$cc-stylefs-tea"
+            "build/native-tea-69/$cc-stylefs-tea" build/native-tea-69/minimal.tea build/native-tea-69/manifest-exact.json | tee "build/native-tea-69/$cc-stylefs-tea.log"
+          done
       - name: Distinct reproducible ordinary TEA executables
         run: python3 tools/test_native_sample_69.py --output build/native-tea-69/samples
       - name: Window capability refusal and lifecycle tests
