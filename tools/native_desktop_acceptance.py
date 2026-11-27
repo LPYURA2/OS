@@ -19,6 +19,11 @@ def exercise(d,proc,serial,folder,wait):
         d.key(name);wait(proc,serial,EVENT,before+1)
         receipt=events(raw())[-1]
         if receipt['key']!=code or receipt['mouse']:raise ValueError('extended input '+name)
+        if code in (0x3e,0x42):
+            count=sum(x==b'STYLEOS SHELL ACTION RENDERED' for x in raw())
+            # The receipt may already have been followed by the render.
+            expected=sum(e['key'] in (0x3e,0x42) and not e['mouse'] for e in events(raw()))
+            if count<expected:wait(proc,serial,b'STYLEOS SHELL ACTION RENDERED',expected)
         return receipt
     def move(x,y):
         before=len(events(raw()))
@@ -68,13 +73,24 @@ def verify(folder,lines,root):
     calls=records(lines,b'STYLEOS NATIVE SHELL-CALL',('pid','gen','root','op','reply'))
     applied=records(lines,b'STYLEOS NATIVE SHELL-APPLY',('epoch',))
     retired=records(lines,b'STYLEOS NATIVE SHELL-CONTROLLER-RETIRED',('pid','epoch','resident'))
-    if len(admitted)!=1 or len(calls)!=2 or len(applied)!=1 or len(retired)!=1:raise ValueError('ordinary controller lifecycle count')
-    i,a=admitted[0];pid,gen,child,epoch=a.values()
-    if not pid or not gen or child==root or not child or epoch!=1:raise ValueError('ordinary controller identity')
-    if [tuple(x.values()) for _,x in calls]!=[(pid,gen,child,0x105,0x100000044),(pid,gen,child,0x106,1)] or tuple(retired[0][1].values())!=(pid,1,0):
-        raise ValueError('ordinary controller syscall and cleanup')
-    if applied[0][1]['epoch']!=1 or not i<calls[0][0]<calls[1][0]<applied[0][0]<lines.index(b'STYLEOS DESKTOP SHELL RESTART'):
-        raise ValueError('ordinary controller actual decision ordering')
+    actions=records(lines,b'STYLEOS NATIVE SHELL-ACTION',('epoch','action'))
+    submits=records(lines,b'STYLEOS NATIVE SHELL-SUBMIT',('key',))
+    renders=[i for i,x in enumerate(lines) if x==b'STYLEOS SHELL ACTION RENDERED']
+    if (len(admitted),len(calls),len(applied),len(retired),len(actions),len(submits),len(renders))!=(4,8,1,4,3,4,3):
+        raise ValueError('ordinary controller lifecycle count')
+    keys=(0x3e,0x3e,0x42,0x44)
+    if [x['key'] for _,x in submits]!=list(keys) or [tuple(x.values()) for _,x in actions]!=[(1,2),(2,2),(3,3)]:
+        raise ValueError('ordinary command policy')
+    for j,(i,a) in enumerate(admitted):
+        pid,gen,child,epoch=a.values()
+        if (pid,gen,epoch)!=(j+1,j+1,j+1) or child==root or not child:raise ValueError('ordinary controller identity')
+        if [tuple(x.values()) for _,x in calls[2*j:2*j+2]]!=[(pid,gen,child,0x105,(epoch<<32)|keys[j]),(pid,gen,child,0x106,epoch)] or tuple(retired[j][1].values())!=(pid,epoch,0):
+            raise ValueError('ordinary controller syscall and cleanup')
+        if not submits[j][0]<i<calls[2*j][0]<calls[2*j+1][0]:raise ValueError('ordinary controller order')
+        if j<3 and not calls[2*j+1][0]<retired[j][0]<actions[j][0]<renders[j]<submits[j+1][0]:
+            raise ValueError('command after retirement and actual render')
+    if applied[0][1]['epoch']!=4 or not calls[-1][0]<applied[0][0]<lines.index(b'STYLEOS DESKTOP SHELL RESTART'):
+        raise ValueError('ordinary controller refresh ordering')
     if lines.count(b'STYLEOS SHELL PROVIDER READY')!=1:raise ValueError('ordinary provider readiness')
     if not any(x==b'STYLEOS DESKTOP CURSOR DAMAGE PASS' for x in lines):raise ValueError('cursor proof missing')
     for name,expected in data['frames'].items():

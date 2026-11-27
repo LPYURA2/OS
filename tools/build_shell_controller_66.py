@@ -10,8 +10,13 @@ def build(folder):
     emit(b'\xb8\x05\x01\x00\x00\xcd\x80') # read event
     emit(b'\x48\x85\xc0');reject(0x74)
     emit(b'\x48\x89\xc3\x48\xc1\xeb\x20') # epoch
-    emit(b'\x83\xf8\x44');reject(0x75) # F10
-    emit(b'\xb9\x01\x00\x00\x00\xb8\x06\x01\x00\x00\xcd\x80')
+    # The controller selects policy from key -> action, not the renderer.
+    # Default refusal; each branch explicitly selects an action.
+    emit(b'\x83\xf8\x44\x74\x10\x83\xf8\x3e\x74\x12\x83\xf8\x42');reject(0x75)
+    emit(b'\xb9\x03\x00\x00\x00\xeb\x0c')
+    emit(b'\xb9\x01\x00\x00\x00\xeb\x05')
+    emit(b'\xb9\x02\x00\x00\x00')
+    emit(b'\xb8\x06\x01\x00\x00\xcd\x80')
     emit(b'\x48\x39\xd8');reject(0x75) # exact acknowledged epoch
     emit(b'\xb8\x02\x00\x00\x00\xcd\x80') # clean exit
     fail=len(code);emit(b'\x0f\x0b')

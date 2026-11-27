@@ -230,6 +230,7 @@ enum pa_status s865_native_snapshot(const struct pa_request *q,struct pa_row *ro
 static struct { uint32_t pid;uint64_t gen,root,epoch; } shell_controller;
 static uint64_t shell_epoch,shell_redraw,shell_refresh_commit;
 static bool shell_refresh_pending;
+static unsigned shell_pending_key,shell_commit_action;
 enum { SHELL_ATTEMPTS=3, SHELL_SLICE_LIMIT=32 };
 static struct {
  struct rt865_launch_request request;
@@ -283,7 +284,7 @@ enum ps_status s865_shell_configure_recovery(const struct rt865_launch_request *
 }
 bool s865_shell_recovery_busy(void){return shell_recovery.configured&&!shell_recovery.exhausted&&(shell_refresh_pending||shell_recovery.pid);}
 bool s865_shell_recovery_exhausted(void){return shell_recovery.exhausted;}
-bool s865_shell_submit_refresh(void){
+static bool shell_submit_key(unsigned key){
  if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
  shell_controller_reconcile();
  if(shell_recovery.exhausted)return true;
@@ -296,27 +297,51 @@ bool s865_shell_submit_refresh(void){
  }
  if(!shell_refresh_pending&&!shell_refresh_commit){
   shell_recovery.attempts=0;shell_recovery.delay=0;
-  shell_refresh_pending=true;
-  arch_puts("STYLEOS NATIVE SHELL-SUBMIT");field("key",0x44);arch_putc('\n');
+  shell_refresh_pending=true;shell_pending_key=key;
+  arch_puts("STYLEOS NATIVE SHELL-SUBMIT");field("key",key);arch_putc('\n');
  }
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
  if(!shell_controller.pid&&!shell_recovery.configured)s865_native_request_shell_gap();
 #endif
  return true;
 }
+bool s865_shell_submit_refresh(void){return shell_submit_key(0x44);}
+bool s865_shell_submit_command(unsigned key){
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+ (void)key;return false;
+#else
+ if(key!=0x3e&&key!=0x42)return false;
+ return shell_submit_key(key);
+#endif
+}
+bool s865_shell_command_waiting(void){
+ return !shell_recovery.exhausted&&((shell_refresh_pending&&shell_pending_key!=0x44)||
+   (shell_refresh_commit&&shell_commit_action!=1));
+}
 uint64_t s865_shell_controller_event(uint32_t pid,uint64_t gen,uint64_t root){
  if(!shell_controller_auth(pid,gen,root)||!shell_refresh_pending)return 0;
- return (shell_controller.epoch<<32)|UINT64_C(0x44);
+ return (shell_controller.epoch<<32)|shell_pending_key;
 }
 uint64_t s865_shell_controller_decide(uint32_t pid,uint64_t gen,uint64_t root,uint64_t epoch,uint64_t action){
  if(!shell_controller_auth(pid,gen,root)||!shell_refresh_pending||shell_refresh_commit||
-    epoch!=shell_controller.epoch||action!=1)return 0;
- shell_refresh_commit=epoch;shell_refresh_pending=false;return epoch;
+    epoch!=shell_controller.epoch||
+    !((shell_pending_key==0x44&&action==1)||(shell_pending_key==0x3e&&action==2)||
+      (shell_pending_key==0x42&&action==3)))return 0;
+ shell_refresh_commit=epoch;shell_commit_action=(unsigned)action;
+ shell_refresh_pending=false;shell_pending_key=0;return epoch;
 }
 uint64_t s865_shell_take_refresh(void){
- uint64_t epoch=shell_refresh_commit;shell_refresh_commit=0;
+ if(shell_commit_action!=1)return 0;
+ uint64_t epoch=shell_refresh_commit;shell_refresh_commit=0;shell_commit_action=0;
  if(epoch){arch_puts("STYLEOS NATIVE SHELL-APPLY");field("epoch",epoch);arch_putc('\n');}
  return epoch;
+}
+unsigned s865_shell_take_command(void){
+ if(!shell_refresh_commit||shell_commit_action<2||shell_recovery.pid)return 0;
+ unsigned action=shell_commit_action;uint64_t epoch=shell_refresh_commit;
+ shell_refresh_commit=0;shell_commit_action=0;
+ arch_puts("STYLEOS NATIVE SHELL-ACTION");field("epoch",epoch);field("action",action);arch_putc('\n');
+ return action;
 }
 uint64_t s865_shell_take_redraw(void){
  uint64_t epoch=shell_redraw;shell_redraw=0;

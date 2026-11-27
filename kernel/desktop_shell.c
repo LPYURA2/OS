@@ -712,12 +712,22 @@ static bool keyboard(unsigned key, unsigned mods)
 #endif
         return true;
     } /* F10, preserve app state and PIDs */
-    if (key == 0x42) { open_window(TASKS); return true; } /* F8 processes */
+    if (key == 0x42) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(s865_shell_submit_command(0x42))return false;
+#endif
+        open_window(TASKS); return true;
+    } /* F8 processes */
     if (key == 0x3f) { open_window(NOTE_WINDOW); return true; } /* F5 Notes */
     if (key == 0x01 && transfer.id >= 0) { transfer.id = -1; transfer.lifted = false; return true; }
     if (key == 0x40 || key == DESK_KEY_LANGUAGE) { toggle_language(); return true; } /* F6 or Alt+Shift */
     if (key == 0x01 && menu) { menu = false; return true; }
-    if (key == 0x15b || key == 0x3e) { menu = !menu; return true; } /* Super or F4 */
+    if (key == 0x15b || key == 0x3e) {
+#ifdef STYLEOS_OWNED_SHELL_865
+        if(s865_shell_submit_command(0x3e))return false;
+#endif
+        menu = !menu; return true;
+    } /* Super or F4 */
 #ifdef STYLEOS_OWNED_SHELL_865
     if(active()==TASKS&&!menu&&!mods&&(key==0x149||key==0x151)){
         unsigned step=process_page_size();
@@ -1521,6 +1531,9 @@ static void desktop_shell_step(void *opaque)
 #ifdef STYLEOS_OWNED_SHELL_865
     if(s865_shell_take_refresh())restart_shell();
     if(s865_shell_take_redraw())shell_refreshed=true;
+    unsigned shell_action=s865_shell_take_command();
+    if(shell_action==2){menu=!menu;shell_refreshed=true;}
+    else if(shell_action==3){open_window(TASKS);shell_refreshed=true;}
 #endif
     struct desk_event e;
 #if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
@@ -1529,7 +1542,11 @@ static void desktop_shell_step(void *opaque)
 #endif
     struct visual old, next;
     bool captured = false, editor = false, clock = false;
-    for (unsigned i = 0; i < 32 && desk_input_next(&e); ++i) {
+    for (unsigned i = 0; i < 32
+#ifdef STYLEOS_OWNED_SHELL_865
+         && !shell_action && !s865_shell_command_waiting()
+#endif
+         && desk_input_next(&e); ++i) {
         if (!captured) { take_visual(&old); captured = true; }
 #if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
         observed863=e;batch863++;
@@ -1582,6 +1599,7 @@ static void desktop_shell_step(void *opaque)
         size_t writes = desk_present(&damage, draw);
 #ifdef STYLEOS_OWNED_SHELL_865
         if(process_pending&&active()==TASKS&&!menu&&writes)process_confirm_drawn=true;
+        if(shell_action&&writes)arch_puts("STYLEOS SHELL ACTION RENDERED\n");
 #endif
 #if (defined(STYLEOS_TEST_DESKTOP_INTERACTIVE_863) || defined(STYLEOS_OWNED_SHELL_865))
         writes863=writes;
