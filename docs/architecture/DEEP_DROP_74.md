@@ -10,3 +10,6 @@ Accepted 73: 701935210e38653141c8cef0e1953ea2050d3ae7, [CI 12/12 SUCCESS](https:
  
 ## Scope boundary and owner decision
 Once the above gate passes, freeze the initial text-only Deep Drop base and move to real independent system apps. No claim of universal drag/drop, general file transfer, multi-session SMP, calibrated idle CPU, service restart after privileged kernel failure or persistent document recovery. Revocation/retry is automatic for loss of endpoint; it is not restoration of unsaved application data after app death. The next independent apps stage must define real text selection, receive/insert, document ownership and cancellation contracts without inheriting the test client UI. After the core apps are integrated, extend Deep Drop to files, images, document objects, cross-application workflows, scoped StyleFS streaming and service/draft recovery as separate work. Preserve approved UI and optimization. No main/release change.
+
+## Owner requirement for future applications
+After base acceptance and native app migration, the system-wide extension must support independently installed new .tea packages through one documented SDK contract, not per-app shell changes. [Common application contract](DEEP_DROP_APP_CONTRACT.md). This is an explicit future acceptance gate, not a claim of present generic support.

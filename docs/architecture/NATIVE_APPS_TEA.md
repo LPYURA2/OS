@@ -14,3 +14,6 @@ A5: native package installation and preinstalled system app registry, verified i
 Android APK and Windows EXE will be system-provided compatibility components, *not* native .tea or separate emulation-app windows. Legacy .sapp is historical only, never a new native alternative.
 
 Visual constraints: current desktop and palette unchanged; Explorer strictly follows the approved 20-screen PDF; Documents strictly follows approved 14-screen PDF.
+
+## Required common Deep Drop SDK integration
+Owner decision (28 Nov 2026): future independently installed .tea applications must be able to participate through a common versioned SDK/system service, without per-app modifications of the shell or kernel. See [DEEP_DROP_APP_CONTRACT.md](DEEP_DROP_APP_CONTRACT.md). Design real apps with selection/receive/insert/undo boundaries now; generalized capability negotiation, installation interoperability, streaming and full system-wide Deep Drop acceptance follow the app migration. Current pinned samples are not a production SDK or proof of this requirement.

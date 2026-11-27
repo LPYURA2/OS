@@ -606,3 +606,6 @@ Correct legacy editor macro collision; CI pending.
 
 ## Deep Drop 74 — base closure candidate
 73 accepted at 701935210e38653141c8cef0e1953ea2050d3ae7, CI 46067252127 12/12. [Base acceptance and scope](architecture/DEEP_DROP_74.md) and [continuation](NEXT_CHAT_DEEP_DROP_74.md). Owner decision: finish bounded initial Deep Drop, then native system applications, then extend Deep Drop system-wide. New test candidate pending full CI; main unchanged.
+
+
+Owner clarification 28.11.2026: Deep Drop must also support future native applications added after installation, through a common versioned public SDK and system service (not per-app shell changes). [Application contract](architecture/DEEP_DROP_APP_CONTRACT.md). This requirement is not yet implemented; generalized acceptance follows real app migration.
