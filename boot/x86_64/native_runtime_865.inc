@@ -159,6 +159,35 @@ enum ps_status s865_native_launch_window(const struct rt865_launch_request *requ
 #endif
  return PS_OK;
 }
+enum ps_status s865_native_launch_tea(const uint8_t *package,size_t bytes,
+ const struct nts_pin *pin,uint32_t session,const char *title,
+ struct ws_bounds bounds,struct s865_window_launch *out)
+{
+ if(!package||!pin||!out||!title||!session||bytes!=pin->package_bytes||
+    bytes<22u||bytes>NTP_MAX_PACKAGE||!pin->package_sha||!pin->elf_sha||
+    !pin->manifest||!pin->manifest_bytes||pin->manifest_bytes>4096u)
+  return PS_ARGUMENT;
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
+ struct ntp_payload view={0};
+ if(ntp_open(package,bytes,pin->package_sha,pin->elf_sha,pin->manifest,
+             pin->manifest_bytes,&view)!=NTP_OK)return PS_EVIDENCE;
+ if(view.elf_bytes<120u||view.elf_bytes>8192u)return PS_EVIDENCE;
+ struct rt865_launch_request request={0};
+ unsigned i=0;
+ for(;i<sizeof request.name&&title[i];++i){
+  unsigned char c=(unsigned char)title[i];
+  if(c<0x20||c==0x7f)return PS_ARGUMENT;
+  request.name[i]=title[i];
+ }
+ if(!i||i==sizeof request.name)return PS_ARGUMENT;
+ request.source=(struct s865_image_source){.read=ntp_elf_sector,.opaque=&view,
+  .lba=0,.sectors=(uint32_t)((view.elf_bytes+511u)/512u),.bytes=(uint32_t)view.elf_bytes};
+ for(i=0;i<32;++i)request.source.sha256[i]=pin->elf_sha[i];
+ /* Existing audited launch rechecks ELF rights and digest, then binds
+  * session, window and port before any dispatch. The stack view is never
+  * retained by the scheduler or published into user memory. */
+ return s865_native_launch_window(&request,session,title,bounds,out);
+}
 #undef WINDOW_LAUNCH_FAULT
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
 bool s865_native_probe_window_rollback(const struct rt865_launch_request *request,uint32_t session){

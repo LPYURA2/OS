@@ -1,5 +1,6 @@
 #ifndef STYLEOS_NATIVE_TEA_PACKAGE_H
 #define STYLEOS_NATIVE_TEA_PACKAGE_H
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -23,4 +24,8 @@ enum ntp_status ntp_open(const uint8_t *package, size_t length,
 enum ntp_status ntp_disk_header(const uint8_t header[NTP_SECTOR_BYTES],
                                 const uint8_t expected_sha[32],
                                 uint32_t *package_bytes);
+/* Synchronous bounded reader of an already validated immutable ELF view.
+ * Context is the caller-owned ntp_payload, valid only for the launch call.
+ * Never exposes ZIP bytes outside the ELF extent; final sector zero padded. */
+bool ntp_elf_sector(void *context,uint32_t lba,uint8_t out[NTP_SECTOR_BYTES]);
 #endif

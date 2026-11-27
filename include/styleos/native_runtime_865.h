@@ -3,6 +3,7 @@
 #include <styleos/runtime_bank_862.h>
 #include <styleos/process_api.h>
 #include <styleos/window_service.h>
+#include <styleos/native_tea_staging.h>
 /* Trusted kernel-side application source, not a syscall. Caller must
  * authorize the immutable reader/digest and own request/output storage.
  * No auto-run of arbitrary disk data, no session/window grant.
@@ -15,6 +16,13 @@ enum ps_status s865_native_launch(const struct rt865_launch_request *,uint32_t *
  * on refusal. No package installation or untrusted caller entry point. */
 struct s865_window_launch { uint32_t pid,window; };
 enum ps_status s865_native_launch_window(const struct rt865_launch_request *,
+    uint32_t session,const char *title,struct ws_bounds,struct s865_window_launch *);
+/* Launch a pre-authorized canonical .tea, using the existing exact manifest
+ * and package/ELF SHA pins. All source bytes and pin metadata are trusted
+ * immutable storage for this synchronous call, not user virtual addresses.
+ * No package installation, signature verification or filesystem authority.
+ * Validate package before acquiring a process lease. Only zero GPR entry. */
+enum ps_status s865_native_launch_tea(const uint8_t *,size_t,const struct nts_pin *,
     uint32_t session,const char *title,struct ws_bounds,struct s865_window_launch *);
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
 /* Acceptance-only fault injection; requires empty resident registry. */

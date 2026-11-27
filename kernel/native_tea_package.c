@@ -83,3 +83,23 @@ enum ntp_status ntp_disk_header(const uint8_t h[NTP_SECTOR_BYTES],
     for(size_t j=48;j<NTP_SECTOR_BYTES;++j)if(h[j])return NTP_FORMAT;
     *n=bytes;return NTP_OK;
 }
+
+bool ntp_elf_sector(void *context,uint32_t lba,uint8_t out[NTP_SECTOR_BYTES])
+{
+    const struct ntp_payload *view=context;
+    if(!view||!out||!view->elf||view->elf_bytes<120u||view->elf_bytes>8192u)
+        return false;
+    if(lba>=(view->elf_bytes+NTP_SECTOR_BYTES-1u)/NTP_SECTOR_BYTES)return false;
+    size_t offset=(size_t)lba*NTP_SECTOR_BYTES;
+    size_t remaining=view->elf_bytes-offset;
+    size_t n=remaining<NTP_SECTOR_BYTES?remaining:NTP_SECTOR_BYTES;
+    /* Reader destination must not alias the immutable source or descriptor. */
+    uintptr_t dst=(uintptr_t)out,src=(uintptr_t)view->elf,v=(uintptr_t)view;
+    if(dst>UINTPTR_MAX-NTP_SECTOR_BYTES||src>UINTPTR_MAX-view->elf_bytes||
+       v>UINTPTR_MAX-sizeof *view||
+       !(dst+NTP_SECTOR_BYTES<=src||src+view->elf_bytes<=dst)||
+       !(dst+NTP_SECTOR_BYTES<=v||v+sizeof *view<=dst))return false;
+    for(size_t i=0;i<NTP_SECTOR_BYTES;++i)
+        out[i]=i<n?view->elf[offset+i]:0;
+    return true;
+}
