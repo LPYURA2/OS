@@ -89,6 +89,10 @@ enum po64_status nf89_submit(struct nf89_queue *,uint32_t,uint64_t,uint64_t,
  uint64_t token,enum nf89_op,const uint8_t *data,size_t bytes,uint64_t *request);
 size_t nf89_reconcile(struct nf89_queue *);
 bool nf89_pump(struct nf89_queue *);
+/* Scheduler query only, no I/O and no result consumption. BUSY means
+ * keep the exact owner parked (pending or locked session). OK means
+ * completion can be collected; other status permits wake to observe refusal. */
+enum po64_status nf95_wait(struct nf89_queue *,uint32_t,uint64_t,uint64_t,uint64_t);
 enum po64_status nf89_cancel(struct nf89_queue *,uint32_t,uint64_t,uint64_t,uint64_t request);
 /* PO64_OK means a completion was consumed; result is actual I/O status.
  * Pending => BUSY; too small output => FULL and retains completion.

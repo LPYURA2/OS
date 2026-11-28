@@ -16,6 +16,11 @@
 /* RECEIVE has zero RBX/RCX/RDX; returns one supervisor-approved token
  * in RDX on success. END means no pending approval. */
 #define NF93_RECEIVE UINT64_C(0x134)
+/* Submit and park atomically; same arguments and returned request ID.
+ * A successful return means the operation has finished or become stale,
+ * not that the operation succeeded. TAKE obtains the actual result. */
+#define NF95_READ_WAIT UINT64_C(0x135)
+#define NF95_WRITE_WAIT UINT64_C(0x136)
 #define NF91_MAX 4096u
 #define NF91_UNAVAILABLE 11u
 #endif

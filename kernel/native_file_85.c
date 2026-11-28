@@ -369,3 +369,13 @@ enum po64_status nf89_take(struct nf89_queue *q,uint32_t pid,uint64_t handle,uin
  for(size_t i=0;i<r->bytes;++i)out[i]=r->data[i];
  *bytes=r->bytes;*result=r->status;wipe(r,sizeof *r);return PO64_OK;
 }
+
+enum po64_status nf95_wait(struct nf89_queue *q,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
+ if(!qready(q)||!id)return PO64_INVALID;
+ if(q->busy||q->files->busy||q->files->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(q->files,pid,handle,root,false,&o))return PO64_DENIED;
+ nf89_reconcile(q);
+ struct nf89_request *r=qfind(q,o,id);if(!r)return PO64_DENIED;
+ if(!owner(q->files,pid,handle,root,true,&o))return PO64_BUSY;
+ return r->state==NF89_DONE?PO64_OK:PO64_BUSY;
+}

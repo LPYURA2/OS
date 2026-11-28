@@ -94,6 +94,11 @@ int main(void){
  C(sty_file_completion((struct sty_reply){0,STY_F_UNCERTAIN},&status,&bytes)&&!bytes&&status==STY_F_UNCERTAIN);
  C(STY_FILE_RECEIVE==NF93_RECEIVE);
  C(sty_file_receive().status==STY_EMPTY&&calls==14&&args[0]==NF93_RECEIVE&&args[1]==0&&args[2]==0&&args[3]==0);
+ C(STY_FILE_READ_WAIT==NF95_READ_WAIT&&STY_FILE_WRITE_WAIT==NF95_WRITE_WAIT);
+ C(sty_file_read_wait(0,1).status==STY_F_INVALID&&calls==14);
+ C(sty_file_read_wait(1,64).status==STY_EMPTY&&calls==15&&args[0]==NF95_READ_WAIT&&args[1]==1&&args[2]==0&&args[3]==64);
+ C(sty_file_write_wait(1,0,1).status==STY_F_INVALID&&calls==15);
+ C(sty_file_write_wait(1,wire,64).status==STY_EMPTY&&calls==16&&args[0]==NF95_WRITE_WAIT&&args[1]==1&&args[2]==(uintptr_t)wire&&args[3]==64);
  printf("Native SDK 77: %u checks PASS (mock transport, no guest claim)\n",checks);
  return 0;
 }

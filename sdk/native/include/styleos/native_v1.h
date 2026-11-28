@@ -13,7 +13,8 @@ enum sty_window_status { STY_OK=0,STY_INVALID,STY_NOT_READY,STY_DENIED,
 enum sty_event_kind { STY_KEY=1,STY_TEXT=2,STY_POINTER=3,STY_DROP=4 };
 enum sty_operation { STY_YIELD=1,STY_EXIT=2,STY_PIXEL=0x100,STY_TILE=0x101,
  STY_INPUT=0x102,STY_FRAME=0x103,STY_PATCH=0x120,STY_FRAME_GEN=0x121,STY_TEXT_LAYER=0x122,
- STY_FILE_READ=0x130,STY_FILE_WRITE=0x131,STY_FILE_TAKE=0x132,STY_FILE_CANCEL=0x133,STY_FILE_RECEIVE=0x134 };
+ STY_FILE_READ=0x130,STY_FILE_WRITE=0x131,STY_FILE_TAKE=0x132,STY_FILE_CANCEL=0x133,STY_FILE_RECEIVE=0x134,
+ STY_FILE_READ_WAIT=0x135,STY_FILE_WRITE_WAIT=0x136 };
 struct sty_reply { uint64_t status,value; };
 struct sty_rect { uint32_t x,y,w,h,rgb; };
 _Static_assert(sizeof(struct sty_rect)==20,"rectangle ABI");
@@ -149,6 +150,17 @@ static inline struct sty_reply sty_file_read(uint64_t grant,size_t capacity){
 static inline struct sty_reply sty_file_write(uint64_t grant,const uint8_t *data,size_t bytes){
  if(!grant||bytes>STY_FILE_MAX||(!data)!=(!bytes))return (struct sty_reply){STY_F_INVALID,0};
  return sty_call(STY_FILE_WRITE,grant,(uintptr_t)data,bytes);
+}
+/* Park the calling process until completion is available. TAKE is still
+ * required to observe the actual transaction result. The bounded worker
+ * itself is synchronous; this is not a fully preemptible disk service. */
+static inline struct sty_reply sty_file_read_wait(uint64_t grant,size_t capacity){
+ if(!grant||!capacity||capacity>STY_FILE_MAX)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_FILE_READ_WAIT,grant,0,capacity);
+}
+static inline struct sty_reply sty_file_write_wait(uint64_t grant,const uint8_t *data,size_t bytes){
+ if(!grant||bytes>STY_FILE_MAX||(!data)!=(!bytes))return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_FILE_WRITE_WAIT,grant,(uintptr_t)data,bytes);
 }
 static inline struct sty_reply sty_file_take(uint64_t request,uint8_t *out,size_t capacity){
  if(!request||capacity>STY_FILE_MAX||(!out)!=(!capacity))return (struct sty_reply){STY_F_INVALID,0};

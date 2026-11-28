@@ -15,6 +15,9 @@ static struct {uint64_t generation,window;} input_wait70[PS_MAX_SLOTS];
 #include <styleos/native_window_channel.h>
 #include <styleos/native_runtime_865.h>
 #include <styleos/native_file_abi.h>
+#ifdef STYLEOS_LIVE_VOLUME_39
+static struct {uint64_t generation,request;} file_wait95[PS_MAX_SLOTS];
+#endif
 #endif
 #define V 0x50u
 #define BIT 0x10000u
@@ -220,7 +223,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   fld848("root",ticket->child_root);fld848("op",op);fld848("reply",reply);arch_putc('\n');
  }
  const uint64_t operation=pending860.gpr[0];
- if(kind==RT865_SYSCALL&&operation>=NF91_READ&&operation<=NF93_RECEIVE){
+ if(kind==RT865_SYSCALL&&operation>=NF91_READ&&operation<=NF95_WRITE_WAIT){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
@@ -230,8 +233,20 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    fail848("865-file-owner");
   uint64_t value=0,status=NF91_UNAVAILABLE;
 #ifdef STYLEOS_LIVE_VOLUME_39
+  const bool wait=operation==NF95_READ_WAIT||operation==NF95_WRITE_WAIT;
+  const uint64_t mapped=operation==NF95_READ_WAIT?NF91_READ:
+                        operation==NF95_WRITE_WAIT?NF91_WRITE:operation;
   status=s91_native_file_call(id,ticket->pid,ticket->handle,ticket->child_root,
-     operation,pending860.gpr[1],pending860.gpr[2],pending860.gpr[3],&value);
+     mapped,pending860.gpr[1],pending860.gpr[2],pending860.gpr[3],&value);
+  if(wait&&status==PO64_OK){
+   if(!value||file_wait95[id].generation||input_wait70[id].generation||
+      rt865_bank_wait_state(&bank862,runtime860,safe,id,ticket->pid,ticket->handle,ticket->child_root,true)!=PS_OK)
+    fail848("95-file-park");
+   file_wait95[id].generation=ticket->handle;file_wait95[id].request=value;
+   state=PR_WAITING;
+   arch_puts("STYLEOS FILE95 PARK");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+   fld848("request",value);arch_putc('\n');
+  }
 #endif
   slot->context.gpr[0]=status;slot->context.gpr[3]=value;
 #if defined(STYLEOS_FILE_PROBE_92) || defined(STYLEOS_FILE_PROBE_94)
@@ -552,8 +567,14 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
  const struct pr_entry *target=pr_find(runtime860->dispatcher.registry,pid);
  const bool parked=target&&target->state==PR_WAITING;
- if(parked&&(input_wait70[id].generation!=generation||
-             target->scheduler_handle!=generation||target->page_root!=child))
+ bool input_parked=input_wait70[id].generation==generation;
+#ifdef STYLEOS_LIVE_VOLUME_39
+ const bool file_parked=file_wait95[id].generation==generation&&file_wait95[id].request!=0;
+ if(parked&&input_parked==file_parked)return PS_EVIDENCE;
+#else
+ if(parked&&!input_parked)return PS_EVIDENCE;
+#endif
+ if(parked&&(target->scheduler_handle!=generation||target->page_root!=child))
   return PS_EVIDENCE;
 #endif
  enum ps_status status=rt865_bank_stop_ready(&bank862,runtime860,safe,id,pid,
@@ -572,7 +593,14 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
  /* Retire broker state synchronously, even when there are no surviving
   * processes and the next supervisor poll would take its empty fast path. */
  input_wait70[id].generation=0;input_wait70[id].window=0;
- if(parked){
+#ifdef STYLEOS_LIVE_VOLUME_39
+ file_wait95[id].generation=0;file_wait95[id].request=0;
+ if(file_parked){
+  arch_puts("STYLEOS FILE95 WAIT-RETIRED");fld848("pid",pid);
+  fld848("gen",generation);fld848("request",file_wait95[id].request);arch_putc('\n');
+ }
+#endif
+ if(parked&&input_parked){
   arch_puts("STYLEOS TEA70 WAIT-RETIRED");fld848("pid",pid);
   fld848("gen",generation);fld848("wait-gen",input_wait70[id].generation);
   fld848("wait-window",input_wait70[id].window);arch_putc('\n');
@@ -592,6 +620,24 @@ void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uin
   * in s865_native_pump; terminal cleanup remains synchronous below. */
  if(!pr_snapshot(runtime860->dispatcher.registry,0,0,true))return;
  if(!audit(opaque))fail848("native-poll-audit");
+#ifdef STYLEOS_LIVE_VOLUME_39
+ /* The volume pump ran at the safe supervisor boundary before this scan.
+  * Waiters never retain user addresses or execute while parked. */
+ for(unsigned j=0;j<PS_MAX_SLOTS;++j){
+  const struct rt862_bank_slot *s=&bank862.slots[j];
+  if(!file_wait95[j].generation)continue;
+  if(!s->pid||s->handle!=file_wait95[j].generation)fail848("95-wait-generation");
+  const struct pr_entry *p=pr_find(runtime860->dispatcher.registry,s->pid);
+  if(!p||p->state!=PR_WAITING||input_wait70[j].generation)fail848("95-wait-identity");
+  const uint64_t request=file_wait95[j].request;
+  if(s95_native_file_wait(s->pid,s->handle,s->root,request)==PO64_BUSY)continue;
+  if(rt865_bank_wait_state(&bank862,runtime860,bank862.safe,j,s->pid,s->handle,s->root,false)!=PS_OK)
+   fail848("95-file-wake");
+  file_wait95[j].generation=0;file_wait95[j].request=0;
+  arch_puts("STYLEOS FILE95 WAKE");fld848("pid",s->pid);fld848("gen",s->handle);
+  fld848("request",request);arch_putc('\n');
+ }
+#endif
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
  /* Queue readiness is checked after the trusted producer. An exact live
   * port with a hidden window/locked session stays parked; restore plus

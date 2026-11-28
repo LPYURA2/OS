@@ -256,6 +256,10 @@ enum po64_status s90_native_file_cancel(uint32_t pid,uint64_t handle,uint64_t ro
 }
 _Static_assert(NF91_MAX==NF85_READ_MAX,"file ABI capacity");
 _Static_assert(PO64_END+1==NF91_UNAVAILABLE,"file ABI unavailable");
+enum po64_status s95_native_file_wait(uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
+ if(!s34_work.native_queue.files)return PO64_STALE;
+ return nf95_wait(&s34_work.native_queue,pid,handle,root,id);
+}
 uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t op,uint64_t token,uint64_t address,uint64_t size,uint64_t *value){
  *value=0;

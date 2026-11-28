@@ -44,6 +44,17 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False):
             emit(b'\x80\xbe'+struct.pack('<I',0x300+i)+bytes([value]));jump(b'\x0f\x85','fail')
         # Completion is one-shot; duplicate take must be denied.
         call(0x132,0x12000300,64);status(2)
+        # Also prove the atomic submit/park/resume ABI on the same file.
+        emit(b'\x48\x8b\x9e\x00\x02\x00\x00')
+        call(0x135,0,64);status(0)
+        emit(b'\x48\x85\xd2');jump(b'\x0f\x84','fail')
+        emit(b'\x48\x89\xd3')
+        for i in range(len(expected)):
+            emit(b'\xc6\x86'+struct.pack('<I',0x300+i)+b'\x00')
+        call(0x132,0x12000300,64);status(0)
+        emit(b'\x48\xb8'+struct.pack('<Q',len(expected)<<32)+b'\x48\x39\xc2');jump(b'\x0f\x85','fail')
+        for i,value in enumerate(expected):
+            emit(b'\x80\xbe'+struct.pack('<I',0x300+i)+bytes([value]));jump(b'\x0f\x85','fail')
         # Distinct pixel call serves as evidence only after all byte checks.
         emit(b'\x31\xdb');call(0x100,0x976332,0);status(0)
     if file_probe_94 and index==1:
@@ -61,7 +72,7 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False):
         call94(0x131,0x12000ff0,len(payload));status94(1)
         for i,value in enumerate(payload):
             emit(b'\xc6\x86'+struct.pack('<I',0x300+i)+bytes([value]))
-        call94(0x131,0x12000300,len(payload));status94(0)
+        call94(0x136,0x12000300,len(payload));status94(0)
         emit(b'\x48\x85\xd2');jump(b'\x0f\x84','fail')
         emit(b'\x48\x89\xd3')
         mark('save_take')

@@ -338,6 +338,28 @@ static void native_file89(void){
  assert(nf93_receive(&nf,peer,96,393216,&other)==PO64_DENIED);
  puts("Native file 93: explicit one-shot grant receipt, pending denial, session and fault cleanup PASS");
 #endif
+#ifdef STYLEOS_NATIVE_FILE_95_TEST
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf95_wait(&queue,pid,80,327680,request)==PO64_BUSY);
+ assert(nf95_wait(&queue,peer,96,393216,request)==PO64_DENIED);
+ assert(usr_lock(&users)==USR_OK&&nf95_wait(&queue,pid,80,327680,request)==PO64_BUSY&&!nf89_pump(&queue));
+ assert(usr_select(&users,1)==USR_OK&&nf89_pump(&queue));
+ assert(nf95_wait(&queue,pid,80,327680,request)==PO64_OK);
+ assert(usr_lock(&users)==USR_OK&&nf95_wait(&queue,pid,80,327680,request)==PO64_BUSY);
+ assert(usr_select(&users,1)==USR_OK&&nf95_wait(&queue,pid,80,327680,request)==PO64_OK);
+ assert(nf89_take(&queue,pid,80,327680,request,out,sizeof out,&n,&result)==PO64_OK&&n==513&&result==PO64_OK);
+ assert(nf95_wait(&queue,pid,80,327680,request)==PO64_DENIED);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf89_cancel(&queue,pid,80,327680,request)==PO64_OK);
+ assert(nf95_wait(&queue,pid,80,327680,request)==PO64_OK);
+ assert(nf89_take(&queue,pid,80,327680,request,0,0,&n,&result)==PO64_OK&&!n&&result==PO64_CANCELLED);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf85_close(&nf,pid,80,327680,token)==PO64_OK);
+ assert(nf95_wait(&queue,pid,80,327680,request)==PO64_OK);
+ assert(nf89_take(&queue,pid,80,327680,request,0,0,&n,&result)==PO64_OK&&!n&&result==PO64_STALE);
+ assert(nf85_grant_read(&nf,pid,80,327680,&a,4,5,&token)==PO64_OK);
+ puts("Native file 95: wait readiness, lock, cancellation and revocation PASS");
+#endif
  assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
  assert(nf89_pump(&queue));
  assert(pr_transition(&procs,pid,80,PR_FAULTED)==PR_OK);

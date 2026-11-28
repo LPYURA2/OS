@@ -363,22 +363,35 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             calls=[v for _,v in calls if v["pid"]==pid_num]
                             wanted=[(0x130,2),(0x131,2),(0x130,0),(0x132,1)]
                             require([(v["op"],v["status"]) for v in calls[:4]]==wanted,"file probe admission/invalid span")
-                            tail=calls[4:]
+                            tail=calls[4:-2]
                             require(len(tail)>=2 and all(v["op"]==0x132 and v["status"]==4 for v in tail[:-2]) and
                                     [(v["op"],v["status"]) for v in tail[-2:]]==[(0x132,0),(0x132,2)],"file probe completion")
                             expected_file=b"StyleOS: paged file read test.\nSecond line.\n"
                             require(tail[-2]["value"]==len(expected_file)<<32 and calls[2]["value"]!=0,"file probe byte count")
+                            require([(v["op"],v["status"]) for v in calls[-2:]]==[(0x135,0),(0x132,0)] and
+                                    calls[-2]["value"]>calls[2]["value"] and calls[-1]["value"]==len(expected_file)<<32,
+                                    "atomic read wait completion without busy poll")
+                            wait_id=calls[-2]["value"]
+                            for marker in (b"STYLEOS FILE95 PARK",b"STYLEOS FILE95 WAKE"):
+                                matches=[v for _,v in records(lines,marker,("pid","gen","request")) if v["pid"]==pid_num]
+                                require(matches==[{"pid":pid_num,"gen":gen,"request":wait_id}],"exact file wait receipt")
+                            require(next(i for i,x in enumerate(lines) if x.startswith(b"STYLEOS FILE95 PARK "))<
+                                    next(i for i,x in enumerate(lines) if x.startswith(b"STYLEOS FILE95 WAKE ")),"file wait receipt order")
                             pixels=records(lines,b"STYLEOS NATIVE PIXEL",("pid","gen","root","window","rgb","status"))
                             require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"client byte comparison marker absent")
                             (folder/"file-probe-92.json").write_text(json.dumps({"pid":pid_num,"calls":calls,"bytes":len(expected_file)},indent=2)+"\n")
                             print("Native file 92 CPL3 read, invalid span, read-only denial, exact content and one-shot completion PASS",flush=True)
                         if file_probe94:
                             calls=[v for _,v in records(lines,b"STYLEOS FILE92 CALL",("pid","op","status","value")) if v["pid"]==pid_num]
-                            require([(v["op"],v["status"]) for v in calls[:4]]==[(0x134,0),(0x134,10),(0x131,1),(0x131,0)],"write probe approval and submission")
+                            require([(v["op"],v["status"]) for v in calls[:4]]==[(0x134,0),(0x134,10),(0x131,1),(0x136,0)],"write probe approval and submission")
                             require(calls[0]["value"] and calls[3]["value"],"grant and request IDs")
                             tail=calls[4:]
-                            require(len(tail)>=3 and all(v["op"]==0x132 and v["status"]==4 for v in tail[:-3]) and
-                                    [(v["op"],v["status"]) for v in tail[-3:]]==[(0x132,0),(0x132,2),(0x131,2)],"durable completion and revocation")
+                            require([(v["op"],v["status"]) for v in tail]==[(0x132,0),(0x132,2),(0x131,2)],"durable completion without busy poll and revocation")
+                            for marker in (b"STYLEOS FILE95 PARK",b"STYLEOS FILE95 WAKE"):
+                                matches=[v for _,v in records(lines,marker,("pid","gen","request")) if v["pid"]==pid_num]
+                                require(matches==[{"pid":pid_num,"gen":gen,"request":calls[3]["value"]}],"exact write wait receipt")
+                            require(next(i for i,x in enumerate(lines) if x.startswith(b"STYLEOS FILE95 PARK "))<
+                                    next(i for i,x in enumerate(lines) if x.startswith(b"STYLEOS FILE95 WAKE ")),"write wait receipt order")
                             require(tail[-3]["value"]==0,"write completion result")
                             pixels=records(lines,b"STYLEOS NATIVE PIXEL",("pid","gen","root","window","rgb","status"))
                             require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"save client success marker absent")
