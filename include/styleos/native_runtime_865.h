@@ -55,7 +55,12 @@ bool s865_shell_submit_command(unsigned key);
 bool s865_launch_native_sample(void);
 #ifdef STYLEOS_LIVE_VOLUME_39
 struct po64_row;
-/* Explicit Explorer selection of the individually approved package only. */
+#include <styleos/native_tea_registry_104.h>
+/* Trusted safe-root approval API, not an installer or user syscall.
+ * Caller is responsible for independent review of the immutable pins
+ * and manifest, never derives approval from the package itself. */
+enum ntr104_status s104_register_native_package(const struct nts_pin *,const char *,bool,unsigned *);
+/* Explicit Explorer selection matched by approved content, not filename. */
 bool s865_launch_native_file(const struct po64_row *);
 #endif
 #endif

@@ -1,5 +1,6 @@
 #include <styleos/native_tea_package.h>
 #include <styleos/native_tea_elf.h>
+#include <styleos/native_tea_registry_104.h>
 
 static uint16_t l16(const uint8_t *x){return (uint16_t)x[0]|((uint16_t)x[1]<<8);}
 static uint32_t l32(const uint8_t *x){return (uint32_t)l16(x)|((uint32_t)l16(x+2)<<16);}
@@ -102,4 +103,62 @@ bool ntp_elf_sector(void *context,uint32_t lba,uint8_t out[NTP_SECTOR_BYTES])
     for(size_t i=0;i<NTP_SECTOR_BYTES;++i)
         out[i]=i<n?view->elf[offset+i]:0;
     return true;
+}
+
+static bool span104(const void *p,size_t n){return p&&n&&n<=UINTPTR_MAX-(uintptr_t)p;}
+static bool apart104(const void *a,size_t n,const void *b,size_t m){
+ return span104(a,n)&&span104(b,m)&&((uintptr_t)a+n<=(uintptr_t)b||(uintptr_t)b+m<=(uintptr_t)a);
+}
+static void copy104(void *to,const void *from,size_t n){
+ uint8_t *a=to;const uint8_t *b=from;for(size_t i=0;i<n;++i)a[i]=b[i];
+}
+enum ntr104_status ntr104_register(struct ntr104_registry *r,const struct nts_pin *pin,
+ const char *title,bool wait_input,unsigned *slot){
+ if(!r||!pin||!title||!slot||!apart104(r,sizeof *r,pin,sizeof *pin)||
+    !apart104(r,sizeof *r,slot,sizeof *slot)||!apart104(pin,sizeof *pin,slot,sizeof *slot)||
+    pin->package_bytes<22||pin->package_bytes>NTP_MAX_PACKAGE||
+    !pin->manifest_bytes||pin->manifest_bytes>NTR104_MANIFEST||
+    !apart104(r,sizeof *r,pin->package_sha,32)||!apart104(r,sizeof *r,pin->elf_sha,32)||
+    !apart104(r,sizeof *r,pin->manifest,pin->manifest_bytes)||
+    !apart104(slot,sizeof *slot,pin->package_sha,32)||!apart104(slot,sizeof *slot,pin->elf_sha,32)||
+    !apart104(slot,sizeof *slot,pin->manifest,pin->manifest_bytes))return NTR104_INVALID;
+ size_t len=0;while(len<NTR104_NAME&&title[len]){
+  unsigned char ch=(unsigned char)title[len];if(ch<0x20||ch==0x7f)return NTR104_INVALID;
+  ++len;
+ }
+ if(!len||len==NTR104_NAME||!apart104(r,sizeof *r,title,len+1)||!apart104(slot,sizeof *slot,title,len+1))
+  return NTR104_INVALID;
+ unsigned free_slot=NTR104_SLOTS;
+ for(unsigned i=0;i<NTR104_SLOTS;++i){
+  const struct ntr104_record *e=&r->entries[i];
+  if(e->used&&eq(e->package_sha,pin->package_sha,32))return NTR104_DUPLICATE;
+  if(!e->used&&free_slot==NTR104_SLOTS)free_slot=i;
+ }
+ if(free_slot==NTR104_SLOTS)return NTR104_FULL;
+ struct ntr104_record *e=&r->entries[free_slot];
+ *e=(struct ntr104_record){0};
+ e->wait_input=wait_input;e->bytes=pin->package_bytes;e->manifest_bytes=pin->manifest_bytes;
+ copy104(e->package_sha,pin->package_sha,32);copy104(e->elf_sha,pin->elf_sha,32);
+ copy104(e->manifest,pin->manifest,pin->manifest_bytes);copy104(e->title,title,len);
+ e->used=true;*slot=free_slot;return NTR104_OK;
+}
+bool ntr104_pin(const struct ntr104_registry *r,unsigned i,struct nts_pin *out){
+ if(!r||i>=NTR104_SLOTS||!r->entries[i].used||!apart104(r,sizeof *r,out,sizeof *out))return false;
+ const struct ntr104_record *e=&r->entries[i];
+ *out=(struct nts_pin){e->package_sha,e->elf_sha,e->manifest,e->manifest_bytes,e->bytes};
+ return true;
+}
+enum ntr104_status ntr104_match(const struct ntr104_registry *r,const uint8_t *p,size_t n,unsigned *slot){
+ if(!r||n<22||n>NTP_MAX_PACKAGE||!apart104(r,sizeof *r,p,n)||
+    !apart104(r,sizeof *r,slot,sizeof *slot)||!apart104(p,n,slot,sizeof *slot))return NTR104_INVALID;
+ uint8_t digest[32];nte_sha256(p,n,digest);
+ for(unsigned i=0;i<NTR104_SLOTS;++i){
+  const struct ntr104_record *e=&r->entries[i];
+  if(!e->used||e->bytes!=n||!eq(e->package_sha,digest,32))continue;
+  struct ntp_payload view={0};
+  if(ntp_open(p,n,e->package_sha,e->elf_sha,e->manifest,e->manifest_bytes,&view)!=NTP_OK)
+   return NTR104_PACKAGE;
+  *slot=i;return NTR104_OK;
+ }
+ return NTR104_UNAPPROVED;
 }

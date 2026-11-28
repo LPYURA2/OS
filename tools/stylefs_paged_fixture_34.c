@@ -78,6 +78,8 @@ int main(int argc,char **argv){
   struct dc64_edit e={.op=DC64_CREATE,.entry={{.parent=1,.length=1,.name={'e'}},5,SD64_DIRECTORY}};
   ok=pp64_edit(&b,&l,&w,nodes,32,runs,32,pair.sequence,&e,0,&pair)==PP64_OK;
   struct sd64_key k={.parent=5,.length=15,.name="Native-peer.tea"};
+  /* Stream fixture uses a different basename: approval is content-based. */
+  if(stream)memcpy(k.name,"Stream-demo.tea",15);
   if(ok)ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,6,0,tea69_size,source69,0,&pair)==PP64_OK;
  }
  if(ok&&stream){

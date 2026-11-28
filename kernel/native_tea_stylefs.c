@@ -27,3 +27,17 @@ enum ntsfs_status ntsfs_use(struct po64_service *s,uint64_t principal,uint64_t t
  }
  wipe(scratch);return status;
 }
+
+enum ntsfs_status nts104_use(struct po64_service *s,uint64_t principal,uint64_t token,size_t bytes,
+ const struct ntr104_registry *registry,uint8_t scratch[NTP_MAX_PACKAGE],nts104_consumer use,void *ctx){
+ if(!s||!principal||!token||!registry||!scratch||!use||bytes<22||bytes>NTP_MAX_PACKAGE)
+  return NTSFS_ARGUMENT;
+ wipe(scratch);
+ struct collect c={scratch,bytes,0};enum ntsfs_status status=NTSFS_READ;
+ if(po64_read(s,principal,token,collect_chunk,&c)==PO64_OK&&c.seen==c.expected){
+  unsigned slot=0;status=NTSFS_PACKAGE;
+  if(ntr104_match(registry,scratch,c.seen,&slot)==NTR104_OK)
+   status=use(ctx,scratch,c.seen,slot)?NTSFS_OK:NTSFS_CONSUMER;
+ }
+ wipe(scratch);return status;
+}

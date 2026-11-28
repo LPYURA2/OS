@@ -3,3 +3,6 @@ Base dfc8c591af56090caeb76f643e6a29ad34a1120f. 102 CI 46138504018 25/30 at obser
 
 ## 103.1 — exact revoked-grant receipt
 102 CI 46138504018 completed 38/38 SUCCESS (all pages, API per_page=100). 103 CI 46138778497 had 37 SUCCESS, 1 failure, 1 running at observation (39 total). Focused guest job 140959873445 reached actual CPL3 read counts 4096,4096,1; read result 0; three write feeds, finish, durable write result 0; duplicate results denied. Final old grant open returned PO64_DENIED (2) because the safe-root supervisor had already reconciled the revoked grant. Diagnostic expected PO64_STALE (3), causing UD2 and retirement before input park. Fix exact expected status in client and runner, not kernel; no weakened assertion. Cold reopen and final retirement not confirmed. Artifact 15261171232 includes original UART. Next repeat all 39 jobs and ensure exact cold verify; then generic trusted TEA admission and comprehensive SDK acceptance.
+
+## Accepted 103.1
+CI 46139197636 completed SUCCESS, all 39 jobs passed. Focused job 140961158002 printed "Native file 103 CPL3 8193-byte stream read, write, cold reopen and exact content PASS" and "FILE103 STREAM AND RETIRE PASS". ISO artifact 15260644010. Stage 104 replaces basename lookup with trusted digest registry; acceptance pending.

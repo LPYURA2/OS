@@ -595,21 +595,39 @@ static const struct sample69_entry sample69_catalog[]={
 };
 #undef SAMPLE69
 #define SAMPLE69_COUNT (sizeof sample69_catalog/sizeof sample69_catalog[0])
-static struct s865_window_launch sample69_live[SAMPLE69_COUNT];
+#ifdef STYLEOS_LIVE_VOLUME_39
+#include <styleos/native_tea_registry_104.h>
+static struct ntr104_registry approved104;
+#define SAMPLE104_LIVE (1u+NTR104_SLOTS)
+#else
+#define SAMPLE104_LIVE SAMPLE69_COUNT
+#endif
+static struct s865_window_launch sample69_live[SAMPLE104_LIVE];
 static uint32_t sample69_session;
 /* Explicitly opted-in immutable sample registry only. Other native callers
  * retain nonblocking INPUT semantics; no arbitrary binary opt-in by name. */
 bool s865_sample_wait_allowed(uint32_t pid,uint64_t gen,uint64_t root){
  const struct pr_entry *e=pr_find(pr_global(),pid);
  if(!e||e->scheduler_handle!=gen||e->page_root!=root)return false;
- for(unsigned i=0;i<SAMPLE69_COUNT;++i)
-  if(sample69_live[i].pid==pid)return true;
+ for(unsigned i=0;i<SAMPLE104_LIVE;++i)
+  if(sample69_live[i].pid==pid){
+#ifdef STYLEOS_LIVE_VOLUME_39
+   return i==0||approved104.entries[i-1].wait_input;
+#else
+   return true;
+#endif
+  }
  return false;
 }
 #ifdef STYLEOS_LIVE_VOLUME_39
 #include <styleos/native_tea_stylefs.h>
 /* Only the mounted volume owner may resolve the exact file revision. */
-bool s69_use_tea_file(const struct po64_row *,const struct nts_pin *,ntsfs_consumer,void *);
+bool s104_use_tea_file(const struct po64_row *,const struct ntr104_registry *,nts104_consumer,void *);
+enum ntr104_status s104_register_native_package(const struct nts_pin *pin,const char *title,
+ bool wait_input,unsigned *slot){
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return NTR104_INVALID;
+ return ntr104_register(&approved104,pin,title,wait_input,slot);
+}
 #endif
 /* Narrow legacy provisioned media extent, never a raw probe of StyleFS
  * volumes. The approved digest and exact size reside in the boot image.
@@ -741,24 +759,25 @@ bool s865_launch_native_sample(void){
  return sample69_publish(index,out);
 }
 #ifdef STYLEOS_LIVE_VOLUME_39
-struct sample69_file_launch {const struct sample69_entry *app;struct s865_window_launch out;};
-static bool sample69_consume_file(void *opaque,const uint8_t *bytes,size_t size){
+struct sample69_file_launch {unsigned index;struct s865_window_launch out;};
+static bool sample104_consume_file(void *opaque,const uint8_t *bytes,size_t size,unsigned slot){
  struct sample69_file_launch *c=opaque;
- if(!sample69_session_ready())return false;
- return s865_native_launch_tea(bytes,size,&c->app->pin,sample69_session,
-   c->app->name,c->app->bounds,&c->out)==PS_OK;
+ struct nts_pin pin;
+ if(slot>=NTR104_SLOTS||sample69_live[slot+1].pid||!ntr104_pin(&approved104,slot,&pin)||
+    !sample69_session_ready())return false;
+ const struct ntr104_record *a=&approved104.entries[slot];
+ struct ws_bounds bounds={280+(int)slot*24,80+(int)slot*24,160,120};
+ if(s865_native_launch_tea(bytes,size,&pin,sample69_session,a->title,bounds,&c->out)!=PS_OK)return false;
+ c->index=slot+1;return true;
 }
 bool s865_launch_native_file(const struct po64_row *row){
- static const char name[]="Native-peer.tea";
- const unsigned index=1;
- const struct sample69_entry *a=&sample69_catalog[index];
- if(!row||row->entry.kind!=SD64_FILE||row->entry.key.length!=sizeof name-1||
-    row->bytes!=a->bytes||sample69_live[index].pid||
+ if(!row||row->entry.kind!=SD64_FILE||row->bytes<22||row->bytes>NTP_MAX_PACKAGE||
     !native_ready||!s865_executor_idle()||!native_audit(0))return false;
- for(size_t i=0;i<sizeof name-1;++i)
-  if(row->entry.key.name[i]!=(uint8_t)name[i])return false;
- struct sample69_file_launch c={.app=a};
- if(!s69_use_tea_file(row,&a->pin,sample69_consume_file,&c))return false;
+ struct sample69_file_launch c={0};
+ if(!s104_use_tea_file(row,&approved104,sample104_consume_file,&c))return false;
+ const unsigned index=c.index;
+ arch_puts("STYLEOS TEA104 APPROVED");field("slot",index-1);field("pid",c.out.pid);arch_putc('\n');
+if(index==1){
 #ifdef STYLEOS_FILE_PROBE_92
  /* Diagnostic package only: exact fixture file, granted after package
   * read completes and before first dispatch, no production auto grant. */
@@ -784,13 +803,14 @@ bool s865_launch_native_file(const struct po64_row *row){
   fail("file103-offer");
  arch_puts("STYLEOS FILE103 OFFER");field("pid",p->pid);arch_putc('\n');
 #endif
+ }
  arch_puts("STYLEOS TEA69 STYLEFS");field("id",row->entry.target);
  field("revision",row->revision);field("bytes",row->bytes);arch_putc('\n');
  return sample69_publish(index,c.out);
 }
 #endif
 static void sample69_reconcile(void){
- for(unsigned i=0;i<SAMPLE69_COUNT;++i){
+ for(unsigned i=0;i<SAMPLE104_LIVE;++i){
   struct s865_window_launch *a=&sample69_live[i];
   if(!a->pid||pr_find(pr_global(),a->pid))continue;
   const struct nwc_service *n=nwc_global();
@@ -821,6 +841,12 @@ _Noreturn void s865_native_supervise(void (*shell_step)(void *),void *state){
   fail("native-supervisor-entry");
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
  if(!shell66_register())fail("shell-provider-register");
+#ifdef STYLEOS_LIVE_VOLUME_39
+ unsigned slot=0;
+ if(s104_register_native_package(&sample69_catalog[1].pin,sample69_catalog[1].name,true,&slot)!=NTR104_OK||slot)
+  fail("tea104-registry");
+ arch_puts("STYLEOS TEA104 REGISTRY READY\n");
+#endif
 #endif
  for(;;){
   shell_step(state);
