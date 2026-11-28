@@ -1,7 +1,7 @@
 name: StyleOS native apps and Deep Drop acceptance
 on:
   push:
-    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72, feature/styleos-deep-drop-73, feature/styleos-deep-drop-74, feature/styleos-native-apps-75, feature/styleos-native-apps-76, feature/styleos-native-apps-77, feature/styleos-native-apps-78, feature/styleos-native-apps-79, feature/styleos-native-apps-80, feature/styleos-native-apps-81, feature/styleos-native-apps-82, feature/styleos-native-apps-83, feature/styleos-native-apps-84, feature/styleos-native-apps-85, feature/styleos-native-apps-86, feature/styleos-native-apps-87, feature/styleos-native-apps-88]
+    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72, feature/styleos-deep-drop-73, feature/styleos-deep-drop-74, feature/styleos-native-apps-75, feature/styleos-native-apps-76, feature/styleos-native-apps-77, feature/styleos-native-apps-78, feature/styleos-native-apps-79, feature/styleos-native-apps-80, feature/styleos-native-apps-81, feature/styleos-native-apps-82, feature/styleos-native-apps-83, feature/styleos-native-apps-84, feature/styleos-native-apps-85, feature/styleos-native-apps-86, feature/styleos-native-apps-87, feature/styleos-native-apps-88, feature/styleos-native-apps-89]
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
           name: deep-drop-host
           path: build/deep-drop/
   native-image-75-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88')))))))))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89'))))))))))))))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -177,7 +177,7 @@ jobs:
           if-no-files-found: warn
 
   native-expanded-75-guest:
-    if: (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88')))))))))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89'))))))))))))))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -212,7 +212,7 @@ jobs:
             build/native-expanded-75/results.json
           if-no-files-found: error
   native-expanded-76-guest:
-    if: (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))))))))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))))))))))))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -238,7 +238,7 @@ jobs:
             build/native-expanded-76/*.elf
           if-no-files-found: warn
   native-sdk-77-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88')))))))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89'))))))))))))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -261,7 +261,7 @@ jobs:
           name: native-sdk-77-host
           path: build/native-sdk-77/
   native-sdk-77-guest:
-    if: (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88')))))))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89'))))))))))))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -287,7 +287,7 @@ jobs:
             build/native-sdk-77-guest/*.ppm
           if-no-files-found: warn
   native-graphics-78-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))))))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))))))))))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -309,7 +309,7 @@ jobs:
           name: native-graphics-78-host
           path: build/native-graphics-78/
   native-surface-79-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88')))))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89'))))))))))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -329,7 +329,7 @@ jobs:
           name: native-surface-79-host
           path: build/native-surface-79/
   native-patch-80-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))))))))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -346,7 +346,7 @@ jobs:
           name: native-patch-80-host
           path: build/native-patch-80/
   native-patch-81-guest:
-    if: (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88')))))))
+    if: (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89'))))))))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -372,7 +372,7 @@ jobs:
             build/native-patch-81-guest/*.ppm
           if-no-files-found: warn
   native-text-84-guest:
-    if: (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))))
+    if: (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -398,7 +398,7 @@ jobs:
             build/native-text-84-guest/*.ppm
           if-no-files-found: warn
   native-file-85-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88')))
+    if: (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89'))))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -418,7 +418,7 @@ jobs:
           name: native-file-85-host
           path: build/native-file-85/*.log
   native-file-86-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))
+    if: (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -438,7 +438,7 @@ jobs:
           name: native-file-86-host
           path: build/native-file-86/*.log
   native-file-87-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88')
+    if: (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89'))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -457,6 +457,26 @@ jobs:
         with:
           name: native-file-87-host
           path: build/native-file-87/*.log
+  native-file-89-host:
+    if: github.ref_name == 'feature/styleos-native-apps-89'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Actual StyleFS deferred requests and isolation
+        run: |
+          set -euo pipefail
+          mkdir -p build/native-file-89
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -DSTYLEOS_NATIVE_FILE_85_TEST -DSTYLEOS_NATIVE_FILE_86_TEST -DSTYLEOS_NATIVE_FILE_87_TEST -DSTYLEOS_NATIVE_FILE_89_TEST -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_paged_object64.c kernel/{stylefs_paged_object64,stylefs_paged_stream64,stylefs_paged_pair64,stylefs_inode_root64,stylefs_inode_pages64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service,process_runtime,window_service,user_session_runtime,native_file_85}.c -o "build/native-file-89/$cc"
+            "build/native-file-89/$cc" | tee "build/native-file-89/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-file-89-host
+          path: build/native-file-89/*.log
   ordinary-shell:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -480,18 +500,18 @@ jobs:
       - name: Deep Drop 73 actual minimized destination and gesture cancellation
         run: python3 tools/test_deep_drop_taskbar_73.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-taskbar-73
       - name: Deep Drop 74 revoke and recover on ordinary native taskbar
-        if: (github.ref_name == 'feature/styleos-deep-drop-74' || (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))))))))))))))
+        if: (github.ref_name == 'feature/styleos-deep-drop-74' || (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))))))))))))))
         run: python3 tools/test_deep_drop_recovery_74.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-recovery-74
       - name: Package the verified boot ISO
         env:
-          ISO_NAME: ${{ (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))))))))))))) && 'StyleOS-Native-Apps.iso' || 'StyleOS-Deep-Drop-72.iso' }}
+          ISO_NAME: ${{ (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))))))))))))) && 'StyleOS-Native-Apps.iso' || 'StyleOS-Deep-Drop-72.iso' }}
         run: |
           mkdir -p build/verified-iso
           cp build/ordinary-shell/build/x86_64/StyleOS-owned-shell-865.iso "build/verified-iso/$ISO_NAME"
           cd build/verified-iso && sha256sum *.iso > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))))))))))))) && 'styleos-native-apps-iso' || 'styleos-deep-drop-72-iso' }}
+          name: ${{ (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))))))))))))) && 'styleos-native-apps-iso' || 'styleos-deep-drop-72-iso' }}
           path: build/verified-iso/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -514,7 +534,7 @@ jobs:
             build/deep-drop-taskbar-73/*.ppm
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
-        if: always() && (github.ref_name == 'feature/styleos-deep-drop-74' || (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || github.ref_name == 'feature/styleos-native-apps-88'))))))))))))))
+        if: always() && (github.ref_name == 'feature/styleos-deep-drop-74' || (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || (github.ref_name == 'feature/styleos-native-apps-77' || (github.ref_name == 'feature/styleos-native-apps-78' || (github.ref_name == 'feature/styleos-native-apps-79' || (github.ref_name == 'feature/styleos-native-apps-80' || (github.ref_name == 'feature/styleos-native-apps-81' || (github.ref_name == 'feature/styleos-native-apps-82' || (github.ref_name == 'feature/styleos-native-apps-83' || (github.ref_name == 'feature/styleos-native-apps-84' || (github.ref_name == 'feature/styleos-native-apps-85' || (github.ref_name == 'feature/styleos-native-apps-86' || (github.ref_name == 'feature/styleos-native-apps-87' || (github.ref_name == 'feature/styleos-native-apps-88' || github.ref_name == 'feature/styleos-native-apps-89')))))))))))))))
         with:
           name: styleos-deep-drop-74-recovery
           path: |

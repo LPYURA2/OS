@@ -251,6 +251,63 @@ static void native_file87(void){
  assert(po64_unmount(&service)==PO64_OK);
  puts("Native file 87: 64-bit offsets, 4KiB chunks, multi-window streaming, cancellation and durable reopen PASS");
 }
+#ifdef STYLEOS_NATIVE_FILE_89_TEST
+static struct nf89_queue queue;
+static void native_file89(void){
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ uint32_t pid=0,peer=0;
+ struct pr_admission spec={PR_NATIVE_USER,0,80,327680,4096,"Queue"};
+ assert(pr_admit(&procs,&spec,&pid)==PR_OK&&usr_bind(&users,1,pid,80)==USR_OK);
+ spec.scheduler_handle=96;spec.page_root=393216;
+ assert(pr_admit(&procs,&spec,&peer)==PR_OK&&usr_bind(&users,1,peer,96)==USR_OK);
+ assert(nf89_start(&queue,&nf)==PO64_OK&&nf89_start(&queue,&nf)==PO64_INVALID);
+ struct sd64_key a=key('a'),h=key('h');
+ uint64_t token=0,other=0,request=0,second=0;
+ assert(nf85_grant_access(&nf,pid,80,327680,&a,4,4,PO64_READ|PO64_WRITE,&token)==PO64_OK);
+ assert(nf85_grant_read(&nf,peer,96,393216,&h,5,1,&other)==PO64_OK);
+ uint8_t data[513],out[514];size_t n=999;enum po64_status result=PO64_INVALID;
+ for(unsigned i=0;i<sizeof data;++i)data[i]=byte(77,i);
+ memset(out,0x5a,sizeof out);unsigned before=writes;
+ assert(nf89_submit(&queue,peer,96,393216,token,NF89_WRITE,data,sizeof data,&request)==PO64_DENIED&&!request);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_WRITE,data,sizeof data,&request)==PO64_OK&&request);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&second)==PO64_BUSY&&!second);
+ assert(nf89_submit(&queue,peer,96,393216,other,NF89_READ,0,1,&second)==PO64_OK&&second>request);
+ assert(writes==before);
+ assert(nf89_take(&queue,pid,80,327680,request,out,sizeof out,&n,&result)==PO64_BUSY&&n==999);
+ assert(nf89_cancel(&queue,peer,96,393216,request)==PO64_DENIED);
+ assert(nf89_cancel(&queue,pid,80,327680,request)==PO64_OK);
+ assert(nf89_take(&queue,pid,80,327680,request,0,0,&n,&result)==PO64_OK&&n==0&&result==PO64_CANCELLED);
+ assert(usr_lock(&users)==USR_OK&&!nf89_pump(&queue)&&writes==before);
+ assert(usr_select(&users,1)==USR_OK&&nf89_pump(&queue));
+ assert(nf89_take(&queue,peer,96,393216,second,out,sizeof out,&n,&result)==PO64_OK&&n==0&&result==PO64_OK);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_WRITE,data,sizeof data,&request)==PO64_OK);
+ memset(data,0,sizeof data);
+ assert(nf89_pump(&queue)&&writes>before);
+ assert(nf89_cancel(&queue,pid,80,327680,request)==PO64_BUSY);
+ assert(nf89_take(&queue,pid,80,327680,request,0,0,&n,&result)==PO64_OK&&n==0&&result==PO64_OK);
+ assert(nf89_take(&queue,pid,80,327680,request,0,0,&n,&result)==PO64_DENIED);
+ assert(nf85_grant_read(&nf,pid,80,327680,&a,4,5,&token)==PO64_OK);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf89_pump(&queue));
+ assert(nf89_take(&queue,pid,80,327680,request,out,512,&n,&result)==PO64_FULL);
+ assert(nf89_take(&queue,peer,96,393216,request,out,sizeof out,&n,&result)==PO64_DENIED);
+ assert(nf89_take(&queue,pid,80,327680,request,out,sizeof out,&n,&result)==PO64_OK&&n==513&&result==PO64_OK);
+ for(unsigned i=0;i<513;++i)assert(out[i]==byte(77,i));
+ assert(out[513]==0x5a);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf89_pump(&queue));
+ assert(pr_transition(&procs,pid,80,PR_FAULTED)==PR_OK);
+ assert(nf89_reconcile(&queue)==1&&nf89_reconcile(&queue)==0);
+ for(unsigned i=0;i<NF89_SLOTS;++i){
+  const uint8_t *p=(const void *)&queue.slots[i];
+  for(size_t j=0;j<sizeof queue.slots[i];++j)assert(!p[j]);
+ }
+ assert(nf85_reconcile(&nf)==1);
+ assert(po64_unmount(&service)==PO64_OK);reopen();
+ check('a',4,5,513,77);check('h',5,1,0,0);
+ puts("Native file 89: deferred immutable requests, owner isolation, cancellation, completion and cleanup PASS");
+}
+#endif
 #endif
 #endif
 #endif
@@ -507,6 +564,9 @@ int main(void){
  native_file86();
 #ifdef STYLEOS_NATIVE_FILE_87_TEST
  native_file87();
+#ifdef STYLEOS_NATIVE_FILE_89_TEST
+ native_file89();
+#endif
 #endif
 #endif
  puts("STYLEFS 49 ID SERVICE PASS: explicit v2, auto allocate, no reuse after unlink and cold boot, folder and copy, damaged receipt refusal");

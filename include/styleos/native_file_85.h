@@ -53,4 +53,39 @@ enum po64_status nf85_close(struct nf85_service *,uint32_t pid,uint64_t handle,u
  * revoked object grants and remounts are removed. Lock/switch only hides
  * live grants; it does not destroy them. */
 size_t nf85_reconcile(struct nf85_service *);
+/* Stage 89: trusted deferred bounded requests, serialized supervisor only.
+ * Zero-init once, never reset/reuse serial. No disk work at submission or
+ * completion collection. One outstanding operation per exact owner.
+ * Pump performs at most one synchronous transaction; NOT a latency bound
+ * or preemptible disk worker. No user pointers, no user callbacks.
+ * All caller spans must be trusted, disjoint from borrowed storage. */
+enum { NF89_SLOTS=2 };
+enum nf89_op { NF89_READ=1,NF89_WRITE=2 };
+enum nf89_state { NF89_FREE,NF89_PENDING,NF89_DONE };
+struct nf89_request {
+ struct nf85_owner owner;
+ uint64_t id,token,mount;
+ enum nf89_op op;
+ enum nf89_state state;
+ enum po64_status status;
+ size_t bytes;
+ uint8_t data[NF85_READ_MAX];
+};
+struct nf89_queue {
+ struct nf85_service *files;
+ uint64_t serial;
+ bool busy;
+ struct nf89_request slots[NF89_SLOTS];
+};
+enum po64_status nf89_start(struct nf89_queue *,struct nf85_service *);
+enum po64_status nf89_submit(struct nf89_queue *,uint32_t,uint64_t,uint64_t,
+ uint64_t token,enum nf89_op,const uint8_t *data,size_t bytes,uint64_t *request);
+size_t nf89_reconcile(struct nf89_queue *);
+bool nf89_pump(struct nf89_queue *);
+enum po64_status nf89_cancel(struct nf89_queue *,uint32_t,uint64_t,uint64_t,uint64_t request);
+/* PO64_OK means a completion was consumed; result is actual I/O status.
+ * Pending => BUSY; too small output => FULL and retains completion.
+ * Write completion never copies data. Cancel never rolls back a commit. */
+enum po64_status nf89_take(struct nf89_queue *,uint32_t,uint64_t,uint64_t,uint64_t request,
+ uint8_t *out,size_t capacity,size_t *bytes,enum po64_status *result);
 #endif

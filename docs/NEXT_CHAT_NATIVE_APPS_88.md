@@ -7,3 +7,6 @@ Stage 87 CI 46132028343: 25/25 SUCCESS. Stage 88 CI 46132305624: 24/25 SUCCESS; 
 
 ## 88.2 — startup readiness clarification
 Owner explicitly requires system services initialized before use, independently of application launch. Added owner requirements and architecture/BOOT_READINESS_88.md. In existing live owned-shell profile, first s863_shell_observe(no event) attempts broker initialization after volume read and before S863 READY. Emits explicit ready/unavailable state. Test verifies exact ready/bind ordering before first interactive receipt, including refused foreign media, no skip. This is only the live file broker readiness boundary, not a global boot manager, user-visible error UI or implemented recovery. Stage 88.1 CI 46133339530 18/25 successful at observation, remaining jobs including StyleFS live pending. Reverify all regressions on 88.2 before queued file SDK. Preserve prior commits and main.
+
+## 89 preparation
+88.1 CI 46133339530: 24/25 successful at observation, StyleFS live still in progress. 88.2 CI 46133530632: 22/25 successful at observation, live regression pending. No live acceptance claim. Independent host-only deferred request queue candidate in stage 89; do not attach to live dispatcher until startup barrier passes.

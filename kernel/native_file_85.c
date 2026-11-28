@@ -233,3 +233,108 @@ enum po64_status nf85_close(struct nf85_service *s,uint32_t pid,uint64_t handle,
  if(rc==PO64_OK)wipe(g,sizeof *g);
  return rc;
 }
+
+/* Deferred requests use independent bounded storage, never retain user
+ * virtual addresses, and revalidate the grant when the worker executes. */
+static bool qready(const struct nf89_queue *q){return q&&ready(q->files);}
+static bool qspan(const struct nf89_queue *q,const void *p,size_t n){
+ return sep(p,n,q,sizeof *q)&&external_span(q->files,p,n);
+}
+enum po64_status nf89_start(struct nf89_queue *q,struct nf85_service *s){
+ if(!q||!ready(s)||q->files||!external_span(s,q,sizeof *q))return PO64_INVALID;
+ wipe(q,sizeof *q);q->files=s;return PO64_OK;
+}
+static struct nf89_request *qfind(struct nf89_queue *q,struct nf85_owner o,uint64_t id){
+ for(unsigned i=0;i<NF89_SLOTS;++i)
+  if(q->slots[i].id==id&&id&&same(q->slots[i].owner,o))return &q->slots[i];
+ return 0;
+}
+size_t nf89_reconcile(struct nf89_queue *q){
+ if(!qready(q)||q->busy||q->files->busy||q->files->fs->busy)return 0;
+ size_t n=0;
+ for(unsigned i=0;i<NF89_SLOTS;++i){
+  struct nf89_request *r=&q->slots[i];struct nf85_owner o;
+  if(!r->id)continue;
+  if(!owner(q->files,r->owner.pid,r->owner.handle,r->owner.root,false,&o)||!same(o,r->owner)){
+   wipe(r,sizeof *r);++n;continue;
+  }
+  /* An old-mount request must never execute or disclose cached data.
+   * Preserve completion of a write (including uncertain outcome) so the
+   * caller does not interpret a discarded receipt as a cancelled commit. */
+  if((!q->files->fs->active||q->files->fs->mount_id!=r->mount)&&
+     (r->state==NF89_PENDING||(r->state==NF89_DONE&&r->op==NF89_READ&&r->status==PO64_OK))){
+   wipe(r->data,sizeof r->data);r->bytes=0;r->status=PO64_STALE;r->state=NF89_DONE;++n;
+  }
+ }
+ return n;
+}
+enum po64_status nf89_submit(struct nf89_queue *q,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,enum nf89_op op,const uint8_t *data,size_t bytes,uint64_t *request){
+ if(!qready(q)||!token||!request||!qspan(q,request,sizeof *request)||
+    bytes>NF85_READ_MAX||(op!=NF89_READ&&op!=NF89_WRITE)||
+    (op==NF89_READ&&(!bytes||data))||
+    (op==NF89_WRITE&&bytes&&(!qspan(q,data,bytes)||!sep(data,bytes,request,sizeof *request))))
+  return PO64_INVALID;
+ if(q->busy||q->files->busy||q->files->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(q->files,pid,handle,root,true,&o))return PO64_DENIED;
+ struct nf85_grant *g=find(q->files,o,token);
+ if(!g||!(g->rights&(op==NF89_READ?PO64_READ:PO64_WRITE)))return PO64_DENIED;
+ if(!token_live(q->files,g))return PO64_STALE;
+ nf89_reconcile(q);
+ unsigned slot=NF89_SLOTS;
+ for(unsigned i=0;i<NF89_SLOTS;++i){
+  if(q->slots[i].id&&same(q->slots[i].owner,o))return PO64_BUSY;
+  if(!q->slots[i].id&&slot==NF89_SLOTS)slot=i;
+ }
+ if(slot==NF89_SLOTS||q->serial==UINT64_MAX)return PO64_FULL;
+ struct nf89_request *r=&q->slots[slot];
+ wipe(r,sizeof *r);r->owner=o;r->id=++q->serial;r->token=token;r->mount=g->mount;
+ r->op=op;r->state=NF89_PENDING;r->bytes=bytes;
+ if(op==NF89_WRITE)for(size_t i=0;i<bytes;++i)r->data[i]=data[i];
+ *request=r->id;return PO64_OK;
+}
+bool nf89_pump(struct nf89_queue *q){
+ if(!qready(q)||q->busy||q->files->busy||q->files->fs->busy)return false;
+ nf89_reconcile(q);
+ struct nf89_request *r=0;
+ for(unsigned i=0;i<NF89_SLOTS;++i){
+  struct nf89_request *p=&q->slots[i];
+  struct nf85_owner o;
+  if(p->state!=NF89_PENDING||!owner(q->files,p->owner.pid,p->owner.handle,p->owner.root,true,&o)||
+     !same(o,p->owner))continue;
+  if(!r||p->id<r->id)r=p;
+ }
+ if(!r)return false;
+ q->busy=true;
+ struct nf85_owner o=r->owner;size_t n=0;
+ enum po64_status status=r->op==NF89_READ?
+  nf85_read(q->files,o.pid,o.handle,o.root,r->token,r->data,r->bytes,&n):
+  nf85_write(q->files,o.pid,o.handle,o.root,r->token,r->data,r->bytes);
+ if(r->op==NF89_WRITE||status!=PO64_OK){wipe(r->data,sizeof r->data);n=0;}
+ r->bytes=n;r->status=status;r->state=NF89_DONE;q->busy=false;
+ return true;
+}
+enum po64_status nf89_cancel(struct nf89_queue *q,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
+ if(!qready(q)||!id)return PO64_INVALID;
+ if(q->busy||q->files->busy||q->files->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(q->files,pid,handle,root,true,&o))return PO64_DENIED;
+ struct nf89_request *r=qfind(q,o,id);if(!r)return PO64_DENIED;
+ if(r->state!=NF89_PENDING)return PO64_BUSY;
+ wipe(r->data,sizeof r->data);r->bytes=0;r->status=PO64_CANCELLED;r->state=NF89_DONE;
+ return PO64_OK;
+}
+enum po64_status nf89_take(struct nf89_queue *q,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id,
+ uint8_t *out,size_t capacity,size_t *bytes,enum po64_status *result){
+ if(!qready(q)||!id||!bytes||!result||capacity>NF85_READ_MAX||
+    !qspan(q,bytes,sizeof *bytes)||!qspan(q,result,sizeof *result)||!sep(bytes,sizeof *bytes,result,sizeof *result)||
+    (capacity&&(!qspan(q,out,capacity)||!sep(out,capacity,bytes,sizeof *bytes)||!sep(out,capacity,result,sizeof *result))))
+  return PO64_INVALID;
+ if(q->busy||q->files->busy||q->files->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(q->files,pid,handle,root,true,&o))return PO64_DENIED;
+ nf89_reconcile(q);
+ struct nf89_request *r=qfind(q,o,id);if(!r)return PO64_DENIED;
+ if(r->state!=NF89_DONE)return PO64_BUSY;
+ if(r->bytes>capacity)return PO64_FULL;
+ for(size_t i=0;i<r->bytes;++i)out[i]=r->data[i];
+ *bytes=r->bytes;*result=r->status;wipe(r,sizeof *r);return PO64_OK;
+}
