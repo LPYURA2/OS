@@ -310,6 +310,34 @@ static void native_file89(void){
  assert(nf85_grant_read(&nf,pid,80,327680,&a,4,5,&token)==PO64_OK);
  puts("Native file 90: revoked pending and completed reads disclose no data PASS");
 #endif
+#ifdef STYLEOS_NATIVE_FILE_93_TEST
+ /* No access until the exact selected process receives its approval. */
+ assert(nf85_close(&nf,pid,80,327680,token)==PO64_OK);
+ token=999;before=writes;
+ assert(nf93_receive(&nf,pid,80,327680,&token)==PO64_END&&token==999);
+ assert(nf93_offer(&nf,pid,80,327680,&a,4,4,PO64_READ)==PO64_STALE);
+ assert(nf93_offer(&nf,pid,80,327680,&a,4,5,PO64_READ)==PO64_OK);
+ assert(nf93_offer(&nf,pid,80,327680,&h,5,1,PO64_READ)==PO64_BUSY);
+ uint64_t pending=0;
+ for(unsigned i=0;i<NF85_HANDLES;++i)if(nf.grants[i].pending_delivery)pending=nf.grants[i].token;
+ assert(pending);
+ assert(nf89_submit(&queue,pid,80,327680,pending,NF89_READ,0,513,&request)==PO64_DENIED);
+ assert(nf93_receive(&nf,peer,96,393216,&token)==PO64_END&&token==999);
+ assert(nf93_receive(&nf,pid,80,331776,&token)==PO64_DENIED&&token==999);
+ assert(usr_lock(&users)==USR_OK);
+ assert(nf93_receive(&nf,pid,80,327680,&token)==PO64_DENIED&&token==999);
+ assert(usr_select(&users,1)==USR_OK);
+ assert(nf93_receive(&nf,pid,80,327680,&token)==PO64_OK&&token==pending);
+ assert(nf93_receive(&nf,pid,80,327680,&other)==PO64_END);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_WRITE,data,sizeof data,&request)==PO64_DENIED);
+ assert(writes==before);
+ /* Pending approval for a different owner vanishes on process fault. */
+ assert(nf93_offer(&nf,peer,96,393216,&h,5,1,PO64_READ)==PO64_OK);
+ assert(pr_transition(&procs,peer,96,PR_FAULTED)==PR_OK);
+ assert(nf85_reconcile(&nf)==1);
+ assert(nf93_receive(&nf,peer,96,393216,&other)==PO64_DENIED);
+ puts("Native file 93: explicit one-shot grant receipt, pending denial, session and fault cleanup PASS");
+#endif
  assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
  assert(nf89_pump(&queue));
  assert(pr_transition(&procs,pid,80,PR_FAULTED)==PR_OK);

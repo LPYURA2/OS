@@ -94,6 +94,7 @@ bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,s
 /* Supervisor-only bridge on the live mounted volume. No app-facing ABI. */
 void s88_native_file_reconcile(void);
 void s90_native_file_pump(void);
+enum po64_status s93_native_file_offer(uint32_t,uint64_t,uint64_t,const struct po64_row *,unsigned);
 #ifdef STYLEOS_FILE_PROBE_92
 enum po64_status s92_file_probe_grant(uint32_t,uint64_t,uint64_t,uint64_t *);
 #endif

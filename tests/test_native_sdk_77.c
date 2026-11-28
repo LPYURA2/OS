@@ -92,6 +92,8 @@ int main(void){
  C(!sty_file_completion((struct sty_reply){0,((uint64_t)1<<32)|STY_F_STALE},&status,&bytes)&&bytes==999);
  C(sty_file_completion((struct sty_reply){0,((uint64_t)513<<32)},&status,&bytes)&&bytes==513&&status==STY_F_OK);
  C(sty_file_completion((struct sty_reply){0,STY_F_UNCERTAIN},&status,&bytes)&&!bytes&&status==STY_F_UNCERTAIN);
+ C(STY_FILE_RECEIVE==NF93_RECEIVE);
+ C(sty_file_receive().status==STY_EMPTY&&calls==14&&args[0]==NF93_RECEIVE&&args[1]==0&&args[2]==0&&args[3]==0);
  printf("Native SDK 77: %u checks PASS (mock transport, no guest claim)\n",checks);
  return 0;
 }

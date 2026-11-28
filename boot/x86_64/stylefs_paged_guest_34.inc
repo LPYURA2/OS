@@ -259,6 +259,11 @@ _Static_assert(PO64_END+1==NF91_UNAVAILABLE,"file ABI unavailable");
 uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t op,uint64_t token,uint64_t address,uint64_t size,uint64_t *value){
  *value=0;
+ if(op==NF93_RECEIVE){
+  if(token||address||size)return PO64_INVALID;
+  if(!s34_work.native_queue.files)return NF91_UNAVAILABLE;
+  return nf93_receive(&s34_work.native_files,pid,handle,root,value);
+ }
  if(!token||size>NF91_MAX)return PO64_INVALID;
  if(op==NF91_READ){if(address||!size)return PO64_INVALID;}
  else if(op==NF91_WRITE||op==NF91_TAKE){
@@ -283,6 +288,16 @@ uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_
  }
  return nf89_submit(q,pid,handle,root,token,
   op==NF91_READ?NF89_READ:NF89_WRITE,alias,(size_t)size,value);
+}
+/* Trusted picker adapter: caller must establish user approval of exact
+ * row and rights. No application call can issue or broaden a grant. */
+enum po64_status s93_native_file_offer(uint32_t pid,uint64_t handle,uint64_t root,
+ const struct po64_row *row,unsigned rights){
+ if(!row||row->entry.kind!=SD64_FILE||!s865_executor_idle())return PO64_DENIED;
+ s88_native_file_reconcile();
+ if(!s34_work.native_queue.files||!s34_work.volume.objects.active)return PO64_STALE;
+ return nf93_offer(&s34_work.native_files,pid,handle,root,&row->entry.key,
+  row->entry.target,row->revision,rights);
 }
 /* Trusted picker/launcher entry, not reachable from application code.
  * Exact row and rights must already be approved by the supervisor;

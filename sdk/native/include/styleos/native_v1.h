@@ -13,7 +13,7 @@ enum sty_window_status { STY_OK=0,STY_INVALID,STY_NOT_READY,STY_DENIED,
 enum sty_event_kind { STY_KEY=1,STY_TEXT=2,STY_POINTER=3,STY_DROP=4 };
 enum sty_operation { STY_YIELD=1,STY_EXIT=2,STY_PIXEL=0x100,STY_TILE=0x101,
  STY_INPUT=0x102,STY_FRAME=0x103,STY_PATCH=0x120,STY_FRAME_GEN=0x121,STY_TEXT_LAYER=0x122,
- STY_FILE_READ=0x130,STY_FILE_WRITE=0x131,STY_FILE_TAKE=0x132,STY_FILE_CANCEL=0x133 };
+ STY_FILE_READ=0x130,STY_FILE_WRITE=0x131,STY_FILE_TAKE=0x132,STY_FILE_CANCEL=0x133,STY_FILE_RECEIVE=0x134 };
 struct sty_reply { uint64_t status,value; };
 struct sty_rect { uint32_t x,y,w,h,rgb; };
 _Static_assert(sizeof(struct sty_rect)==20,"rectangle ABI");
@@ -137,6 +137,11 @@ enum sty_file_status { STY_F_OK=0,STY_F_INVALID,STY_F_DENIED,STY_F_STALE,
  STY_F_BUSY,STY_F_FULL,STY_F_IO,STY_F_CORRUPT,STY_F_CANCELLED,STY_F_UNCERTAIN,
  STY_F_END,STY_F_UNAVAILABLE };
 #define STY_FILE_MAX 4096u
+/* Obtain one already-approved grant; this does not open a picker or
+ * authorize any file. END means nothing is pending. */
+static inline struct sty_reply sty_file_receive(void){
+ return sty_call(STY_FILE_RECEIVE,0,0,0);
+}
 static inline struct sty_reply sty_file_read(uint64_t grant,size_t capacity){
  if(!grant||!capacity||capacity>STY_FILE_MAX)return (struct sty_reply){STY_F_INVALID,0};
  return sty_call(STY_FILE_READ,grant,0,capacity);

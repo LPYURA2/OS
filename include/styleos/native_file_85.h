@@ -10,7 +10,7 @@
  * No concurrent call, registry reset or mutable callback into this adapter. */
 enum { NF85_HANDLES=8,NF85_READ_MAX=4096 };
 struct nf85_owner { uint32_t pid,session;uint64_t handle,root; };
-struct nf85_grant { struct nf85_owner owner;uint64_t token,mount;unsigned rights; };
+struct nf85_grant { struct nf85_owner owner;uint64_t token,mount;unsigned rights;bool pending_delivery; };
 struct nf85_service {
  struct po64_service *fs;
  const struct usr_runtime *sessions;
@@ -25,7 +25,14 @@ enum po64_status nf85_grant_read(struct nf85_service *,uint32_t pid,uint64_t han
  * No directory mutation, implicit path grants or automatic reauthorization. */
 enum po64_status nf85_grant_access(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,
  const struct sd64_key *,uint64_t id,uint64_t revision,unsigned rights,uint64_t *token);
-/* Whole-file bounded read, never truncate; output/count unchanged on failure.
+/* Stage 93: trusted explicit approval, then one-shot receipt by the exact
+ * live selected owner. At most one undelivered grant per owner.
+ * No path or requested rights are accepted from the untrusted receiver.
+ * Offer may perform metadata I/O; receive never performs disk I/O. */
+enum po64_status nf93_offer(struct nf85_service *,uint32_t,uint64_t,uint64_t,
+ const struct sd64_key *,uint64_t,uint64_t,unsigned);
+enum po64_status nf93_receive(struct nf85_service *,uint32_t,uint64_t,uint64_t,uint64_t *);
+ /* Whole-file bounded read, never truncate; output/count unchanged on failure.
  * No byte is released before complete underlying checksum verification.
  * PO64_FULL means insufficient bounded capacity; later streaming API is separate. */
 enum po64_status nf85_read(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,

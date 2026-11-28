@@ -13,6 +13,9 @@
 #define NF91_WRITE UINT64_C(0x131)
 #define NF91_TAKE UINT64_C(0x132)
 #define NF91_CANCEL UINT64_C(0x133)
+/* RECEIVE has zero RBX/RCX/RDX; returns one supervisor-approved token
+ * in RDX on success. END means no pending approval. */
+#define NF93_RECEIVE UINT64_C(0x134)
 #define NF91_MAX 4096u
 #define NF91_UNAVAILABLE 11u
 #endif
