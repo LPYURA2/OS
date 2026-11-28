@@ -260,6 +260,32 @@ jobs:
         with:
           name: native-sdk-77-host
           path: build/native-sdk-77/
+  native-sdk-77-guest:
+    if: github.ref_name == 'feature/styleos-native-apps-77'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          set -euo pipefail
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Compiled independent C SDK guest client
+        run: python3 tools/test_native_sdk_77_guest.py --output build/native-sdk-77-guest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-sdk-77-guest
+          path: |
+            build/native-sdk-77-guest/*.log
+            build/native-sdk-77-guest/*.json
+            build/native-sdk-77-guest/*.elf
+            build/native-sdk-77-guest/*.ppm
+          if-no-files-found: warn
   ordinary-shell:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

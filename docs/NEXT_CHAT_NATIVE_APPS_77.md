@@ -20,3 +20,15 @@ All published work is an ancestor of the accepted 76 checkpoint. Inspect
 your unpublished changes and reconcile without resets or force pushes.
 Continue from current HEAD. No concurrent writers. Keep exact CI/SHA/ISO
 and concise handoff. See docs/NEXT_CHAT_NATIVE_APPS_75.md and _76.md.
+
+## Implementation 2
+CI 46128959668 confirmed 16/16 success; GCC and Clang each 203 SDK host
+checks and disassembly confirmed INT 0x80. New candidate compiles an independent
+C client using SDK wrappers and decodes actual input in CPL3. Existing stage 76
+pinned guest catalog and verifier reused, with SDK stack range explicitly
+opted in; original 76 exact-stack proof unchanged. New test verifies invalid
+span refusal, real cross-page input, target marker after SDK decode, exact
+trap site from linked disassembly, preemption, stop and zero leases/writes.
+No general ELF packaging or runtime discovery yet; no guest PASS until CI.
+Owner confirmed that app UI implementation will use supplied designs when
+infrastructure is accepted. Do not begin standalone product UI before that.

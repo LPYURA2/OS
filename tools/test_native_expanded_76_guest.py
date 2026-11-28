@@ -116,10 +116,11 @@ def ipc_payload():
     for off in fix:struct.pack_into('<i',code,off,failure-off-4)
     return elf(code,True),Sites(wait,refused,good)
 
-def prepare(out):
+def prepare(out,target=None):
     disk=out/'expanded.raw'
     provision(disk)
-    good,good_sites=ipc_payload();bad,bad_sites=payload(False)
+    good,good_sites=ipc_payload() if target is None else target
+    bad,bad_sites=payload(False)
     peer,peer_sites=legacy_payload()
     catalog=bytearray(2048)
     struct.pack_into('<8sII',catalog,0,b'STYLNAT1',1,3)
@@ -146,7 +147,7 @@ def wait_slices(events,app,sites):
     return [i for i,e in enumerate(events) if e['pid']==app['pid'] and e['root']==app['root']
             and e['vector']==0x50 and e['state']==1 and e['rip'] in sites.wait]
 
-def verify(trace,lines,apps,pcs):
+def verify(trace,lines,apps,pcs,*,sdk_stack=False):
     entries=list(records(lines,EVENT,KEYS));events=[e for _,e in entries]
     a,b,z=apps
     stop=list(records(lines,b'STYLEOS WIDE76 STOP',('pid','gen','root','peer','legacy','resident','bytes','wire','queue')))
@@ -165,7 +166,7 @@ def verify(trace,lines,apps,pcs):
     ipc=[e for e in ae if e['vector']==128]
     assert [(e['rax'],e['rip']) for e in ipc]==[(0x102,pcs[0].yielded),(0x102,pcs[0].terminal)]
     assert all(i<fi and e['state']==1 for i,e in entries if e['pid']==a['pid'])
-    assert all(e['root']==a['root'] and CODE+P<=e['rip']<CODE+2*P and e['sp']==STACK+2*P for e in ae)
+    assert all(e['root']==a['root'] and CODE+P<=e['rip']<CODE+2*P and (STACK+P<e['sp']<=STACK+2*P if sdk_stack else e['sp']==STACK+2*P) for e in ae)
     before=[e for i,e in entries if i<fi]
     counts=[len(wait_slices(before,app,site)) for app,site in zip(apps,pcs)]
     assert all(n>=MIN_SLICES for n in counts)
@@ -193,9 +194,9 @@ def verify(trace,lines,apps,pcs):
     assert real==[(e['root'],e['vector'],e['rip'],e['sp'],e['error'],e['rax'],e['flags']) for e in events]
     return len(real),counts
 
-def run(out):
+def run(out,prepare_case=prepare,verify_case=verify):
     out=out.resolve();out.mkdir(parents=True,exist_ok=False)
-    disk,cat,pcs=prepare(out);before=digest(disk)
+    disk,cat,pcs=prepare_case(out);before=digest(disk)
     with (out/'compile.log').open('w') as log:
         subprocess.run([sys.executable,str(ROOT/'tools/build.py'),'--arch','x86_64',
             '--desktop-owned-shell-865','--native-catalog-sha256',cat,'--output',str(out/'build')],
@@ -240,7 +241,7 @@ def run(out):
         finally:
             if proc.poll() is None:proc.kill();proc.wait(timeout=15)
     lines=complete_lines(serial.read_bytes())
-    count,slices=verify(trace,lines,apps,pcs)
+    count,slices=verify_case(trace,lines,apps,pcs)
     assert digest(disk)==before
     result=dict(status='PASS',qemu=version,verified_cpl3_events=count,expanded_apps=2,
                 legacy_apps=1,pre_release_loop_irqs=slices,leased_app_pages=[7,7,3],
