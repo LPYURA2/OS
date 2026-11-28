@@ -43,13 +43,13 @@ static enum ntp_status parse_member(const uint8_t *p,size_t n,size_t *index,
     return NTP_OK;
 }
 
-enum ntp_status ntp_open(const uint8_t *p,size_t n,const uint8_t pkg_sha[32],
+static enum ntp_status open_bounded105(size_t max,const uint8_t *p,size_t n,const uint8_t pkg_sha[32],
                          const uint8_t elf_sha[32],const uint8_t *manifest,
                          size_t manifest_bytes,struct ntp_payload *out)
 {
     if(!p || !pkg_sha || !elf_sha || !manifest || !manifest_bytes || !out)
         return NTP_ARGUMENT;
-    if(n<22 || n>NTP_MAX_PACKAGE) return NTP_BOUNDS;
+    if(n<22 || n>max) return NTP_BOUNDS;
     uint8_t digest[32];nte_sha256(p,n,digest);
     if(!eq(digest,pkg_sha,32))return NTP_HASH;
     size_t end=n-22;
@@ -66,12 +66,22 @@ enum ntp_status ntp_open(const uint8_t *p,size_t n,const uint8_t pkg_sha[32],
     if(rc!=NTP_OK)return rc;
     if(it!=end || a.start!=0 || a.end!=b.start || b.end!=dir ||
        a.size!=manifest_bytes || !eq(a.data,manifest,manifest_bytes))return NTP_FORMAT;
+    if(max==NTP105_MAX_PACKAGE&&b.size>NTP105_MAX_ELF)return NTP_BOUNDS;
     nte_sha256(b.data,b.size,digest);
     if(!eq(digest,elf_sha,32))return NTP_HASH;
     *out=(struct ntp_payload){b.data,b.size};
     return NTP_OK;
 }
 
+enum ntp_status ntp_open(const uint8_t *p,size_t n,const uint8_t pkg_sha[32],
+ const uint8_t elf_sha[32],const uint8_t *manifest,size_t manifest_bytes,struct ntp_payload *out){
+ return open_bounded105(NTP_MAX_PACKAGE,p,n,pkg_sha,elf_sha,manifest,manifest_bytes,out);
+}
+enum ntp_status ntp105_open(const uint8_t *p,size_t n,const uint8_t pkg_sha[32],
+ const uint8_t elf_sha[32],const uint8_t *manifest,size_t manifest_bytes,struct ntp_payload *out){
+ if(manifest_bytes>NTR104_MANIFEST)return NTP_BOUNDS;
+ return open_bounded105(NTP105_MAX_PACKAGE,p,n,pkg_sha,elf_sha,manifest,manifest_bytes,out);
+}
 enum ntp_status ntp_disk_header(const uint8_t h[NTP_SECTOR_BYTES],
                                 const uint8_t expected[32],uint32_t *n)
 {
@@ -116,7 +126,7 @@ enum ntr104_status ntr104_register(struct ntr104_registry *r,const struct nts_pi
  const char *title,bool wait_input,unsigned *slot){
  if(!r||!pin||!title||!slot||!apart104(r,sizeof *r,pin,sizeof *pin)||
     !apart104(r,sizeof *r,slot,sizeof *slot)||!apart104(pin,sizeof *pin,slot,sizeof *slot)||
-    pin->package_bytes<22||pin->package_bytes>NTP_MAX_PACKAGE||
+    pin->package_bytes<22||pin->package_bytes>NTP105_MAX_PACKAGE||
     !pin->manifest_bytes||pin->manifest_bytes>NTR104_MANIFEST||
     !apart104(r,sizeof *r,pin->package_sha,32)||!apart104(r,sizeof *r,pin->elf_sha,32)||
     !apart104(r,sizeof *r,pin->manifest,pin->manifest_bytes)||
@@ -149,14 +159,14 @@ bool ntr104_pin(const struct ntr104_registry *r,unsigned i,struct nts_pin *out){
  return true;
 }
 enum ntr104_status ntr104_match(const struct ntr104_registry *r,const uint8_t *p,size_t n,unsigned *slot){
- if(!r||n<22||n>NTP_MAX_PACKAGE||!apart104(r,sizeof *r,p,n)||
+ if(!r||n<22||n>NTP105_MAX_PACKAGE||!apart104(r,sizeof *r,p,n)||
     !apart104(r,sizeof *r,slot,sizeof *slot)||!apart104(p,n,slot,sizeof *slot))return NTR104_INVALID;
  uint8_t digest[32];nte_sha256(p,n,digest);
  for(unsigned i=0;i<NTR104_SLOTS;++i){
   const struct ntr104_record *e=&r->entries[i];
   if(!e->used||e->bytes!=n||!eq(e->package_sha,digest,32))continue;
   struct ntp_payload view={0};
-  if(ntp_open(p,n,e->package_sha,e->elf_sha,e->manifest,e->manifest_bytes,&view)!=NTP_OK)
+  if(ntp105_open(p,n,e->package_sha,e->elf_sha,e->manifest,e->manifest_bytes,&view)!=NTP_OK)
    return NTR104_PACKAGE;
   *slot=i;return NTR104_OK;
  }

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 static struct ntr104_registry registry;
-static uint8_t pkg[2][NTP_MAX_PACKAGE],elf[2][8192],manifest[2][4096],sha[2][32],eh[2][32];
+static uint8_t pkg[2][NTP105_MAX_PACKAGE],elf[2][NTP105_MAX_ELF],manifest[2][4096],sha[2][32],eh[2][32];
 static size_t readfile(const char *path,uint8_t *buf,size_t cap){
  FILE *f=fopen(path,"rb");assert(f);size_t n=fread(buf,1,cap,f);
  assert(n&&!ferror(f)&&fgetc(f)==EOF&&!fclose(f));return n;
@@ -17,6 +17,14 @@ int main(int argc,char **argv){
   nte_sha256(pkg[i],n,sha[i]);nte_sha256(elf[i],e,eh[i]);
   pins[i]=(struct nts_pin){sha[i],eh[i],manifest[i],m,(uint32_t)n};
  }
+ assert(pins[1].package_bytes>NTP_MAX_PACKAGE);
+ struct ntp_payload large={0};
+ assert(ntp_open(pkg[1],pins[1].package_bytes,sha[1],eh[1],manifest[1],pins[1].manifest_bytes,&large)==NTP_BOUNDS);
+ assert(!large.elf&&!large.elf_bytes);
+ assert(ntp105_open(pkg[1],pins[1].package_bytes,sha[1],eh[1],manifest[1],pins[1].manifest_bytes,&large)==NTP_OK);
+ assert(large.elf_bytes==20480&&large.elf[12288+0x1ff8]==0xde&&large.elf[12288+0x1ffb]==0x10);
+ assert(ntp105_open(pkg[1],NTP105_MAX_PACKAGE+1,sha[1],eh[1],manifest[1],pins[1].manifest_bytes,&large)==NTP_BOUNDS);
+ assert(large.elf_bytes==20480);
  unsigned slot=99;
  assert(ntr104_match(&registry,pkg[0],pins[0].package_bytes,&slot)==NTR104_UNAPPROVED&&slot==99);
  assert(ntr104_register(&registry,&pins[0],"",false,&slot)==NTR104_INVALID&&slot==99);
@@ -43,6 +51,6 @@ int main(int argc,char **argv){
  badhash[1]^=1;
  assert(ntr104_register(&registry,&bad,"Overflow",false,&slot)==NTR104_FULL&&slot==3);
  assert(ntr104_match(&registry,pkg[0],pins[0].package_bytes,(unsigned *)&registry)==NTR104_INVALID);
- puts("TEA104 registry PASS: independent approvals, immutable pins, content lookup, malformed and full refusal");
+ puts("TEA105 registry PASS: legacy limit retained, expanded package, immutable pins, content lookup, malformed and full refusal");
  return 0;
 }

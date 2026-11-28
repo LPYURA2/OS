@@ -71,6 +71,7 @@ def main():
     volume.unlink()
     package=folder/"x86_64/Native-peer.tea"
     require(package.is_file(),"standalone peer package absent")
+    if args.file_probe_103:require(16384<package.stat().st_size<=136*1024,"extended package fixture size")
     # Generated package is independently provisioned into StyleFS.
     # The exact EFI path can vary; ordinary stage 69 already checks absence.
     damaged=out/"damaged.tea"

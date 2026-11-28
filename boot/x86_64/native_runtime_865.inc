@@ -287,14 +287,19 @@ enum ps_status s865_native_launch_tea(const uint8_t *package,size_t bytes,
  struct ws_bounds bounds,struct s865_window_launch *out)
 {
  if(!package||!pin||!out||!title||!session||bytes!=pin->package_bytes||
-    bytes<22u||bytes>NTP_MAX_PACKAGE||!pin->package_sha||!pin->elf_sha||
+    bytes<22u||bytes>NTP105_MAX_PACKAGE||!pin->package_sha||!pin->elf_sha||
     !pin->manifest||!pin->manifest_bytes||pin->manifest_bytes>4096u)
   return PS_ARGUMENT;
  if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
  struct ntp_payload view={0};
- if(ntp_open(package,bytes,pin->package_sha,pin->elf_sha,pin->manifest,
+ if(ntp105_open(package,bytes,pin->package_sha,pin->elf_sha,pin->manifest,
              pin->manifest_bytes,&view)!=NTP_OK)return PS_EVIDENCE;
- if(view.elf_bytes<120u||view.elf_bytes>8192u)return PS_EVIDENCE;
+ if(view.elf_bytes<120u||view.elf_bytes>NTP105_MAX_ELF)return PS_EVIDENCE;
+ /* The audited expanded image path validates the exact two PT_LOAD
+  * layout and all page limits, without the legacy sector scratch cap. */
+ if(view.elf[56]==2&&view.elf[57]==0)
+  return launch_window_image103(0,view.elf,view.elf_bytes,pin->elf_sha,session,title,bounds,out);
+ if(view.elf_bytes>8192u)return PS_EVIDENCE;
  struct rt865_launch_request request={0};
  unsigned i=0;
  for(;i<sizeof request.name&&title[i];++i){
@@ -309,8 +314,6 @@ enum ps_status s865_native_launch_tea(const uint8_t *package,size_t bytes,
  /* Existing audited launch rechecks ELF rights and digest, then binds
   * session, window and port before any dispatch. The stack view is never
   * retained by the scheduler or published into user memory. */
- if(view.elf[56]==2&&view.elf[57]==0)
-  return launch_window_image103(0,view.elf,view.elf_bytes,pin->elf_sha,session,title,bounds,out);
  return s865_native_launch_window(&request,session,title,bounds,out);
 }
 #undef WINDOW_LAUNCH_FAULT
@@ -771,7 +774,7 @@ static bool sample104_consume_file(void *opaque,const uint8_t *bytes,size_t size
  c->index=slot+1;return true;
 }
 bool s865_launch_native_file(const struct po64_row *row){
- if(!row||row->entry.kind!=SD64_FILE||row->bytes<22||row->bytes>NTP_MAX_PACKAGE||
+ if(!row||row->entry.kind!=SD64_FILE||row->bytes<22||row->bytes>NTP105_MAX_PACKAGE||
     !native_ready||!s865_executor_idle()||!native_audit(0))return false;
  struct sample69_file_launch c={0};
  if(!s104_use_tea_file(row,&approved104,sample104_consume_file,&c))return false;

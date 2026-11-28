@@ -24,7 +24,7 @@ static bool sink103(void *ctx,uint64_t at,const uint8_t *p,size_t n){
  for(size_t i=0;i<n;++i)if(p[i]!='B')return false;
  *seen+=n;return true;
 }
-static uint8_t tea69[16384];
+static uint8_t tea69[136u*1024u];
 static size_t tea69_size;
 static bool source69(void *ctx,uint64_t at,uint8_t *p,size_t n){
  (void)ctx;if(at>tea69_size||n>tea69_size-at)return false;

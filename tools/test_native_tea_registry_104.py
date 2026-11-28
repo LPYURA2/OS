@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True);a=p.parse_args()
     out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
-    build(out)
+    build(out,file_probe_103=True)
     args=[]
     for name in ("Native-sample","Native-peer"):
         package=out/(name+".tea");meta=out/(name+".json")

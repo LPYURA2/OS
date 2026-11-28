@@ -86,6 +86,10 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
         call94(0x131,0x12000300,len(payload));status94(2)
         emit(b'\x31\xdb');call94(0x100,0x976332,0);status94(0)
     if file_probe_103 and index==1:
+        # A nonzero word in the second initialized DATA page must survive
+        # loading a package larger than the original 16 KiB bound.
+        emit(b'\x81\xbe'+struct.pack('<I',0x1ff8)+struct.pack('<I',0x105abcde))
+        jump(b'\x0f\x85','fail')
         total=8193;packet=0x12000800
         def call103(op,addr=0,size=0):
             emit(b'\xb8'+struct.pack('<I',op)+b'\xb9'+struct.pack('<I',addr)+b'\xba'+struct.pack('<I',size)+b'\xcd\x80')
@@ -140,11 +144,14 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
     wide=file_probe_103 and index==1
     assert len(code)<=4096
     blob=bytearray(4096)+code
-    if wide:blob.extend(bytes(8192-len(blob)))
+    if wide:
+        blob.extend(bytes(12288-len(blob)))
+        blob.extend(bytes(8192))
+        struct.pack_into('<I',blob,12288+0x1ff8,0x105abcde)
     blob[:7]=b'\x7fELF\x02\x01\x01'
     struct.pack_into('<HHIQQQIHHHHHH',blob,16,2,62,1,0x10000000,64,0,0,64,56,2 if wide else 1,0,0,0)
     struct.pack_into('<IIQQQQQQ',blob,64,1,5,4096,0x10000000,0,len(code),4096,4096)
-    if wide:struct.pack_into('<IIQQQQQQ',blob,120,1,6,8192,0x12000000,0,0,8192,4096)
+    if wide:struct.pack_into('<IIQQQQQQ',blob,120,1,6,12288,0x12000000,0,8192,8192,4096)
     elf=folder/(name+'.elf');elf.write_bytes(blob)
     tea=folder/(name+'.tea')
     if tea.exists():tea.unlink()
@@ -152,7 +159,7 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
     assert inspect(tea)==manifest
     package=tea.read_bytes()
     with zipfile.ZipFile(tea) as z:meta=z.read('manifest.json')
-    assert len(package)<=16384
+    assert (16384<len(package)<=136*1024) if wide else len(package)<=16384
     def arr(name,data):return 'static const uint8_t '+name+'[]={'+','.join(str(x) for x in data)+'};\n'
     prefix='sample69_'+str(index)+'_'
     # Peer is stored on a separately provisioned data disk; compile only

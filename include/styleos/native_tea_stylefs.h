@@ -15,8 +15,9 @@ enum ntsfs_status ntsfs_use(struct po64_service *,uint64_t principal,uint64_t to
  const struct nts_pin *,uint8_t scratch[NTP_MAX_PACKAGE],ntsfs_consumer,void *);
 /* Exact file CRC, then external approval registry, then canonical ZIP,
  * manifest and ELF digest checks. Registry is immutable during callback.
- * No filename-based authority and no pointers survive this call. */
+ * No filename-based authority and no pointers survive this call.
+ * Scratch capacity must cover bytes; used prefix is scrubbed on exit. */
 typedef bool (*nts104_consumer)(void *,const uint8_t *,size_t,unsigned);
 enum ntsfs_status nts104_use(struct po64_service *,uint64_t,uint64_t,size_t,
- const struct ntr104_registry *,uint8_t scratch[NTP_MAX_PACKAGE],nts104_consumer,void *);
+ const struct ntr104_registry *,uint8_t *scratch,size_t scratch_capacity,nts104_consumer,void *);
 #endif

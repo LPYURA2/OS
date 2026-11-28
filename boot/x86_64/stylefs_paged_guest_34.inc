@@ -462,15 +462,15 @@ bool s43_read_text(const struct po64_row *row,char *out,size_t cap,size_t *bytes
 }
 /* Separate principal for an explicit, exact-revision package read.
  * Scratch never belongs to Explorer or a user process. */
-static uint8_t s69_package_scratch[NTP_MAX_PACKAGE];
+static uint8_t s69_package_scratch[NTP105_MAX_PACKAGE];
 bool s104_use_tea_file(const struct po64_row *row,const struct ntr104_registry *registry,
  nts104_consumer consumer,void *ctx){
  if(!s41_root_view()||!row||!registry||row->entry.kind!=SD64_FILE||
-    row->bytes<22||row->bytes>NTP_MAX_PACKAGE)return false;
+    row->bytes<22||row->bytes>NTP105_MAX_PACKAGE)return false;
  struct po64_service *s=&s34_work.volume.objects;
  uint64_t token=0;
  if(po64_grant(s,404,&row->entry.key,row->entry.target,row->revision,&token)!=PO64_OK)return false;
- enum ntsfs_status status=nts104_use(s,404,token,(size_t)row->bytes,registry,s69_package_scratch,consumer,ctx);
+ enum ntsfs_status status=nts104_use(s,404,token,(size_t)row->bytes,registry,s69_package_scratch,sizeof s69_package_scratch,consumer,ctx);
  if(s->active){
   if(po64_revoke(s,404,token)!=PO64_OK)fail("tea104-stylefs-revoke");
  }else (void)pv64_close(&s34_work.volume);

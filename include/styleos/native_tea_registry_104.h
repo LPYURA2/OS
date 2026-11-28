@@ -7,7 +7,7 @@
  * Exact manifest/ELF/package pins are copied, no borrowed caller pointers.
  * No automatic update or ambient permissions; installation persistence and
  * publisher verification are separate policies. Zero-initialize once.
- * Current live package bound is 16 KiB; existing loader applies ELF limits. */
+ * Current live package bound is 136 KiB; existing loader applies ELF limits. */
 enum { NTR104_SLOTS=4,NTR104_NAME=64,NTR104_MANIFEST=4096 };
 struct ntr104_record {
  bool used,wait_input;
