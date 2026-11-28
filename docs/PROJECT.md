@@ -1,3 +1,6 @@
+## 2026-11-28 — StyleOS product direction and native applications 83 candidate
+StyleOS is not intended to compete with Windows or Linux; high everyday usability and sustainable development are the owner priorities. See [owner requirements](STYLEOS_OWNER_REQUIREMENTS.md). Stage 82 CI 46130513032 19/21 successful at observation; candidate compact retained text rendering follows. [Handoff](NEXT_CHAT_NATIVE_APPS_83.md).
+
 ## Deep Drop 72 — текст между независимыми приложениями
 
 База — проверенный Deep Drop 71, коммит `4fa9d9b3b6b5e717605c1dd18bf2540cef3e9525`.

@@ -51,6 +51,14 @@ struct nwc_patch {
     uint32_t generation;
     uint32_t pixel[NWC_TILE_PIXELS];
 };
+/* Compact retained text over the rectangle frame, below raster patches.
+ * Each opaque line clips glyphs to its own width and fixed 20px height.
+ * Initial trusted service contract, not a public wire or arbitrary font. */
+enum { NWC_TEXT_RUNS=8,NWC_TEXT_GLYPHS=64,NWC_TEXT_HEIGHT=20 };
+struct nwc_text_run {
+    uint32_t x,y,width,foreground,background,count;
+    uint32_t cp[NWC_TEXT_GLYPHS];
+};
 struct nwc_port {
     uint32_t window_id, owner_pid, session_id;
     uint64_t scheduler_handle, user_root;
@@ -63,6 +71,8 @@ struct nwc_port {
     struct nwc_patch patches[NWC_PATCH_SLOTS];
     unsigned patch_latest; /* 1-based last changed cell; 0 after full frame */
     uint32_t patch_base; /* generation of full frame preceding these patches */
+    unsigned text_count;
+    struct nwc_text_run text[NWC_TEXT_RUNS];
 };
 struct nwc_service {
     const struct pr_table *registry;
@@ -144,6 +154,12 @@ const struct nwc_patch *nwc_visible_patches(const struct nwc_service *,uint32_t 
     unsigned *latest);
 /* Trusted compositor reads base generation only for visible valid frames. */
 uint32_t nwc_visible_patch_base(const struct nwc_service *,uint32_t window);
+/* Trusted complete text layer replacement. Refuses while raster patches
+ * exist; caller may explicitly publish a new frame first. Count 0 clears.
+ * Staged copies only; exact owner, generation and geometry are required. */
+enum nwc_status nwc_publish_text(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+    uint64_t window,uint32_t expected,const struct nwc_text_run *,unsigned count);
+const struct nwc_text_run *nwc_visible_text(const struct nwc_service *,uint32_t,unsigned *count);
 /* Read-only condition for a trusted serialized wait broker. Same authority
  * checks as receive; no event consumption or output pointer. */
 enum nwc_status nwc_input_ready(struct nwc_service *,uint32_t,uint64_t,uint64_t,uint64_t);

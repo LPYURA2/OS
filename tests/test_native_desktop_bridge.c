@@ -325,6 +325,33 @@ int main(void)
         }
     }
     assert(ndb_task_box(800,600,5,0).w==105);
+    /* Compact retained Cyrillic/Latin text uses the existing font and
+     * does not consume a raster cell per glyph. */
+    assert(usr_select(&sessions,s1)==USR_OK);
+    const struct nwc_rect text_frame={0,0,100,100,0x112233};
+    assert(nwc_publish_frame(&ipc,p4,64,262144,w4,&text_frame,1)==NWC_OK);
+    update(1);
+    struct nwc_text_run line={.x=4,.y=6,.width=90,.foreground=0xffffff,
+        .background=0x263345,.count=6,.cp={0x421,0x442,0x438,0x43b,0x44c,'!'}};
+    assert(nwc_publish_text(&ipc,p4,65,262144,w4,1,&line,1)==NWC_DENIED);
+    assert(nwc_publish_text(&ipc,p4,64,262144,w4,2,&line,1)==NWC_STALE);
+    line.cp[6]=1;
+    assert(nwc_publish_text(&ipc,p4,64,262144,w4,1,&line,1)==NWC_INVALID);
+    line.cp[6]=0;update(0);
+    assert(nwc_publish_text(&ipc,p4,64,262144,w4,1,&line,1)==NWC_OK);
+    update(2);
+    unsigned ink=0;
+    for(unsigned y=26;y<46;++y)for(unsigned x=24;x<114;++x)
+        if(framebuffer[y*800u+x]!=0x263345)++ink;
+    assert(ink>20&&framebuffer[26u*800u+24u]==0x263345&&framebuffer[25u*800u+24u]==0x112233);
+    assert(nwc_publish_text(&ipc,p4,64,262144,w4,2,&line,1)==NWC_OK);
+    update(0);
+    assert(nwc_publish_text(&ipc,p4,64,262144,w4,2,0,0)==NWC_OK);
+    update(2);
+    assert(framebuffer[26u*800u+24u]==0x112233);
+    assert(ws_close_app(&windows,p4,w4)==WS_OK&&nwc_reconcile(&ipc)==1);
+    update(1);
+    puts("STYLEOS 83 compact retained text and cleanup PASS");
     puts("STYLEOS 73 native panel layout / stale token / damage PASS");
     puts("STYLEOS 774 DESKTOP BRIDGE PASS: authentic pixels, clipping, damage, restart, user switch, lock, fault and stale cleanup");
     return 0;

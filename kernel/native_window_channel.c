@@ -288,7 +288,8 @@ enum nwc_status nwc_publish_tile(struct nwc_service *s,uint32_t pid,
     tile.generation=prior+1u;
     for(size_t i=0;i<(size_t)w*h;++i)tile.pixel[i]=pixels[i]&UINT32_C(0x00ffffff);
     zero(&p->frame,sizeof p->frame);
-    zero(p->patches,sizeof p->patches);p->patch_latest=0;p->patch_base=0;
+    zero(p->patches,sizeof p->patches);p->patch_latest=0;
+    zero(p->text,sizeof p->text);p->text_count=0;p->patch_base=0;
     p->tile=tile;p->has_tile=true;
     return NWC_OK;
 }
@@ -355,6 +356,32 @@ static bool patches_valid(const struct nwc_port *p,unsigned width,unsigned heigh
         p->patches[p->patch_latest-1].generation==p->frame.generation):
         !p->patch_latest&&p->patch_base==p->frame.generation;
 }
+static bool text_run_valid(const struct nwc_text_run *q,unsigned width,unsigned height)
+{
+    if(!q->width||q->x>=width||q->width>width-q->x||q->y>=height||
+       NWC_TEXT_HEIGHT>height-q->y||!q->count||q->count>NWC_TEXT_GLYPHS||
+       q->foreground>0xffffffu||q->background>0xffffffu)return false;
+    for(unsigned j=0;j<NWC_TEXT_GLYPHS;++j){
+        uint32_t cp=q->cp[j];
+        if(j>=q->count){if(cp)return false;}
+        else if(cp<32u||(cp>=127u&&cp<=159u)||cp>0x10ffffu||
+                (cp>=0xd800u&&cp<=0xdfffu))return false;
+    }
+    return true;
+}
+static bool text_valid(const struct nwc_port *p,unsigned width,unsigned height)
+{
+    if(p->text_count>NWC_TEXT_RUNS)return false;
+    for(unsigned i=0;i<NWC_TEXT_RUNS;++i){
+        if(i<p->text_count){
+            if(!text_run_valid(&p->text[i],width,height))return false;
+        }else{
+            const unsigned char *z=(const void *)&p->text[i];
+            for(size_t j=0;j<sizeof p->text[i];++j)if(z[j])return false;
+        }
+    }
+    return true;
+}
 bool nwc_frame_valid(const struct nwc_port *p,const struct ws_window *w)
 {
     if(!p||!w)return false;
@@ -362,14 +389,15 @@ bool nwc_frame_valid(const struct nwc_port *p,const struct ws_window *w)
     if(!f->count){
         const unsigned char *b=(const void *)f;
         for(size_t i=0;i<sizeof *f;++i)if(b[i])return false;
-        return patches_valid(p,0,0);
+        return !p->text_count&&text_valid(p,0,0)&&patches_valid(p,0,0);
     }
     if(p->has_tile||!f->generation||f->window_id!=p->window_id||
        !frame_rects(f->rect,f->count,w))return false;
     const unsigned char *unused=(const void *)&f->rect[f->count];
     for(size_t i=0;i<(NWC_FRAME_RECTS-f->count)*sizeof f->rect[0];++i)
         if(unused[i])return false;
-    return patches_valid(p,(unsigned)w->bounds.width,(unsigned)w->bounds.height);
+    return text_valid(p,(unsigned)w->bounds.width,(unsigned)w->bounds.height)&&
+        patches_valid(p,(unsigned)w->bounds.width,(unsigned)w->bounds.height);
 }
 enum nwc_status nwc_publish_frame(struct nwc_service *s,uint32_t pid,uint64_t handle,
                                   uint64_t root,uint64_t window,const struct nwc_rect *rect,unsigned count)
@@ -388,7 +416,8 @@ enum nwc_status nwc_publish_frame(struct nwc_service *s,uint32_t pid,uint64_t ha
     next.window_id=win;next.generation=prior+1;next.count=count;
     for(unsigned i=0;i<count;++i)next.rect[i]=rect[i];
     zero(&p->tile,sizeof p->tile);p->has_tile=false;p->frame=next;
-    zero(p->patches,sizeof p->patches);p->patch_latest=0;p->patch_base=next.generation;
+    zero(p->patches,sizeof p->patches);p->patch_latest=0;
+    zero(p->text,sizeof p->text);p->text_count=0;p->patch_base=next.generation;
     return NWC_OK;
 }
 const struct nwc_frame *nwc_visible_frame(const struct nwc_service *s,uint32_t win)
@@ -481,6 +510,48 @@ const struct nwc_patch *nwc_visible_patches(const struct nwc_service *s,uint32_t
 uint32_t nwc_visible_patch_base(const struct nwc_service *s,uint32_t win)
 {
     return nwc_visible_frame(s,win)?find_port(s,win)->patch_base:0;
+}
+enum nwc_status nwc_publish_text(struct nwc_service *s,uint32_t pid,uint64_t handle,
+    uint64_t root,uint64_t window,uint32_t expected,const struct nwc_text_run *runs,unsigned count)
+{
+    if(!expected||count>NWC_TEXT_RUNS||(count&&!runs))return NWC_INVALID;
+    uint32_t win=0;
+    enum nwc_status status=resolve_port(s,pid,handle,root,window,&win);
+    if(status!=NWC_OK)return status;
+    struct nwc_port *p=mut_port(s,win);
+    if(!p)return NWC_MISSING;
+    if(!authentic(p,pid,handle,root)||!selected(s,p))return NWC_DENIED;
+    const struct ws_window *w=ws_find(s->windows,win);
+    if(!p->frame.count||!nwc_frame_valid(p,w)||p->patch_latest)return NWC_NOT_READY;
+    if(p->frame.generation!=expected)return NWC_STALE;
+    for(unsigned i=0;i<count;++i)
+        if(!text_run_valid(&runs[i],(unsigned)w->bounds.width,(unsigned)w->bounds.height))return NWC_INVALID;
+    /* Staged caller-owned immutable runs may not alias this service. */
+    if(count){
+        uintptr_t a=(uintptr_t)runs,b=(uintptr_t)s;
+        size_t bytes=(size_t)count*sizeof *runs;
+        if(bytes>UINTPTR_MAX-a||sizeof *s>UINTPTR_MAX-b||
+           !(a+bytes<=b||b+sizeof *s<=a))return NWC_INVALID;
+    }
+    bool equal=count==p->text_count;
+    for(unsigned i=0;equal&&i<count;++i){
+        const unsigned char *a=(const void *)&runs[i],*b=(const void *)&p->text[i];
+        for(size_t j=0;j<sizeof *runs;++j)if(a[j]!=b[j]){equal=false;break;}
+    }
+    if(equal)return NWC_OK;
+    if(expected==UINT32_MAX)return NWC_OVERFLOW;
+    zero(p->text,sizeof p->text);
+    for(unsigned i=0;i<count;++i)p->text[i]=runs[i];
+    p->text_count=count;
+    ++p->frame.generation;p->patch_base=p->frame.generation;
+    return NWC_OK;
+}
+const struct nwc_text_run *nwc_visible_text(const struct nwc_service *s,uint32_t win,unsigned *count)
+{
+    if(!count||!nwc_visible_frame(s,win))return 0;
+    const struct nwc_port *p=find_port(s,win);
+    *count=p->text_count;
+    return p->text;
 }
 enum nwc_status nwc_visible_tile(const struct nwc_service *s,uint32_t win,
                                  struct nwc_tile *out)

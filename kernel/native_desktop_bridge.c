@@ -1,4 +1,6 @@
 #include <styleos/native_desktop_bridge.h>
+/* Existing licensed StyleOS Desktop Sans, no new font resource. */
+#include "desktop_font.inc"
 
 /* The maximum tile is 16x16. Window coordinates are trusted registry fields
  * but may legitimately be negative; arithmetic stays within signed int. */
@@ -159,6 +161,45 @@ unsigned ndb_track(const struct nwc_service *ipc,struct ndb_tracker *tracker,
 {
     return ndb_track_top(ipc,tracker,width,height,0,damage);
 }
+static uint32_t text_blend(uint32_t bg,uint32_t fg,unsigned a)
+{
+    uint32_t result=0;
+    for(unsigned shift=0;shift<24;shift+=8)
+        result|=((((bg>>shift)&255u)*(3u-a)+((fg>>shift)&255u)*a)/3u)<<shift;
+    return result;
+}
+static unsigned paint_text(const struct nwc_text_run *run,const struct ws_bounds *bounds,
+                          int width,int height,ndb_pixel_plot plot,ndb_rect_plot fill,void *opaque)
+{
+    const struct nwc_rect rect={run->x,run->y,run->width,NWC_TEXT_HEIGHT,0};
+    const struct desk_box box=frame_clip(bounds,&rect,width,height);
+    if(!box.w)return 0;
+    if(fill)fill(opaque,box.x,box.y,box.w,box.h,run->background);
+    else for(int y=box.y;y<box.y+box.h;++y)for(int x=box.x;x<box.x+box.w;++x)
+        plot(opaque,x,y,run->background);
+    int64_t left=(int64_t)bounds->x+run->x,top=(int64_t)bounds->y+run->y,x=left;
+    unsigned painted=(unsigned)box.w*(unsigned)box.h;
+    for(unsigned i=0;i<run->count&&x<box.x+box.w;++i){
+        uint32_t cp=run->cp[i];
+        unsigned index=cp>=32&&cp<127?cp-32:cp==0x401?95:
+            cp>=0x410&&cp<=0x44f?96+cp-0x410:cp==0x451?160:63-32;
+        const struct desk_font_glyph *g=&desk_font[index];
+        for(unsigned row=0;row<20;++row){
+            int64_t y=top+row;
+            if(y<box.y||y>=box.y+box.h)continue;
+            uint32_t mask=g->rows[row];
+            for(unsigned col=0;mask;mask>>=2,++col){
+                int64_t px=x+col;unsigned a=mask&3u;
+                if(a&&px>=box.x&&px<box.x+box.w){
+                    plot(opaque,(int)px,(int)y,text_blend(run->background,run->foreground,a));
+                    ++painted;
+                }
+            }
+        }
+        x+=g->step;
+    }
+    return painted;
+}
 unsigned ndb_paint_top(const struct nwc_service *ipc,int width,int height,uint32_t top,
                        ndb_pixel_plot plot,ndb_rect_plot fill,void *opaque)
 {
@@ -181,6 +222,12 @@ unsigned ndb_paint_top(const struct nwc_service *ipc,int width,int height,uint32
                 else for(int y=r.y;y<r.y+r.h;++y)
                     for(int x=r.x;x<r.x+r.w;++x)plot(opaque,x,y,frame->rect[j].rgb);
                 unsigned n=(unsigned)r.w*(unsigned)r.h;
+                painted=n>UINT32_MAX-painted?UINT32_MAX:painted+n;
+            }
+            unsigned text_count=0;
+            const struct nwc_text_run *text=nwc_visible_text(ipc,window->id,&text_count);
+            if(text)for(unsigned j=0;j<text_count;++j){
+                unsigned n=paint_text(&text[j],&window->bounds,width,height,plot,fill,opaque);
                 painted=n>UINT32_MAX-painted?UINT32_MAX:painted+n;
             }
             unsigned latest=0;
