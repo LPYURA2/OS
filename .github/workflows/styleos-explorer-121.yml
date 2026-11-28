@@ -1,0 +1,31 @@
+name: StyleOS Explorer mutation guest 121
+on:
+  push:
+    branches: [feature/styleos-explorer-121]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  explorer-mutation-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          set -euo pipefail
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Actual CPL3 mutation and durable reopen
+        run: python3 tools/test_explorer_mutation_121_guest.py --output build/explorer-121
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: explorer-mutation-121
+          path: |
+            build/explorer-121/
+            !build/explorer-121/**/*.raw
+          if-no-files-found: warn

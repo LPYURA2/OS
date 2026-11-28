@@ -2,7 +2,7 @@
 The ordinary boot image contains approved package bytes, not linked app code."""
 import hashlib,struct,zipfile
 from tea_package import pack,inspect
-def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_probe_103=False):
+def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_probe_103=False,explorer_probe_121=False):
     code=bytearray()
     labels={};fix=[]
     def emit(b):code.extend(b)
@@ -181,6 +181,54 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
         # Reconciliation has removed the old grant before user resumes.
         call103(0x137);status103(2)
         emit(b'\x31\xdb');call103(0x100,0x976332);status103(0)
+    if explorer_probe_121 and index==1:
+        # Exact separate ID-managed fixture; scope is directory 3.
+        # Private DATA: command 0x400, receipt 0x600, row 0x700.
+        def call121(op,addr=0,size=0,arg=None):
+            if arg is not None:emit(b'\xbb'+struct.pack('<I',arg))
+            emit(b'\xb8'+struct.pack('<I',op)+b'\xb9'+struct.pack('<I',addr)+b'\xba'+struct.pack('<I',size)+b'\xcd\x80')
+        def status121(n):
+            emit(b'\x83\xf8'+bytes([n]));jump(b'\x0f\x85','fail')
+        def take121(label,addr,size):
+            emit(b'\x48\x85\xd2');jump(b'\x0f\x84','fail')
+            emit(b'\x48\x89\xd3')
+            mark(label);call121(0x143,addr,size)
+            emit(b'\x83\xf8\x04');jump(b'\x0f\x84',label);status121(0)
+        def word121(off,val):
+            emit(b'\xc7\x86'+struct.pack('<I',off)+struct.pack('<I',val))
+        def expect121(off,val):
+            emit(b'\x81\xbe'+struct.pack('<I',off)+struct.pack('<I',val));jump(b'\x0f\x85','fail')
+        def copy121(src,dst):
+            emit(b'\x48\x8b\x86'+struct.pack('<I',src)+b'\x48\x89\x86'+struct.pack('<I',dst))
+        def command121(op,name=b'',ordinal=0,object_id=0):
+            emit(b'\xbf\x00\x04\x00\x12\xb9\x40\x01\x00\x00\x31\xc0\xfc\xf3\xaa')
+            word121(0x400,1);word121(0x404,op);word121(0x40c,len(name))
+            for i in range(3):copy121(0x600+8*i,0x410+8*i)
+            word121(0x428,ordinal);word121(0x430,object_id)
+            if object_id:copy121(0x720,0x438)
+            if name:word121(0x440,int.from_bytes(name.ljust(4,b'\0'),'little'))
+        def edit121(label):
+            call121(0x145,0x12000400,320,0);status121(0)
+            take121(label,0x12000600,24)
+            expect121(0x610,3)
+        def row121(label,object_id,name):
+            call121(0x140,arg=1);status121(0);take121(label,0x12000700,296)
+            for off,val in ((0,1),(4,1),(8,1),(16,object_id),(20,0),(24,0),(28,0),(40,ord(name))):
+                expect121(0x700+off,val)
+        call121(0x146,arg=0);status121(0);take121('ex121_refresh',0x12000600,24)
+        expect121(0x610,3)
+        command121(1,b'z')
+        call121(0x145,0x12000ff0,320,0);status121(1)
+        edit121('ex121_create')
+        # Original command's snapshot is stale; do not replay mutation.
+        call121(0x145,0x12000400,320,0);status121(3)
+        row121('ex121_row_z',7,'z')
+        command121(3,b'y',1,7);edit121('ex121_rename')
+        row121('ex121_row_y',7,'y')
+        command121(4,b'',1,7);edit121('ex121_delete')
+        command121(1,b'z');edit121('ex121_recreate')
+        row121('ex121_row_new',8,'z')
+        emit(b'\x31\xdb');call121(0x100,0x976332);status121(0)
     mark('poll')
     emit(b'\xb8\x02\x01\x00\x00\x31\xdb\xb9\x00\x01\x00\x12\xba\x40\x00\x00\x00\xcd\x80')
     emit(b'\x85\xc0');jump(b'\x0f\x85','poll')
@@ -217,9 +265,9 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
         '#define '+prefix+'bytes '+str(len(package))+'u\n'+arr(prefix+'manifest',meta)+
         arr(prefix+'pkg_hash',hashlib.sha256(package).digest())+
         arr(prefix+'elf_hash',hashlib.sha256(blob).digest()))
-def build(folder,file_probe_92=False,file_probe_94=False,file_probe_103=False):
+def build(folder,file_probe_92=False,file_probe_94=False,file_probe_103=False,explorer_probe_121=False):
     (folder/'native_sample_69.h').write_text(
-        make(folder,0,'Native-sample',0x2579a1)+make(folder,1,'Native-peer',0x976332,file_probe_92=file_probe_92,file_probe_94=file_probe_94,file_probe_103=file_probe_103))
+        make(folder,0,'Native-sample',0x2579a1)+make(folder,1,'Native-peer',0x976332,file_probe_92=file_probe_92,file_probe_94=file_probe_94,file_probe_103=file_probe_103,explorer_probe_121=explorer_probe_121))
     # Both approved packages must carry independent executable identities.
     first=(folder/'Native-sample.elf').read_bytes()
     second=(folder/'Native-peer.elf').read_bytes()

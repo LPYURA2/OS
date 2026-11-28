@@ -273,7 +273,16 @@ void s90_native_file_pump(void){
   if(q->files->fs->active&&sequence!=q->files->fs->pair.sequence){
    struct sd64_key k=s34_key(1,'a');
    uint64_t parent=s34_work.root_view.parent,first=s34_work.root_view.first;
-   if(po64_grant(q->files->fs,101,&k,2,1,&s34_work.token)!=PO64_OK||!s42_load(parent,first)){
+   if(s34_work.explorer.op==5&&s34_work.explorer.state==2&&s34_work.explorer.result==PO64_OK){
+    /* Namespace commit is independent of old shell rows/diagnostic file.
+     * A missing diagnostic object is not a reason to unmount valid data. */
+    s34_work.token=0;
+    (void)po64_grant(q->files->fs,101,&k,2,1,&s34_work.token);
+    if(!s42_load(parent,first)){
+     s34_work.depth=0;
+     if(!s42_load(1,0))arch_puts("STYLEOS EXPLORER121 LEGACY VIEW UNAVAILABLE\n");
+    }
+   }else if(po64_grant(q->files->fs,101,&k,2,1,&s34_work.token)!=PO64_OK||!s42_load(parent,first)){
     (void)pv64_close(&s34_work.volume);
     arch_puts("SFS99 POSTCOMMIT VIEW UNAVAILABLE\n");
    }
@@ -451,7 +460,7 @@ enum po64_status s103_file_probe_offer(uint32_t pid,uint64_t handle,uint64_t roo
 #endif
 static void s39_read(void){
  struct po64_service *s=&s34_work.volume.objects;
- if(!s->active||s->busy)return;
+ if(!s->active||s->busy||(!s34_work.token&&s34_work.observations>=2))return;
  uint64_t seen=0;
  if(po64_read(s,101,s34_work.token,s34_sink,&seen)!=PO64_OK||seen!=S34_BYTES){
   (void)pv64_close(&s34_work.volume);

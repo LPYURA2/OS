@@ -37,15 +37,17 @@ static bool sink(void *c,uint64_t at,const uint8_t *p,size_t n){return fwrite(p,
 int main(int argc,char **argv){
  if(argc!=3&&argc!=4)return 1;
  bool install=!strcmp(argv[1],"newtea107");
- bool ids=install||!strcmp(argv[1],"new50")||!strcmp(argv[1],"check50");
+ bool explorer=!strcmp(argv[1],"newtea121");
+ bool check_explorer=!strcmp(argv[1],"check121");
+ bool ids=install||explorer||!strcmp(argv[1],"new50")||!strcmp(argv[1],"check50");
  bool stream=!strcmp(argv[1],"newtea103");
  bool check_stream=!strcmp(argv[1],"check103");
- bool tea=install||stream||!strcmp(argv[1],"newtea69");
+ bool tea=install||explorer||stream||!strcmp(argv[1],"newtea69");
  bool live=tea||!strcmp(argv[1],"new39")||!strcmp(argv[1],"new50");
  bool create=live||!strcmp(argv[1],"new");
  bool object=!strcmp(argv[1],"get37");
  bool verify=!strcmp(argv[1],"check46")||!strcmp(argv[1],"check50");
- if((create&&argc!=(tea?4:3))||(!create&&(argc!=4||(!verify&&!object&&!check_stream&&strcmp(argv[1],"get")))))return 1;
+ if((create&&argc!=(tea?4:3))||(!create&&(argc!=4||(!verify&&!object&&!check_stream&&!check_explorer&&strcmp(argv[1],"get")))))return 1;
  if(tea){
   FILE *f=fopen(argv[3],"rb");if(!f)return 1;
   tea69_size=fread(tea69,1,sizeof tea69,f);
@@ -91,7 +93,19 @@ int main(int argc,char **argv){
   struct sd64_key k={.parent=3,.length=5,.name="z.bin"};
   ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,7,0,8193,source103,0,&pair)==PP64_OK;
  }
- if(ok&&check_stream){
+ if(ok&&check_explorer){
+  struct sd64_key k={.parent=3,.length=1,.name={'z'}};
+  uint64_t id=0;uint8_t kind=0;struct sfs64_file file;
+  ok=!strcmp(argv[3],"verified")&&pp64_mount(&b,&l,&w.pair,nodes,32,runs,32,&pair)==PP64_OK&&
+   pair.sequence==10&&pair.id_floor==8&&
+   sd64_lookup(&b,1,l.dir,&w.pair.dir.root,&k,w.pair.dw.page,&id,&kind)==SD64_OK&&id==8&&kind==SD64_FILE&&
+   ip64_stat(&b,1,l.inode,&w.pair.inode.root,id,&w.pair.iw,&file)==IP64_OK&&file.bytes==0&&file.revision==1;
+  k.name[0]='y';
+  if(ok)ok=sd64_lookup(&b,1,l.dir,&w.pair.dir.root,&k,w.pair.dw.page,&id,&kind)==SD64_MISSING;
+  k=(struct sd64_key){.parent=3,.length=5,.name="x.txt"};
+  if(ok)ok=sd64_lookup(&b,1,l.dir,&w.pair.dir.root,&k,w.pair.dw.page,&id,&kind)==SD64_OK&&id==4&&kind==SD64_FILE&&
+   ip64_stat(&b,1,l.inode,&w.pair.inode.root,id,&w.pair.iw,&file)==IP64_OK&&file.bytes==sizeof text43-1&&file.revision==1;
+ }else if(ok&&check_stream){
   uint64_t seen=0;struct sd64_key k={.parent=3,.length=5,.name="z.bin"};
   ok=pp64_mount(&b,&l,&w.pair,nodes,32,runs,32,&pair)==PP64_OK&&
      pp64_get(&b,&l,&w,nodes,32,runs,32,pair.sequence,&k,7,2,sink103,&seen)==PP64_OK&&seen==8193;

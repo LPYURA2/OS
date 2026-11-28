@@ -249,7 +249,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   }
 #endif
   slot->context.gpr[0]=status;slot->context.gpr[3]=value;
-#ifdef STYLEOS_FILE_PROBE_92
+#if defined(STYLEOS_FILE_PROBE_92) || defined(STYLEOS_EXPLORER_PROBE_121)
   if(operation>=EX113_ROW&&operation<=EX120_REFRESH){
    arch_puts("STYLEOS EXPLORER114 CALL");fld848("pid",ticket->pid);fld848("op",operation);
    fld848("status",status);fld848("value",value);arch_putc('\n');

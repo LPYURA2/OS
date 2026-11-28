@@ -1,7 +1,7 @@
 name: StyleOS Explorer namespace wire 120
 on:
   push:
-    branches: [feature/styleos-explorer-120]
+    branches: [feature/styleos-explorer-120, feature/styleos-explorer-121]
   workflow_dispatch:
 permissions:
   contents: read

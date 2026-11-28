@@ -805,6 +805,11 @@ if(index==1){
  if(!dst)fail("file92-delivery");
  for(unsigned i=0;i<8;++i)dst[i]=(uint8_t)(token>>(8*i));
  arch_puts("STYLEOS FILE92 GRANT");field("pid",p->pid);field("token",token);arch_putc('\n');
+#elif defined(STYLEOS_EXPLORER_PROBE_121)
+ const struct pr_entry *p=pr_find(pr_global(),c.out.pid);
+ if(!p||s113_explorer_offer(p->pid,p->scheduler_handle,p->page_root,3)!=PO64_OK||
+    s120_explorer_allow_edit(p->pid,p->scheduler_handle,p->page_root)!=PO64_OK)fail("explorer121-grant");
+ arch_puts("STYLEOS EXPLORER121 GRANT");field("pid",p->pid);arch_putc('\n');
 #elif defined(STYLEOS_FILE_PROBE_94)
  const struct pr_entry *p=pr_find(pr_global(),c.out.pid);
  if(!p||s94_file_probe_offer(p->pid,p->scheduler_handle,p->page_root)!=PO64_OK)
