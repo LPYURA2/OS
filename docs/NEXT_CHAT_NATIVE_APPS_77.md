@@ -32,3 +32,6 @@ trap site from linked disassembly, preemption, stop and zero leases/writes.
 No general ELF packaging or runtime discovery yet; no guest PASS until CI.
 Owner confirmed that app UI implementation will use supplied designs when
 infrastructure is accepted. Do not begin standalone product UI before that.
+
+## Guest SDK result (observed)
+CI 46129381517 native-sdk-77-guest SUCCESS: QEMU 8.2.2, 17 actual CPL3 events, IRQ counts 2/4/2, cross-page IPC/refusal/forced stop each 1, residual lease pages and disk writes 0. Remaining ordinary-shell, forced-stop and StyleFS jobs still running at observation; do not claim complete 17/17 until checked. Stage 78 candidate is independent host-only graphics work and retains all regressions.
