@@ -48,7 +48,7 @@ static bool owned_zero(const struct stop_owned *r){
  return clear_bytes(r->owner,sizeof *r->owner)&&clear_bytes(r->window,sizeof *r->window)&&
         clear_bytes(r->port,sizeof *r->port);
 }
-static bool input_probe,focus_probe,frame_probe,patch81_probe;
+static bool input_probe,focus_probe,frame_probe,patch81_probe,text84_probe;
 static bool grant_owned(uint32_t pid,uint64_t gen,uint32_t *win){
  const struct pr_entry *p=pr_find(pr_global(),pid);
  struct usr_runtime *s=sessions();struct nwc_service *c=channels();
@@ -106,8 +106,8 @@ static bool nc_equal(const uint8_t *a,const uint8_t *b,size_t n){unsigned diff=0
  * pinned test catalog, never in the ordinary kernel or generic installer. */
 static bool wide_record(const uint8_t *r){
  static const uint8_t a[8]={'w','i','d','e','7','5',0,0},b[8]={'f','a','u','l','t','7','5',0};
- static const uint8_t x[8]="ipc76",y[8]="wide76",z[8]="ipc81";
- return nc_equal(r+40,a,8)||nc_equal(r+40,b,8)||nc_equal(r+40,x,8)||nc_equal(r+40,y,8)||nc_equal(r+40,z,8);
+ static const uint8_t x[8]="ipc76",y[8]="wide76",z[8]="ipc81",q[8]="ipc84";
+ return nc_equal(r+40,a,8)||nc_equal(r+40,b,8)||nc_equal(r+40,x,8)||nc_equal(r+40,y,8)||nc_equal(r+40,z,8)||nc_equal(r+40,q,8);
 }
 /* Only this pinned three-program workload waits for a second F9. Keep the
  * admission identities so a recycled slot can never receive the release. */
@@ -124,13 +124,14 @@ static bool wide_catalog(void){
  return true;
 }
 static bool stop76_catalog(void){
- static const uint8_t names[3][8]={"ipc76","wide76","peer76"},patch_names[3][8]={"ipc81","wide76","peer76"};
- bool old=true,new=true;
+ static const uint8_t names[3][8]={"ipc76","wide76","peer76"},patch_names[3][8]={"ipc81","wide76","peer76"},text_names[3][8]={"ipc84","wide76","peer76"};
+ bool old=true,new=true,text=true;
  for(unsigned i=0;i<3;i++){
   old=old&&nc_equal(catalog+16+i*NC_RECORD+40,names[i],8);
   new=new&&nc_equal(catalog+16+i*NC_RECORD+40,patch_names[i],8);
+  text=text&&nc_equal(catalog+16+i*NC_RECORD+40,text_names[i],8);
  }
- patch81_probe=new;return old||new;
+ text84_probe=text;patch81_probe=new||text;return old||new||text;
 }
 static bool remember_wide_owners(const struct pa_row *rows){
  for(unsigned i=0;i<3;i++){
@@ -182,10 +183,17 @@ static bool stop76_release(void){
  if(patch81_probe){
   const struct nwc_frame *f=nwc_visible_frame(channels(),stop_window);unsigned latest=0;
   const struct nwc_patch *patch=nwc_visible_patches(channels(),stop_window,&latest);
-  if(!f||f->generation!=3||f->count!=1||f->rect[0].rgb!=0x224466||!patch||latest!=1||
+  if(!f||f->generation!=(text84_probe?4u:3u)||f->count!=1||f->rect[0].rgb!=0x224466||!patch||latest!=1||
      patch[0].x!=32||patch[0].y!=32||patch[0].w!=16||patch[0].h!=16)return false;
   for(unsigned i=0;i<256;i++)if(patch[0].pixel[i]!=0x91c725)return false;
   for(unsigned i=1;i<NWC_PATCH_SLOTS;i++)if(!clear_bytes(&patch[i],sizeof patch[i]))return false;
+  if(text84_probe){
+   unsigned n=0;const struct nwc_text_run *line=nwc_visible_text(channels(),stop_window,&n);
+   if(!line||n!=1||line[0].x!=8||line[0].y!=8||line[0].width!=120||
+      line[0].foreground!=0xffffff||line[0].background!=0x263345||line[0].count!=6||
+      line[0].cp[0]!=0x421||line[0].cp[1]!=0x442||line[0].cp[2]!=0x438||
+      line[0].cp[3]!=0x43b||line[0].cp[4]!=0x44c||line[0].cp[5]!='!')return false;
+  }
   arch_puts("STYLEOS PATCH81 VERIFIED");field("pid",a->pid);field("window",stop_window);field("generation",f->generation);arch_putc('\n');
  }
  uint8_t wire[64],guard[4],marker[4],neighbor[8];

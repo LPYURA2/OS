@@ -546,6 +546,26 @@ enum nwc_status nwc_publish_text(struct nwc_service *s,uint32_t pid,uint64_t han
     ++p->frame.generation;p->patch_base=p->frame.generation;
     return NWC_OK;
 }
+enum nwc_status nwc_text_wire(struct nwc_service *s,uint32_t pid,uint64_t handle,
+    uint64_t root,uint64_t window,const uint8_t *wire,size_t bytes,uint64_t *generation)
+{
+    if(!generation||!wire||bytes<NWC_TEXT_HEADER||bytes>NWC_TEXT_WIRE_MAX||
+       patch_u32(wire)!=1)return NWC_INVALID;
+    uint32_t expected=patch_u32(wire+4),count=patch_u32(wire+8);
+    if(!expected||count>NWC_TEXT_RUNS||bytes!=NWC_TEXT_HEADER+count*NWC_TEXT_RUN_BYTES)
+        return NWC_INVALID;
+    struct nwc_text_run runs[NWC_TEXT_RUNS]={0};
+    for(unsigned i=0;i<count;++i){
+        const uint8_t *p=wire+NWC_TEXT_HEADER+i*NWC_TEXT_RUN_BYTES;
+        struct nwc_text_run *q=&runs[i];
+        q->x=patch_u32(p);q->y=patch_u32(p+4);q->width=patch_u32(p+8);
+        q->foreground=patch_u32(p+12);q->background=patch_u32(p+16);q->count=patch_u32(p+20);
+        for(unsigned j=0;j<NWC_TEXT_GLYPHS;++j)q->cp[j]=patch_u32(p+24+4*j);
+    }
+    enum nwc_status result=nwc_publish_text(s,pid,handle,root,window,expected,runs,count);
+    if(result!=NWC_OK)return result;
+    return nwc_frame_generation(s,pid,handle,root,window,generation);
+}
 const struct nwc_text_run *nwc_visible_text(const struct nwc_service *s,uint32_t win,unsigned *count)
 {
     if(!count||!nwc_visible_frame(s,win))return 0;

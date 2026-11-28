@@ -159,6 +159,15 @@ uint32_t nwc_visible_patch_base(const struct nwc_service *,uint32_t window);
  * Staged copies only; exact owner, generation and geometry are required. */
 enum nwc_status nwc_publish_text(struct nwc_service *,uint32_t,uint64_t,uint64_t,
     uint64_t window,uint32_t expected,const struct nwc_text_run *,unsigned count);
+/* LE v1: version, expected generation, count; each run is 70 u32:
+ * x,y,width,foreground,background,count and 64 Unicode scalars.
+ * Exact packet length, unused scalars zero; count 0 clears the layer. */
+#define NWC_CALL_TEXT UINT64_C(0x122)
+#define NWC_TEXT_HEADER 12u
+#define NWC_TEXT_RUN_BYTES 280u
+#define NWC_TEXT_WIRE_MAX (NWC_TEXT_HEADER+NWC_TEXT_RUNS*NWC_TEXT_RUN_BYTES)
+enum nwc_status nwc_text_wire(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+    uint64_t window,const uint8_t *,size_t,uint64_t *generation);
 const struct nwc_text_run *nwc_visible_text(const struct nwc_service *,uint32_t,unsigned *count);
 /* Read-only condition for a trusted serialized wait broker. Same authority
  * checks as receive; no event consumption or output pointer. */

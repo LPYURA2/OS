@@ -220,7 +220,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
  }
  const uint64_t operation=pending860.gpr[0];
  const bool drop=operation>=DD_CALL_OFFER && operation<=DD_CALL_CANCEL;
- if(kind==RT865_SYSCALL && (drop||pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME||operation==NWC_CALL_PATCH||operation==NWC_CALL_FRAME_GEN)){
+ if(kind==RT865_SYSCALL && (drop||pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME||operation==NWC_CALL_PATCH||operation==NWC_CALL_FRAME_GEN||operation==NWC_CALL_TEXT)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
@@ -244,6 +244,22 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
    arch_puts("STYLEOS NATIVE PIXEL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
    fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
    fld848("rgb",pending860.gpr[2]);fld848("status",pixel);arch_putc('\n');
+#endif
+  }else if(operation==NWC_CALL_TEXT){
+   uint64_t generation=0,bytes=pending860.gpr[3];
+   uint8_t wire[NWC_TEXT_WIRE_MAX]={0};
+   if(bytes>=NWC_TEXT_HEADER&&bytes<=sizeof wire&&
+      s865_native_copy_data(id,ticket->pid,ticket->handle,ticket->child_root,
+                            pending860.gpr[2],wire,(size_t)bytes))
+    pixel=nwc_text_wire((struct nwc_service *)nwc_global(),ticket->pid,ticket->handle,
+      ticket->child_root,pending860.gpr[1],wire,(size_t)bytes,&generation);
+   slot->context.gpr[3]=pixel==NWC_OK?generation:0;
+   volatile uint8_t *wipe=wire;
+   for(size_t j=0;j<sizeof wire;++j)wipe[j]=0;
+#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+   arch_puts("STYLEOS NATIVE TEXT-CALL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
+   fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);fld848("bytes",bytes);
+   fld848("status",pixel);fld848("generation",slot->context.gpr[3]);arch_putc('\n');
 #endif
   }else if(operation==NWC_CALL_PATCH||operation==NWC_CALL_FRAME_GEN){
    uint64_t generation=0;

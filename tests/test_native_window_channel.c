@@ -127,10 +127,33 @@ int main(void)
     unsigned latest=0;
     const struct nwc_patch *view=nwc_visible_patches(&ipc,win_a,&latest);
     assert(view&&latest&&view[latest-1].pixel[0]==0x112233);
+    uint8_t text[NWC_TEXT_HEADER+NWC_TEXT_RUN_BYTES]={0};
+    text[0]=1;text[4]=6;text[8]=1;text[12]=4;text[16]=6;text[20]=90;
+    text[24]=0xff;text[25]=0xff;text[26]=0xff;text[32]=1;
+    text[36]=0x21;text[37]=4; /* Cyrillic capital Es */
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,text,sizeof text,&gen)==NWC_NOT_READY&&gen==6);
+    assert(nwc_publish_frame(&ipc,pid_a,16,65536,0,&frame,1)==NWC_OK);
+    text[4]=7;gen=999;
+    for(size_t n=0;n<sizeof text;++n)
+        assert(nwc_text_wire(&ipc,pid_a,16,65536,0,text,n,&gen)==NWC_INVALID&&gen==999);
+    assert(nwc_text_wire(&ipc,pid_b,32,131072,win_a,text,sizeof text,&gen)==NWC_DENIED&&gen==999);
+    text[40]=1;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,text,sizeof text,&gen)==NWC_INVALID&&gen==999);
+    text[40]=0;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,text,sizeof text,&gen)==NWC_OK&&gen==8);
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,text,sizeof text,&gen)==NWC_STALE&&gen==8);
+    text[4]=8;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,text,sizeof text,&gen)==NWC_OK&&gen==8);
+    unsigned text_count=0;
+    const struct nwc_text_run *line=nwc_visible_text(&ipc,win_a,&text_count);
+    assert(line&&text_count==1&&line[0].cp[0]==0x421);
+    text[8]=0;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,text,NWC_TEXT_HEADER,&gen)==NWC_OK&&gen==9);
+    assert(nwc_visible_text(&ipc,win_a,&text_count)&&!text_count);
     assert(nwc_publish_block(&ipc,pid_a,16,65536,0,block,2,2)==NWC_OK);
     assert(!nwc_visible_patches(&ipc,win_a,&latest));
     assert(ws_compositor_restart(&windows)==2);
-    assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==7);
+    assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==10);
     assert(ws_set_minimized(&windows,pid_a,win_a,true)==WS_OK);
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_DENIED);
     assert(nwc_send_key(&ipc,win_a,'X',0,true)==NWC_DENIED);

@@ -15,6 +15,8 @@ _Static_assert(STY_INPUT==NWC_CALL_INPUT&&STY_FRAME==NWC_CALL_FRAME&&STY_PIXEL==
 _Static_assert((int)STY_KEY==(int)NWC_KEY&&(int)STY_TEXT==(int)NWC_TEXT&&
  (int)STY_POINTER==(int)NWC_POINTER&&(int)STY_DROP==(int)NWC_DEEP_DROP,"event parity");
 _Static_assert(STY_PATCH==NWC_CALL_PATCH&&STY_FRAME_GEN==NWC_CALL_FRAME_GEN&&STY_PATCH_BYTES==NWC_PATCH_BYTES,"patch parity");
+_Static_assert(STY_TEXT_LAYER==NWC_CALL_TEXT&&STY_TEXT_WIRE_MAX==NWC_TEXT_WIRE_MAX&&
+ STY_TEXT_RUN_BYTES==NWC_TEXT_RUN_BYTES&&STY_TEXT_HEADER==NWC_TEXT_HEADER,"text wire parity");
 static uint64_t args[4];static unsigned calls,checks;
 #define C(x) do{assert(x);++checks;}while(0)
 struct sty_reply sty_call(uint64_t op,uint64_t arg,uint64_t addr,uint64_t len){
@@ -55,6 +57,17 @@ int main(void){
  C(sty_window_patch(0,patch,1047).status==STY_INVALID&&calls==5);
  C(sty_window_patch(7,patch,sizeof patch).status==STY_EMPTY&&calls==6&&args[0]==STY_PATCH&&args[1]==7&&args[2]==(uintptr_t)patch&&args[3]==STY_PATCH_BYTES);
  C(sty_window_generation(7).status==STY_EMPTY&&calls==7&&args[0]==STY_FRAME_GEN&&args[1]==7&&args[2]==0&&args[3]==0);
+ uint8_t text[STY_TEXT_HEADER+STY_TEXT_RUN_BYTES];memset(text,0x5a,sizeof text);
+ struct sty_text_run line={.x=4,.y=6,.width=90,.foreground=0xffffff,.count=1,.cp={0x421}};
+ C(sty_text_wire_size(0)==12&&sty_text_wire_size(8)==2252&&!sty_text_wire_size(9));
+ line.cp[0]=0xd800;
+ C(!sty_text_encode(text,sizeof text,5,&line,1)&&text[0]==0x5a);
+ line.cp[0]=0x421;
+ C(sty_text_encode(text,sizeof text,5,&line,1));
+ C(sty_le32(text)==1&&sty_le32(text+4)==5&&sty_le32(text+8)==1&&sty_le32(text+36)==0x421&&text[291]==0);
+ C(sty_window_text(0,text,291).status==STY_INVALID&&calls==7);
+ C(sty_window_text(7,text,sizeof text).status==STY_EMPTY&&calls==8&&args[0]==STY_TEXT_LAYER&&args[1]==7&&args[2]==(uintptr_t)text&&args[3]==sizeof text);
+ C(sty_text_encode(text,12,6,0,0)&&sty_le32(text+8)==0);
  printf("Native SDK 77: %u checks PASS (mock transport, no guest claim)\n",checks);
  return 0;
 }
