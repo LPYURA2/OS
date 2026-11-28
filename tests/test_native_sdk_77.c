@@ -1,5 +1,7 @@
 #include <styleos/native_v1.h>
 #include <styleos/native_window_channel.h>
+#include <styleos/native_file_abi.h>
+#include <styleos/stylefs_paged_object64.h>
 #include <styleos/process_trap_847.h>
 #include <assert.h>
 #include <string.h>
@@ -17,6 +19,14 @@ _Static_assert((int)STY_KEY==(int)NWC_KEY&&(int)STY_TEXT==(int)NWC_TEXT&&
 _Static_assert(STY_PATCH==NWC_CALL_PATCH&&STY_FRAME_GEN==NWC_CALL_FRAME_GEN&&STY_PATCH_BYTES==NWC_PATCH_BYTES,"patch parity");
 _Static_assert(STY_TEXT_LAYER==NWC_CALL_TEXT&&STY_TEXT_WIRE_MAX==NWC_TEXT_WIRE_MAX&&
  STY_TEXT_RUN_BYTES==NWC_TEXT_RUN_BYTES&&STY_TEXT_HEADER==NWC_TEXT_HEADER,"text wire parity");
+_Static_assert(STY_FILE_READ==NF91_READ&&STY_FILE_WRITE==NF91_WRITE&&STY_FILE_TAKE==NF91_TAKE&&
+ STY_FILE_CANCEL==NF91_CANCEL&&STY_FILE_MAX==NF91_MAX&&STY_F_UNAVAILABLE==NF91_UNAVAILABLE,"file op parity");
+_Static_assert((int)STY_F_OK==(int)PO64_OK&&(int)STY_F_INVALID==(int)PO64_INVALID&&
+ (int)STY_F_DENIED==(int)PO64_DENIED&&(int)STY_F_STALE==(int)PO64_STALE&&
+ (int)STY_F_BUSY==(int)PO64_BUSY&&(int)STY_F_FULL==(int)PO64_FULL&&
+ (int)STY_F_IO==(int)PO64_IO&&(int)STY_F_CORRUPT==(int)PO64_CORRUPT&&
+ (int)STY_F_CANCELLED==(int)PO64_CANCELLED&&(int)STY_F_UNCERTAIN==(int)PO64_UNCERTAIN&&
+ (int)STY_F_END==(int)PO64_END,"file status parity");
 static uint64_t args[4];static unsigned calls,checks;
 #define C(x) do{assert(x);++checks;}while(0)
 struct sty_reply sty_call(uint64_t op,uint64_t arg,uint64_t addr,uint64_t len){
@@ -68,6 +78,20 @@ int main(void){
  C(sty_window_text(0,text,291).status==STY_INVALID&&calls==7);
  C(sty_window_text(7,text,sizeof text).status==STY_EMPTY&&calls==8&&args[0]==STY_TEXT_LAYER&&args[1]==7&&args[2]==(uintptr_t)text&&args[3]==sizeof text);
  C(sty_text_encode(text,12,6,0,0)&&sty_le32(text+8)==0);
+ C(sty_file_read(0,1).status==STY_F_INVALID&&sty_file_read(1,0).status==STY_F_INVALID&&calls==8);
+ C(sty_file_read(UINT64_C(0x100000001),4096).status==STY_EMPTY&&calls==9&&args[0]==NF91_READ&&args[1]==UINT64_C(0x100000001)&&args[2]==0&&args[3]==4096);
+ C(sty_file_write(1,0,1).status==STY_F_INVALID&&sty_file_write(1,wire,0).status==STY_F_INVALID&&calls==9);
+ C(sty_file_write(1,wire,64).status==STY_EMPTY&&calls==10&&args[0]==NF91_WRITE&&args[2]==(uintptr_t)wire&&args[3]==64);
+ C(sty_file_write(1,0,0).status==STY_EMPTY&&calls==11&&args[2]==0&&args[3]==0);
+ C(sty_file_take(1,0,1).status==STY_F_INVALID&&calls==11);
+ C(sty_file_take(1,wire,64).status==STY_EMPTY&&calls==12&&args[0]==NF91_TAKE&&args[1]==1&&args[2]==(uintptr_t)wire&&args[3]==64);
+ C(sty_file_cancel(1).status==STY_EMPTY&&calls==13&&args[0]==NF91_CANCEL&&args[2]==0&&args[3]==0);
+ enum sty_file_status status=STY_F_INVALID;size_t bytes=999;
+ C(!sty_file_completion((struct sty_reply){STY_F_BUSY,0},&status,&bytes)&&bytes==999&&status==STY_F_INVALID);
+ C(!sty_file_completion((struct sty_reply){0,((uint64_t)4097<<32)},&status,&bytes)&&bytes==999);
+ C(!sty_file_completion((struct sty_reply){0,((uint64_t)1<<32)|STY_F_STALE},&status,&bytes)&&bytes==999);
+ C(sty_file_completion((struct sty_reply){0,((uint64_t)513<<32)},&status,&bytes)&&bytes==513&&status==STY_F_OK);
+ C(sty_file_completion((struct sty_reply){0,STY_F_UNCERTAIN},&status,&bytes)&&!bytes&&status==STY_F_UNCERTAIN);
  printf("Native SDK 77: %u checks PASS (mock transport, no guest claim)\n",checks);
  return 0;
 }

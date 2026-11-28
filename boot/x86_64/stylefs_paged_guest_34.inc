@@ -254,6 +254,36 @@ enum po64_status s90_native_file_cancel(uint32_t pid,uint64_t handle,uint64_t ro
  if(!s34_work.native_queue.files)return PO64_STALE;
  return nf89_cancel(&s34_work.native_queue,pid,handle,root,request);
 }
+_Static_assert(NF91_MAX==NF85_READ_MAX,"file ABI capacity");
+_Static_assert(PO64_END+1==NF91_UNAVAILABLE,"file ABI unavailable");
+uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t op,uint64_t token,uint64_t address,uint64_t size,uint64_t *value){
+ *value=0;
+ if(!token||size>NF91_MAX)return PO64_INVALID;
+ if(op==NF91_READ){if(address||!size)return PO64_INVALID;}
+ else if(op==NF91_WRITE||op==NF91_TAKE){
+  if((!address)!=(!size))return PO64_INVALID;
+ }else if(op==NF91_CANCEL){if(address||size)return PO64_INVALID;}
+ else return PO64_INVALID;
+ uint8_t *alias=0;
+ if((op==NF91_WRITE||op==NF91_TAKE)&&size){
+  alias=(uint8_t *)s865_native_data_span(slot,pid,handle,root,address,(size_t)size);
+  if(!alias)return PO64_INVALID;
+ }
+ struct nf89_queue *q=&s34_work.native_queue;
+ if(!q->files)return NF91_UNAVAILABLE;
+ /* Do not use the idle-only public supervisor wrappers here: the
+  * executor owns a pending receipt and has authenticated the ticket. */
+ if(op==NF91_CANCEL)return nf89_cancel(q,pid,handle,root,token);
+ if(op==NF91_TAKE){
+  size_t bytes=0;enum po64_status result=PO64_INVALID;
+  enum po64_status status=nf89_take(q,pid,handle,root,token,alias,(size_t)size,&bytes,&result);
+  if(status==PO64_OK)*value=((uint64_t)bytes<<32)|(uint32_t)result;
+  return status;
+ }
+ return nf89_submit(q,pid,handle,root,token,
+  op==NF91_READ?NF89_READ:NF89_WRITE,alias,(size_t)size,value);
+}
 /* Trusted picker/launcher entry, not reachable from application code.
  * Exact row and rights must already be approved by the supervisor;
  * no selection, authorization or raw path lookup occurs here.

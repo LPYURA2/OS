@@ -90,9 +90,15 @@ bool s865_native_shell_probe_available(void);
 bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,size_t);
 #ifdef STYLEOS_LIVE_VOLUME_39
 #include <styleos/native_file_85.h>
+#include <styleos/native_file_abi.h>
 /* Supervisor-only bridge on the live mounted volume. No app-facing ABI. */
 void s88_native_file_reconcile(void);
 void s90_native_file_pump(void);
+/* Only authenticated executor continuation, safe CR3 with pending receipt.
+ * Caller identity comes from scheduler ticket; audited DATA alias acquired
+ * before any request mutation. Never calls the disk pump. */
+uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t op,uint64_t token,uint64_t address,uint64_t size,uint64_t *value);
 enum po64_status s90_native_file_submit(uint32_t,uint64_t,uint64_t,uint64_t,
  enum nf89_op,const uint8_t *,size_t,uint64_t *);
 enum po64_status s90_native_file_take(uint32_t,uint64_t,uint64_t,uint64_t,

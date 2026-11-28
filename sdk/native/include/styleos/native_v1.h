@@ -12,7 +12,8 @@ enum sty_window_status { STY_OK=0,STY_INVALID,STY_NOT_READY,STY_DENIED,
  STY_MISSING,STY_FULL,STY_EMPTY,STY_STALE,STY_OVERFLOW };
 enum sty_event_kind { STY_KEY=1,STY_TEXT=2,STY_POINTER=3,STY_DROP=4 };
 enum sty_operation { STY_YIELD=1,STY_EXIT=2,STY_PIXEL=0x100,STY_TILE=0x101,
- STY_INPUT=0x102,STY_FRAME=0x103,STY_PATCH=0x120,STY_FRAME_GEN=0x121,STY_TEXT_LAYER=0x122 };
+ STY_INPUT=0x102,STY_FRAME=0x103,STY_PATCH=0x120,STY_FRAME_GEN=0x121,STY_TEXT_LAYER=0x122,
+ STY_FILE_READ=0x130,STY_FILE_WRITE=0x131,STY_FILE_TAKE=0x132,STY_FILE_CANCEL=0x133 };
 struct sty_reply { uint64_t status,value; };
 struct sty_rect { uint32_t x,y,w,h,rgb; };
 _Static_assert(sizeof(struct sty_rect)==20,"rectangle ABI");
@@ -127,6 +128,39 @@ static inline struct sty_reply sty_window_text(uint32_t window,const uint8_t *wi
  if(!wire||bytes<STY_TEXT_HEADER||bytes>STY_TEXT_WIRE_MAX||
     (bytes-STY_TEXT_HEADER)%STY_TEXT_RUN_BYTES)return (struct sty_reply){STY_INVALID,0};
  return sty_call(STY_TEXT_LAYER,window,(uintptr_t)wire,bytes);
+}
+/* v1 file status namespace is distinct from window status. Grants come
+ * from trusted file selection, not filenames or application-supplied IDs.
+ * Submission does not mean a durable save. Poll take; BUSY is pending.
+ * A successful take returns actual transaction status and byte count. */
+enum sty_file_status { STY_F_OK=0,STY_F_INVALID,STY_F_DENIED,STY_F_STALE,
+ STY_F_BUSY,STY_F_FULL,STY_F_IO,STY_F_CORRUPT,STY_F_CANCELLED,STY_F_UNCERTAIN,
+ STY_F_END,STY_F_UNAVAILABLE };
+#define STY_FILE_MAX 4096u
+static inline struct sty_reply sty_file_read(uint64_t grant,size_t capacity){
+ if(!grant||!capacity||capacity>STY_FILE_MAX)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_FILE_READ,grant,0,capacity);
+}
+static inline struct sty_reply sty_file_write(uint64_t grant,const uint8_t *data,size_t bytes){
+ if(!grant||bytes>STY_FILE_MAX||(!data)!=(!bytes))return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_FILE_WRITE,grant,(uintptr_t)data,bytes);
+}
+static inline struct sty_reply sty_file_take(uint64_t request,uint8_t *out,size_t capacity){
+ if(!request||capacity>STY_FILE_MAX||(!out)!=(!capacity))return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_FILE_TAKE,request,(uintptr_t)out,capacity);
+}
+static inline struct sty_reply sty_file_cancel(uint64_t request){
+ if(!request)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_FILE_CANCEL,request,0,0);
+}
+static inline bool sty_file_completion(struct sty_reply reply,enum sty_file_status *status,size_t *bytes){
+ uint32_t result=(uint32_t)reply.value;uint64_t n=reply.value>>32;
+ if(!status||!bytes||reply.status!=STY_F_OK||result>STY_F_END||n>STY_FILE_MAX||
+    (result!=STY_F_OK&&n))return false;
+ uintptr_t a=(uintptr_t)status,b=(uintptr_t)bytes;
+ if(sizeof *status>UINTPTR_MAX-a||sizeof *bytes>UINTPTR_MAX-b||
+    !(a+sizeof *status<=b||b+sizeof *bytes<=a))return false;
+ *status=(enum sty_file_status)result;*bytes=(size_t)n;return true;
 }
 static inline uint64_t sty_yield(void){return sty_call(STY_YIELD,0,0,0).status;}
 #endif

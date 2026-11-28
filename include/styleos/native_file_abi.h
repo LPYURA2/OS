@@ -1,0 +1,18 @@
+#ifndef STYLEOS_NATIVE_FILE_ABI_H
+#define STYLEOS_NATIVE_FILE_ABI_H
+#include <stdint.h>
+/* v1 register ABI: RAX op/status, RBX exact grant/request token,
+ * RCX private DATA address, RDX size/secondary result.
+ * READ submit: address zero, capacity 1..4096.
+ * WRITE submit: data length 0..4096, zero address iff empty.
+ * TAKE: output address zero iff capacity zero; successful collection
+ * returns operation status in low 32 bits, byte count in high 32 bits.
+ * All refused calls return zero secondary result. No path authority.
+ * No disk I/O in the trap; grants are issued by trusted supervisor only. */
+#define NF91_READ UINT64_C(0x130)
+#define NF91_WRITE UINT64_C(0x131)
+#define NF91_TAKE UINT64_C(0x132)
+#define NF91_CANCEL UINT64_C(0x133)
+#define NF91_MAX 4096u
+#define NF91_UNAVAILABLE 11u
+#endif

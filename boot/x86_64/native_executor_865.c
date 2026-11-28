@@ -14,6 +14,7 @@ static struct {uint64_t generation,window;} input_wait70[PS_MAX_SLOTS];
 #include <styleos/user_session_runtime.h>
 #include <styleos/native_window_channel.h>
 #include <styleos/native_runtime_865.h>
+#include <styleos/native_file_abi.h>
 #endif
 #define V 0x50u
 #define BIT 0x10000u
@@ -219,6 +220,21 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   fld848("root",ticket->child_root);fld848("op",op);fld848("reply",reply);arch_putc('\n');
  }
  const uint64_t operation=pending860.gpr[0];
+ if(kind==RT865_SYSCALL&&operation>=NF91_READ&&operation<=NF91_CANCEL){
+  const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
+  struct rt862_bank_slot *slot=&bank862.slots[id];
+  if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
+     caller->page_root!=ticket->child_root||slot->pid!=ticket->pid||
+     slot->handle!=ticket->handle||slot->root!=ticket->child_root||
+     runtime860->dispatcher.current!=-1||root848()!=safe||(flags848()&0x200))
+   fail848("865-file-owner");
+  uint64_t value=0,status=NF91_UNAVAILABLE;
+#ifdef STYLEOS_LIVE_VOLUME_39
+  status=s91_native_file_call(id,ticket->pid,ticket->handle,ticket->child_root,
+     operation,pending860.gpr[1],pending860.gpr[2],pending860.gpr[3],&value);
+#endif
+  slot->context.gpr[0]=status;slot->context.gpr[3]=value;
+ }
  const bool drop=operation>=DD_CALL_OFFER && operation<=DD_CALL_CANCEL;
  if(kind==RT865_SYSCALL && (drop||pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME||operation==NWC_CALL_PATCH||operation==NWC_CALL_FRAME_GEN||operation==NWC_CALL_TEXT)){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
