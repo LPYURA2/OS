@@ -21,3 +21,14 @@ Beta target; idle RAM below 1 GiB is still unmeasured.
 Astra / Work: inspect unpublished work and reconcile with the current remote
 head; do not reset, overwrite, force-push or redo accepted work.
 See docs/NEXT_CHAT_NATIVE_APPS_75.md for earlier checkpoints.
+
+## Implementation 2 — actual guest candidate
+Initial stage 76 CI 46128107386: 13 completed jobs successful; StyleFS live
+regression still running at observation. Added separate pinned diagnostic
+catalog mode ipc76/wide76/peer76 and raw CPL3 verifier. Target performs invalid
+64-byte input then valid cross-page input; verifies full returned wire,
+end sentinel and peer contents; stops exact target and releases surviving
+peers. Independent raw CPU trace, IRQs, zero final leases and zero disk writes
+required. Ordinary runtime unchanged. New CI pending; no guest PASS claimed.
+Astra: preserve stage 75 and 76 history; inspect any unpublished changes,
+reconcile on a separate branch, do not reset or repeat accepted work.

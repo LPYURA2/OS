@@ -211,6 +211,32 @@ jobs:
             build/native-expanded-75/expanded.raw
             build/native-expanded-75/results.json
           if-no-files-found: error
+  native-expanded-76-guest:
+    if: github.ref_name == 'feature/styleos-native-apps-76'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          set -euo pipefail
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Actual multi-page forced stop and window IPC
+        run: python3 tools/test_native_expanded_76_guest.py --output build/native-expanded-76
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-expanded-76-guest
+          path: |
+            build/native-expanded-76/*.log
+            build/native-expanded-76/*.json
+            build/native-expanded-76/*.ppm
+            build/native-expanded-76/*.elf
+          if-no-files-found: warn
   ordinary-shell:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

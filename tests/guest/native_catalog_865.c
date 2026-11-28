@@ -106,7 +106,8 @@ static bool nc_equal(const uint8_t *a,const uint8_t *b,size_t n){unsigned diff=0
  * pinned test catalog, never in the ordinary kernel or generic installer. */
 static bool wide_record(const uint8_t *r){
  static const uint8_t a[8]={'w','i','d','e','7','5',0,0},b[8]={'f','a','u','l','t','7','5',0};
- return nc_equal(r+40,a,8)||nc_equal(r+40,b,8);
+ static const uint8_t x[8]="ipc76",y[8]="wide76";
+ return nc_equal(r+40,a,8)||nc_equal(r+40,b,8)||nc_equal(r+40,x,8)||nc_equal(r+40,y,8);
 }
 /* Only this pinned three-program workload waits for a second F9. Keep the
  * admission identities so a recycled slot can never receive the release. */
@@ -115,9 +116,15 @@ static struct wide_owner {
  uint32_t pid;
  uint64_t generation,root;
 } wide_owners[3];
-static bool wide_waiting;
+static bool wide_waiting,wide_stop76;
 static bool wide_catalog(void){
  static const uint8_t names[3][8]={"wide75","fault75","peer75"};
+ for(unsigned i=0;i<3;i++)
+  if(!nc_equal(catalog+16+i*NC_RECORD+40,names[i],8))return false;
+ return true;
+}
+static bool stop76_catalog(void){
+ static const uint8_t names[3][8]={"ipc76","wide76","peer76"};
  for(unsigned i=0;i<3;i++)
   if(!nc_equal(catalog+16+i*NC_RECORD+40,names[i],8))return false;
  return true;
@@ -152,6 +159,59 @@ static bool release_wide_workload(void){
  wide_waiting=false;
  arch_puts("STYLEOS WIDE75 RELEASE");field("first",ticks[0]);field("second",ticks[1]);
  field("peer",ticks[2]);arch_putc('\n');
+ return true;
+}
+/* Separate pinned acceptance: actual IPC into two private pages, then
+ * trusted forced termination while two other processes remain runnable. */
+static bool stop76_release(void){
+ const struct wide_owner *a=&wide_owners[0],*b=&wide_owners[1],*z=&wide_owners[2];
+ const struct pr_entry *p=pr_find(pr_global(),a->pid),*q=pr_find(pr_global(),b->pid),
+                       *r=pr_find(pr_global(),z->pid);
+ if(!p||!q||!r||p->state!=PR_READY||q->state!=PR_READY||r->state!=PR_READY||
+    p->scheduler_handle!=a->generation||q->scheduler_handle!=b->generation||
+    r->scheduler_handle!=z->generation||p->page_root!=a->root||
+    q->page_root!=b->root||r->page_root!=z->root||
+    p->cpu_ticks<2||q->cpu_ticks<2||r->cpu_ticks<2)return false;
+ struct stop_owned target,peer;
+ if(!owned_refs(a->pid,stop_window,&target)||!owned_refs(b->pid,peer_window,&peer)||
+    target.port->length!=0||target.port->next_sequence!=2||
+    peer.port->length!=1||!target.port->has_tile||!peer.port->has_tile)return false;
+ uint8_t wire[64],guard[4],marker[4],neighbor[8];
+ if(!s865_native_copy_data(a->slot,a->pid,a->generation,a->root,S846_DATA+4096u-32u,wire,sizeof wire)||
+    !s865_native_copy_data(a->slot,a->pid,a->generation,a->root,S846_DATA+3u*4096u-4u,guard,sizeof guard)||
+    !s865_native_copy_data(a->slot,a->pid,a->generation,a->root,S846_DATA+2u*4096u,marker,sizeof marker)||
+    !s865_native_copy_data(b->slot,b->pid,b->generation,b->root,S846_DATA+2u*4096u,neighbor,sizeof neighbor))return false;
+ const uint32_t expected[8]={1,1,stop_window,NWC_TEXT,0,0,0,2};
+ for(unsigned i=0;i<8;++i)if(nc_u32(wire+4*i)!=expected[i])return false;
+ if(wire[32]!=0x5a||wire[33]!=(uint8_t)a->pid||!clear_bytes(wire+34,30)||
+    nc_u32(guard)!=0x11223344u||nc_u32(marker)!=0x66778899u||
+    nc_u32(neighbor)!=0x1234567u||nc_u32(neighbor+4))return false;
+ save_peer(&peer);
+ const uint64_t ticks=q->cpu_ticks,zticks=r->cpu_ticks;
+ const uint32_t serial=pr_global()->change_serial;
+ if(s865_native_stop(a->pid,a->generation,false)!=PS_EVIDENCE||
+    s865_native_stop(a->pid,b->generation,true)!=PS_EVIDENCE||
+    pr_global()->change_serial!=serial)return false;
+ if(s865_native_stop(a->pid,a->generation,true)!=PS_OK||
+    s865_native_stop(a->pid,a->generation,true)!=PS_EVIDENCE||
+    pr_find(pr_global(),a->pid)||!revoked(a->pid,a->generation,a->root,stop_window,&target)||
+    !same_peer(&peer)||nwc_port_count(channels())!=1||
+    pr_snapshot(pr_global(),0,0,true)!=2)return false;
+ q=pr_find(pr_global(),b->pid);r=pr_find(pr_global(),z->pid);
+ if(!q||!r||q->cpu_ticks!=ticks||r->cpu_ticks!=zticks||q->state!=PR_READY||
+    r->state!=PR_READY||q->page_root!=b->root||r->page_root!=z->root||
+    q->resident_bytes!=7u*4096u||r->resident_bytes!=3u*4096u)return false;
+ uint8_t after[8];
+ if(!s865_native_copy_data(b->slot,b->pid,b->generation,b->root,S846_DATA+2u*4096u,after,sizeof after)||
+    !nc_equal(after,neighbor,sizeof after))return false;
+ volatile uint8_t *bf=s865_native_data_span(b->slot,b->pid,b->generation,b->root,S846_DATA+2u*4096u+8u,1);
+ volatile uint8_t *zf=s865_native_data_span(z->slot,z->pid,z->generation,z->root,S846_DATA+8u,1);
+ if(!bf||!zf||*bf||*zf)return false;
+ *bf=1;*zf=1;wide_waiting=false;
+ arch_puts("STYLEOS WIDE76 STOP");field("pid",a->pid);field("gen",a->generation);
+ field("root",a->root);field("peer",b->pid);field("legacy",z->pid);
+ field("resident",2);field("bytes",q->resident_bytes+r->resident_bytes);
+ field("wire",64);field("queue",peer.port->length);arch_putc('\n');
  return true;
 }
 static bool catalog_valid(unsigned *out){
@@ -379,7 +439,7 @@ static bool stop_step(void){
 bool s865_native_catalog_request(void){
  if(native_catalog_busy||!s865_executor_idle())return false;
  if(wide_waiting){
-  native_catalog_busy=true;bool ok=release_wide_workload();native_catalog_busy=false;return ok;
+  native_catalog_busy=true;bool ok=wide_stop76?stop76_release():release_wide_workload();native_catalog_busy=false;return ok;
  }
  if(stop_phase==1||stop_phase==2){
   native_catalog_busy=true;bool ok=stop_step();native_catalog_busy=false;return ok;
@@ -431,7 +491,8 @@ bool s865_native_catalog_request(void){
  /* Before the first dispatch, require the real supervisor process API to
   * report both expanded leases and the legacy peer's actual allocation.
   * This path is limited to the explicit three-record fixture. */
- if(valid&&count==3&&accepted==3&&wide_catalog()){
+ wide_stop76=valid&&count==3&&accepted==3&&stop76_catalog();
+ if(valid&&count==3&&accepted==3&&(wide_catalog()||wide_stop76)){
   static struct pa_row rows[PA_MAX_ROWS];
   struct pa_reply reply={0};
   const struct pa_request query={.version=PA_VERSION,.order=PI_BY_PID};
@@ -442,6 +503,18 @@ bool s865_native_catalog_request(void){
      rows[2].resident_bytes!=3u*4096u||!remember_wide_owners(rows)){
    native_wipe(catalog,sizeof catalog);native_catalog_busy=false;
    arch_puts("STYLEOS WIDE75 FAIL process accounting\n");return false;
+  }
+  if(wide_stop76){
+   stop_pid=wide_owners[0].pid;stop_gen=wide_owners[0].generation;
+   peer_pid=wide_owners[1].pid;peer_gen=wide_owners[1].generation;
+   if(!sessions()||!channels()||usr_create(sessions(),UINT64_C(0x876),&stop_session)!=USR_OK||
+      usr_select(sessions(),stop_session)!=USR_OK||
+      !grant_owned(stop_pid,stop_gen,&stop_window)||!grant_owned(peer_pid,peer_gen,&peer_window)||
+      nwc_port_count(channels())!=2){
+    native_wipe(catalog,sizeof catalog);native_catalog_busy=false;return stop_fail();
+   }
+   arch_puts("STYLEOS WIDE76 BOUND");field("pid",stop_pid);field("window",stop_window);
+   field("peer",peer_pid);field("peer-window",peer_window);arch_putc('\n');
   }
   arch_puts("STYLEOS WIDE75 ACCOUNT");field("first",rows[0].resident_bytes);
   field("second",rows[1].resident_bytes);field("peer",rows[2].resident_bytes);
