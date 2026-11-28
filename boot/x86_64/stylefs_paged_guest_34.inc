@@ -567,9 +567,16 @@ static struct {
 } s46;
 void s46_cancel(void){s46.op=0;s46.n=0;s46.name[0]=0;s46.message=0;}
 const char *s46_footer(void){
+#ifdef STYLEOS_LIVE_VOLUME_50
+ if(s46.op==4)return "Установить одобренное приложение? Enter / Esc";
+#endif
  if(s46.op==3)return "Удалить файл? Enter — да, Esc — отмена";
  if(s46.op==1||s46.op==2)return s46.n?s46.name:"Введите имя — Enter / Esc";
+#ifdef STYLEOS_LIVE_VOLUME_50
+ return s46.message?s46.message:"Ctrl+I — установить / Ctrl+N / Ctrl+R / Del";
+#else
  return s46.message?s46.message:"Ctrl+N — создать / Ctrl+R — имя / Del";
+#endif
 }
 static bool s46_begin(unsigned op){
  const struct dp41_view *v=s41_root_view();
@@ -586,6 +593,24 @@ static bool s46_begin(unsigned op){
  return true;
 }
 bool s46_begin_create(void){return s46_begin(1);}
+#ifdef STYLEOS_LIVE_VOLUME_50
+/* Only the root's separately provisioned Apps directory is accepted.
+ * No arbitrary destination from user mode. Contents never establish trust. */
+static enum po64_status apps107(struct po64_service *s,struct po64_snapshot snap,uint64_t *id){
+ const struct sd64_key key={.parent=1,.length=4,.name="Apps"};
+ for(uint64_t i=0;i<s->node_cap;++i){
+  struct po64_row row;enum po64_status rc=po64_child_at(s,snap,1,i,&row);
+  if(rc!=PO64_OK)return rc;
+  int cmp=sd64_compare(&row.entry.key,&key);
+  if(!cmp){
+   if(row.entry.kind!=SD64_DIRECTORY)return PO64_DENIED;
+   *id=row.entry.target;return PO64_OK;
+  }
+  if(cmp>0)return PO64_END;
+ }
+ return PO64_END;
+}
+#endif
 static bool s46_commit(uint64_t protected_id){
  struct po64_service *s=&s34_work.volume.objects;
  unsigned op=s46.op;
@@ -594,6 +619,20 @@ static bool s46_commit(uint64_t protected_id){
     (op!=1&&s46.row.entry.target==protected_id)){
   s46_cancel();s46.message="Операция запрещена";arch_puts("SFS46 REFUSED\n");return true;
  }
+#ifdef STYLEOS_LIVE_VOLUME_50
+ if(op==4){
+  struct po64_snapshot snap;uint64_t parent=0;unsigned slot=0;
+  rc=po64_snapshot(s,&snap);
+  if(rc==PO64_OK&&(snap.mount!=s46.snap.mount||snap.sequence!=s46.snap.sequence))rc=PO64_STALE;
+  if(rc==PO64_OK)rc=apps107(s,snap,&parent);
+  if(rc==PO64_OK)rc=s106_install_approved(&s46.row,parent,&slot);
+  s46_cancel();
+  if(!s->active)(void)pv64_close(&s34_work.volume);
+  s46.message=rc==PO64_OK?"Приложение установлено":"Установка не выполнена";
+  arch_puts(rc==PO64_OK?"STYLEOS TEA107 INSTALL PASS\n":"STYLEOS TEA107 INSTALL REFUSED\n");
+  return true;
+ }
+#endif
  struct sd64_key key={.parent=s46.parent,.length=(uint16_t)s46.n};
  for(unsigned i=0;i<s46.n;i++)key.name[i]=(uint8_t)s46.name[i];
  if(op==1){
@@ -626,13 +665,20 @@ bool s46_input(unsigned key,unsigned mods,uint32_t cp,uint64_t protected_id){
  if(s46.op){
   if(key==0x01){s46_cancel();return true;}
   if(!mods&&(key==0x1c||key==0x11c))return s46_commit(protected_id);
-  if(s46.op==3)return true;
+  if(s46.op==3||s46.op==4)return true;
   if(!mods&&key==0x0e){if(s46.n)s46.name[--s46.n]=0;return true;}
   if(!(mods&(DESK_CTRL|DESK_ALT))&&cp>=32&&cp<127&&cp!='/'&&cp!='\\'&&s46.n<SD64_NAME){
    s46.name[s46.n++]=(char)cp;s46.name[s46.n]=0;
   }
   return true;
  }
+#ifdef STYLEOS_LIVE_VOLUME_50
+ if(mods==DESK_CTRL&&key==0x17){
+  if(!s46_begin(4))return false;
+  if(s46.op==4)arch_puts("STYLEOS TEA107 INSTALL ARMED\n");
+  return true;
+ }
+#endif
  if(mods==DESK_CTRL&&key==0x31)return s46_begin(1);
  if(mods==DESK_CTRL&&key==0x13)return s46_begin(2);
  if(!mods&&key==0x153)return s46_begin(3);

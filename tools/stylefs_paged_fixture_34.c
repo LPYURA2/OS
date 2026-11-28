@@ -36,10 +36,11 @@ static bool fl(void *c){return fdatasync(*(int *)c)==0;}
 static bool sink(void *c,uint64_t at,const uint8_t *p,size_t n){return fwrite(p,1,n,c)==n&&at<1041;}
 int main(int argc,char **argv){
  if(argc!=3&&argc!=4)return 1;
- bool ids=!strcmp(argv[1],"new50")||!strcmp(argv[1],"check50");
+ bool install=!strcmp(argv[1],"newtea107");
+ bool ids=install||!strcmp(argv[1],"new50")||!strcmp(argv[1],"check50");
  bool stream=!strcmp(argv[1],"newtea103");
  bool check_stream=!strcmp(argv[1],"check103");
- bool tea=stream||!strcmp(argv[1],"newtea69");
+ bool tea=install||stream||!strcmp(argv[1],"newtea69");
  bool live=tea||!strcmp(argv[1],"new39")||!strcmp(argv[1],"new50");
  bool create=live||!strcmp(argv[1],"new");
  bool object=!strcmp(argv[1],"get37");
@@ -81,6 +82,10 @@ int main(int argc,char **argv){
   /* Stream fixture uses a different basename: approval is content-based. */
   if(stream)memcpy(k.name,"Stream-demo.tea",15);
   if(ok)ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,6,0,tea69_size,source69,0,&pair)==PP64_OK;
+ }
+ if(ok&&install){
+  struct dc64_edit e={.op=DC64_CREATE,.entry={{.parent=1,.length=4,.name="Apps"},7,SD64_DIRECTORY}};
+  ok=pp64_edit(&b,&l,&w,nodes,32,runs,32,pair.sequence,&e,0,&pair)==PP64_OK;
  }
  if(ok&&stream){
   struct sd64_key k={.parent=3,.length=5,.name="z.bin"};

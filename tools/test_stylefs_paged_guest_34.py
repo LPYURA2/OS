@@ -78,7 +78,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False, file_probe92=False, file_probe94=False, file_probe103=False, cold103=False):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False, file_probe92=False, file_probe94=False, file_probe103=False, cold103=False, install107=False, installed107=False):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -186,6 +186,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                     raise RuntimeError("missing navigation marker "+repr(marker))
                 wait_exact(b"SFS42 ROOT ROWS")
                 d.key("down")
+                if install107 or installed107:d.key("down") # Apps sorts before a
                 d.key("ret")
                 wait_exact(b"SFS42 ENTER DIRECTORY")
                 wait_exact(b"SFS42 CHILD ROWS")
@@ -218,17 +219,32 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                     d.key("a")
                     d.key("ctrl-s")
                     wait_exact(b"SFS44 SAVE PASS")
-                elif not cold44 and not cold103 and not namespace46 and not file_probe94 and not file_probe103:
+                elif not cold44 and not cold103 and not namespace46 and not file_probe94 and not file_probe103 and not install107 and not installed107:
                     d.key("a")
                     wait_exact(b"SFS43 EDIT REFUSED")
                 d.key("f2")
                 d.key("backspace")
                 wait_exact(b"SFS42 UP DIRECTORY")
                 wait_exact(b"SFS42 ROOT ROWS",2)
+                if install107:
+                    # Root contains Apps, a, d, e. Explicit confirmation,
+                    # then delete the original through normal Explorer.
+                    d.key("down");d.key("down");d.key("down");d.key("ret")
+                    wait_exact(b"SFS42 ENTER DIRECTORY",2)
+                    d.key("ctrl-i");wait_exact(b"STYLEOS TEA107 INSTALL ARMED")
+                    d.key("esc")
+                    require(b"STYLEOS TEA107 INSTALL PASS" not in uart.read_bytes(),"cancel installed package")
+                    d.key("ctrl-i");wait_exact(b"STYLEOS TEA107 INSTALL ARMED",2)
+                    d.key("ret");wait_exact(b"STYLEOS TEA107 INSTALL PASS")
+                    d.key("delete");d.key("ret");wait_exact(b"SFS46 DELETE PASS")
+                    rows=uart.read_bytes().splitlines()
+                    require(rows.count(b"STYLEOS TEA107 INSTALL PASS")==1 and
+                            not any(x.startswith(b"STYLEOS TEA69 LAUNCHED ") for x in rows),"install must not launch")
                 if tea69 is not None:
                     # The new directory e follows a and d, and contains
                     # exactly one individually pinned package.
-                    d.key("down");d.key("down");d.key("ret")
+                    if not installed107:d.key("down");d.key("down")
+                    d.key("ret")
                     wait_exact(b"SFS42 ENTER DIRECTORY",2)
                     def wait_prefix(marker,count=1):
                         deadline=time.monotonic()+40
@@ -348,6 +364,9 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         if prior_cycles:d.key("f2")
                         d.key("ret")
                         launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ",prior_cycles+1)
+                        if installed107:
+                            file=wait_prefix(b"STYLEOS TEA69 STYLEFS id=")
+                            require(b" id=0x0000000000000008 " in file and b" revision=0x0000000000000001 " in file,"cold installed copy identity")
                         pid_num=int(launch.split()[3].split(b"=")[1],16)
                         gen=int(launch.split()[4].split(b"=")[1],16)
                         require(pid_num not in seen_pids,"fresh stop-test PID")
@@ -470,9 +489,9 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
             require(b"STYLEOS S863S DMA-AFTER " in uart.read_bytes() and b"STYLEOS S863S BAR4 " in uart.read_bytes(), "missing owned-root DMA admission receipts")
             require(not any(b" FAIL " in x for x in uart.read_bytes().splitlines()),"kernel failure receipt")
             written=final["wr_bytes"]-disk_stats_before["wr_bytes"]
-            require(written>0 if save44 or file_probe94 or file_probe103 or namespace46 in ("create","delete") else written==expected_writes, "write byte count")
+            require(written>0 if save44 or file_probe94 or file_probe103 or install107 or namespace46 in ("create","delete") else written==expected_writes, "write byte count")
             require(final["unmap_bytes"]==disk_stats_before["unmap_bytes"], "unexpected unmap")
-            if expected_writes or save44 or file_probe94 or file_probe103 or namespace46 in ('create','delete'):
+            if expected_writes or save44 or file_probe94 or file_probe103 or install107 or namespace46 in ('create','delete'):
                 require(final["flush_operations"]-disk_stats_before["flush_operations"]>=2, "flush evidence")
             for k in ("failed_wr_operations","invalid_wr_operations","failed_flush_operations","invalid_flush_operations"):
                 require(final.get(k,0)==disk_stats_before.get(k,0), k)
