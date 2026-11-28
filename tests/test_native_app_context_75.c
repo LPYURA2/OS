@@ -81,5 +81,39 @@ int main(void){
  C(rt862_extent(&bank,0).code==1&&rt862_extent(&bank,0).stack==1);
  C(rt865_bank_stop_ready(&bank,&d,0x1000,0,fresh,103,0x2000,true)==PS_OK);
  C(rt862_bank_release(&bank,&d,0x1000,0,fresh,103,0x2000)==PS_OK);
+ /* Stage 76: stop a real expanded bank entry after a timer receipt, with
+  * an independent ready peer. Host receipts are synthetic, not CPL3 proof. */
+ uint32_t wide=0,survivor=0,widewin=0,peerwin=0;
+ lease.generation=104;child.lease=lease;
+ C(rt875_bank_admit_image(&bank,&d,0x1000,0,&child,&lease,&image,"WideStop",&initial,&wide)==PS_OK);
+ C(rt862_bank_admit(&bank,&d,0x1000,1,105,0x3000,"Survivor",&survivor)==PS_OK);
+ C(ws_open_app(&w,&p,wide,"WideStop",(struct ws_bounds){0,0,400,300},&widewin)==WS_OK);
+ C(ws_open_app(&w,&p,survivor,"Survivor",(struct ws_bounds){0,0,400,300},&peerwin)==WS_OK);
+ /* Dispatcher next may retain its round-robin cursor from earlier tests. */
+ unsigned sid;uint32_t selected;
+ C(dpr_dispatch(&d,&sid,&selected)==PS_OK);
+ const struct ps_slot *ss=&d.dispatcher.slots[sid];
+ struct rt862_selection sel={sid,d.dispatcher.dispatches,selected,ss->handle,ss->user_root,d.dispatcher.safe_root};
+ C(rt862_bank_enter(&bank,&d,&sel,0x1000,&c));
+ r=receipt(sel,c,0x50);C(rt863_bank_event(&bank,&d,&sel,0x1000,&r,0)==PS_OK);
+ if(sid!=0){
+  sel=pick(0,wide);C(rt862_bank_enter(&bank,&d,&sel,0x1000,&c));
+  r=receipt(sel,c,0x50);C(rt863_bank_event(&bank,&d,&sel,0x1000,&r,0)==PS_OK);
+ }
+ REFUSE(rt865_bank_stop_ready(&bank,&d,0x1000,0,wide,104,0x2000,false));
+ REFUSE(rt865_bank_stop_ready(&bank,&d,0x1000,0,wide,103,0x2000,true));
+ const struct rt862_bank_slot keep=bank.slots[1];
+ const struct pr_entry keep_entry=*pr_find(&p,survivor);
+ C(rt865_bank_stop_ready(&bank,&d,0x1000,0,wide,104,0x2000,true)==PS_OK);
+ C(pr_find(&p,wide)->state==PR_EXITED&&pr_find(&p,wide)->cpu_ticks==1);
+ C(!ws_find(&w,widewin)&&ws_find(&w,peerwin));
+ C(!memcmp(&keep,&bank.slots[1],sizeof keep)&&!memcmp(&keep_entry,pr_find(&p,survivor),sizeof keep_entry));
+ C(rt862_bank_release(&bank,&d,0x1000,0,wide,104,0x2000)==PS_OK);
+ C(!pr_find(&p,wide)&&!bank.extents[0].code&&!bank.extents[0].data&&!bank.extents[0].stack);
+ z=pick(1,survivor);C(rt862_bank_enter(&bank,&d,&z,0x1000,&c));
+ r=receipt(z,c,128);r.frame.gpr[0]=S847_CALL_EXIT;
+ C(rt863_bank_event(&bank,&d,&z,0x1000,&r,0)==PS_OK);
+ C(rt862_bank_release(&bank,&d,0x1000,1,survivor,105,0x3000)==PS_OK);
+ C(!pr_snapshot(&p,0,0,true));
  printf("Native expanded context 75: %u checks PASS (synthetic receipts; no hardware execution)\n",checks);
 }

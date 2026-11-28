@@ -73,6 +73,18 @@ int main(void){
  CHECK(!s875_data_pa(&arena,leases[0],sizes[0],UINT64_MAX,1));
  CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA,SIZE_MAX));
  CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA,0));
+ /* Stage 76: exact 64-byte window wire size, every split across each
+  * internal data boundary. This tests the actual alias planner, not IPC. */
+ for(unsigned page=1;page<16;++page){
+  for(unsigned left=1;left<64;++left){
+   uint64_t off=page*P-left;
+   CHECK(s875_data_pa(&arena,leases[0],sizes[0],S846_DATA+off,64)==data_pa+off);
+  }
+ }
+ CHECK(s875_data_pa(&arena,leases[0],sizes[0],S846_DATA+16*P-64,64)==data_pa+16*P-64);
+ for(unsigned left=1;left<64;++left)
+  CHECK(!s875_data_pa(&arena,leases[0],sizes[0],S846_DATA+16*P-left,64));
+ CHECK(!s875_data_pa(&arena,leases[1],sizes[1],S846_DATA+P-32,64));
  CHECK(!s875_data_pa(&arena,leases[1],sizes[0],S846_DATA,1));
  struct s844_lease stale=leases[0];stale.generation++;
  CHECK(!s875_data_pa(&arena,stale,sizes[0],S846_DATA,1));
