@@ -137,8 +137,64 @@ static void native_file85(void){
  assert(nf85_reconcile(&nf)==1&&nf85_reconcile(&nf)==0);
  assert(po64_read(&service,UINT64_C(0x8000000000000000)|pid,grant,accept,0)==PO64_DENIED);
  assert(writes==before);
+ assert(nf85_grant_access(&nf,peer,32,131072,&k,3,1,PO64_WRITE,&other)==PO64_DENIED);
  puts("Native file 85: real StyleFS object, owner/session, bounded read and cleanup PASS");
 }
+#ifdef STYLEOS_NATIVE_FILE_86_TEST
+static void native_file86(void){
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ uint32_t pid=0;
+ struct pr_admission spec={PR_NATIVE_USER,0,48,196608,4096,"Writer"};
+ assert(pr_admit(&procs,&spec,&pid)==PR_OK);
+ assert(usr_select(&users,1)==USR_OK&&usr_bind(&users,1,pid,48)==USR_OK);
+ struct sd64_key a=key('a'),h=key('h');
+ uint64_t ro=0,rw=0,other=0;
+ assert(nf85_grant_access(&nf,pid,48,196608,&a,4,1,0,&rw)==PO64_INVALID);
+ assert(nf85_grant_read(&nf,pid,48,196608,&a,4,1,&ro)==PO64_OK);
+ assert(nf85_grant_access(&nf,pid,48,196608,&a,4,1,PO64_READ|PO64_WRITE,&rw)==PO64_OK);
+ assert(nf85_grant_read(&nf,pid,48,196608,&h,5,1,&other)==PO64_OK);
+ uint8_t data[513],out[514];
+ for(unsigned i=0;i<sizeof data;++i)data[i]=byte(91,i);
+ unsigned before=writes;
+ assert(nf85_write(&nf,pid,48,196608,ro,data,sizeof data)==PO64_DENIED);
+ assert(nf85_write(&nf,pid,48,200704,rw,data,sizeof data)==PO64_DENIED);
+ assert(nf85_write(&nf,pid,48,196608,rw,data,NF85_READ_MAX+1)==PO64_INVALID);
+ assert(nf85_write(&nf,pid,48,196608,rw,nf.scratch,1)==PO64_INVALID);
+ assert(usr_lock(&users)==USR_OK);
+ assert(nf85_write(&nf,pid,48,196608,rw,data,sizeof data)==PO64_DENIED);
+ assert(writes==before);
+ assert(usr_select(&users,1)==USR_OK);
+ assert(nf85_write(&nf,pid,48,196608,rw,data,sizeof data)==PO64_OK);
+ assert(writes>before);
+ for(unsigned i=0;i<NF85_READ_MAX;++i)assert(!nf.scratch[i]);
+ for(unsigned i=0;i<NF85_HANDLES;++i)assert(!nf.grants[i].token);
+ size_t n=999;
+ assert(nf85_read(&nf,pid,48,196608,other,out,sizeof out,&n)==PO64_DENIED&&n==999);
+ assert(nf85_write(&nf,pid,48,196608,rw,data,sizeof data)==PO64_DENIED);
+ assert(nf85_grant_read(&nf,pid,48,196608,&a,4,1,&ro)==PO64_STALE);
+ assert(nf85_grant_access(&nf,pid,48,196608,&a,4,2,PO64_WRITE,&rw)==PO64_OK);
+ assert(nf85_read(&nf,pid,48,196608,rw,out,sizeof out,&n)==PO64_DENIED&&n==999);
+ assert(po64_unmount(&service)==PO64_OK);
+ assert(nf85_reconcile(&nf)==1);
+ reopen();check('a',4,2,513,91);check('h',5,1,0,0);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(nf85_grant_access(&nf,pid,48,196608,&a,4,2,PO64_READ|PO64_WRITE,&rw)==PO64_OK);
+ memset(out,0x5a,sizeof out);
+ assert(nf85_read(&nf,pid,48,196608,rw,out,sizeof out,&n)==PO64_OK&&n==513);
+ assert(!memcmp(out,data,513)&&out[513]==0x5a);
+ fail=writes+1;data[0]^=0xff;
+ assert(nf85_write(&nf,pid,48,196608,rw,data,sizeof data)==PO64_UNCERTAIN&&!service.active);
+ assert(nf85_reconcile(&nf)==0);
+ for(unsigned i=0;i<NF85_READ_MAX;++i)assert(!nf.scratch[i]);
+ reopen();check('a',4,2,513,91);check('h',5,1,0,0);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(nf85_grant_access(&nf,pid,48,196608,&a,4,2,PO64_WRITE,&rw)==PO64_OK);
+ assert(nf85_write(&nf,pid,48,196608,rw,0,0)==PO64_OK);
+ assert(po64_unmount(&service)==PO64_OK);
+ reopen();check('a',4,3,0,0);check('h',5,1,0,0);
+ puts("Native file 86: authorized durable save, cold reopen, write failure recovery, empty file and revocation PASS");
+}
+#endif
 #endif
 int main(void){
  attach();assert(dc64_provision(&b,7,l.dir,D)==DC64_OK);
@@ -389,6 +445,9 @@ int main(void){
  disk[pair.slot][112]^=1;
  assert(pp64_mount(&b,&l,&w.pair,nodes,128,current,128,&pair)==PP64_CORRUPT);
  reopen();assert(pair.id_floor==5);
+#ifdef STYLEOS_NATIVE_FILE_86_TEST
+ native_file86();
+#endif
  puts("STYLEFS 49 ID SERVICE PASS: explicit v2, auto allocate, no reuse after unlink and cold boot, folder and copy, damaged receipt refusal");
  puts("STYLEFS 48 COPY PASS: 32KiB+17, exact source, independent data, zero file, CRC rejection, no partial publication");
  puts("STYLEFS 47 DIRECTORY SERVICE PASS: mkdir, cross-parent move, cold reopen, cycle and nonempty refusal, empty rmdir");

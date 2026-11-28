@@ -36,7 +36,7 @@ static bool token_live(const struct nf85_service *s,const struct nf85_grant *g){
  if(!g->token||!s->fs->active||s->fs->mount_id!=g->mount)return false;
  for(unsigned i=0;i<PO64_HANDLES;++i){
   const struct po64_handle *h=&s->fs->handles[i];
-  if(h->token==g->token&&h->principal==principal(g->owner.pid)&&h->rights==PO64_READ)return true;
+  if(h->token==g->token&&h->principal==principal(g->owner.pid)&&h->rights==g->rights)return true;
  }
  return false;
 }
@@ -68,9 +68,9 @@ size_t nf85_reconcile(struct nf85_service *s){
  }
  return count;
 }
-enum po64_status nf85_grant_read(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
- const struct sd64_key *key,uint64_t id,uint64_t revision,uint64_t *token){
- if(!ready(s)||!key||!token||!external_span(s,token,sizeof *token)||
+enum po64_status nf85_grant_access(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
+ const struct sd64_key *key,uint64_t id,uint64_t revision,unsigned rights,uint64_t *token){
+ if(!ready(s)||!key||!token||!rights||(rights&~(PO64_READ|PO64_WRITE))||!external_span(s,token,sizeof *token)||
     !external_span(s,key,sizeof *key)||!sep(key,sizeof *key,token,sizeof *token))return PO64_INVALID;
  if(s->busy||s->fs->busy)return PO64_BUSY;
  struct nf85_owner o;if(!owner(s,pid,handle,root,true,&o))return PO64_DENIED;
@@ -79,9 +79,13 @@ enum po64_status nf85_grant_read(struct nf85_service *s,uint32_t pid,uint64_t ha
  for(unsigned i=0;i<NF85_HANDLES;++i)if(!s->grants[i].token){slot=i;break;}
  if(slot==NF85_HANDLES)return PO64_FULL;
  uint64_t value=0;
- enum po64_status rc=po64_grant(s->fs,principal(pid),key,id,revision,&value);
+ enum po64_status rc=po64_grant_access(s->fs,principal(pid),key,id,revision,rights,&value);
  if(rc!=PO64_OK)return rc;
- s->grants[slot]=(struct nf85_grant){o,value,s->fs->mount_id};*token=value;return PO64_OK;
+ s->grants[slot]=(struct nf85_grant){o,value,s->fs->mount_id,rights};*token=value;return PO64_OK;
+}
+enum po64_status nf85_grant_read(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
+ const struct sd64_key *key,uint64_t id,uint64_t revision,uint64_t *token){
+ return nf85_grant_access(s,pid,handle,root,key,id,revision,PO64_READ,token);
 }
 struct reader {uint8_t *p;size_t capacity,seen;bool overflow;};
 static bool collect(void *opaque,uint64_t offset,const uint8_t *p,size_t n){
@@ -100,7 +104,7 @@ enum po64_status nf85_read(struct nf85_service *s,uint32_t pid,uint64_t handle,u
  if(s->busy||s->fs->busy)return PO64_BUSY;
  struct nf85_owner o;if(!owner(s,pid,handle,root,true,&o))return PO64_DENIED;
  struct nf85_grant *g=find(s,o,token);
- if(!g)return PO64_DENIED;
+ if(!g||!(g->rights&PO64_READ))return PO64_DENIED;
  if(!token_live(s,g))return PO64_STALE;
  s->busy=true;wipe(s->scratch,sizeof s->scratch);
  struct reader r={s->scratch,capacity,0,false};
@@ -110,6 +114,31 @@ enum po64_status nf85_read(struct nf85_service *s,uint32_t pid,uint64_t handle,u
   *bytes=r.seen;
  }else if(rc==PO64_CANCELLED&&r.overflow)rc=PO64_FULL;
  wipe(s->scratch,sizeof s->scratch);s->busy=false;return rc;
+}
+struct writer {const uint8_t *p;size_t bytes;};
+static bool supply(void *opaque,uint64_t offset,uint8_t *out,size_t n){
+ const struct writer *w=opaque;
+ if(!out||offset>w->bytes||n>w->bytes-(size_t)offset)return false;
+ for(size_t i=0;i<n;++i)out[i]=w->p[(size_t)offset+i];
+ return true;
+}
+enum po64_status nf85_write(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,const uint8_t *data,size_t bytes){
+ if(!ready(s)||!token||bytes>NF85_READ_MAX||(bytes&&!external_span(s,data,bytes)))return PO64_INVALID;
+ if(s->busy||s->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(s,pid,handle,root,true,&o))return PO64_DENIED;
+ struct nf85_grant *g=find(s,o,token);
+ if(!g||!(g->rights&PO64_WRITE))return PO64_DENIED;
+ if(!token_live(s,g))return PO64_STALE;
+ s->busy=true;wipe(s->scratch,sizeof s->scratch);
+ for(size_t i=0;i<bytes;++i)s->scratch[i]=data[i];
+ struct writer w={s->scratch,bytes};
+ enum po64_status rc=po64_write(s->fs,principal(pid),token,bytes,supply,&w);
+ wipe(s->scratch,sizeof s->scratch);s->busy=false;
+ /* Durable publication invalidates all prior exact-revision object tokens.
+  * On uncertainty po64 closes the mount; reconciliation removes old grants. */
+ nf85_reconcile(s);
+ return rc;
 }
 enum po64_status nf85_close(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,uint64_t token){
  if(!ready(s)||!token)return PO64_INVALID;

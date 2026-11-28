@@ -10,7 +10,7 @@
  * No concurrent call, registry reset or mutable callback into this adapter. */
 enum { NF85_HANDLES=8,NF85_READ_MAX=4096 };
 struct nf85_owner { uint32_t pid,session;uint64_t handle,root; };
-struct nf85_grant { struct nf85_owner owner;uint64_t token,mount; };
+struct nf85_grant { struct nf85_owner owner;uint64_t token,mount;unsigned rights; };
 struct nf85_service {
  struct po64_service *fs;
  const struct usr_runtime *sessions;
@@ -21,11 +21,21 @@ struct nf85_service {
 enum po64_status nf85_start(struct nf85_service *,struct po64_service *,const struct usr_runtime *);
 enum po64_status nf85_grant_read(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,
  const struct sd64_key *,uint64_t id,uint64_t revision,uint64_t *token);
+/* Supervisor authorizes READ and/or WRITE on one existing revision.
+ * No directory mutation, implicit path grants or automatic reauthorization. */
+enum po64_status nf85_grant_access(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,
+ const struct sd64_key *,uint64_t id,uint64_t revision,unsigned rights,uint64_t *token);
 /* Whole-file bounded read, never truncate; output/count unchanged on failure.
  * No byte is released before complete underlying checksum verification.
  * PO64_FULL means insufficient bounded capacity; later streaming API is separate. */
 enum po64_status nf85_read(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t token,uint8_t *out,size_t capacity,size_t *bytes);
+/* Bounded whole-file replacement, including empty files. Source is copied
+ * to private scratch before durable transaction. On success all old object
+ * grants expire; supervisor must explicitly authorize the new revision.
+ * On uncertain publication fail closed, never retry automatically. */
+enum po64_status nf85_write(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,const uint8_t *data,size_t bytes);
 enum po64_status nf85_close(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,uint64_t token);
 /* Trusted periodic/termination reconciliation; dead or rebound owners,
  * revoked object grants and remounts are removed. Lock/switch only hides

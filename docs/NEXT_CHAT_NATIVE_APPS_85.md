@@ -5,3 +5,6 @@ Next verify 84 and 85, connect to live mounted volume and trusted picker grant/r
 
 ## 85.1 — session fixture correction and alias refusal
 Stage 84 CI 46130922703: all 22 jobs SUCCESS, real text guest included. Stage 85 CI 46131104799: host test job 140936209933 failed at test_stylefs_paged_object64.c:93, because usr_bind requires active selected session and fixture attempted to bind peer while session z was inactive. Preserve the failure; no weakening of session policy. New fixture explicitly proves denial, selects z, binds peer, returns to a. Added output alias refusals for service/registry and revoked-token stale/reconciliation checks; trusted external storage contract retained. No write implementation or new guest integration. Rerun full CI before accepting. Proceed to durable writes, actual live volume and user ABI only after host acceptance.
+
+## Accepted 85.1
+CI 46131303435: 23/23 SUCCESS, job 140936821905 confirms native file adapter test on GCC and Clang ASan/UBSan. Exact SHA 182c41e45457b49ab4f12d3b4b95adc9d0febe4e. Ordinary ISO artifact 15257484219. Host scope only, no file syscall claim.
