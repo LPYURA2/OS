@@ -2,7 +2,7 @@
 The ordinary boot image contains approved package bytes, not linked app code."""
 import hashlib,struct,zipfile
 from tea_package import pack,inspect
-def make(folder,index,name,color):
+def make(folder,index,name,color,file_probe_92=False):
     code=bytearray()
     labels={};fix=[]
     def emit(b):code.extend(b)
@@ -15,6 +15,37 @@ def make(folder,index,name,color):
         emit(b'\xc7\x46'+bytes([off*4])+struct.pack('<I',value))
     emit(b'\xb8\x03\x01\x00\x00\x31\xdb\x89\xf1\xba\x01\x00\x00\x00\xcd\x80')
     emit(b'\x85\xc0');jump(b'\x0f\x85','fail')
+    if file_probe_92 and index==1:
+        # Diagnostic grant is in this process's private DATA + 0x200.
+        # Preserve normal frame and input-wait behavior. Verify the actual
+        # bytes read from the separately provisioned file, not a stub.
+        expected=b"StyleOS: paged file read test.\nSecond line.\n"
+        def call(op,addr,size):
+            emit(b'\xb8'+struct.pack('<I',op)+b'\xb9'+struct.pack('<I',addr)+b'\xba'+struct.pack('<I',size)+b'\xcd\x80')
+        def status(n):
+            emit(b'\x83\xf8'+bytes([n]));jump(b'\x0f\x85','fail')
+        # rbx=granted token; intentionally wrong grant must fail.
+        emit(b'\x48\x8b\x9e\x00\x02\x00\x00\x48\x85\xdb');jump(b'\x0f\x84','fail')
+        emit(b'\x48\x83\xf3\x01')
+        call(0x130,0,64);status(2)
+        emit(b'\x48\x8b\x9e\x00\x02\x00\x00')
+        call(0x131,0,0);status(2) # read-only grant cannot write
+        call(0x130,0,64);status(0)
+        emit(b'\x48\x85\xd2');jump(b'\x0f\x84','fail')
+        emit(b'\x48\x89\xd3') # request id
+        # Boundary crossing outside single DATA page must not consume.
+        call(0x132,0x12000ff0,64);status(1)
+        mark('file_take')
+        call(0x132,0x12000300,64)
+        emit(b'\x83\xf8\x04');jump(b'\x0f\x84','file_take')
+        status(0)
+        emit(b'\x48\xb8'+struct.pack('<Q',len(expected)<<32)+b'\x48\x39\xc2');jump(b'\x0f\x85','fail')
+        for i,value in enumerate(expected):
+            emit(b'\x80\xbe'+struct.pack('<I',0x300+i)+bytes([value]));jump(b'\x0f\x85','fail')
+        # Completion is one-shot; duplicate take must be denied.
+        call(0x132,0x12000300,64);status(2)
+        # Distinct pixel call serves as evidence only after all byte checks.
+        emit(b'\x31\xdb');call(0x100,0x976332,0);status(0)
     mark('poll')
     emit(b'\xb8\x02\x01\x00\x00\x31\xdb\xb9\x00\x01\x00\x12\xba\x40\x00\x00\x00\xcd\x80')
     emit(b'\x85\xc0');jump(b'\x0f\x85','poll')
@@ -44,9 +75,9 @@ def make(folder,index,name,color):
         '#define '+prefix+'bytes '+str(len(package))+'u\n'+arr(prefix+'manifest',meta)+
         arr(prefix+'pkg_hash',hashlib.sha256(package).digest())+
         arr(prefix+'elf_hash',hashlib.sha256(blob).digest()))
-def build(folder):
+def build(folder,file_probe_92=False):
     (folder/'native_sample_69.h').write_text(
-        make(folder,0,'Native-sample',0x2579a1)+make(folder,1,'Native-peer',0x976332))
+        make(folder,0,'Native-sample',0x2579a1)+make(folder,1,'Native-peer',0x976332,file_probe_92=file_probe_92))
     # Both approved packages must carry independent executable identities.
     first=(folder/'Native-sample.elf').read_bytes()
     second=(folder/'Native-peer.elf').read_bytes()

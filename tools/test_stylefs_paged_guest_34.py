@@ -78,7 +78,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False, file_probe92=False):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -358,6 +358,20 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             if any(v=={"pid":pid_num,"gen":gen} for _,v in parks):break
                             time.sleep(.05)
                         else:raise RuntimeError("stop-test app never parked")
+                        if file_probe92:
+                            calls=records(lines,b"STYLEOS FILE92 CALL",("pid","op","status","value"))
+                            calls=[v for _,v in calls if v["pid"]==pid_num]
+                            wanted=[(0x130,2),(0x131,2),(0x130,0),(0x132,1)]
+                            require([(v["op"],v["status"]) for v in calls[:4]]==wanted,"file probe admission/invalid span")
+                            tail=calls[4:]
+                            require(len(tail)>=2 and all(v["op"]==0x132 and v["status"]==4 for v in tail[:-2]) and
+                                    [(v["op"],v["status"]) for v in tail[-2:]]==[(0x132,0),(0x132,2)],"file probe completion")
+                            expected=b"StyleOS: paged file read test.\nSecond line.\n"
+                            require(tail[-2]["value"]==len(expected)<<32 and calls[2]["value"]!=0,"file probe byte count")
+                            pixels=records(lines,b"STYLEOS NATIVE PIXEL",("pid","gen","root","window","rgb","status"))
+                            require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"client byte comparison marker absent")
+                            (folder/"file-probe-92.json").write_text(json.dumps({"pid":pid_num,"calls":calls,"bytes":len(expected)},indent=2)+"\n")
+                            print("Native file 92 CPL3 read, invalid span, read-only denial, exact content and one-shot completion PASS",flush=True)
                         snapshot_count=sum(x==b"STYLEOS PROCESSES END" for x in lines)
                         d.key("f8");wait_exact(b"STYLEOS PROCESSES END",snapshot_count+1)
                         from native_process_view_02 import decimal,ROW,HEADER,END

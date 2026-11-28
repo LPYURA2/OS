@@ -297,6 +297,12 @@ enum po64_status s88_native_file_grant(uint32_t pid,uint64_t handle,uint64_t roo
                           row->entry.target,row->revision,rights,token);
 }
 #endif
+#if defined(STYLEOS_FILE_PROBE_92) && defined(STYLEOS_OWNED_SHELL_865)
+enum po64_status s92_file_probe_grant(uint32_t pid,uint64_t handle,uint64_t root,uint64_t *token){
+ const struct po64_row row={.entry={{.parent=3,.length=5,.name={'x','.','t','x','t'}},4,SD64_FILE},.revision=1};
+ return s88_native_file_grant(pid,handle,root,&row,PO64_READ,token);
+}
+#endif
 static void s39_read(void){
  struct po64_service *s=&s34_work.volume.objects;
  if(!s->active)return;

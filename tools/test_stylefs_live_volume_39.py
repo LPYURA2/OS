@@ -12,7 +12,9 @@ SERIAL="STYLEOS-SFS39-DATA"
 def main():
     p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True)
     p.add_argument("--waiting-stop-only",action="store_true")
+    p.add_argument("--file-probe-92",action="store_true")
     args=p.parse_args()
+    require(not args.file_probe_92 or args.waiting_stop_only,"file probe needs isolated one-client stop")
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     require(subprocess.check_output(["qemu-system-x86_64","--version"],text=True).startswith("QEMU emulator version 8.2.2 "), "unvalidated QEMU")
     fw=(firmware_path("OVMF_CODE","OVMF_CODE"),firmware_path("OVMF_VARS","OVMF_VARS"))
@@ -23,11 +25,13 @@ def main():
         *[ROOT/("kernel/"+s+".c") for s in ("stylefs_paged_stream64","stylefs_paged_pair64","stylefs_inode_root64","stylefs_inode_pages64","stylefs_namespace64","stylefs_dircommit64","stylefs_directory64","stylefs_alloc64","stylefs_map64","stylefs_extent64","block_service")],"-o",tool)
     volume=out/"provision.raw";run(tool,"new39",volume)
     folder=out/"build"
-    run("python3",ROOT/"tools/build.py","--arch","x86_64","--desktop-owned-shell-865","--live-volume-39","--output",folder)
+    run("python3",ROOT/"tools/build.py","--arch","x86_64","--desktop-owned-shell-865","--live-volume-39",
+        *(["--file-probe-92"] if args.file_probe_92 else []),"--output",folder)
     manifest=json.loads((folder/"x86_64/owned-shell-compiler.json").read_text())
     require(manifest["profile"]=="live-volume-39" and "-DSTYLEOS_LIVE_VOLUME_39=1" in manifest["flags"] and
         "kernel/stylefs_paged_volume64.c" in manifest["sources"] and
         "kernel/native_file_85.c" in manifest["sources"],"profile proof")
+    require(("-DSTYLEOS_FILE_PROBE_92=1" in manifest["flags"])==args.file_probe_92,"diagnostic isolation")
     iso=folder/"x86_64/StyleOS-owned-shell-865.iso"
     results=[]
     for name,serial,tag,receipt in (() if args.waiting_stop_only else (("live",SERIAL,TAG,"SFS39 MOUNT PASS"),("foreign-tag",SERIAL,b"X"*512,"SFS39 REFUSE tag"))):
@@ -69,7 +73,7 @@ def main():
         raw=out/(name+".raw");fixture(raw,N,volume,TAG)
         before=hashlib.sha256(volume.read_bytes()).digest()
         try:
-            results.append(boot(out/name,iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only,native_file88=True))
+            results.append(boot(out/name,iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only,native_file88=True,file_probe92=args.file_probe_92))
         except Exception:
             # Bounded diagnostic tail in the job log even if upload fails.
             uart=out/name/"debug.log"

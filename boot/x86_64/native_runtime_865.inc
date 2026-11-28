@@ -750,6 +750,21 @@ bool s865_launch_native_file(const struct po64_row *row){
   if(row->entry.key.name[i]!=(uint8_t)name[i])return false;
  struct sample69_file_launch c={.app=a};
  if(!s69_use_tea_file(row,&a->pin,sample69_consume_file,&c))return false;
+#ifdef STYLEOS_FILE_PROBE_92
+ /* Diagnostic package only: exact fixture file, granted after package
+  * read completes and before first dispatch, no production auto grant. */
+ const struct pr_entry *p=pr_find(pr_global(),c.out.pid);
+ if(!p)fail("file92-owner");
+ unsigned slot=0;
+ while(slot<S846_ROOT_COUNT&&bank862.slots[slot].pid!=p->pid)++slot;
+ uint64_t token=0;
+ if(slot==S846_ROOT_COUNT||s92_file_probe_grant(p->pid,p->scheduler_handle,p->page_root,&token)!=PO64_OK)
+  fail("file92-grant");
+ volatile uint8_t *dst=s865_native_data_span(slot,p->pid,p->scheduler_handle,p->page_root,S846_DATA+0x200,8);
+ if(!dst)fail("file92-delivery");
+ for(unsigned i=0;i<8;++i)dst[i]=(uint8_t)(token>>(8*i));
+ arch_puts("STYLEOS FILE92 GRANT");field("pid",p->pid);field("token",token);arch_putc('\n');
+#endif
  arch_puts("STYLEOS TEA69 STYLEFS");field("id",row->entry.target);
  field("revision",row->revision);field("bytes",row->bytes);arch_putc('\n');
  return sample69_publish(index,c.out);

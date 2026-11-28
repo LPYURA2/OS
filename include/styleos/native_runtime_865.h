@@ -94,6 +94,9 @@ bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,s
 /* Supervisor-only bridge on the live mounted volume. No app-facing ABI. */
 void s88_native_file_reconcile(void);
 void s90_native_file_pump(void);
+#ifdef STYLEOS_FILE_PROBE_92
+enum po64_status s92_file_probe_grant(uint32_t,uint64_t,uint64_t,uint64_t *);
+#endif
 /* Only authenticated executor continuation, safe CR3 with pending receipt.
  * Caller identity comes from scheduler ticket; audited DATA alias acquired
  * before any request mutation. Never calls the disk pump. */

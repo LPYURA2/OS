@@ -234,6 +234,10 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
      operation,pending860.gpr[1],pending860.gpr[2],pending860.gpr[3],&value);
 #endif
   slot->context.gpr[0]=status;slot->context.gpr[3]=value;
+#ifdef STYLEOS_FILE_PROBE_92
+  arch_puts("STYLEOS FILE92 CALL");fld848("pid",ticket->pid);fld848("op",operation);
+  fld848("status",status);fld848("value",value);arch_putc('\n');
+#endif
  }
  const bool drop=operation>=DD_CALL_OFFER && operation<=DD_CALL_CANCEL;
  if(kind==RT865_SYSCALL && (drop||pending860.gpr[0]==NWC_CALL_PIXEL||pending860.gpr[0]==NWC_CALL_TILE||pending860.gpr[0]==NWC_CALL_INPUT||pending860.gpr[0]==NWC_CALL_FRAME||operation==NWC_CALL_PATCH||operation==NWC_CALL_FRAME_GEN||operation==NWC_CALL_TEXT)){
@@ -256,7 +260,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   }else if(pending860.gpr[0]==NWC_CALL_PIXEL){
    pixel=nwc_publish_pixel((struct nwc_service *)nwc_global(),
     ticket->pid,ticket->handle,ticket->child_root,pending860.gpr[1],pending860.gpr[2]);
-#ifdef STYLEOS_NATIVE_PINNED_CATALOG
+#if defined(STYLEOS_NATIVE_PINNED_CATALOG) || defined(STYLEOS_FILE_PROBE_92)
    arch_puts("STYLEOS NATIVE PIXEL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
    fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
    fld848("rgb",pending860.gpr[2]);fld848("status",pixel);arch_putc('\n');
