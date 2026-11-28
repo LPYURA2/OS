@@ -396,6 +396,12 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             require(next(i for i,x in enumerate(lines) if x.startswith(b"STYLEOS FILE95 PARK "))<
                                     next(i for i,x in enumerate(lines) if x.startswith(b"STYLEOS FILE95 WAKE ")),"write wait receipt order")
                             require(tail[-3]["value"]==0,"write completion result")
+                            phases=[]
+                            for marker in (b"STYLEOS FILE99 BEGIN",b"STYLEOS FILE99 STAGED",b"STYLEOS FILE99 END"):
+                                matches=[(i,v["request"]) for i,v in records(lines,marker,("request",))]
+                                require(len(matches)==1 and matches[0][1]==calls[3]["value"],"queued write phase receipt")
+                                phases.append(matches[0][0])
+                            require(phases[0]<phases[1]<phases[2],"queued write phase order")
                             pixels=records(lines,b"STYLEOS NATIVE PIXEL",("pid","gen","root","window","rgb","status"))
                             require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"save client success marker absent")
                             (folder/"file-probe-94.json").write_text(json.dumps({"pid":pid_num,"calls":calls},indent=2)+"\n")

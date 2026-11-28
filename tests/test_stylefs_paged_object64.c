@@ -535,6 +535,58 @@ static void write98(void){
  assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,7,0,0);check('h',5,1,0,0);
  puts("Native file 98: bounded staged write, cancellation, uncertain recovery, durable commit and empty replacement PASS");
 }
+#ifdef STYLEOS_NATIVE_FILE_99_TEST
+static void write99(void){
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ uint32_t pid=0;
+ struct pr_admission spec={PR_NATIVE_USER,0,112,458752,4096,"Writer99"};
+ assert(pr_admit(&procs,&spec,&pid)==PR_OK&&usr_bind(&users,1,pid,112)==USR_OK);
+ struct sd64_key a=key('a');
+ uint64_t grant=0,request=0;
+ assert(nf85_grant_access(&nf,pid,112,458752,&a,4,7,PO64_READ|PO64_WRITE,&grant)==PO64_OK);
+ uint8_t data[513];for(unsigned i=0;i<sizeof data;++i)data[i]=byte(55,i);
+ size_t n=999;enum po64_status result=PO64_INVALID;
+ assert(nf89_submit(&queue,pid,112,458752,grant,NF89_WRITE,data,sizeof data,&request)==PO64_OK);
+ assert(nf99_pump(&queue)&&service.busy&&queue.write99_id==request);
+ unsigned before=writes,read_before=reads;
+ assert(nf99_pump(&queue)&&queue.write99_staged&&writes-before==2);
+ assert(nf89_take(&queue,pid,112,458752,request,0,0,&n,&result)==PO64_BUSY&&n==999);
+ before=writes;read_before=reads;
+ assert(nf89_cancel(&queue,pid,112,458752,request)==PO64_OK&&queue.write99_cancel);
+ assert(writes==before&&reads==read_before&&service.busy);
+ assert(nf99_pump(&queue)&&!service.busy&&!queue.write99_id);
+ assert(nf89_take(&queue,pid,112,458752,request,0,0,&n,&result)==PO64_OK&&!n&&result==PO64_CANCELLED);
+ assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,7,0,0);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(nf85_grant_access(&nf,pid,112,458752,&a,4,7,PO64_WRITE,&grant)==PO64_OK);
+ assert(nf89_submit(&queue,pid,112,458752,grant,NF89_WRITE,data,sizeof data,&request)==PO64_OK);
+ assert(nf99_pump(&queue)&&service.busy);
+ assert(usr_lock(&users)==USR_OK&&nf99_reconcile(&queue)==1&&!service.busy);
+ assert(usr_select(&users,1)==USR_OK);
+ assert(nf89_take(&queue,pid,112,458752,request,0,0,&n,&result)==PO64_OK&&result==PO64_CANCELLED);
+ assert(nf89_submit(&queue,pid,112,458752,grant,NF89_WRITE,data,sizeof data,&request)==PO64_OK);
+ memset(data,0,sizeof data);
+ uint64_t sequence=service.pair.sequence;
+ assert(nf99_pump(&queue)&&service.busy);
+ before=writes;
+ assert(nf99_pump(&queue)&&queue.write99_staged&&writes-before==2&&service.pair.sequence==sequence);
+ assert(nf95_wait(&queue,pid,112,458752,request)==PO64_BUSY);
+ assert(nf99_pump(&queue)&&!service.busy&&service.pair.sequence>sequence);
+ assert(nf95_wait(&queue,pid,112,458752,request)==PO64_OK);
+ assert(nf89_take(&queue,pid,112,458752,request,0,0,&n,&result)==PO64_OK&&!n&&result==PO64_OK);
+ assert(nf89_submit(&queue,pid,112,458752,grant,NF89_WRITE,data,sizeof data,&request)==PO64_STALE);
+ assert(nf85_grant_access(&nf,pid,112,458752,&a,4,8,PO64_WRITE,&grant)==PO64_OK);
+ assert(nf89_submit(&queue,pid,112,458752,grant,NF89_WRITE,data,sizeof data,&request)==PO64_OK);
+ assert(nf99_pump(&queue)&&service.busy);
+ assert(pr_transition(&procs,pid,112,PR_FAULTED)==PR_OK);
+ assert(nf99_reconcile(&queue)==1&&!service.busy&&!queue.write99_id);
+ assert(nf85_reconcile(&nf)==1);
+ const uint8_t *p=(const void *)&queue.write99;
+ for(size_t i=0;i<sizeof queue.write99;++i)assert(!p[i]);
+ assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,8,513,55);check('h',5,1,0,0);
+ puts("Native file 99: queued staged save, deferred cancellation, lock, fault and durable publication PASS");
+}
+#endif
 #endif
 int main(void){
  attach();assert(dc64_provision(&b,7,l.dir,D)==DC64_OK);
@@ -793,6 +845,9 @@ int main(void){
  native_file89();
 #ifdef STYLEOS_NATIVE_FILE_98_TEST
  write98();
+#ifdef STYLEOS_NATIVE_FILE_99_TEST
+ write99();
+#endif
 #endif
 #endif
 #endif

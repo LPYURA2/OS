@@ -227,10 +227,13 @@ void s88_native_file_reconcile(void){
   if(!s34_work.volume.objects.active||nf89_start(q,s)!=PO64_OK)return;
   arch_puts("STYLEOS NATIVE FILE90 QUEUE-READY\n");
  }
- (void)nf97_reconcile(q);
+ (void)nf99_reconcile(q);
  /* Cursor cancellation can release the exclusive object service. */
  (void)nf85_reconcile(s);
 }
+#ifdef STYLEOS_LIVE_VOLUME_44
+static bool s42_load(uint64_t,uint64_t);
+#endif
 /* Only the safe supervisor poll may run one bounded request. No user
  * callback or disk I/O in the trap continuation. A transaction can still
  * block the supervisor on slow I/O; not a preemptible disk worker yet. */
@@ -238,8 +241,36 @@ void s90_native_file_pump(void){
  if(!s865_executor_idle())return;
  if(s34_work.native_queue.files){
   struct nf89_queue *q=&s34_work.native_queue;
-  uint64_t before=q->read97_id;
-  (void)nf97_pump(q);
+  uint64_t before=q->read97_id,write_before=q->write99_id;
+  bool staged=q->write99_staged;
+#ifdef STYLEOS_LIVE_VOLUME_44
+  uint64_t sequence=q->files->fs->pair.sequence;
+#endif
+  (void)nf99_pump(q);
+#ifdef STYLEOS_LIVE_VOLUME_44
+  /* All old capabilities and Explorer rows expire after a native save.
+   * Rebuild the trusted shell view, without changing the app's durable
+   * completion receipt if the independent refresh fails. */
+  if(q->files->fs->active&&sequence!=q->files->fs->pair.sequence){
+   struct sd64_key k=s34_key(1,'a');
+   uint64_t parent=s34_work.root_view.parent,first=s34_work.root_view.first;
+   if(po64_grant(q->files->fs,101,&k,2,1,&s34_work.token)!=PO64_OK||!s42_load(parent,first)){
+    (void)pv64_close(&s34_work.volume);
+    arch_puts("SFS99 POSTCOMMIT VIEW UNAVAILABLE\n");
+   }
+  }
+#endif
+#if defined(STYLEOS_FILE_PROBE_94)
+  if(!write_before&&q->write99_id){
+   arch_puts("STYLEOS FILE99 BEGIN");field("request",q->write99_id);arch_putc('\n');
+  }else if(write_before&&q->write99_id&&!staged&&q->write99_staged){
+   arch_puts("STYLEOS FILE99 STAGED");field("request",write_before);arch_putc('\n');
+  }else if(write_before&&!q->write99_id){
+   arch_puts("STYLEOS FILE99 END");field("request",write_before);arch_putc('\n');
+  }
+#else
+  (void)write_before;(void)staged;
+#endif
 #if defined(STYLEOS_FILE_PROBE_92) || defined(STYLEOS_FILE_PROBE_94)
   if(!before&&q->read97_id){
    arch_puts("STYLEOS FILE97 BEGIN");field("request",q->read97_id);arch_putc('\n');

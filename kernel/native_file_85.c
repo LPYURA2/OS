@@ -428,12 +428,89 @@ bool nf97_pump(struct nf89_queue *q){
  if(status!=PO64_OK)read97_complete(q,r,status);
  return true;
 }
+static struct nf89_request *write99_request(struct nf89_queue *q){
+ for(unsigned i=0;i<NF89_SLOTS;++i)
+  if(q->write99_id&&q->slots[i].id==q->write99_id&&q->slots[i].state==NF89_PENDING&&q->slots[i].op==NF89_WRITE)
+   return &q->slots[i];
+ return 0;
+}
+static void write99_complete(struct nf89_queue *q,struct nf89_request *r,enum po64_status status){
+ if(r){wipe(r->data,sizeof r->data);r->bytes=0;r->status=status;r->state=NF89_DONE;}
+ q->write99_id=0;q->write99_staged=false;q->write99_cancel=false;
+}
+size_t nf99_reconcile(struct nf89_queue *q){
+ if(!qready(q)||q->busy||q->files->busy)return 0;
+ size_t n=0;
+ if(q->write99_id){
+  struct nf89_request *r=write99_request(q);struct nf85_owner o;
+  bool live=r&&owner(q->files,r->owner.pid,r->owner.handle,r->owner.root,false,&o)&&same(o,r->owner);
+  struct nf85_grant *g=live?find(q->files,o,r->token):0;
+  bool valid=g&&g->mount==r->mount&&token_live(q->files,g)&&(g->rights&PO64_WRITE);
+  bool selected=live&&owner(q->files,o.pid,o.handle,o.root,true,&o);
+  if(!valid||!selected||q->write99_cancel){
+   q->busy=true;
+   enum po64_status rc=po98_cancel(q->files->fs,&q->write99);
+   q->busy=false;
+   if(q->write99.active)return 0;
+   if(rc==PO64_CANCELLED&&!valid)rc=PO64_STALE;
+   write99_complete(q,r,rc);
+   if(r&&!live)wipe(r,sizeof *r);
+   ++n;
+  }
+ }
+ return n+nf97_reconcile(q);
+}
+static bool write99_source(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ struct nf89_queue *q=ctx;struct nf89_request *r=write99_request(q);
+ if(!q->busy||!r||at>r->bytes||n>r->bytes-at)return false;
+ for(size_t i=0;i<n;++i)p[i]=r->data[(size_t)at+i];
+ return true;
+}
+bool nf99_pump(struct nf89_queue *q){
+ if(!qready(q)||q->busy||q->files->busy)return false;
+ if(nf99_reconcile(q))return true;
+ if(q->read97_id)return nf97_pump(q);
+ struct nf89_request *r=write99_request(q);
+ if(q->write99_id){
+  if(!r||!q->write99.active)return false;
+  q->busy=true;
+  enum po64_status rc;
+  if(q->write99_staged){
+   rc=po98_commit(q->files->fs,&q->write99);
+  }else{
+   bool done=false;
+   rc=po98_step(q->files->fs,&q->write99,write99_source,q,&done);
+   if(rc==PO64_OK)q->write99_staged=done;
+  }
+  q->busy=false;
+  if(!q->write99.active)write99_complete(q,r,rc);
+  return true;
+ }
+ if(q->files->fs->busy)return false;
+ for(unsigned i=0;i<NF89_SLOTS;++i){
+  struct nf89_request *p=&q->slots[i];struct nf85_owner o;
+  if(p->state!=NF89_PENDING||!owner(q->files,p->owner.pid,p->owner.handle,p->owner.root,true,&o)||
+     !same(o,p->owner))continue;
+  if(!r||p->id<r->id)r=p;
+ }
+ if(!r)return false;
+ if(r->op==NF89_READ)return nf97_pump(q);
+ q->busy=true;
+ enum po64_status rc=po98_begin(q->files->fs,principal(r->owner.pid),r->token,r->bytes,&q->write99);
+ q->busy=false;
+ if(rc==PO64_OK){q->write99_id=r->id;q->write99_staged=false;q->write99_cancel=false;}
+ else write99_complete(q,r,rc);
+ return true;
+}
 enum po64_status nf89_cancel(struct nf89_queue *q,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
  if(!qready(q)||!id)return PO64_INVALID;
  if(q->busy||q->files->busy)return PO64_BUSY;
  struct nf85_owner o;if(!owner(q->files,pid,handle,root,true,&o))return PO64_DENIED;
  struct nf89_request *r=qfind(q,o,id);if(!r)return PO64_DENIED;
  if(r->state!=NF89_PENDING)return PO64_BUSY;
+ /* A live write cancellation is recorded only. Recovery validation may
+  * perform disk I/O and must be deferred to the supervisor. */
+ if(q->write99_id==id){q->write99_cancel=true;return PO64_OK;}
  if(q->files->fs->busy&&q->read97_id!=id)return PO64_BUSY;
  if(q->read97_id==id&&!read97_stop(q))return PO64_BUSY;
  wipe(r->data,sizeof r->data);r->bytes=0;r->status=PO64_CANCELLED;r->state=NF89_DONE;

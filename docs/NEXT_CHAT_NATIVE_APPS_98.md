@@ -3,3 +3,6 @@ Base 16094370143c14688462fc920747009437f6edcf. Stage 97 CI 46136523432 20/30 at 
 
 ## 98.1 — CI expression normalization
 Initial CI 46136679934 failed before any jobs ran (workflow validation). The branch predicates had grown deeply nested through repeated stage extensions. Flatten pure branch OR expressions into contains(fromJSON(exact list), github.ref_name), preserving exact branch sets and always() guards. No source/test assertions changed. Initial failure reason is inferred from expression depth unless GitHub annotations explicitly confirm. Repeat complete CI; staged writer not yet tested. Stage 97 CI 46136523432 28/30 successful at observation, focused real read/write guest passed; last ordinary/live jobs pending.
+
+## 99 preparation
+Stage 97 CI 46136523432 30/30 SUCCESS. Stage 98.1 CI 46136729069 29/30 at observation; focused host 140953578511 SUCCESS, live regression pending. Stage 99 integrates writes into supervisor queue, not accepted until CI passes.

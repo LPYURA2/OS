@@ -87,6 +87,9 @@ struct nf89_queue {
  struct pp96_reader read97;
  uint64_t read97_id;
  size_t read97_seen;
+ struct pp98_writer write99;
+ uint64_t write99_id;
+ bool write99_staged,write99_cancel;
 };
 enum po64_status nf89_start(struct nf89_queue *,struct nf85_service *);
 enum po64_status nf89_submit(struct nf89_queue *,uint32_t,uint64_t,uint64_t,
@@ -99,6 +102,11 @@ bool nf89_pump(struct nf89_queue *);
  * Reconcile on process/session change before other volume callers. */
 bool nf97_pump(struct nf89_queue *);
 size_t nf97_reconcile(struct nf89_queue *);
+/* Live pump stages one data window or one metadata phase per iteration.
+ * Cancellation request is memory-only; supervisor performs recovery
+ * validation outside the syscall. Lock cancels pre-publication writes. */
+bool nf99_pump(struct nf89_queue *);
+size_t nf99_reconcile(struct nf89_queue *);
 /* Scheduler query only, no I/O and no result consumption. BUSY means
  * keep the exact owner parked (pending or locked session). OK means
  * completion can be collected; other status permits wake to observe refusal. */
