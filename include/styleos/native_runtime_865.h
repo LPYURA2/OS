@@ -96,6 +96,9 @@ void s88_native_file_reconcile(void);
 void s90_native_file_pump(void);
 enum po64_status s95_native_file_wait(uint32_t,uint64_t,uint64_t,uint64_t);
 enum po64_status s93_native_file_offer(uint32_t,uint64_t,uint64_t,const struct po64_row *,unsigned);
+#ifdef STYLEOS_FILE_PROBE_103
+enum po64_status s103_file_probe_offer(uint32_t,uint64_t,uint64_t);
+#endif
 #ifdef STYLEOS_FILE_PROBE_94
 enum po64_status s94_file_probe_offer(uint32_t,uint64_t,uint64_t);
 #endif

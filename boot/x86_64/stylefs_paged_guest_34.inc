@@ -388,6 +388,12 @@ enum po64_status s94_file_probe_offer(uint32_t pid,uint64_t handle,uint64_t root
  return s93_native_file_offer(pid,handle,root,&row,PO64_READ|PO64_WRITE);
 }
 #endif
+#if defined(STYLEOS_FILE_PROBE_103) && defined(STYLEOS_OWNED_SHELL_865)
+enum po64_status s103_file_probe_offer(uint32_t pid,uint64_t handle,uint64_t root){
+ const struct po64_row row={.entry={{.parent=3,.length=5,.name={'z','.','b','i','n'}},7,SD64_FILE},.revision=1};
+ return s93_native_file_offer(pid,handle,root,&row,PO64_READ|PO64_WRITE);
+}
+#endif
 static void s39_read(void){
  struct po64_service *s=&s34_work.volume.objects;
  if(!s->active||s->busy)return;

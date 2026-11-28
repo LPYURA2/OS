@@ -16,6 +16,14 @@ static bool source43(void *ctx,uint64_t at,uint8_t *p,size_t n){
  (void)ctx;if(at>sizeof text43-1||n>sizeof text43-1-at)return false;
  memcpy(p,text43+at,n);return true;
 }
+static bool source103(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ (void)ctx;(void)at;memset(p,'A',n);return true;
+}
+static bool sink103(void *ctx,uint64_t at,const uint8_t *p,size_t n){
+ uint64_t *seen=ctx;if(at!=*seen||at>8193||n>8193-at)return false;
+ for(size_t i=0;i<n;++i)if(p[i]!='B')return false;
+ *seen+=n;return true;
+}
 static uint8_t tea69[16384];
 static size_t tea69_size;
 static bool source69(void *ctx,uint64_t at,uint8_t *p,size_t n){
@@ -29,12 +37,14 @@ static bool sink(void *c,uint64_t at,const uint8_t *p,size_t n){return fwrite(p,
 int main(int argc,char **argv){
  if(argc!=3&&argc!=4)return 1;
  bool ids=!strcmp(argv[1],"new50")||!strcmp(argv[1],"check50");
- bool tea=!strcmp(argv[1],"newtea69");
+ bool stream=!strcmp(argv[1],"newtea103");
+ bool check_stream=!strcmp(argv[1],"check103");
+ bool tea=stream||!strcmp(argv[1],"newtea69");
  bool live=tea||!strcmp(argv[1],"new39")||!strcmp(argv[1],"new50");
  bool create=live||!strcmp(argv[1],"new");
  bool object=!strcmp(argv[1],"get37");
  bool verify=!strcmp(argv[1],"check46")||!strcmp(argv[1],"check50");
- if((create&&argc!=(tea?4:3))||(!create&&(argc!=4||(!verify&&!object&&strcmp(argv[1],"get")))))return 1;
+ if((create&&argc!=(tea?4:3))||(!create&&(argc!=4||(!verify&&!object&&!check_stream&&strcmp(argv[1],"get")))))return 1;
  if(tea){
   FILE *f=fopen(argv[3],"rb");if(!f)return 1;
   tea69_size=fread(tea69,1,sizeof tea69,f);
@@ -70,7 +80,15 @@ int main(int argc,char **argv){
   struct sd64_key k={.parent=5,.length=15,.name="Native-peer.tea"};
   if(ok)ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,6,0,tea69_size,source69,0,&pair)==PP64_OK;
  }
- if(ok&&verify){
+ if(ok&&stream){
+  struct sd64_key k={.parent=3,.length=5,.name="z.bin"};
+  ok=pp64_put(&b,&l,&w,nodes,32,runs,previous,32,pair.sequence,&k,7,0,8193,source103,0,&pair)==PP64_OK;
+ }
+ if(ok&&check_stream){
+  uint64_t seen=0;struct sd64_key k={.parent=3,.length=5,.name="z.bin"};
+  ok=pp64_mount(&b,&l,&w.pair,nodes,32,runs,32,&pair)==PP64_OK&&
+     pp64_get(&b,&l,&w,nodes,32,runs,32,pair.sequence,&k,7,2,sink103,&seen)==PP64_OK&&seen==8193;
+ }else if(ok&&verify){
   bool recreated=ids&&!strcmp(argv[3],"recreated");
   bool present=recreated||!strcmp(argv[3],"present");
   ok=(present||!strcmp(argv[3],"absent"))&&pp64_mount(&b,&l,&w.pair,nodes,32,runs,32,&pair)==PP64_OK;

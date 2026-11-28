@@ -233,9 +233,10 @@ static unsigned window_launch_fault;
 #else
 #define WINDOW_LAUNCH_FAULT(step) false
 #endif
-enum ps_status s865_native_launch_window(const struct rt865_launch_request *request,
+static enum ps_status launch_window_image103(const struct rt865_launch_request *request,
+ const uint8_t *elf,size_t bytes,const uint8_t *hash,
  uint32_t session,const char *title,struct ws_bounds bounds,struct s865_window_launch *out){
- if(!request||!out||!title||!session)return PS_ARGUMENT;
+ if((!request&&!elf)||(request&&elf)||!out||!title||!session)return PS_ARGUMENT;
  if(!native_ready||!s865_executor_idle()||!native_audit(0))return PS_STATE;
  struct usr_runtime *u=(struct usr_runtime *)usr_global();
  struct nwc_service *n=(struct nwc_service *)nwc_global();
@@ -256,7 +257,7 @@ enum ps_status s865_native_launch_window(const struct rt865_launch_request *requ
  if(!w->next_id||w->next_id==UINT32_MAX)return PS_EXHAUSTED;
  if(nwc_port_count(n)>=NWC_PORTS||ws_snapshot(w,0,0)>=WS_MAX_WINDOWS)return PS_FULL;
  uint32_t pid=0,win=0;
- enum ps_status status=s865_native_launch(request,&pid);
+ enum ps_status status=elf?s875_native_launch_image(elf,bytes,hash,1,title,&pid):s865_native_launch(request,&pid);
  if(status!=PS_OK)return status;
  const struct pr_entry *entry=pr_find(registry,pid);
  if(!entry||entry->state!=PR_READY||!entry->scheduler_handle)fail("native-window-launch-owner");
@@ -276,6 +277,10 @@ enum ps_status s865_native_launch_window(const struct rt865_launch_request *requ
  field("root",root);field("session",session);field("window",win);arch_putc('\n');
 #endif
  return PS_OK;
+}
+enum ps_status s865_native_launch_window(const struct rt865_launch_request *request,
+ uint32_t session,const char *title,struct ws_bounds bounds,struct s865_window_launch *out){
+ return launch_window_image103(request,0,0,0,session,title,bounds,out);
 }
 enum ps_status s865_native_launch_tea(const uint8_t *package,size_t bytes,
  const struct nts_pin *pin,uint32_t session,const char *title,
@@ -304,6 +309,8 @@ enum ps_status s865_native_launch_tea(const uint8_t *package,size_t bytes,
  /* Existing audited launch rechecks ELF rights and digest, then binds
   * session, window and port before any dispatch. The stack view is never
   * retained by the scheduler or published into user memory. */
+ if(view.elf[56]==2&&view.elf[57]==0)
+  return launch_window_image103(0,view.elf,view.elf_bytes,pin->elf_sha,session,title,bounds,out);
  return s865_native_launch_window(&request,session,title,bounds,out);
 }
 #undef WINDOW_LAUNCH_FAULT
@@ -700,7 +707,9 @@ static void sample70_resources(unsigned phase,uint32_t pid){
  if(!u||!ports||!windows||!native_audit(0)||!s844_count(native_arena,&used))fail("sample70-resource-audit");
  size_t resident=pr_snapshot(pr_global(),0,0,true);
  for(unsigned i=0;i<PR_MAX_PROCESSES;++i)if(u->owners[i].pid)++owners;
- if(used!=3u*resident)fail("sample70-page-account");
+ unsigned actual=0;
+ for(unsigned i=0;i<S846_ROOT_COUNT;++i)if(native_leases[i].generation)actual+=native_leases[i].pages;
+ if(used!=actual)fail("sample70-page-account");
  arch_puts("STYLEOS TEA70 RESOURCES");field("phase",phase);field("pid",pid);
  field("resident",resident);field("pages",used);field("owners",owners);
  field("windows",ws_snapshot(windows,0,0));field("ports",nwc_port_count(ports));arch_putc('\n');
@@ -769,6 +778,11 @@ bool s865_launch_native_file(const struct po64_row *row){
  if(!p||s94_file_probe_offer(p->pid,p->scheduler_handle,p->page_root)!=PO64_OK)
   fail("file94-offer");
  arch_puts("STYLEOS FILE94 OFFER");field("pid",p->pid);arch_putc('\n');
+#elif defined(STYLEOS_FILE_PROBE_103)
+ const struct pr_entry *p=pr_find(pr_global(),c.out.pid);
+ if(!p||s103_file_probe_offer(p->pid,p->scheduler_handle,p->page_root)!=PO64_OK)
+  fail("file103-offer");
+ arch_puts("STYLEOS FILE103 OFFER");field("pid",p->pid);arch_putc('\n');
 #endif
  arch_puts("STYLEOS TEA69 STYLEFS");field("id",row->entry.target);
  field("revision",row->revision);field("bytes",row->bytes);arch_putc('\n');

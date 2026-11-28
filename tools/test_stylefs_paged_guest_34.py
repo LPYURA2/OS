@@ -78,7 +78,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False, file_probe92=False, file_probe94=False):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False, file_probe92=False, file_probe94=False, file_probe103=False, cold103=False):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -218,7 +218,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                     d.key("a")
                     d.key("ctrl-s")
                     wait_exact(b"SFS44 SAVE PASS")
-                elif not cold44 and not namespace46 and not file_probe94:
+                elif not cold44 and not cold103 and not namespace46 and not file_probe94 and not file_probe103:
                     d.key("a")
                     wait_exact(b"SFS43 EDIT REFUSED")
                 d.key("f2")
@@ -405,6 +405,16 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             pixels=records(lines,b"STYLEOS NATIVE PIXEL",("pid","gen","root","window","rgb","status"))
                             require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"save client success marker absent")
                             (folder/"file-probe-94.json").write_text(json.dumps({"pid":pid_num,"calls":calls},indent=2)+"\n")
+                        if file_probe103:
+                            calls=[v for _,v in records(lines,b"STYLEOS FILE92 CALL",("pid","op","status","value")) if v["pid"]==pid_num]
+                            actual=[(v["op"],v["status"]) for v in calls if v["status"]!=4]
+                            wanted=[(0x134,0),(0x137,0),(0x139,1)]+[(0x139,0)]*3+[(0x139,10),(0x13e,0),(0x13e,2),(0x138,0)]+[(0x13a,0)]*3+[(0x13b,0),(0x13f,0),(0x13f,2),(0x137,3)]
+                            require(actual==wanted,"stream probe exact syscall sequence")
+                            require([v["value"] for v in calls if v["op"]==0x139 and v["status"]==0]==[4096,4096,1],"stream read byte counts")
+                            require(all(v["value"]==0 for v in calls if v["op"] in (0x13e,0x13f) and v["status"]==0),"stream final result")
+                            pixels=records(lines,b"STYLEOS NATIVE PIXEL",("pid","gen","root","window","rgb","status"))
+                            require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"stream byte verification marker")
+                            (folder/"file-probe-103.json").write_text(json.dumps({"pid":pid_num,"calls":calls,"bytes":8193},indent=2)+"\n")
                         snapshot_count=sum(x==b"STYLEOS PROCESSES END" for x in lines)
                         d.key("f8");wait_exact(b"STYLEOS PROCESSES END",snapshot_count+1)
                         from native_process_view_02 import decimal,ROW,HEADER,END
@@ -432,7 +442,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         wait_prefix(b"STYLEOS TEA70 RESOURCES ",2*(prior_cycles+1))
                         lines=complete_lines(uart.read_bytes())
                         resources=records(lines,b"STYLEOS TEA70 RESOURCES",("phase","pid","resident","pages","owners","windows","ports"))
-                        require([tuple(v.values()) for _,v in resources]==expected+[(1,pid_num,1,3,1,1,1),(2,pid_num,0,0,0,0,0)],"forced waiting cleanup")
+                        require([tuple(v.values()) for _,v in resources]==expected+[(1,pid_num,1,4 if file_probe103 else 3,1,1,1),(2,pid_num,0,0,0,0,0)],"forced waiting cleanup")
                         require(not any(v["pid"]==pid_num for _,v in records(lines,b"STYLEOS TEA70 WAKE",("pid","gen"))),"stop-test app woke unexpectedly")
                         waiting_retired=records(lines,b"STYLEOS TEA70 WAIT-RETIRED",("pid","gen","wait-gen","wait-window"))
                         require([tuple(v.values()) for _,v in waiting_retired]==[(pid_num,gen,0,0)],"wait broker retirement")
@@ -460,9 +470,9 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
             require(b"STYLEOS S863S DMA-AFTER " in uart.read_bytes() and b"STYLEOS S863S BAR4 " in uart.read_bytes(), "missing owned-root DMA admission receipts")
             require(not any(b" FAIL " in x for x in uart.read_bytes().splitlines()),"kernel failure receipt")
             written=final["wr_bytes"]-disk_stats_before["wr_bytes"]
-            require(written>0 if save44 or file_probe94 or namespace46 in ("create","delete") else written==expected_writes, "write byte count")
+            require(written>0 if save44 or file_probe94 or file_probe103 or namespace46 in ("create","delete") else written==expected_writes, "write byte count")
             require(final["unmap_bytes"]==disk_stats_before["unmap_bytes"], "unexpected unmap")
-            if expected_writes or save44 or file_probe94 or namespace46 in ('create','delete'):
+            if expected_writes or save44 or file_probe94 or file_probe103 or namespace46 in ('create','delete'):
                 require(final["flush_operations"]-disk_stats_before["flush_operations"]>=2, "flush evidence")
             for k in ("failed_wr_operations","invalid_wr_operations","failed_flush_operations","invalid_flush_operations"):
                 require(final.get(k,0)==disk_stats_before.get(k,0), k)
