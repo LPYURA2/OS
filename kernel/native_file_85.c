@@ -140,6 +140,88 @@ enum po64_status nf85_write(struct nf85_service *s,uint32_t pid,uint64_t handle,
  nf85_reconcile(s);
  return rc;
 }
+struct stream85 {
+ struct nf85_service *service;
+ struct nf85_owner owner;
+ uint64_t seen,limit;
+ pp64_sink sink;
+ pp64_source source;
+ void *context;
+ bool revoked;
+};
+static bool stream_owner(struct stream85 *v){
+ struct nf85_owner o;
+ if(owner(v->service,v->owner.pid,v->owner.handle,v->owner.root,true,&o)&&same(o,v->owner))return true;
+ v->revoked=true;return false;
+}
+static bool stream_sink(void *opaque,uint64_t offset,const uint8_t *p,size_t n){
+ struct stream85 *v=opaque;
+ if(!p||!n||offset!=v->seen||n>UINT64_MAX-offset)return false;
+ size_t done=0;
+ while(done<n){
+  if(!stream_owner(v))return false;
+  size_t chunk=n-done;
+  if(chunk>NF85_READ_MAX)chunk=NF85_READ_MAX;
+  for(size_t i=0;i<chunk;++i)v->service->scratch[i]=p[done+i];
+  bool ok=v->sink(v->context,offset+done,v->service->scratch,chunk);
+  wipe(v->service->scratch,sizeof v->service->scratch);
+  if(!ok||!stream_owner(v))return false;
+  done+=chunk;v->seen+=chunk;
+ }
+ return true;
+}
+static bool stream_source(void *opaque,uint64_t offset,uint8_t *p,size_t n){
+ struct stream85 *v=opaque;
+ if(!p||!n||offset!=v->seen||offset>v->limit||n>v->limit-offset)return false;
+ size_t done=0;
+ while(done<n){
+  if(!stream_owner(v))return false;
+  size_t chunk=n-done;
+  if(chunk>NF85_READ_MAX)chunk=NF85_READ_MAX;
+  /* Never expose the underlying StyleFS transfer workspace to callbacks. */
+  wipe(v->service->scratch,sizeof v->service->scratch);
+  bool ok=v->source(v->context,offset+done,v->service->scratch,chunk);
+  if(ok&&stream_owner(v))for(size_t i=0;i<chunk;++i)p[done+i]=v->service->scratch[i];
+  else ok=false;
+  wipe(v->service->scratch,sizeof v->service->scratch);
+  if(!ok)return false;
+  done+=chunk;v->seen+=chunk;
+ }
+ return true;
+}
+enum po64_status nf85_stream_read(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,pp64_sink sink,void *ctx,uint64_t *completed){
+ if(!ready(s)||!token||!sink||!completed||!external_span(s,completed,sizeof *completed))return PO64_INVALID;
+ if(s->busy||s->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(s,pid,handle,root,true,&o))return PO64_DENIED;
+ struct nf85_grant *g=find(s,o,token);
+ if(!g||!(g->rights&PO64_READ))return PO64_DENIED;
+ if(!token_live(s,g))return PO64_STALE;
+ s->busy=true;wipe(s->scratch,sizeof s->scratch);
+ struct stream85 v={.service=s,.owner=o,.sink=sink,.context=ctx};
+ enum po64_status rc=po64_read(s->fs,principal(pid),token,stream_sink,&v);
+ if(rc==PO64_OK&&stream_owner(&v))*completed=v.seen;
+ else if(rc==PO64_OK||(rc==PO64_CANCELLED&&v.revoked))rc=PO64_DENIED;
+ wipe(s->scratch,sizeof s->scratch);s->busy=false;
+ nf85_reconcile(s);
+ return rc;
+}
+enum po64_status nf85_stream_write(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,uint64_t bytes,pp64_source source,void *ctx){
+ if(!ready(s)||!token||(bytes&&!source))return PO64_INVALID;
+ if(s->busy||s->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(s,pid,handle,root,true,&o))return PO64_DENIED;
+ struct nf85_grant *g=find(s,o,token);
+ if(!g||!(g->rights&PO64_WRITE))return PO64_DENIED;
+ if(!token_live(s,g))return PO64_STALE;
+ s->busy=true;wipe(s->scratch,sizeof s->scratch);
+ struct stream85 v={.service=s,.owner=o,.limit=bytes,.source=source,.context=ctx};
+ enum po64_status rc=po64_write(s->fs,principal(pid),token,bytes,stream_source,&v);
+ if(rc==PO64_CANCELLED&&v.revoked)rc=PO64_DENIED;
+ wipe(s->scratch,sizeof s->scratch);s->busy=false;
+ nf85_reconcile(s);
+ return rc;
+}
 enum po64_status nf85_close(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,uint64_t token){
  if(!ready(s)||!token)return PO64_INVALID;
  if(s->busy||s->fs->busy)return PO64_BUSY;

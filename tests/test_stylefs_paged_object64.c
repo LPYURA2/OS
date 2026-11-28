@@ -194,6 +194,64 @@ static void native_file86(void){
  reopen();check('a',4,3,0,0);check('h',5,1,0,0);
  puts("Native file 86: authorized durable save, cold reopen, write failure recovery, empty file and revocation PASS");
 }
+#ifdef STYLEOS_NATIVE_FILE_87_TEST
+struct stream_probe {uint32_t pid;uint64_t token,seen,stop;uint8_t seed;unsigned calls;};
+static bool stream_probe_sink(void *ctx,uint64_t at,const uint8_t *p,size_t n){
+ struct stream_probe *v=ctx;
+ assert(p==nf.scratch&&n&&n<=NF85_READ_MAX&&at==v->seen);
+ assert(nf85_close(&nf,v->pid,64,262144,v->token)==PO64_BUSY);
+ if(at>=v->stop)return false;
+ for(size_t i=0;i<n;++i)assert(p[i]==byte(v->seed,at+i));
+ v->seen+=n;++v->calls;return true;
+}
+static bool stream_probe_source(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ struct stream_probe *v=ctx;
+ assert(p==nf.scratch&&n&&n<=NF85_READ_MAX&&at==v->seen);
+ assert(nf85_close(&nf,v->pid,64,262144,v->token)==PO64_BUSY);
+ if(at>=v->stop)return false;
+ for(size_t i=0;i<n;++i)p[i]=byte(v->seed,at+i);
+ v->seen+=n;++v->calls;return true;
+}
+static void native_file87(void){
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ uint32_t pid=0;
+ struct pr_admission spec={PR_NATIVE_USER,0,64,262144,4096,"Streamer"};
+ assert(pr_admit(&procs,&spec,&pid)==PR_OK&&usr_bind(&users,1,pid,64)==USR_OK);
+ struct sd64_key a=key('a'),h=key('h');uint64_t token=0,ro=0,completed=999;
+ const uint64_t bytes=SFS64_WINDOW_BYTES+17;
+ assert(nf85_grant_access(&nf,pid,64,262144,&a,4,3,PO64_READ|PO64_WRITE,&token)==PO64_OK);
+ assert(nf85_grant_read(&nf,pid,64,262144,&h,5,1,&ro)==PO64_OK);
+ struct stream_probe v={pid,token,0,UINT64_MAX,123,0};
+ unsigned before=writes;
+ assert(nf85_stream_write(&nf,pid,64,262144,ro,bytes,stream_probe_source,&v)==PO64_DENIED&&!v.calls);
+ assert(nf85_stream_write(&nf,pid,64,266240,token,bytes,stream_probe_source,&v)==PO64_DENIED&&!v.calls);
+ assert(writes==before);
+ /* Cancel after a full underlying 32 KiB window has been staged. */
+ v.stop=SFS64_WINDOW_BYTES;
+ assert(nf85_stream_write(&nf,pid,64,262144,token,bytes,stream_probe_source,&v)==PO64_CANCELLED);
+ assert(v.seen==SFS64_WINDOW_BYTES&&service.active);
+ assert(nf85_stream_read(&nf,pid,64,262144,token,stream_probe_sink,&v,&completed)==PO64_OK&&completed==0);
+ v=(struct stream_probe){pid,token,0,UINT64_MAX,123,0};
+ assert(nf85_stream_write(&nf,pid,64,262144,token,bytes,stream_probe_source,&v)==PO64_OK);
+ assert(v.seen==bytes&&v.calls==(bytes+NF85_READ_MAX-1)/NF85_READ_MAX);
+ for(unsigned i=0;i<NF85_HANDLES;++i)assert(!nf.grants[i].token);
+ for(unsigned i=0;i<NF85_READ_MAX;++i)assert(!nf.scratch[i]);
+ assert(po64_unmount(&service)==PO64_OK);reopen();
+ check('a',4,4,bytes,123);check('h',5,1,0,0);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(nf85_grant_read(&nf,pid,64,262144,&a,4,4,&token)==PO64_OK);
+ v=(struct stream_probe){pid,token,0,NF85_READ_MAX,123,0};completed=999;
+ assert(nf85_stream_read(&nf,pid,64,262144,token,stream_probe_sink,&v,&completed)==PO64_CANCELLED&&completed==999);
+ assert(v.seen==NF85_READ_MAX);
+ v=(struct stream_probe){pid,token,0,UINT64_MAX,123,0};
+ assert(nf85_stream_read(&nf,pid,64,262144,token,stream_probe_sink,&v,&completed)==PO64_OK&&completed==bytes);
+ assert(v.seen==bytes&&v.calls==(bytes+NF85_READ_MAX-1)/NF85_READ_MAX);
+ for(unsigned i=0;i<NF85_READ_MAX;++i)assert(!nf.scratch[i]);
+ assert(nf85_close(&nf,pid,64,262144,token)==PO64_OK);
+ assert(po64_unmount(&service)==PO64_OK);
+ puts("Native file 87: 64-bit offsets, 4KiB chunks, multi-window streaming, cancellation and durable reopen PASS");
+}
+#endif
 #endif
 #endif
 int main(void){
@@ -447,6 +505,9 @@ int main(void){
  reopen();assert(pair.id_floor==5);
 #ifdef STYLEOS_NATIVE_FILE_86_TEST
  native_file86();
+#ifdef STYLEOS_NATIVE_FILE_87_TEST
+ native_file87();
+#endif
 #endif
  puts("STYLEFS 49 ID SERVICE PASS: explicit v2, auto allocate, no reuse after unlink and cold boot, folder and copy, damaged receipt refusal");
  puts("STYLEFS 48 COPY PASS: 32KiB+17, exact source, independent data, zero file, CRC rejection, no partial publication");

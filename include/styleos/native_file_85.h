@@ -36,6 +36,18 @@ enum po64_status nf85_read(struct nf85_service *,uint32_t pid,uint64_t handle,ui
  * On uncertain publication fail closed, never retry automatically. */
 enum po64_status nf85_write(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t token,const uint8_t *data,size_t bytes);
+/* Trusted synchronous streaming bridge, NOT an app callback or syscall.
+ * Chunk length <= NF85_READ_MAX, 64-bit offsets, callback cannot retain
+ * scratch pointer, modify broker/registry/storage, or call user code.
+ * Read bytes are provisional until return PO64_OK (checksum verified).
+ * Receiver must discard staged output on any failure/cancel. Write uses
+ * existing transactional staging, with no publication on cancellation.
+ * This contract does NOT bound duration of the full operation; future
+ * scheduler-safe asynchronous service must not run it in a trap handler. */
+enum po64_status nf85_stream_read(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,pp64_sink,void *context,uint64_t *completed);
+enum po64_status nf85_stream_write(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,uint64_t bytes,pp64_source,void *context);
 enum po64_status nf85_close(struct nf85_service *,uint32_t pid,uint64_t handle,uint64_t root,uint64_t token);
 /* Trusted periodic/termination reconciliation; dead or rebound owners,
  * revoked object grants and remounts are removed. Lock/switch only hides
