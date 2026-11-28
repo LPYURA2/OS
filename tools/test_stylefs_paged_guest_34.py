@@ -78,7 +78,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -142,6 +142,20 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
             if live and receipt=="SFS39 MOUNT PASS":
                 require(b"SFS39 DESKTOP READ PASS" in uart.read_bytes().splitlines(),
                         "mounted object not readable before input")
+                if native_file88:
+                    # Prove initialization with no input or app launch.
+                    # Do not treat an eventual application-triggered bind as a pass.
+                    deadline=time.monotonic()+40
+                    while time.monotonic()<deadline and proc.poll() is None:
+                        lines=uart.read_bytes().splitlines()
+                        require(not any(b" FAIL " in x for x in lines),"guest failure before native file bind")
+                        count=lines.count(b"STYLEOS NATIVE FILE88 READY")
+                        require(count<=1,"duplicate native file initialization")
+                        if count==1:
+                            break
+                        time.sleep(.05)
+                    else:
+                        raise RuntimeError("native file service did not initialize before input")
                 # A single relative mouse event, not an absolute-coordinate helper.
                 d.call("input-send-event", events=[{"type":"rel","data":{"axis":"x","value":20}}])
                 # Desktop.wait_uart prepends STYLEOS DESKTOP; this receipt

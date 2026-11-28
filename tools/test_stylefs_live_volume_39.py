@@ -33,10 +33,19 @@ def main():
     for name,serial,tag,receipt in (() if args.waiting_stop_only else (("live",SERIAL,TAG,"SFS39 MOUNT PASS"),("foreign-tag",SERIAL,b"X"*512,"SFS39 REFUSE tag"))):
         raw=out/(name+".raw");fixture(raw,N,volume,tag)
         before=hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest()
-        results.append(boot(out/name,iso,raw,N,serial,receipt,0,fw,live=True))
-        uart=(out/name/"debug.log").read_bytes()
-        require(uart.count(b"STYLEOS NATIVE FILE88 READY")== (1 if name=="live" else 0),
-                "native file service must bind exactly once, only on admitted media")
+        try:
+            results.append(boot(out/name,iso,raw,N,serial,receipt,0,fw,live=True,native_file88=True))
+            uart=(out/name/"debug.log").read_bytes()
+            expected=1 if name=="live" else 0
+            count=uart.splitlines().count(b"STYLEOS NATIVE FILE88 READY")
+            require(count==expected,f"{name}: native file bind count {count}, expected {expected}")
+        except Exception:
+            uart=out/name/"debug.log"
+            if uart.exists():
+                with uart.open("rb") as stream:
+                    stream.seek(max(0,uart.stat().st_size-16384))
+                    print(stream.read().decode("ascii",errors="replace"),flush=True)
+            raise
         require(read_sector(raw,0)==tag and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"readonly disk changed")
         raw.unlink()
     volume.unlink()
@@ -53,7 +62,7 @@ def main():
         raw=out/(name+".raw");fixture(raw,N,volume,TAG)
         before=hashlib.sha256(volume.read_bytes()).digest()
         try:
-            results.append(boot(out/name,iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only))
+            results.append(boot(out/name,iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only,native_file88=True))
         except Exception:
             # Bounded diagnostic tail in the job log even if upload fails.
             uart=out/name/"debug.log"
@@ -63,7 +72,8 @@ def main():
                     print(stream.read().decode("ascii",errors="replace"),flush=True)
             raise
         uart=(out/name/"debug.log").read_bytes()
-        require(uart.count(b"STYLEOS NATIVE FILE88 READY")==1,"native file service live binding")
+        count=uart.splitlines().count(b"STYLEOS NATIVE FILE88 READY")
+        require(count==1,f"{name}: native file service bind count {count}, expected 1")
         require(read_sector(raw,0)==TAG and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"TEA volume changed")
         raw.unlink();volume.unlink()
     (out/"results.json").write_text(json.dumps(results,indent=2)+"\n")

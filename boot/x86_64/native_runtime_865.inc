@@ -541,6 +541,12 @@ void s865_native_pump(void){
  if(!native_ready)fail("native-runtime-not-ready");
  shell_controller_reconcile();
  shell_recovery_tick();
+#ifdef STYLEOS_LIVE_VOLUME_39
+ /* Volume capability service has a lifetime independent of resident
+  * applications. Reconcile even when there is no runnable process. */
+ if(!s865_executor_idle())fail("native-file88-boundary");
+ s88_native_file_reconcile();
+#endif
  if(!pr_snapshot(pr_global(),0,0,true))return;
  s865_executor_poll(native_audit,native_release,0);
  shell_controller_reconcile();

@@ -568,9 +568,8 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
 void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
  if(!s865_executor_idle()||!audit||!retire)fail848("native-poll-boundary");
  native_drop_reconcile();
-#ifdef STYLEOS_LIVE_VOLUME_39
-  s88_native_file_reconcile();
-#endif
+ /* Live-volume reconciliation already occurs before the empty fast path
+  * in s865_native_pump; terminal cleanup remains synchronous below. */
  if(!pr_snapshot(runtime860->dispatcher.registry,0,0,true))return;
  if(!audit(opaque))fail848("native-poll-audit");
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
