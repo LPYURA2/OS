@@ -1,7 +1,7 @@
 name: StyleOS native apps and Deep Drop acceptance
 on:
   push:
-    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72, feature/styleos-deep-drop-73, feature/styleos-deep-drop-74, feature/styleos-native-apps-75, feature/styleos-native-apps-76]
+    branches: [feature/styleos-native-tea-launch-69, feature/styleos-native-app-acceptance-70, feature/styleos-deep-drop-71, feature/styleos-deep-drop-72, feature/styleos-deep-drop-73, feature/styleos-deep-drop-74, feature/styleos-native-apps-75, feature/styleos-native-apps-76, feature/styleos-native-apps-77]
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
           name: deep-drop-host
           path: build/deep-drop/
   native-image-75-host:
-    if: (github.ref_name == 'feature/styleos-native-apps-75' || github.ref_name == 'feature/styleos-native-apps-76')
+    if: (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || github.ref_name == 'feature/styleos-native-apps-77'))
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -177,7 +177,7 @@ jobs:
           if-no-files-found: warn
 
   native-expanded-75-guest:
-    if: (github.ref_name == 'feature/styleos-native-apps-75' || github.ref_name == 'feature/styleos-native-apps-76')
+    if: (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || github.ref_name == 'feature/styleos-native-apps-77'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -212,7 +212,7 @@ jobs:
             build/native-expanded-75/results.json
           if-no-files-found: error
   native-expanded-76-guest:
-    if: github.ref_name == 'feature/styleos-native-apps-76'
+    if: (github.ref_name == 'feature/styleos-native-apps-76' || github.ref_name == 'feature/styleos-native-apps-77')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -237,6 +237,29 @@ jobs:
             build/native-expanded-76/*.ppm
             build/native-expanded-76/*.elf
           if-no-files-found: warn
+  native-sdk-77-host:
+    if: github.ref_name == 'feature/styleos-native-apps-77'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: SDK wire, ABI parity, and syscall wrapper compile
+        run: |
+          set -euo pipefail
+          mkdir -p build/native-sdk-77
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Iinclude -Isdk/native/include tests/test_native_sdk_77.c -o "build/native-sdk-77/$cc"
+            "build/native-sdk-77/$cc" | tee "build/native-sdk-77/$cc.log"
+            "$cc" -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -fno-stack-protector -mno-red-zone -Isdk/native/include -c sdk/native/x86_64/syscall.c -o "build/native-sdk-77/$cc-syscall.o"
+            objdump -d "build/native-sdk-77/$cc-syscall.o" | tee "build/native-sdk-77/$cc-disassembly.log"
+            grep -Eq 'int[[:space:]]+\$0x80' "build/native-sdk-77/$cc-disassembly.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-sdk-77-host
+          path: build/native-sdk-77/
   ordinary-shell:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -260,18 +283,18 @@ jobs:
       - name: Deep Drop 73 actual minimized destination and gesture cancellation
         run: python3 tools/test_deep_drop_taskbar_73.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-taskbar-73
       - name: Deep Drop 74 revoke and recover on ordinary native taskbar
-        if: (github.ref_name == 'feature/styleos-deep-drop-74' || (github.ref_name == 'feature/styleos-native-apps-75' || github.ref_name == 'feature/styleos-native-apps-76'))
+        if: (github.ref_name == 'feature/styleos-deep-drop-74' || (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || github.ref_name == 'feature/styleos-native-apps-77')))
         run: python3 tools/test_deep_drop_recovery_74.py --build build/ordinary-shell/build/x86_64 --output build/deep-drop-recovery-74
       - name: Package the verified boot ISO
         env:
-          ISO_NAME: ${{ (github.ref_name == 'feature/styleos-native-apps-75' || github.ref_name == 'feature/styleos-native-apps-76') && 'StyleOS-Native-Apps.iso' || 'StyleOS-Deep-Drop-72.iso' }}
+          ISO_NAME: ${{ (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || github.ref_name == 'feature/styleos-native-apps-77')) && 'StyleOS-Native-Apps.iso' || 'StyleOS-Deep-Drop-72.iso' }}
         run: |
           mkdir -p build/verified-iso
           cp build/ordinary-shell/build/x86_64/StyleOS-owned-shell-865.iso "build/verified-iso/$ISO_NAME"
           cd build/verified-iso && sha256sum *.iso > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ (github.ref_name == 'feature/styleos-native-apps-75' || github.ref_name == 'feature/styleos-native-apps-76') && 'styleos-native-apps-iso' || 'styleos-deep-drop-72-iso' }}
+          name: ${{ (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || github.ref_name == 'feature/styleos-native-apps-77')) && 'styleos-native-apps-iso' || 'styleos-deep-drop-72-iso' }}
           path: build/verified-iso/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -294,7 +317,7 @@ jobs:
             build/deep-drop-taskbar-73/*.ppm
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
-        if: always() && (github.ref_name == 'feature/styleos-deep-drop-74' || (github.ref_name == 'feature/styleos-native-apps-75' || github.ref_name == 'feature/styleos-native-apps-76'))
+        if: always() && (github.ref_name == 'feature/styleos-deep-drop-74' || (github.ref_name == 'feature/styleos-native-apps-75' || (github.ref_name == 'feature/styleos-native-apps-76' || github.ref_name == 'feature/styleos-native-apps-77')))
         with:
           name: styleos-deep-drop-74-recovery
           path: |
