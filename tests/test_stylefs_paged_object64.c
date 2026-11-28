@@ -294,6 +294,22 @@ static void native_file89(void){
  assert(nf89_take(&queue,pid,80,327680,request,out,sizeof out,&n,&result)==PO64_OK&&n==513&&result==PO64_OK);
  for(unsigned i=0;i<513;++i)assert(out[i]==byte(77,i));
  assert(out[513]==0x5a);
+#ifdef STYLEOS_NATIVE_FILE_90_TEST
+ /* Revoke after successful I/O, before collection; no cached disclosure. */
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf89_pump(&queue));
+ assert(nf85_close(&nf,pid,80,327680,token)==PO64_OK);
+ memset(out,0x5a,sizeof out);n=999;
+ assert(nf89_take(&queue,pid,80,327680,request,out,sizeof out,&n,&result)==PO64_OK&&n==0&&result==PO64_STALE);
+ for(unsigned i=0;i<sizeof out;++i)assert(out[i]==0x5a);
+ assert(nf85_grant_read(&nf,pid,80,327680,&a,4,5,&token)==PO64_OK);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf85_close(&nf,pid,80,327680,token)==PO64_OK);
+ assert(!nf89_pump(&queue));
+ assert(nf89_take(&queue,pid,80,327680,request,out,sizeof out,&n,&result)==PO64_OK&&n==0&&result==PO64_STALE);
+ assert(nf85_grant_read(&nf,pid,80,327680,&a,4,5,&token)==PO64_OK);
+ puts("Native file 90: revoked pending and completed reads disclose no data PASS");
+#endif
  assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
  assert(nf89_pump(&queue));
  assert(pr_transition(&procs,pid,80,PR_FAULTED)==PR_OK);

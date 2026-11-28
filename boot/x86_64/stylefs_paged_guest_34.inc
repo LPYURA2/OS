@@ -128,6 +128,7 @@ struct s34_work {
  struct pv64_volume volume;
 #ifdef STYLEOS_OWNED_SHELL_865
  struct nf85_service native_files;
+ struct nf89_queue native_queue;
 #endif
  struct s34_guard guard;
  uint64_t token;
@@ -213,12 +214,45 @@ static void s37_replace(struct bs_service *svc,const struct pp64_layout *l){
  * Called only at serialized safe-root supervisor/retirement boundaries. */
 void s88_native_file_reconcile(void){
  struct nf85_service *s=&s34_work.native_files;
- if(s->ready){(void)nf85_reconcile(s);return;}
- if(!s34_work.volume.attached||!s34_work.volume.objects.active)return;
- const struct usr_runtime *u=usr_global();
- if(!u||!u->ready)return;
- if(nf85_start(s,&s34_work.volume.objects,u)!=PO64_OK)return;
- arch_puts("STYLEOS NATIVE FILE88 READY\n");
+ struct nf89_queue *q=&s34_work.native_queue;
+ if(!s->ready){
+  if(!s34_work.volume.attached||!s34_work.volume.objects.active)return;
+  const struct usr_runtime *u=usr_global();
+  if(!u||!u->ready)return;
+  if(nf85_start(s,&s34_work.volume.objects,u)!=PO64_OK)return;
+  arch_puts("STYLEOS NATIVE FILE88 READY\n");
+ }
+ (void)nf85_reconcile(s);
+ if(!q->files){
+  if(!s34_work.volume.objects.active||nf89_start(q,s)!=PO64_OK)return;
+  arch_puts("STYLEOS NATIVE FILE90 QUEUE-READY\n");
+ }
+ (void)nf89_reconcile(q);
+}
+/* Only the safe supervisor poll may run one bounded request. No user
+ * callback or disk I/O in the trap continuation. A transaction can still
+ * block the supervisor on slow I/O; not a preemptible disk worker yet. */
+void s90_native_file_pump(void){
+ if(!s865_executor_idle())return;
+ if(s34_work.native_queue.files)(void)nf89_pump(&s34_work.native_queue);
+}
+/* Trusted callers only. Queue owns copies; no app VAs or direct syscall. */
+enum po64_status s90_native_file_submit(uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,enum nf89_op op,const uint8_t *data,size_t bytes,uint64_t *request){
+ if(!s865_executor_idle())return PO64_DENIED;
+ if(!s34_work.native_queue.files)return PO64_STALE;
+ return nf89_submit(&s34_work.native_queue,pid,handle,root,token,op,data,bytes,request);
+}
+enum po64_status s90_native_file_take(uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t request,uint8_t *out,size_t capacity,size_t *bytes,enum po64_status *result){
+ if(!s865_executor_idle())return PO64_DENIED;
+ if(!s34_work.native_queue.files)return PO64_STALE;
+ return nf89_take(&s34_work.native_queue,pid,handle,root,request,out,capacity,bytes,result);
+}
+enum po64_status s90_native_file_cancel(uint32_t pid,uint64_t handle,uint64_t root,uint64_t request){
+ if(!s865_executor_idle())return PO64_DENIED;
+ if(!s34_work.native_queue.files)return PO64_STALE;
+ return nf89_cancel(&s34_work.native_queue,pid,handle,root,request);
 }
 /* Trusted picker/launcher entry, not reachable from application code.
  * Exact row and rights must already be approved by the supervisor;

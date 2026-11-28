@@ -546,6 +546,7 @@ void s865_native_pump(void){
   * applications. Reconcile even when there is no runnable process. */
  if(!s865_executor_idle())fail("native-file88-boundary");
  s88_native_file_reconcile();
+ s90_native_file_pump();
 #endif
  if(!pr_snapshot(pr_global(),0,0,true))return;
  s865_executor_poll(native_audit,native_release,0);

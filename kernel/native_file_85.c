@@ -258,11 +258,14 @@ size_t nf89_reconcile(struct nf89_queue *q){
   if(!owner(q->files,r->owner.pid,r->owner.handle,r->owner.root,false,&o)||!same(o,r->owner)){
    wipe(r,sizeof *r);++n;continue;
   }
-  /* An old-mount request must never execute or disclose cached data.
-   * Preserve completion of a write (including uncertain outcome) so the
-   * caller does not interpret a discarded receipt as a cancelled commit. */
-  if((!q->files->fs->active||q->files->fs->mount_id!=r->mount)&&
-     (r->state==NF89_PENDING||(r->state==NF89_DONE&&r->op==NF89_READ&&r->status==PO64_OK))){
+  /* Revalidate the exact grant even for already completed reads.
+   * Preserve completed writes (including uncertain outcome), not a
+   * misleading cancellation after the durable publication boundary. */
+  struct nf85_grant *g=find(q->files,o,r->token);
+  bool valid=g&&g->mount==r->mount&&token_live(q->files,g)&&
+      (g->rights&(r->op==NF89_READ?PO64_READ:PO64_WRITE));
+  if(!valid&&(r->state==NF89_PENDING||
+     (r->state==NF89_DONE&&r->op==NF89_READ&&r->status==PO64_OK))){
    wipe(r->data,sizeof r->data);r->bytes=0;r->status=PO64_STALE;r->state=NF89_DONE;++n;
   }
  }

@@ -147,9 +147,10 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                     # not an eventual successful bind after input.
                     lines=uart.read_bytes().splitlines()
                     ready=[i for i,x in enumerate(lines) if x==b"STYLEOS NATIVE FILE88 READY"]
+                    queue=[i for i,x in enumerate(lines) if x==b"STYLEOS NATIVE FILE90 QUEUE-READY"]
                     state=[i for i,x in enumerate(lines) if x==b"STYLEOS FILE88 BOOT-STATE ready"]
                     desk=[i for i,x in enumerate(lines) if x.startswith(b"STYLEOS S863 READY ")]
-                    require(len(ready)==len(state)==1 and bool(desk) and ready[0]<state[0]<desk[0],
+                    require(len(ready)==len(queue)==len(state)==1 and bool(desk) and ready[0]<queue[0]<state[0]<desk[0],
                             "native file service not ready at first interactive desktop barrier")
                 # A single relative mouse event, not an absolute-coordinate helper.
                 d.call("input-send-event", events=[{"type":"rel","data":{"axis":"x","value":20}}])

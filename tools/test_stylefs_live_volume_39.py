@@ -40,6 +40,8 @@ def main():
             count=uart.splitlines().count(b"STYLEOS NATIVE FILE88 READY")
             require(count==expected,f"{name}: native file bind count {count}, expected {expected}")
             lines=uart.splitlines()
+            require(lines.count(b"STYLEOS NATIVE FILE90 QUEUE-READY")==expected,
+                    f"{name}: unexpected file queue initialization")
             state=b"STYLEOS FILE88 BOOT-STATE "+(b"ready" if expected else b"unavailable")
             desk=[i for i,x in enumerate(lines) if x.startswith(b"STYLEOS S863 READY ")]
             require(lines.count(state)==1 and bool(desk) and lines.index(state)<desk[0],
@@ -79,6 +81,8 @@ def main():
         uart=(out/name/"debug.log").read_bytes()
         count=uart.splitlines().count(b"STYLEOS NATIVE FILE88 READY")
         require(count==1,f"{name}: native file service bind count {count}, expected 1")
+        require(uart.splitlines().count(b"STYLEOS NATIVE FILE90 QUEUE-READY")==1,
+                f"{name}: native file queue not initialized exactly once")
         require(read_sector(raw,0)==TAG and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"TEA volume changed")
         raw.unlink();volume.unlink()
     (out/"results.json").write_text(json.dumps(results,indent=2)+"\n")

@@ -92,6 +92,12 @@ bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,s
 #include <styleos/native_file_85.h>
 /* Supervisor-only bridge on the live mounted volume. No app-facing ABI. */
 void s88_native_file_reconcile(void);
+void s90_native_file_pump(void);
+enum po64_status s90_native_file_submit(uint32_t,uint64_t,uint64_t,uint64_t,
+ enum nf89_op,const uint8_t *,size_t,uint64_t *);
+enum po64_status s90_native_file_take(uint32_t,uint64_t,uint64_t,uint64_t,
+ uint8_t *,size_t,size_t *,enum po64_status *);
+enum po64_status s90_native_file_cancel(uint32_t,uint64_t,uint64_t,uint64_t);
 enum po64_status s88_native_file_grant(uint32_t,uint64_t,uint64_t,
  const struct po64_row *,unsigned,uint64_t *);
 #endif
