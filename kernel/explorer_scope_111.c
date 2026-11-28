@@ -74,3 +74,60 @@ enum po64_status ex111_up(struct ex111_scope *s,uint32_t pid,uint64_t handle,uin
  if(s->depth==1)return PO64_DENIED;
  s->dirs[--s->depth]=0;return PO64_OK;
 }
+
+enum po64_status ex119_allow_edit(struct ex111_scope *s,uint32_t pid,uint64_t handle,uint64_t root){
+ enum po64_status rc=check(s,pid,handle,root);
+ if(rc!=PO64_OK)return rc;
+ if(!s->fs->writable||!s->fs->pair.id_floor)return PO64_DENIED;
+ s->edit_allowed=true;return PO64_OK;
+}
+enum po64_status ex119_refresh(struct ex111_scope *s,uint32_t pid,uint64_t handle,uint64_t root){
+ if(!ex111_authorized(s,pid,handle,root))return PO64_DENIED;
+ struct po64_snapshot now;
+ enum po64_status rc=po64_snapshot(s->fs,&now);
+ if(rc!=PO64_OK)return rc;
+ if(now.mount!=s->snapshot.mount||!s->fs->pair.id_floor||now.sequence<s->snapshot.sequence)return PO64_STALE;
+ struct po64_row row;
+ rc=po64_child_at(s->fs,now,s->dirs[0],0,&row);
+ if(rc!=PO64_OK&&rc!=PO64_END)return rc;
+ s->snapshot=now;
+ for(unsigned i=1;i<EX111_DEPTH;++i)s->dirs[i]=0;
+ s->depth=1;return PO64_OK;
+}
+enum po64_status ex119_edit(struct ex111_scope *s,uint32_t pid,uint64_t handle,uint64_t root,
+ unsigned op,uint64_t ordinal,uint64_t expected_id,uint64_t expected_revision,
+ unsigned ancestor,const uint8_t *name,size_t name_bytes){
+ if(op<EX119_FILE||op>EX119_MOVE_UP)return PO64_INVALID;
+ enum po64_status rc=check(s,pid,handle,root);
+ if(rc!=PO64_OK)return rc;
+ if(!s->edit_allowed||!s->fs->writable||!s->fs->pair.id_floor)return PO64_DENIED;
+ bool create=op==EX119_FILE||op==EX119_DIRECTORY;
+ bool remove=op==EX119_DELETE;
+ bool move=op==EX119_MOVE_UP;
+ if(create?(ordinal||expected_id||expected_revision):expected_id<2)return PO64_INVALID;
+ if(move?(ancestor>=s->depth-1):ancestor!=0)return PO64_INVALID;
+ if(remove?(name||name_bytes):(!name||!name_bytes||name_bytes>SD64_NAME))return PO64_INVALID;
+ struct sd64_key dest={.parent=s->dirs[move?ancestor:s->depth-1]};
+ if(!remove){
+  dest.length=(uint8_t)name_bytes;
+  for(size_t i=0;i<name_bytes;++i)dest.name[i]=name[i];
+  if(!sd64_key_valid(&dest))return PO64_INVALID;
+ }
+ if(create){
+  rc=op==EX119_FILE?po64_create_empty(s->fs,s->snapshot,&dest,0):
+     po64_mkdir(s->fs,s->snapshot,&dest,0);
+ }else{
+  struct po64_row row;
+  rc=ex111_row(s,pid,handle,root,ordinal,&row);
+  if(rc!=PO64_OK)return rc;
+  if(row.entry.target!=expected_id||row.revision!=expected_revision)return PO64_STALE;
+  if(row.entry.kind==SD64_FILE)rc=po64_change_file(s->fs,s->snapshot,&row,remove?0:&dest);
+  else if(row.entry.kind==SD64_DIRECTORY)rc=po64_change_directory(s->fs,s->snapshot,&row,remove?0:&dest);
+  else return PO64_CORRUPT;
+ }
+ /* A successful broker commit already published the validated new pair.
+  * Current directory and ancestors are not editable from this operation.
+  * No extra I/O that could turn a durable success into an apparent failure. */
+ if(rc==PO64_OK)s->snapshot.sequence=s->fs->pair.sequence;
+ return rc;
+}

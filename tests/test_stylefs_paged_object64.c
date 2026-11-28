@@ -1152,6 +1152,55 @@ int main(void){
  disk[pair.slot][112]^=1;
  assert(pp64_mount(&b,&l,&w.pair,nodes,128,current,128,&pair)==PP64_CORRUPT);
  reopen();assert(pair.id_floor==5);
+#ifdef STYLEOS_EXPLORER_119_TEST
+ {
+  assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+  struct ex111_scope scope={0};
+  struct po64_row item;
+  uint32_t peer=0;
+  for(unsigned i=0;i<PR_MAX_PROCESSES;++i)
+   if(users.owners[i].session_id==2)peer=users.owners[i].pid;
+  assert(peer&&usr_select(&users,2)==USR_OK);
+  assert(ex111_open(&scope,&service,&users,peer,32,131072,1)==PO64_OK);
+  unsigned old_writes=writes;
+  assert(ex119_edit(&scope,peer,32,131072,EX119_DIRECTORY,0,0,0,0,(const uint8_t *)"z",1)==PO64_DENIED);
+  assert(ex119_allow_edit(&scope,peer,33,131072)==PO64_DENIED);
+  assert(ex119_allow_edit(&scope,peer,32,131072)==PO64_OK);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_FILE,0,0,0,0,(const uint8_t *)"../x",4)==PO64_INVALID);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_FILE,0,0,0,0,(const uint8_t *)"a",1)==PO64_DENIED);
+  assert(writes==old_writes);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_DIRECTORY,0,0,0,0,(const uint8_t *)"z",1)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,3,&item)==PO64_OK&&item.entry.target==6);
+  assert(ex111_enter(&scope,peer,32,131072,3)==PO64_OK);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_FILE,0,0,0,0,(const uint8_t *)"p",1)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,0,&item)==PO64_OK&&item.entry.target==7&&item.revision==1);
+  old_writes=writes;
+  assert(ex119_edit(&scope,peer,32,131072,EX119_RENAME,0,8,1,0,(const uint8_t *)"q",1)==PO64_STALE);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_MOVE_UP,0,7,1,1,(const uint8_t *)"q",1)==PO64_INVALID);
+  assert(writes==old_writes);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_RENAME,0,7,1,0,(const uint8_t *)"q",1)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,0,&item)==PO64_OK&&item.entry.key.name[0]=='q');
+  assert(ex119_edit(&scope,peer,32,131072,EX119_MOVE_UP,0,7,item.revision,0,(const uint8_t *)"q",1)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,0,&item)==PO64_END);
+  assert(ex111_up(&scope,peer,32,131072)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,3,&item)==PO64_OK&&item.entry.target==7);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_DELETE,3,7,item.revision,0,0,0)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,3,&item)==PO64_OK&&item.entry.target==6);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_DELETE,3,6,0,0,0,0)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,3,&item)==PO64_END);
+  assert(po64_snapshot(&service,&snap)==PO64_OK);
+  assert(po64_create_empty(&service,snap,&(struct sd64_key){.parent=1,.length=1,.name={'v'}},0)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,0,&item)==PO64_STALE);
+  assert(ex119_refresh(&scope,peer,32,131072)==PO64_OK&&scope.depth==1);
+  assert(ex111_row(&scope,peer,32,131072,3,&item)==PO64_OK&&item.entry.target==8);
+  assert(ex119_edit(&scope,peer,32,131072,EX119_DELETE,3,8,item.revision,0,0,0)==PO64_OK);
+  ex111_close(&scope);
+  assert(po64_unmount(&service)==PO64_OK);
+  reopen();assert(pair.id_floor==8);
+  check('a',4,1,0,0);check('h',5,1,0,0);
+  puts("EXPLORER119 scoped namespace edits, refresh and durable preservation PASS");
+ }
+#endif
 #ifdef STYLEOS_NATIVE_FILE_86_TEST
  native_file86();
 #ifdef STYLEOS_NATIVE_FILE_87_TEST
