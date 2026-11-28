@@ -1102,7 +1102,8 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
    * never becomes authority to mount or format another device. */
   s88_native_file_reconcile();
   if(s34_work.volume.objects.active&&s34_work.native_files.ready&&
-     s34_work.native_queue.files==&s34_work.native_files)
+     s34_work.native_queue.files==&s34_work.native_files&&
+     s34_work.native_streams.queue==&s34_work.native_queue)
    arch_puts("STYLEOS FILE88 BOOT-STATE ready\n");
   else
    arch_puts("STYLEOS FILE88 BOOT-STATE unavailable\n");

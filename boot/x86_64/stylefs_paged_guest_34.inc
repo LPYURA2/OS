@@ -129,6 +129,7 @@ struct s34_work {
 #ifdef STYLEOS_OWNED_SHELL_865
  struct nf85_service native_files;
  struct nf89_queue native_queue;
+ struct nf102_service native_streams;
 #endif
  struct s34_guard guard;
  uint64_t token;
@@ -227,7 +228,10 @@ void s88_native_file_reconcile(void){
   if(!s34_work.volume.objects.active||nf89_start(q,s)!=PO64_OK)return;
   arch_puts("STYLEOS NATIVE FILE90 QUEUE-READY\n");
  }
- (void)nf99_reconcile(q);
+ if(!s34_work.native_streams.queue){
+  if(nf102_start(&s34_work.native_streams,q)!=PO64_OK)return;
+ }
+ (void)nf102_reconcile(&s34_work.native_streams);
  /* Cursor cancellation can release the exclusive object service. */
  (void)nf85_reconcile(s);
 }
@@ -246,7 +250,7 @@ void s90_native_file_pump(void){
 #ifdef STYLEOS_LIVE_VOLUME_44
   uint64_t sequence=q->files->fs->pair.sequence;
 #endif
-  (void)nf99_pump(q);
+  (void)nf102_pump(&s34_work.native_streams);
 #ifdef STYLEOS_LIVE_VOLUME_44
   /* All old capabilities and Explorer rows expire after a native save.
    * Rebuild the trusted shell view, without changing the app's durable
@@ -287,7 +291,7 @@ enum po64_status s90_native_file_submit(uint32_t pid,uint64_t handle,uint64_t ro
  uint64_t token,enum nf89_op op,const uint8_t *data,size_t bytes,uint64_t *request){
  if(!s865_executor_idle())return PO64_DENIED;
  if(!s34_work.native_queue.files)return PO64_STALE;
- return nf89_submit(&s34_work.native_queue,pid,handle,root,token,op,data,bytes,request);
+ return nf102_submit(&s34_work.native_streams,pid,handle,root,token,op,data,bytes,request);
 }
 enum po64_status s90_native_file_take(uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t request,uint8_t *out,size_t capacity,size_t *bytes,enum po64_status *result){
@@ -309,6 +313,16 @@ enum po64_status s95_native_file_wait(uint32_t pid,uint64_t handle,uint64_t root
 uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t op,uint64_t token,uint64_t address,uint64_t size,uint64_t *value){
  *value=0;
+ if(op>=NF102_ROPEN&&op<=NF102_WRESULT){
+  if(!s34_work.native_streams.queue)return NF91_UNAVAILABLE;
+  uint8_t *packet=0;
+  if(op==NF102_RTAKE||op==NF102_WFEED){
+   if(!address||size<=NF102_HEADER||size>NF102_PACKET_MAX)return PO64_INVALID;
+   packet=(uint8_t *)s865_native_data_span(slot,pid,handle,root,address,(size_t)size);
+   if(!packet)return PO64_INVALID;
+  }else if(address)return PO64_INVALID;
+  return nf102_call(&s34_work.native_streams,pid,handle,root,op,token,packet,size,value);
+ }
  if(op==NF93_RECEIVE){
   if(token||address||size)return PO64_INVALID;
   if(!s34_work.native_queue.files)return NF91_UNAVAILABLE;
@@ -336,7 +350,7 @@ uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_
   if(status==PO64_OK)*value=((uint64_t)bytes<<32)|(uint32_t)result;
   return status;
  }
- return nf89_submit(q,pid,handle,root,token,
+ return nf102_submit(&s34_work.native_streams,pid,handle,root,token,
   op==NF91_READ?NF89_READ:NF89_WRITE,alias,(size_t)size,value);
 }
 /* Trusted picker adapter: caller must establish user approval of exact

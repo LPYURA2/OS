@@ -99,6 +99,20 @@ int main(void){
  C(sty_file_read_wait(1,64).status==STY_EMPTY&&calls==15&&args[0]==NF95_READ_WAIT&&args[1]==1&&args[2]==0&&args[3]==64);
  C(sty_file_write_wait(1,0,1).status==STY_F_INVALID&&calls==15);
  C(sty_file_write_wait(1,wire,64).status==STY_EMPTY&&calls==16&&args[0]==NF95_WRITE_WAIT&&args[1]==1&&args[2]==(uintptr_t)wire&&args[3]==64);
+ C(STY_STREAM_ROPEN==NF102_ROPEN&&STY_STREAM_WOPEN==NF102_WOPEN&&STY_STREAM_RTAKE==NF102_RTAKE&&STY_STREAM_WFEED==NF102_WFEED);
+ C(STY_STREAM_WFINISH==NF102_WFINISH&&STY_STREAM_RCANCEL==NF102_RCANCEL&&STY_STREAM_WCANCEL==NF102_WCANCEL&&STY_STREAM_RRESULT==NF102_RRESULT&&STY_STREAM_WRESULT==NF102_WRESULT);
+ C(STY_STREAM_HEADER==NF102_HEADER&&STY_STREAM_PACKET_MAX==NF102_PACKET_MAX);
+ C(!sty_stream_offset(wire,8,1)&&sty_stream_offset(wire,64,UINT64_C(0x123456789abcdef0)));
+ C(sty_le32(wire)==0x9abcdef0&&sty_le32(wire+4)==0x12345678);
+ C(sty_stream_read_open(0).status==STY_F_INVALID&&calls==16);
+ C(sty_stream_write_open(1,UINT64_C(0x100000001)).status==STY_EMPTY&&calls==17&&args[0]==NF102_WOPEN&&args[3]==UINT64_C(0x100000001));
+ C(sty_stream_read_open(2).status==STY_EMPTY&&calls==18&&args[0]==NF102_ROPEN&&args[1]==2&&args[2]==0&&args[3]==0);
+ C(sty_stream_read_take(1,wire,8).status==STY_F_INVALID&&calls==18);
+ C(sty_stream_read_take(1,wire,64).status==STY_EMPTY&&calls==19&&args[0]==NF102_RTAKE&&args[2]==(uintptr_t)wire&&args[3]==64);
+ C(sty_stream_write_feed(1,wire,64).status==STY_EMPTY&&calls==20&&args[0]==NF102_WFEED);
+ C(sty_stream_finish(1).status==STY_EMPTY&&calls==21&&args[0]==NF102_WFINISH);
+ C(sty_stream_cancel(1,false).status==STY_EMPTY&&calls==22&&args[0]==NF102_RCANCEL);
+ C(sty_stream_result(1,true).status==STY_EMPTY&&calls==23&&args[0]==NF102_WRESULT);
  printf("Native SDK 77: %u checks PASS (mock transport, no guest claim)\n",checks);
  return 0;
 }

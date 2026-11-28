@@ -223,7 +223,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   fld848("root",ticket->child_root);fld848("op",op);fld848("reply",reply);arch_putc('\n');
  }
  const uint64_t operation=pending860.gpr[0];
- if(kind==RT865_SYSCALL&&operation>=NF91_READ&&operation<=NF95_WRITE_WAIT){
+ if(kind==RT865_SYSCALL&&operation>=NF91_READ&&operation<=NF102_WRESULT){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||

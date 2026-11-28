@@ -14,7 +14,10 @@ enum sty_event_kind { STY_KEY=1,STY_TEXT=2,STY_POINTER=3,STY_DROP=4 };
 enum sty_operation { STY_YIELD=1,STY_EXIT=2,STY_PIXEL=0x100,STY_TILE=0x101,
  STY_INPUT=0x102,STY_FRAME=0x103,STY_PATCH=0x120,STY_FRAME_GEN=0x121,STY_TEXT_LAYER=0x122,
  STY_FILE_READ=0x130,STY_FILE_WRITE=0x131,STY_FILE_TAKE=0x132,STY_FILE_CANCEL=0x133,STY_FILE_RECEIVE=0x134,
- STY_FILE_READ_WAIT=0x135,STY_FILE_WRITE_WAIT=0x136 };
+ STY_FILE_READ_WAIT=0x135,STY_FILE_WRITE_WAIT=0x136,
+ STY_STREAM_ROPEN=0x137,STY_STREAM_WOPEN=0x138,STY_STREAM_RTAKE=0x139,STY_STREAM_WFEED=0x13a,
+ STY_STREAM_WFINISH=0x13b,STY_STREAM_RCANCEL=0x13c,STY_STREAM_WCANCEL=0x13d,
+ STY_STREAM_RRESULT=0x13e,STY_STREAM_WRESULT=0x13f };
 struct sty_reply { uint64_t status,value; };
 struct sty_rect { uint32_t x,y,w,h,rgb; };
 _Static_assert(sizeof(struct sty_rect)==20,"rectangle ABI");
@@ -179,5 +182,37 @@ static inline bool sty_file_completion(struct sty_reply reply,enum sty_file_stat
     !(a+sizeof *status<=b||b+sizeof *bytes<=a))return false;
  *status=(enum sty_file_status)result;*bytes=(size_t)n;return true;
 }
+/* Stream packets live in private DATA: LE64 offset, then payload.
+ * RTAKE success count is in value; all read chunks remain provisional
+ * until RRESULT transport and operation status both equal STY_F_OK. */
+enum { STY_STREAM_HEADER=8,STY_STREAM_PACKET_MAX=8+STY_FILE_MAX };
+static inline bool sty_stream_offset(uint8_t *packet,size_t bytes,uint64_t offset){
+ if(!packet||bytes<=STY_STREAM_HEADER||bytes>STY_STREAM_PACKET_MAX)return false;
+ for(unsigned i=0;i<STY_STREAM_HEADER;++i)packet[i]=(uint8_t)(offset>>(i*8));
+ return true;
+}
+static inline struct sty_reply sty_stream_read_open(uint64_t grant){
+ if(!grant)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_STREAM_ROPEN,grant,0,0);
+}
+static inline struct sty_reply sty_stream_write_open(uint64_t grant,uint64_t total){
+ if(!grant)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_STREAM_WOPEN,grant,0,total);
+}
+static inline struct sty_reply sty_stream_read_take(uint64_t id,uint8_t *packet,size_t bytes){
+ if(!id||!packet||bytes<=STY_STREAM_HEADER||bytes>STY_STREAM_PACKET_MAX)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_STREAM_RTAKE,id,(uintptr_t)packet,bytes);
+}
+static inline struct sty_reply sty_stream_write_feed(uint64_t id,const uint8_t *packet,size_t bytes){
+ if(!id||!packet||bytes<=STY_STREAM_HEADER||bytes>STY_STREAM_PACKET_MAX)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(STY_STREAM_WFEED,id,(uintptr_t)packet,bytes);
+}
+static inline struct sty_reply sty_stream_control(uint64_t op,uint64_t id){
+ if(!id||op<STY_STREAM_WFINISH||op>STY_STREAM_WRESULT)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(op,id,0,0);
+}
+static inline struct sty_reply sty_stream_finish(uint64_t id){return sty_stream_control(STY_STREAM_WFINISH,id);}
+static inline struct sty_reply sty_stream_cancel(uint64_t id,bool write){return sty_stream_control(write?STY_STREAM_WCANCEL:STY_STREAM_RCANCEL,id);}
+static inline struct sty_reply sty_stream_result(uint64_t id,bool write){return sty_stream_control(write?STY_STREAM_WRESULT:STY_STREAM_RRESULT,id);}
 static inline uint64_t sty_yield(void){return sty_call(STY_YIELD,0,0,0).status;}
 #endif

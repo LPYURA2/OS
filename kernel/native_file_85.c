@@ -1,4 +1,5 @@
 #include <styleos/native_file_85.h>
+#include <styleos/native_file_abi.h>
 static uint64_t principal(uint32_t pid){return UINT64_C(0x8000000000000000)|pid;}
 static void wipe(void *p,size_t n){volatile uint8_t *b=p;for(size_t i=0;i<n;++i)b[i]=0;}
 static bool sep(const void *a,size_t n,const void *b,size_t m){
@@ -792,4 +793,102 @@ bool nf101_pump(struct nf101_stream *s){
   return true;
  }
  return false;
+}
+
+static bool stream102_ready(const struct nf102_service *s){
+ return s&&qready(s->queue)&&s->read.files==s->queue->files&&s->write.files==s->queue->files;
+}
+static bool stream102_span(const struct nf102_service *s,const void *p,size_t n){
+ return sep(p,n,s,sizeof *s)&&qspan(s->queue,p,n);
+}
+static bool active102(const struct nf102_service *s){
+ return (s->read.state!=NF101_IDLE&&s->read.state!=NF101_DONE)||
+        (s->write.state!=NF100_IDLE&&s->write.state!=NF100_DONE);
+}
+enum po64_status nf102_start(struct nf102_service *s,struct nf89_queue *q){
+ if(!s||s->queue||!qready(q)||!qspan(q,s,sizeof *s))return PO64_INVALID;
+ wipe(s,sizeof *s);
+ if(nf100_start(&s->write,q->files)!=PO64_OK||nf101_start(&s->read,q->files)!=PO64_OK){
+  wipe(s,sizeof *s);return PO64_INVALID;
+ }
+ s->queue=q;return PO64_OK;
+}
+static bool queued102(const struct nf89_queue *q){
+ if(q->read97_id||q->write99_id)return true;
+ for(unsigned i=0;i<NF89_SLOTS;++i)if(q->slots[i].state==NF89_PENDING)return true;
+ return false;
+}
+enum po64_status nf102_submit(struct nf102_service *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,enum nf89_op op,const uint8_t *data,size_t n,uint64_t *request){
+ if(!stream102_ready(s)||!stream102_span(s,request,sizeof *request)||
+    (data&&n&&!stream102_span(s,data,n)))return PO64_INVALID;
+ if(active102(s))return PO64_BUSY;
+ return nf89_submit(s->queue,pid,handle,root,token,op,data,n,request);
+}
+/* Reconciliation only cancels invalid/abandoned ownership, never advances
+ * data, ages a waiting client, or commits. Trusted safe-root call only. */
+size_t nf102_reconcile(struct nf102_service *s){
+ if(!stream102_ready(s)||s->queue->busy||s->read.busy||s->write.busy)return 0;
+ size_t n=0;
+ struct nf85_service *f=s->queue->files;struct nf85_owner o;
+ if(s->read.state!=NF101_IDLE){
+  bool live=owner(f,s->read.owner.pid,s->read.owner.handle,s->read.owner.root,false,&o)&&same(o,s->read.owner);
+  bool selected=live&&owner(f,o.pid,o.handle,o.root,true,&o);
+  if(!live||(s->read.state!=NF101_DONE&&(!selected||!stream101_valid(&s->read)||s->read.cancel)))
+   n+=nf101_pump(&s->read);
+ }
+ if(s->write.state!=NF100_IDLE){
+  bool live=owner(f,s->write.owner.pid,s->write.owner.handle,s->write.owner.root,false,&o)&&same(o,s->write.owner);
+  struct nf85_grant *g=live?find(f,o,s->write.token):0;
+  bool valid=g&&g->mount==s->write.mount&&token_live(f,g)&&(g->rights&PO64_WRITE);
+  bool selected=live&&owner(f,o.pid,o.handle,o.root,true,&o);
+  if(!live||(s->write.state!=NF100_DONE&&(!selected||!valid||s->write.cancel)))
+   n+=nf100_pump(&s->write);
+ }
+ return n+nf99_reconcile(s->queue);
+}
+bool nf102_pump(struct nf102_service *s){
+ if(!stream102_ready(s))return false;
+ if(nf102_reconcile(s))return true;
+ if(s->read.state!=NF101_IDLE&&s->read.state!=NF101_DONE)return nf101_pump(&s->read);
+ if(s->write.state!=NF100_IDLE&&s->write.state!=NF100_DONE)return nf100_pump(&s->write);
+ return nf99_pump(s->queue);
+}
+enum po64_status nf102_call(struct nf102_service *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t op,uint64_t token,uint8_t *packet,uint64_t size,uint64_t *value){
+ if(!stream102_ready(s)||!token||!stream102_span(s,value,sizeof *value))return PO64_INVALID;
+ if(packet&&size<=NF102_PACKET_MAX&&!sep(packet,(size_t)size,value,sizeof *value))return PO64_INVALID;
+ *value=0;
+ if(op==NF102_ROPEN||op==NF102_WOPEN){
+  if(packet||(op==NF102_ROPEN&&size))return PO64_INVALID;
+  if(active102(s)||queued102(s->queue))return PO64_BUSY;
+  if(op==NF102_ROPEN)return nf101_open(&s->read,pid,handle,root,token,value);
+  return nf100_open(&s->write,pid,handle,root,token,size,value);
+ }
+ if(op==NF102_RTAKE||op==NF102_WFEED){
+  if(size<=NF102_HEADER||size>NF102_PACKET_MAX||!stream102_span(s,packet,(size_t)size)||
+     !sep(packet,(size_t)size,value,sizeof *value))return PO64_INVALID;
+  uint64_t offset=0;
+  for(unsigned i=0;i<NF102_HEADER;++i)offset|=(uint64_t)packet[i]<<(8*i);
+  size_t bytes=(size_t)size-NF102_HEADER;
+  if(op==NF102_WFEED)return nf100_feed(&s->write,pid,handle,root,token,offset,packet+NF102_HEADER,bytes);
+  size_t taken=0;
+  enum po64_status rc=nf101_take(&s->read,pid,handle,root,token,offset,packet+NF102_HEADER,bytes,&taken);
+  if(rc==PO64_OK)*value=taken;
+  return rc;
+ }
+ if(packet||size)return PO64_INVALID;
+ switch(op){
+ case NF102_WFINISH:return nf100_finish(&s->write,pid,handle,root,token);
+ case NF102_RCANCEL:return nf101_cancel(&s->read,pid,handle,root,token);
+ case NF102_WCANCEL:return nf100_cancel(&s->write,pid,handle,root,token);
+ case NF102_RRESULT:case NF102_WRESULT:{
+  enum po64_status result=PO64_INVALID;
+  enum po64_status rc=op==NF102_RRESULT?nf101_result(&s->read,pid,handle,root,token,&result):
+      nf100_result(&s->write,pid,handle,root,token,&result);
+  if(rc==PO64_OK)*value=result;
+  return rc;
+ }
+ default:return PO64_INVALID;
+ }
 }

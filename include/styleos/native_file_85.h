@@ -173,4 +173,22 @@ enum po64_status nf101_take(struct nf101_stream *,uint32_t,uint64_t,uint64_t,uin
 enum po64_status nf101_cancel(struct nf101_stream *,uint32_t,uint64_t,uint64_t,uint64_t);
 enum po64_status nf101_result(struct nf101_stream *,uint32_t,uint64_t,uint64_t,uint64_t,enum po64_status *);
 bool nf101_pump(struct nf101_stream *);
+/* Stage 102: one active stream across both directions; existing queued
+ * operations have priority at admission. Completed receipts do not own
+ * the disk. Each direction retains its terminal receipt until collected
+ * or owner dies. Exclusive cursor and bounded buffers, not a per-client
+ * fairness or wall-clock guarantee. No I/O from stream_call/submit.
+ * Trusted supervisor supplies all validated private aliases. */
+struct nf102_service {
+ struct nf89_queue *queue;
+ struct nf100_stream write;
+ struct nf101_stream read;
+};
+enum po64_status nf102_start(struct nf102_service *,struct nf89_queue *);
+bool nf102_pump(struct nf102_service *);
+size_t nf102_reconcile(struct nf102_service *);
+enum po64_status nf102_submit(struct nf102_service *,uint32_t,uint64_t,uint64_t,uint64_t,
+ enum nf89_op,const uint8_t *,size_t,uint64_t *);
+enum po64_status nf102_call(struct nf102_service *,uint32_t,uint64_t,uint64_t,
+ uint64_t op,uint64_t token,uint8_t *packet,uint64_t size,uint64_t *value);
 #endif

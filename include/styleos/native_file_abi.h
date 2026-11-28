@@ -21,6 +21,24 @@
  * not that the operation succeeded. TAKE obtains the actual result. */
 #define NF95_READ_WAIT UINT64_C(0x135)
 #define NF95_WRITE_WAIT UINT64_C(0x136)
+/* Streaming: OPEN uses grant in RBX, RCX=0, RDX=0 (read) or total
+ * bytes (write); returns direction-specific stream ID in RDX.
+ * TAKE/FEED use ID, private DATA packet [LE64 offset][payload], RDX
+ * packet length 9..4104. TAKE writes only payload and returns count.
+ * FINISH/CANCEL/RESULT use ID, zero RCX/RDX; RESULT returns actual
+ * terminal status in RDX (including integrity or durable commit).
+ * Read payload is provisional until successful RESULT. No disk in trap. */
+#define NF102_ROPEN UINT64_C(0x137)
+#define NF102_WOPEN UINT64_C(0x138)
+#define NF102_RTAKE UINT64_C(0x139)
+#define NF102_WFEED UINT64_C(0x13a)
+#define NF102_WFINISH UINT64_C(0x13b)
+#define NF102_RCANCEL UINT64_C(0x13c)
+#define NF102_WCANCEL UINT64_C(0x13d)
+#define NF102_RRESULT UINT64_C(0x13e)
+#define NF102_WRESULT UINT64_C(0x13f)
+#define NF102_HEADER 8u
 #define NF91_MAX 4096u
+#define NF102_PACKET_MAX (NF102_HEADER+NF91_MAX)
 #define NF91_UNAVAILABLE 11u
 #endif
