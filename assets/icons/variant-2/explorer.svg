@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+<defs>
+<linearGradient id="metal" x1=".08" y1="0" x2=".88" y2="1"><stop offset="0" stop-color="#e3e3e0"/><stop offset=".55" stop-color="#b5b8b9"/><stop offset="1" stop-color="#8c949b"/></linearGradient>
+<linearGradient id="paper" x1=".1" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#f1f0eb"/><stop offset="1" stop-color="#c6c8c8"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#f4bf67"/><stop offset="1" stop-color="#d48e37"/></linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#636970"/><stop offset="1" stop-color="#383d45"/></linearGradient>
+</defs>
+<path d="M7 16 q0-3 3-3 h13 l5 6 h25 q4 0 4 4 v26 q0 4-4 4 H10 q-3 0-3-4z" fill="url(#gold)" stroke="#98652e" stroke-width="1.7" stroke-linejoin="round"/>
+<path d="M11 25 h41 q4 0 3.5 4 l-3 23 H10 q-4 0-3.2-4 l3-19 q.5-4 4.2-4z" fill="url(#dark)" stroke="#353b40" stroke-width="1.7"/>
+<path d="M14 32 h20" stroke="#a5a9a6" stroke-width="2.8" stroke-linecap="round"/>
+<path d="M14 40 h13" stroke="#a5a9a6" stroke-width="2.8" stroke-linecap="round"/>
+<path d="M14 47 h10" stroke="#a5a9a6" stroke-width="2.8" stroke-linecap="round"/>
+<path d="M38 28 l14 0" stroke="#85898a" stroke-width="1.2"/>
+</svg>

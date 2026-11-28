@@ -977,13 +977,6 @@ int main(void){
  assert(po64_grant(&service,10,&moved,2,2,&token)==PO64_OK);
  p=(struct pattern){55,UINT64_MAX,0};
  assert(po64_read(&service,10,token,sink,&p)==PO64_OK&&p.seen==513);
- assert(po64_child_at(&service,snap,5,0,&inner_row)==PO64_OK);
- before=writes;
- assert(po64_change_directory(&service,snap,&inner_row,0)==PO64_DENIED&&writes==before);
- nested.parent=1;
- assert(po64_change_directory(&service,snap,&inner_row,&nested)==PO64_OK);
- assert(po64_snapshot(&service,&snap)==PO64_OK);
- assert(po64_child_at(&service,snap,6,0,&file_row)==PO64_OK&&file_row.entry.target==2);
 #ifdef STYLEOS_EXPLORER_111_TEST
  {
   struct ex111_scope scope={0};
@@ -1023,6 +1016,14 @@ int main(void){
   puts("EXPLORER111 real scoped directory navigation, owner denial, mutation refresh PASS");
  }
 #endif
+ assert(po64_child_at(&service,snap,5,0,&inner_row)==PO64_OK);
+ before=writes;
+ assert(po64_change_directory(&service,snap,&inner_row,0)==PO64_DENIED&&writes==before);
+ nested.parent=1;
+ assert(po64_change_directory(&service,snap,&inner_row,&nested)==PO64_OK);
+ assert(po64_snapshot(&service,&snap)==PO64_OK);
+ assert(po64_child_at(&service,snap,6,0,&file_row)==PO64_OK&&file_row.entry.target==2);
+
 
  assert(po64_change_file(&service,snap,&file_row,&d)==PO64_OK);
  assert(po64_snapshot(&service,&snap)==PO64_OK);

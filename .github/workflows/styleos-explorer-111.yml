@@ -1,7 +1,7 @@
 name: StyleOS Explorer SDK scope 111
 on:
   push:
-    branches: [feature/styleos-explorer-111]
+    branches: [feature/styleos-explorer-111, feature/styleos-explorer-111-1]
   workflow_dispatch:
 permissions:
   contents: read
