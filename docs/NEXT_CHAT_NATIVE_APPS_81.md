@@ -5,3 +5,6 @@ New syscalls 0x120 (patch), 0x121 (frame generation) deliberately avoid existing
 
 ## Implementation 2
 Initial 81 run 46130209961: SDK and kernel host tests and previous compiled SDK guest SUCCESS; full regression pending. New independently compiled C diagnostic client issues real 0x103/0x120/0x121 calls, uses cross-page 1048-byte wire, rejects unmapped, stale and invalid version, checks no-op generation, actual screenshot pixels and unchanged neighbors, kernel cache contents, forced-stop cleanup and raw CPL3 trace. Prior 76/77 profiles unchanged by opt-in catalog mode. No guest PASS until CI. Next: scalable backing/presentation beyond four cells, then scoped file API; owner supplies designs at app stage.
+
+## Observed acceptance evidence
+Stage 80 CI 46130051966: 20/20 SUCCESS. Stage 81.2 code a8f9abf93aa208bba308e7a95188ce1f02c2363b, CI 46130343861, native-patch-81-guest SUCCESS (job 140933871728): 41 actual CPL3 events, IRQ 2/12/10, screen verification, zero residual leased pages and disk writes. Follow-up screen retry commit 8a44b118a5cf00f78d4c254d3bb71e35edfc15de CI 46130366925 queued at observation. Other regressions pending; do not claim complete acceptance of 81 yet.

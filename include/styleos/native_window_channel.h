@@ -45,9 +45,10 @@ struct nwc_frame {
 /* Initial sparse raster cache over an opaque retained frame. Each cell
  * is a complete aligned 16x16 block (smaller only at the window edge).
  * Explicit capacity refusal; never evict or silently lose visible pixels. */
-enum { NWC_PATCH_SLOTS=4 };
+enum { NWC_PATCH_SLOTS=16 };
 struct nwc_patch {
     uint32_t x,y,w,h;
+    uint32_t generation;
     uint32_t pixel[NWC_TILE_PIXELS];
 };
 struct nwc_port {
@@ -61,6 +62,7 @@ struct nwc_port {
     struct nwc_frame frame;
     struct nwc_patch patches[NWC_PATCH_SLOTS];
     unsigned patch_latest; /* 1-based last changed cell; 0 after full frame */
+    uint32_t patch_base; /* generation of full frame preceding these patches */
 };
 struct nwc_service {
     const struct pr_table *registry;
@@ -140,6 +142,8 @@ enum nwc_status nwc_patch_wire(struct nwc_service *,uint32_t,uint64_t,uint64_t,
     uint64_t window,const uint8_t *,size_t,uint64_t *generation);
 const struct nwc_patch *nwc_visible_patches(const struct nwc_service *,uint32_t window,
     unsigned *latest);
+/* Trusted compositor reads base generation only for visible valid frames. */
+uint32_t nwc_visible_patch_base(const struct nwc_service *,uint32_t window);
 /* Read-only condition for a trusted serialized wait broker. Same authority
  * checks as receive; no event consumption or output pointer. */
 enum nwc_status nwc_input_ready(struct nwc_service *,uint32_t,uint64_t,uint64_t,uint64_t);

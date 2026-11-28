@@ -10,6 +10,7 @@
 struct ndb_seen {
     uint32_t window_id, generation;
     struct desk_box rect;
+    struct ws_bounds bounds; /* unclipped geometry: same clip can hide a move */
 };
 struct ndb_tracker {
     struct ndb_seen last[NWC_PORTS];

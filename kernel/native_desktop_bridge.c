@@ -32,10 +32,16 @@ static struct desk_box frame_clip(const struct ws_bounds *b,const struct nwc_rec
     if(right>x&&bottom>y)out=(struct desk_box){x,y,right-x,bottom-y};
     return out;
 }
+static bool geometry(struct ndb_seen a,struct ndb_seen b)
+{
+    return desk_box_equal(a.rect,b.rect)&&a.bounds.x==b.bounds.x&&
+        a.bounds.y==b.bounds.y&&a.bounds.width==b.bounds.width&&
+        a.bounds.height==b.bounds.height;
+}
 static bool same(struct ndb_seen a,struct ndb_seen b)
 {
     return a.window_id==b.window_id && a.generation==b.generation &&
-           desk_box_equal(a.rect,b.rect);
+           geometry(a,b);
 }
 static unsigned snapshot(const struct nwc_service *ipc,int width,int height,
                          struct ndb_seen out[NWC_PORTS])
@@ -58,7 +64,7 @@ static unsigned snapshot(const struct nwc_service *ipc,int width,int height,
             generation=tile.generation;
         }
         if(!rect.w)continue;
-        out[count++]=(struct ndb_seen){window->id,generation,rect};
+        out[count++]=(struct ndb_seen){window->id,generation,rect,window->bounds};
     }
     return count;
 }
@@ -75,20 +81,29 @@ static unsigned ordered(const struct nwc_service *ipc,int width,int height,uint3
     }
     return count;
 }
-/* Only one immediately following patch can use the narrow damage path.
- * Missed generations, resize, full frame, move and removal use old/new bounds. */
-static bool patch_step(const struct nwc_service *ipc,struct ndb_seen old,
-                       struct ndb_seen next,int width,int height,struct desk_box *out)
+/* All cells retain their last change generation. For an unchanged base
+ * frame and exact geometry, dirty cells newer than the observer cover
+ * all final pixel differences, including repeated changes to one cell.
+ * A replaced base, moved/resized window or stale observer falls back. */
+static bool patch_steps(const struct nwc_service *ipc,struct ndb_seen old,
+                       struct ndb_seen next,int width,int height,
+                       struct desk_damage *damage,unsigned *changes)
 {
-    if(old.window_id!=next.window_id||old.generation==UINT32_MAX||
-       next.generation!=old.generation+1||!desk_box_equal(old.rect,next.rect))return false;
+    if(old.window_id!=next.window_id||old.generation>=next.generation||
+       !geometry(old,next))return false;
+    uint32_t base=nwc_visible_patch_base(ipc,next.window_id);
+    if(!base||old.generation<base)return false;
     unsigned latest=0;
     const struct nwc_patch *patch=nwc_visible_patches(ipc,next.window_id,&latest);
     const struct ws_window *w=ws_find(ipc->windows,next.window_id);
     if(!patch||!latest||!w)return false;
-    const struct nwc_patch *q=&patch[latest-1];
-    const struct nwc_rect r={q->x,q->y,q->w,q->h,0};
-    *out=frame_clip(&w->bounds,&r,width,height);
+    if(damage&&changes)for(unsigned i=0;i<NWC_PATCH_SLOTS;++i){
+        const struct nwc_patch *q=&patch[i];
+        if(!q->w||q->generation<=old.generation)continue;
+        const struct nwc_rect r={q->x,q->y,q->w,q->h,0};
+        struct desk_box box=frame_clip(&w->bounds,&r,width,height);
+        if(box.w){desk_damage_add(damage,box);++*changes;}
+    }
     return true;
 }
 unsigned ndb_track_top(const struct nwc_service *ipc,struct ndb_tracker *tracker,
@@ -103,9 +118,7 @@ unsigned ndb_track_top(const struct nwc_service *ipc,struct ndb_tracker *tracker
         for(unsigned j=0;j<count;++j)
             if(previous.window_id==next[j].window_id){
                 if(same(previous,next[j])){unchanged=true;break;}
-                struct desk_box patch={0};
-                if(patch_step(ipc,previous,next[j],width,height,&patch)){
-                    if(patch.w){desk_damage_add(damage,patch);++changes;}
+                if(patch_steps(ipc,previous,next[j],width,height,damage,&changes)){
                     unchanged=true;break;
                 }
             }
@@ -115,9 +128,8 @@ unsigned ndb_track_top(const struct nwc_service *ipc,struct ndb_tracker *tracker
         bool unchanged=false;
         for(unsigned j=0;j<tracker->count;++j)
             if(next[i].window_id==tracker->last[j].window_id){
-                struct desk_box patch={0};
                 if(same(next[i],tracker->last[j])||
-                   patch_step(ipc,tracker->last[j],next[i],width,height,&patch)){
+                   patch_steps(ipc,tracker->last[j],next[i],width,height,0,0)){
                     unchanged=true;break;
                 }
             }

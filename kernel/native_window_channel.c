@@ -288,7 +288,7 @@ enum nwc_status nwc_publish_tile(struct nwc_service *s,uint32_t pid,
     tile.generation=prior+1u;
     for(size_t i=0;i<(size_t)w*h;++i)tile.pixel[i]=pixels[i]&UINT32_C(0x00ffffff);
     zero(&p->frame,sizeof p->frame);
-    zero(p->patches,sizeof p->patches);p->patch_latest=0;
+    zero(p->patches,sizeof p->patches);p->patch_latest=0;p->patch_base=0;
     p->tile=tile;p->has_tile=true;
     return NWC_OK;
 }
@@ -333,7 +333,8 @@ static bool patch_shape(const struct nwc_patch *q,unsigned width,unsigned height
 }
 static bool patches_valid(const struct nwc_port *p,unsigned width,unsigned height)
 {
-    if(p->patch_latest>NWC_PATCH_SLOTS)return false;
+    if(p->patch_latest>NWC_PATCH_SLOTS||p->patch_base>p->frame.generation||
+       (p->frame.count?(!p->patch_base):p->patch_base!=0))return false;
     unsigned count=0;
     for(unsigned i=0;i<NWC_PATCH_SLOTS;++i){
         const struct nwc_patch *q=&p->patches[i];
@@ -342,14 +343,17 @@ static bool patches_valid(const struct nwc_port *p,unsigned width,unsigned heigh
             for(size_t k=0;k<sizeof *q;++k)if(z[k])return false;
             continue;
         }
-        if(!patch_shape(q,width,height))return false;
+        if(!patch_shape(q,width,height)||q->generation<=p->patch_base||
+           q->generation>p->frame.generation)return false;
         ++count;
         for(unsigned j=0;j<i;++j)
             if(p->patches[j].w&&p->patches[j].x==q->x&&p->patches[j].y==q->y)return false;
         for(unsigned j=0;j<NWC_TILE_PIXELS;++j)
             if(j<q->w*q->h?q->pixel[j]>0xffffffu:q->pixel[j]!=0)return false;
     }
-    return count?(p->patch_latest&&p->patches[p->patch_latest-1].w):!p->patch_latest;
+    return count?(p->patch_latest&&p->patches[p->patch_latest-1].w&&
+        p->patches[p->patch_latest-1].generation==p->frame.generation):
+        !p->patch_latest&&p->patch_base==p->frame.generation;
 }
 bool nwc_frame_valid(const struct nwc_port *p,const struct ws_window *w)
 {
@@ -384,7 +388,7 @@ enum nwc_status nwc_publish_frame(struct nwc_service *s,uint32_t pid,uint64_t ha
     next.window_id=win;next.generation=prior+1;next.count=count;
     for(unsigned i=0;i<count;++i)next.rect[i]=rect[i];
     zero(&p->tile,sizeof p->tile);p->has_tile=false;p->frame=next;
-    zero(p->patches,sizeof p->patches);p->patch_latest=0;
+    zero(p->patches,sizeof p->patches);p->patch_latest=0;p->patch_base=next.generation;
     return NWC_OK;
 }
 const struct nwc_frame *nwc_visible_frame(const struct nwc_service *s,uint32_t win)
@@ -428,6 +432,7 @@ enum nwc_status nwc_publish_patch(struct nwc_service *s,uint32_t pid,uint64_t ha
     }else slot=free_slot;
     if(slot==NWC_PATCH_SLOTS)return NWC_FULL;
     if(expected==UINT32_MAX)return NWC_OVERFLOW;
+    next.generation=expected+1;
     p->patches[slot]=next;p->patch_latest=slot+1;++p->frame.generation;
     return NWC_OK;
 }
@@ -472,6 +477,10 @@ const struct nwc_patch *nwc_visible_patches(const struct nwc_service *s,uint32_t
     const struct nwc_port *p=find_port(s,win);
     *latest=p->patch_latest;
     return p->patches;
+}
+uint32_t nwc_visible_patch_base(const struct nwc_service *s,uint32_t win)
+{
+    return nwc_visible_frame(s,win)?find_port(s,win)->patch_base:0;
 }
 enum nwc_status nwc_visible_tile(const struct nwc_service *s,uint32_t win,
                                  struct nwc_tile *out)

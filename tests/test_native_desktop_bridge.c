@@ -217,20 +217,35 @@ int main(void)
         assert(framebuffer[y*800u+x]==(x>=26&&x<42&&y>=32&&y<48?0xface01:baseline[y*800u+x]));
     assert(nwc_publish_patch(&ipc,p2,32,131072,w2,3,16,16,pattern,16,16)==NWC_OK);
     update(0);
+    memcpy(baseline,framebuffer,sizeof baseline);
     for(unsigned i=1;i<NWC_PATCH_SLOTS;++i)
-        assert(nwc_publish_patch(&ipc,p2,32,131072,w2,2+i,16+16*i,16,pattern,16,16)==NWC_OK);
-    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,6,80,16,pattern,16,16)==NWC_FULL);
-    update(2); /* skipped generations: conservative full window damage */
-    assert(framebuffer[32u*800u+26u]==0xface01&&framebuffer[32u*800u+74u]==0xface01);
+        assert(nwc_publish_patch(&ipc,p2,32,131072,w2,2+i,16+16*(i%8),16+16*(i/8),pattern,16,16)==NWC_OK);
+    const uint32_t generation=2+NWC_PATCH_SLOTS;
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,generation,160,16,pattern,16,16)==NWC_FULL);
+    /* Multiple updates between presentations: final dirty cells, not full
+     * window. Adjacent cells may merge into one bounded damage rectangle. */
+    struct desk_damage multi={0};
+    assert(ndb_track_top(&ipc,&tracked,800,540,raised,&multi)==NWC_PATCH_SLOTS-1);
+    assert(!multi.all&&desk_present(&multi,scene)<=NWC_PATCH_SLOTS*256u);
+    for(unsigned y=0;y<600;++y)for(unsigned x=0;x<800;++x)
+        assert(framebuffer[y*800u+x]==(x>=26&&x<154&&y>=32&&y<64?0xface01:baseline[y*800u+x]));
+    /* Repeated updates of a single cached cell coalesce. */
+    pattern[0]=0x123456;
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,generation,16,16,pattern,16,16)==NWC_OK);
+    pattern[0]=0x654321;
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,generation+1,16,16,pattern,16,16)==NWC_OK);
+    struct desk_damage repeated={0};
+    assert(ndb_track_top(&ipc,&tracked,800,540,raised,&repeated)==1);
+    assert(!repeated.all&&desk_present(&repeated,scene)==256&&framebuffer[32u*800u+26u]==0x654321);
     assert(ws_set_minimized(&windows,p2,w2,true)==WS_OK);
-    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,6,16,16,pattern,16,16)==NWC_DENIED);
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,generation+2,16,16,pattern,16,16)==NWC_DENIED);
     update(1);
     assert(ws_set_minimized(&windows,p2,w2,false)==WS_OK);update(1);
     for(unsigned i=0;i<NWC_TILE_PIXELS;++i)pattern[i]=0xabcdef;
     assert(nwc_publish_tile(&ipc,p2,32,131072,w2,pattern,16,16)==NWC_OK);
     assert(!nwc_visible_frame(&ipc,w2));
     struct nwc_tile restored={0};
-    assert(nwc_visible_tile(&ipc,w2,&restored)==NWC_OK&&restored.generation==7);
+    assert(nwc_visible_tile(&ipc,w2,&restored)==NWC_OK&&restored.generation==generation+3);
     update(2);
     assert(framebuffer[135u*800u+309u]==0x142030);
     assert(ndb_route_pointer(&ipc,&input,800,540,10,16,1,0,true,false,false));
