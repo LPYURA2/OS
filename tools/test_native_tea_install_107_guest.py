@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explicit native package install, source deletion, cold VM launch."""
+"""Explicit native package install, same-session launch, source deletion, cold VM launch."""
 import argparse
 import hashlib
 import json
@@ -30,7 +30,13 @@ def main():
     volume.unlink();run(tool,"newtea107",volume,package)
     raw=out/"installed.raw";fixture(raw,N,volume,TAG)
     before=hashlib.sha256(volume.read_bytes()).digest()
-    results=[boot(out/"install",iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,install107=True,native_file88=True)]
+    results=[boot(out/"install",iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,install107=True,installed107=True,tea69=True,tea_stop_only=True,native_file88=True)]
+    same=(out/"install"/"debug.log").read_bytes().splitlines()
+    require(same.count(b"STYLEOS DESKTOP READY")==1,"same-session boot identity")
+    installed=next(i for i,x in enumerate(same) if x==b"STYLEOS TEA107 INSTALL PASS")
+    deleted=next(i for i,x in enumerate(same) if x==b"SFS46 DELETE PASS")
+    launched=[i for i,x in enumerate(same) if x.startswith(b"STYLEOS TEA69 LAUNCHED ")]
+    require(len(launched)==1 and installed<deleted<launched[0],"explicit install then same-session launch")
     after=hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest()
     require(before!=after,"install did not change disk")
     results.append(boot(out/"cold-launch",iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=True,tea_stop_only=True,installed107=True,native_file88=True))
@@ -38,5 +44,5 @@ def main():
     require(read_sector(raw,0)==TAG and read_sector(raw,BOUNDARY-1)==SENTINEL,"protected sectors changed")
     raw.unlink();volume.unlink()
     (out/"results.json").write_text(json.dumps(results,indent=2)+"\n")
-    print("TEA107 GUEST PASS: explicit cancel and install, source deleted, cold installed CPL3 launch and retirement, zero cold writes")
+    print("TEA107 GUEST PASS: explicit cancel and install, source deleted, same-session and cold installed CPL3 launch and retirement, zero cold writes")
 if __name__=="__main__":main()

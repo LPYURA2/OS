@@ -241,11 +241,15 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                     require(rows.count(b"STYLEOS TEA107 INSTALL PASS")==1 and
                             not any(x.startswith(b"STYLEOS TEA69 LAUNCHED ") for x in rows),"install must not launch")
                 if tea69 is not None:
-                    # The new directory e follows a and d, and contains
-                    # exactly one individually pinned package.
-                    if not installed107:d.key("down");d.key("down")
+                    # Installed package lives under Apps (first root row).
+                    # When also installing, stay in this VM and return from e.
+                    if install107 and installed107:
+                        d.key("backspace");wait_exact(b"SFS42 UP DIRECTORY",2)
+                        wait_exact(b"SFS42 ROOT ROWS",3)
+                    elif not installed107:
+                        d.key("down");d.key("down")
                     d.key("ret")
-                    wait_exact(b"SFS42 ENTER DIRECTORY",2)
+                    wait_exact(b"SFS42 ENTER DIRECTORY",3 if install107 and installed107 else 2)
                     def wait_prefix(marker,count=1):
                         deadline=time.monotonic()+40
                         while time.monotonic()<deadline and proc.poll() is None:
@@ -366,7 +370,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         launch=wait_prefix(b"STYLEOS TEA69 LAUNCHED ",prior_cycles+1)
                         if installed107:
                             file=wait_prefix(b"STYLEOS TEA69 STYLEFS id=")
-                            require(b" id=0x0000000000000008 " in file and b" revision=0x0000000000000001 " in file,"cold installed copy identity")
+                            require(b" id=0x0000000000000008 " in file and b" revision=0x0000000000000001 " in file,"installed copy identity")
                         pid_num=int(launch.split()[3].split(b"=")[1],16)
                         gen=int(launch.split()[4].split(b"=")[1],16)
                         require(pid_num not in seen_pids,"fresh stop-test PID")
