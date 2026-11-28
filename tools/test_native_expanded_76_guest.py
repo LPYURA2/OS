@@ -116,7 +116,7 @@ def ipc_payload():
     for off in fix:struct.pack_into('<i',code,off,failure-off-4)
     return elf(code,True),Sites(wait,refused,good)
 
-def prepare(out,target=None):
+def prepare(out,target=None,*,target_name='ipc76'):
     disk=out/'expanded.raw'
     provision(disk)
     good,good_sites=ipc_payload() if target is None else target
@@ -126,7 +126,7 @@ def prepare(out,target=None):
     struct.pack_into('<8sII',catalog,0,b'STYLNAT1',1,3)
     with disk.open('r+b') as f:
         f.seek(4095*512);f.write(b'STYLEOS-S864-PROVISIONED-V1'.ljust(512,b'\0'))
-        for i,(name,lba,blob) in enumerate((('ipc76',3072,good),('wide76',3120,bad),('peer76',3168,peer))):
+        for i,(name,lba,blob) in enumerate(((target_name,3072,good),('wide76',3120,bad),('peer76',3168,peer))):
             struct.pack_into('<II32s8s',catalog,16+i*48,lba,len(blob),hashlib.sha256(blob).digest(),name.encode())
             f.seek(lba*512);f.write(blob)
             (out/(name+'.elf')).write_bytes(blob)
@@ -147,7 +147,7 @@ def wait_slices(events,app,sites):
     return [i for i,e in enumerate(events) if e['pid']==app['pid'] and e['root']==app['root']
             and e['vector']==0x50 and e['state']==1 and e['rip'] in sites.wait]
 
-def verify(trace,lines,apps,pcs,*,sdk_stack=False):
+def verify(trace,lines,apps,pcs,*,sdk_stack=False,extra_ops=()):
     entries=list(records(lines,EVENT,KEYS));events=[e for _,e in entries]
     a,b,z=apps
     stop=list(records(lines,b'STYLEOS WIDE76 STOP',('pid','gen','root','peer','legacy','resident','bytes','wire','queue')))
@@ -164,7 +164,7 @@ def verify(trace,lines,apps,pcs,*,sdk_stack=False):
         assert bi<i<fi and call==dict(pid=a['pid'],gen=a['gen'],root=a['root'],window=0,va=va,bytes=64,status=status,seq=seq)
     ae=[e for i,e in entries if e['pid']==a['pid']]
     ipc=[e for e in ae if e['vector']==128]
-    assert [(e['rax'],e['rip']) for e in ipc]==[(0x102,pcs[0].yielded),(0x102,pcs[0].terminal)]
+    assert [(e['rax'],e['rip']) for e in ipc]==[(0x102,pcs[0].yielded),(0x102,pcs[0].terminal)]+[(op,pcs[0].terminal) for op in extra_ops]
     assert all(i<fi and e['state']==1 for i,e in entries if e['pid']==a['pid'])
     assert all(e['root']==a['root'] and CODE+P<=e['rip']<CODE+2*P and (STACK+P<e['sp']<=STACK+2*P if sdk_stack else e['sp']==STACK+2*P) for e in ae)
     before=[e for i,e in entries if i<fi]
@@ -194,7 +194,7 @@ def verify(trace,lines,apps,pcs,*,sdk_stack=False):
     assert real==[(e['root'],e['vector'],e['rip'],e['sp'],e['error'],e['rax'],e['flags']) for e in events]
     return len(real),counts
 
-def run(out,prepare_case=prepare,verify_case=verify):
+def run(out,prepare_case=prepare,verify_case=verify,before_release=None):
     out=out.resolve();out.mkdir(parents=True,exist_ok=False)
     disk,cat,pcs=prepare_case(out);before=digest(disk)
     with (out/'compile.log').open('w') as log:
@@ -230,6 +230,7 @@ def run(out,prepare_case=prepare,verify_case=verify):
                 ev=[v for _,v in records(lines,EVENT,KEYS)]
                 return all(len(wait_slices(ev,a,s))>=MIN_SLICES for a,s in zip(apps,pcs))
             r.until(all_preempted,'two LAPIC preemptions in each private workload')
+            if before_release is not None:before_release(desktop,r,apps)
             desktop.key('f9')
             r.receipt(b'STYLEOS WIDE76 STOP',('pid','gen','root','peer','legacy','resident','bytes','wire','queue'),resident=2,bytes=10*P,wire=64,queue=1)
             r.receipt(b'STYLEOS NATIVE EMPTY',('used','dispatches'),used=0)

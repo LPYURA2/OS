@@ -48,7 +48,7 @@ static bool owned_zero(const struct stop_owned *r){
  return clear_bytes(r->owner,sizeof *r->owner)&&clear_bytes(r->window,sizeof *r->window)&&
         clear_bytes(r->port,sizeof *r->port);
 }
-static bool input_probe,focus_probe,frame_probe;
+static bool input_probe,focus_probe,frame_probe,patch81_probe;
 static bool grant_owned(uint32_t pid,uint64_t gen,uint32_t *win){
  const struct pr_entry *p=pr_find(pr_global(),pid);
  struct usr_runtime *s=sessions();struct nwc_service *c=channels();
@@ -60,7 +60,7 @@ static bool grant_owned(uint32_t pid,uint64_t gen,uint32_t *win){
      owned.port->scheduler_handle!=gen||owned.port->user_root!=p->page_root||
      owned.port->length||owned.port->has_tile||owned.port->frame.count)return false;
  }else if(usr_bind(s,stop_session,pid,gen)!=USR_OK||
-    ws_open_app(ws_global(),pr_global(),pid,"Stop fixture",(struct ws_bounds){0,0,160,120},win)!=WS_OK||
+    ws_open_app(ws_global(),pr_global(),pid,"Stop fixture",(struct ws_bounds){patch81_probe?(pid==stop_pid?80:280):0,patch81_probe?80:0,160,120},win)!=WS_OK||
     nwc_claim(c,pid,gen,p->page_root,*win)!=NWC_OK)return false;
  /* Nonempty IPC queue and tile must be scrubbed, not just hidden. */
  uint32_t pixel=UINT32_C(0x00a00000)|pid;uint8_t data[2]={0x5a,(uint8_t)pid};
@@ -106,8 +106,8 @@ static bool nc_equal(const uint8_t *a,const uint8_t *b,size_t n){unsigned diff=0
  * pinned test catalog, never in the ordinary kernel or generic installer. */
 static bool wide_record(const uint8_t *r){
  static const uint8_t a[8]={'w','i','d','e','7','5',0,0},b[8]={'f','a','u','l','t','7','5',0};
- static const uint8_t x[8]="ipc76",y[8]="wide76";
- return nc_equal(r+40,a,8)||nc_equal(r+40,b,8)||nc_equal(r+40,x,8)||nc_equal(r+40,y,8);
+ static const uint8_t x[8]="ipc76",y[8]="wide76",z[8]="ipc81";
+ return nc_equal(r+40,a,8)||nc_equal(r+40,b,8)||nc_equal(r+40,x,8)||nc_equal(r+40,y,8)||nc_equal(r+40,z,8);
 }
 /* Only this pinned three-program workload waits for a second F9. Keep the
  * admission identities so a recycled slot can never receive the release. */
@@ -124,10 +124,13 @@ static bool wide_catalog(void){
  return true;
 }
 static bool stop76_catalog(void){
- static const uint8_t names[3][8]={"ipc76","wide76","peer76"};
- for(unsigned i=0;i<3;i++)
-  if(!nc_equal(catalog+16+i*NC_RECORD+40,names[i],8))return false;
- return true;
+ static const uint8_t names[3][8]={"ipc76","wide76","peer76"},patch_names[3][8]={"ipc81","wide76","peer76"};
+ bool old=true,new=true;
+ for(unsigned i=0;i<3;i++){
+  old=old&&nc_equal(catalog+16+i*NC_RECORD+40,names[i],8);
+  new=new&&nc_equal(catalog+16+i*NC_RECORD+40,patch_names[i],8);
+ }
+ patch81_probe=new;return old||new;
 }
 static bool remember_wide_owners(const struct pa_row *rows){
  for(unsigned i=0;i<3;i++){
@@ -175,7 +178,16 @@ static bool stop76_release(void){
  struct stop_owned target,peer;
  if(!owned_refs(a->pid,stop_window,&target)||!owned_refs(b->pid,peer_window,&peer)||
     target.port->length!=0||target.port->next_sequence!=2||
-    peer.port->length!=1||!target.port->has_tile||!peer.port->has_tile)return false;
+    peer.port->length!=1||(!patch81_probe&&!target.port->has_tile)||!peer.port->has_tile)return false;
+ if(patch81_probe){
+  const struct nwc_frame *f=nwc_visible_frame(channels(),stop_window);unsigned latest=0;
+  const struct nwc_patch *patch=nwc_visible_patches(channels(),stop_window,&latest);
+  if(!f||f->generation!=3||f->count!=1||f->rect[0].rgb!=0x224466||!patch||latest!=1||
+     patch[0].x!=32||patch[0].y!=32||patch[0].w!=16||patch[0].h!=16)return false;
+  for(unsigned i=0;i<256;i++)if(patch[0].pixel[i]!=0x91c725)return false;
+  for(unsigned i=1;i<NWC_PATCH_SLOTS;i++)if(!clear_bytes(&patch[i],sizeof patch[i]))return false;
+  arch_puts("STYLEOS PATCH81 VERIFIED");field("pid",a->pid);field("window",stop_window);field("generation",f->generation);arch_putc('\n');
+ }
  uint8_t wire[64],guard[4],marker[4],neighbor[8];
  if(!s865_native_copy_data(a->slot,a->pid,a->generation,a->root,S846_DATA+4096u-32u,wire,sizeof wire)||
     !s865_native_copy_data(a->slot,a->pid,a->generation,a->root,S846_DATA+3u*4096u-4u,guard,sizeof guard)||

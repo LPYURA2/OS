@@ -345,6 +345,32 @@ jobs:
         with:
           name: native-patch-80-host
           path: build/native-patch-80/
+  native-patch-81-guest:
+    if: github.ref_name == 'feature/styleos-native-apps-81'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install guest tools
+        run: |
+          set -euo pipefail
+          opts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${opts[@]}" update
+          sudo apt-get "${opts[@]}" install -y clang lld qemu-system-x86 qemu-utils ovmf dosfstools mtools xorriso
+      - name: Actual native patch and screen acceptance
+        run: python3 tools/test_native_patch_81_guest.py --output build/native-patch-81-guest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-patch-81-guest
+          path: |
+            build/native-patch-81-guest/*.log
+            build/native-patch-81-guest/*.json
+            build/native-patch-81-guest/*.elf
+            build/native-patch-81-guest/*.ppm
+          if-no-files-found: warn
   ordinary-shell:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

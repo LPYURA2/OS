@@ -7,13 +7,13 @@ import test_native_expanded_76_guest as old
 
 ROOT=old.ROOT
 
-def prepare(out):
+def prepare(out,*,client='native_sdk_77_client.c',target_name='ipc76'):
     src=ROOT/'tests/guest'
     sdk=ROOT/'sdk/native'
     common=['gcc','-std=c11','-O2','-Wall','-Wextra','-Werror','-ffreestanding',
             '-fno-stack-protector','-fno-pie','-fno-pic','-fno-asynchronous-unwind-tables',
             '-mno-red-zone','-mgeneral-regs-only','-I'+str(sdk/'include')]
-    for source,name in ((src/'native_sdk_77_client.c','client'),(sdk/'x86_64/syscall.c','syscall')):
+    for source,name in ((src/client,'client'),(sdk/'x86_64/syscall.c','syscall')):
         subprocess.run([*common,'-c',str(source),'-o',str(out/(name+'.o'))],check=True)
     subprocess.run(['gcc','-c',str(src/'native_sdk_77_entry.S'),'-o',str(out/'entry.o')],check=True)
     linked=out/'sdk77-linked.elf'
@@ -36,7 +36,7 @@ def prepare(out):
     subprocess.run(['objcopy','-O','binary','--only-section=.text',str(linked),str(raw)],check=True)
     code=raw.read_bytes()
     assert 0<len(code)<=old.P
-    return old.prepare(out,(old.elf(code,True),old.Sites(wait,ret,ret)))
+    return old.prepare(out,(old.elf(code,True),old.Sites(wait,ret,ret)),target_name=target_name)
 
 def verify(trace,lines,apps,pcs):
     return old.verify(trace,lines,apps,pcs,sdk_stack=True)
