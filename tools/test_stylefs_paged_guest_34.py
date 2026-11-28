@@ -366,11 +366,11 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             tail=calls[4:]
                             require(len(tail)>=2 and all(v["op"]==0x132 and v["status"]==4 for v in tail[:-2]) and
                                     [(v["op"],v["status"]) for v in tail[-2:]]==[(0x132,0),(0x132,2)],"file probe completion")
-                            expected=b"StyleOS: paged file read test.\nSecond line.\n"
-                            require(tail[-2]["value"]==len(expected)<<32 and calls[2]["value"]!=0,"file probe byte count")
+                            expected_file=b"StyleOS: paged file read test.\nSecond line.\n"
+                            require(tail[-2]["value"]==len(expected_file)<<32 and calls[2]["value"]!=0,"file probe byte count")
                             pixels=records(lines,b"STYLEOS NATIVE PIXEL",("pid","gen","root","window","rgb","status"))
                             require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"client byte comparison marker absent")
-                            (folder/"file-probe-92.json").write_text(json.dumps({"pid":pid_num,"calls":calls,"bytes":len(expected)},indent=2)+"\n")
+                            (folder/"file-probe-92.json").write_text(json.dumps({"pid":pid_num,"calls":calls,"bytes":len(expected_file)},indent=2)+"\n")
                             print("Native file 92 CPL3 read, invalid span, read-only denial, exact content and one-shot completion PASS",flush=True)
                         snapshot_count=sum(x==b"STYLEOS PROCESSES END" for x in lines)
                         d.key("f8");wait_exact(b"STYLEOS PROCESSES END",snapshot_count+1)

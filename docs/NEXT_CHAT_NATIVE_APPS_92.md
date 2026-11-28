@@ -3,3 +3,6 @@ Base bbf2b158e53efe80dbc1dda251cd623f46fa174e; stage 91 CI 46134432262 27/27 SUC
 
 ## 93 preparation
 Stage 92 CI 46134999718 in progress (9/28 successful at observation). Do not claim guest read accepted yet. Stage 93 adds independent explicit grant receipt mechanism; diagnostic 92 remains unchanged and runs again in 93 CI.
+
+## Observed 92 guest evidence and harness failure
+CI 46134999718 job 140948197658: raw UART proves wrong grant denied, write denied, authorized read submit success, invalid span denied, take success RDX=0x0000002c00000000 (44 bytes), duplicate take denied; diagnostic client byte-comparison marker and park/forced retirement reached. Retired process resource receipt all zero. Runner failed after retirement because local expected bytes shadowed the expected resource list (TypeError). Full zero-write check not completed by failing runner. Do not mark CI accepted. Fix in 93.1 preserves assertions and 92 original history.
