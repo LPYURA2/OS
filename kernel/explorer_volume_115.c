@@ -53,3 +53,30 @@ enum po64_status ex115_volume_at(struct bs_service *b,struct pv64_volume *const 
  if(at>=n)return PO64_END;
  return ex115_volume_info(v[at],out);
 }
+
+static void wire_put(uint8_t *p,uint64_t v,unsigned n){for(unsigned i=0;i<n;++i)p[i]=(uint8_t)(v>>(8*i));}
+enum po64_status ex117_volume_wire(struct pv64_volume *v,struct po64_snapshot snap,
+ struct sfs64_run *scratch,uint8_t *out,size_t n){
+ if(!v||!out||n!=EX117_VOLUME_BYTES||!sep(v,sizeof *v,out,n))return PO64_INVALID;
+ if(!v->attached||!v->objects.active||!v->block)return PO64_STALE;
+ struct po64_service *s=&v->objects;
+ if(!sep(v->block,sizeof *v->block,out,n)||!sep(s->work,sizeof *s->work,out,n)||
+    !sep(s->nodes,s->node_cap*sizeof *s->nodes,out,n)||!sep(s->runs,s->run_cap*sizeof *s->runs,out,n)||
+    (s->writable&&!sep(s->previous,s->run_cap*sizeof *s->previous,out,n))||
+    (scratch&&!sep(scratch,s->run_cap*sizeof *scratch,out,n)))return PO64_INVALID;
+ struct ex115_volume_info info;
+ enum po64_status rc=ex115_volume_info(v,&info);
+ if(rc!=PO64_OK)return rc;
+ if(info.mount!=snap.mount||info.sequence!=snap.sequence)return PO64_STALE;
+ struct sfs64_space space;
+ rc=po116_space(s,snap,scratch,&space);
+ if(rc!=PO64_OK)return rc;
+ if(space.free_sectors>info.volume_bytes/BS_SECTOR_BYTES||space.largest_run>space.free_sectors)return PO64_CORRUPT;
+ uint8_t p[EX117_VOLUME_BYTES]={0};
+ wire_put(p,1,4);wire_put(p+4,info.writable?1:0,4);
+ wire_put(p+8,info.mount,8);wire_put(p+16,info.sequence,8);
+ wire_put(p+24,info.volume_bytes,8);wire_put(p+32,info.device_bytes,8);
+ wire_put(p+40,space.free_sectors*BS_SECTOR_BYTES,8);wire_put(p+48,space.largest_run*BS_SECTOR_BYTES,8);
+ for(unsigned i=0;i<EX117_VOLUME_BYTES;++i)out[i]=p[i];
+ return PO64_OK;
+}

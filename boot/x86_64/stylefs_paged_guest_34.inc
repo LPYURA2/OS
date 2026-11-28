@@ -331,18 +331,22 @@ enum po64_status s113_explorer_offer(uint32_t pid,uint64_t handle,uint64_t root,
  struct ex112_queue *q=&s34_work.explorer;
  if(q->scope.active||q->state)return PO64_BUSY;
  if(!s34_work.volume.attached||!s34_work.volume.objects.active)return PO64_STALE;
- return ex111_open(&q->scope,&s34_work.volume.objects,usr_global(),pid,handle,root,directory);
+ enum po64_status rc=ex111_open(&q->scope,&s34_work.volume.objects,usr_global(),pid,handle,root,directory);
+ if(rc!=PO64_OK)return rc;
+ rc=ex117_bind_volume(q,&s34_work.volume,s34_work.volume.objects.writable?0:s34_work.previous);
+ if(rc!=PO64_OK)ex112_discard(q);
+ return rc;
 }
 uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t op,uint64_t token,uint64_t address,uint64_t size,uint64_t *value){
  *value=0;
- if(op>=EX113_ROW&&op<=EX113_TAKE){
+ if(op>=EX113_ROW&&op<=EX117_VOLUME){
   struct ex112_queue *q=&s34_work.explorer;
   if(op!=EX113_TAKE){
    if(address||size||(op==EX113_UP&&token))return PO64_INVALID;
-   return ex112_submit(q,pid,handle,root,(unsigned)(op-EX113_ROW+1),token,value);
+   return ex112_submit(q,pid,handle,root,op==EX117_VOLUME?4u:(unsigned)(op-EX113_ROW+1),token,value);
   }
-  if((!address)!=(!size)||(size&&size!=EX112_WIRE_BYTES))return PO64_INVALID;
+  if((!address)!=(!size)||(size&&size!=EX112_WIRE_BYTES&&size!=EX117_VOLUME_BYTES))return PO64_INVALID;
   uint8_t *out=0;
   if(size){
    out=(uint8_t *)s865_native_data_span(slot,pid,handle,root,address,(size_t)size);

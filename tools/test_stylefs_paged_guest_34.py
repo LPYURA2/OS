@@ -410,13 +410,15 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             observed=[(v["op"],v["status"]) for v in ex if v["status"]!=4]
                             wanted=[(0x142,0),(0x143,2),(0x140,0),(0x143,1),(0x143,0),(0x143,2),
                                     (0x141,0),(0x143,0),(0x140,0),(0x143,0),(0x143,2),
-                                    (0x140,0),(0x143,10),(0x141,0),(0x143,2),(0x142,0),(0x143,0)]
+                                    (0x140,0),(0x143,10),(0x141,0),(0x143,2),(0x142,0),(0x143,0),
+                                    (0x144,0),(0x143,1),(0x143,0),(0x143,2),(0x144,0),(0x143,10)]
                             require(observed==wanted,"Explorer 114 exact directory syscall sequence")
                             ids=[v["value"] for v in ex if v["op"]!=0x143 and v["status"]==0]
-                            require(len(ids)==7 and all(ids[i]>ids[i-1] for i in range(1,len(ids))),"Explorer request identity")
+                            require(len(ids)==9 and all(ids[i]>ids[i-1] for i in range(1,len(ids))),"Explorer request identity")
                             require(len([v for _,v in records(lines,b"STYLEOS EXPLORER114 GRANT",("pid",)) if v["pid"]==pid_num])==1,"Explorer grant identity")
                             (folder/"explorer-114.json").write_text(json.dumps({"pid":pid_num,"calls":ex},indent=2)+"\n")
                             print("EXPLORER114 CPL3 directory wire, navigation, denial and one-shot completion PASS",flush=True)
+                            print("EXPLORER117 CPL3 real volume, wrong size and enumeration end PASS",flush=True)
                             print("Native file 92 CPL3 read, invalid span, read-only denial, exact content and one-shot completion PASS",flush=True)
                         if file_probe94:
                             calls=[v for _,v in records(lines,b"STYLEOS FILE92 CALL",("pid","op","status","value")) if v["pid"]==pid_num]

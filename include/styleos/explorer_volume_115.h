@@ -15,4 +15,10 @@ enum po64_status ex115_volume_info(struct pv64_volume *,struct ex115_volume_info
  * step; stale/unattached is NOT an empty directory. Caller starts fresh
  * after topology changes. No probing, mounting, or device names invented. */
 enum po64_status ex115_volume_at(struct bs_service *,struct pv64_volume *const *,size_t,size_t,struct ex115_volume_info *);
+/* Fixed little-endian record: version/flags, mount/sequence, volume bytes,
+ * visible block span bytes (NOT necessarily physical disk), free data bytes,
+ * largest free run bytes, reserved zero. Exact authorized snapshot. */
+enum { EX117_VOLUME_BYTES=64 };
+enum po64_status ex117_volume_wire(struct pv64_volume *,struct po64_snapshot,
+ struct sfs64_run *,uint8_t *,size_t);
 #endif

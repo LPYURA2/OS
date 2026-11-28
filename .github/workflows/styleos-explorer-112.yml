@@ -1,7 +1,7 @@
 name: StyleOS Explorer SDK wire 112
 on:
   push:
-    branches: [feature/styleos-explorer-112, feature/styleos-explorer-113, feature/styleos-explorer-114]
+    branches: [feature/styleos-explorer-112, feature/styleos-explorer-113, feature/styleos-explorer-114, feature/styleos-explorer-117]
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,7 +17,7 @@ jobs:
           set -euo pipefail
           mkdir -p build/explorer-112
           for cc in gcc clang; do
-            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -DSTYLEOS_NATIVE_FILE_85_TEST -DSTYLEOS_EXPLORER_111_TEST -DSTYLEOS_EXPLORER_112_TEST -fsanitize=address,undefined -fno-pie -no-pie -Iinclude -Isdk/native/include tests/test_stylefs_paged_object64.c kernel/{stylefs_paged_object64,stylefs_paged_stream64,stylefs_paged_pair64,stylefs_inode_root64,stylefs_inode_pages64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service,process_runtime,window_service,user_session_runtime,native_file_85,explorer_scope_111,explorer_queue_112}.c -o "build/explorer-112/$cc"
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -DSTYLEOS_NATIVE_FILE_85_TEST -DSTYLEOS_EXPLORER_111_TEST -DSTYLEOS_EXPLORER_112_TEST -fsanitize=address,undefined -fno-pie -no-pie -Iinclude -Isdk/native/include tests/test_stylefs_paged_object64.c kernel/{stylefs_paged_object64,stylefs_paged_stream64,stylefs_paged_pair64,stylefs_inode_root64,stylefs_inode_pages64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service,process_runtime,window_service,user_session_runtime,native_file_85,explorer_scope_111,explorer_queue_112,explorer_volume_115}.c -o "build/explorer-112/$cc"
             "build/explorer-112/$cc" | tee "build/explorer-112/$cc.log"
             grep -F 'EXPLORER111 real scoped directory navigation, owner denial, mutation refresh PASS' "build/explorer-112/$cc.log"
             grep -F 'EXPLORER112 deferred actual rows, SDK wire, identity and retirement PASS' "build/explorer-112/$cc.log"

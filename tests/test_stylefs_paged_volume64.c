@@ -1,6 +1,9 @@
 #include <styleos/stylefs_paged_volume64.h>
 #ifdef STYLEOS_EXPLORER_115_TEST
 #include <styleos/explorer_volume_115.h>
+#ifdef STYLEOS_EXPLORER_117_TEST
+#include <styleos/explorer_v1.h>
+#endif
 #endif
 #include <assert.h>
 #include <stdio.h>
@@ -126,6 +129,21 @@ int main(void){
  assert(po116_space(&v.objects,sp,current,&free_space)==PO64_INVALID);
  assert(po116_space(&v.objects,sp,previous,&free_space)==PO64_OK);
  assert(free_space.free_sectors==F-1-4&&writes==after_write);
+#ifdef STYLEOS_EXPLORER_117_TEST
+ uint8_t packet[EX117_VOLUME_BYTES],saved_packet[EX117_VOLUME_BYTES];
+ struct sty_explorer_volume decoded={0};
+ assert(ex117_volume_wire(&v,sp,previous,packet,sizeof packet)==PO64_OK);
+ assert(sty_explorer_volume_decode(packet,sizeof packet,&decoded));
+ assert(decoded.mount==sp.mount&&decoded.sequence==sp.sequence&&!decoded.writable&&
+        decoded.volume_bytes==(uint64_t)N*512&&decoded.visible_block_bytes==(uint64_t)N*512&&
+        decoded.free_bytes==(uint64_t)(F-1-4)*512&&decoded.largest_run_bytes==free_space.largest_run*512);
+ memcpy(saved_packet,packet,sizeof packet);
+ packet[56]=1;assert(!sty_explorer_volume_decode(packet,sizeof packet,&decoded));
+ memcpy(packet,saved_packet,sizeof packet);
+ assert(ex117_volume_wire(&v,sp,previous,packet,sizeof packet-1)==PO64_INVALID&&!memcmp(packet,saved_packet,sizeof packet));
+ assert(writes==after_write);
+ puts("EXPLORER117 real volume wire and SDK decoder PASS");
+#endif
  memcpy(&saved_space,&free_space,sizeof free_space);
 #endif
 #ifdef STYLEOS_EXPLORER_115_TEST

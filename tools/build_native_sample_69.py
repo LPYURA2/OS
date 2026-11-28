@@ -87,7 +87,22 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
         ex_submit(0x140,1);ex_take('ex_end',10,True)
         ex_submit(0x141,0);ex_take('ex_file_enter',2)
         ex_submit(0x142,0);ex_take('ex_up',0)
-        # Distinct pixel call serves as evidence only after all byte and directory checks.
+        # 117: the actual mounted fixture is a 512-sector visible block
+        # span, NOT the physical 4 TiB disk. Verify exact geometry and
+        # positive allocator capacity, plus wrong-size and END receipts.
+        ex_submit(0x144,0)
+        call(0x143,0x12000600,296);status(1)
+        mark('ex_volume');call(0x143,0x12000600,64)
+        emit(b'\x83\xf8\x04');jump(b'\x0f\x84','ex_volume');status(0)
+        for off,val in ((0,1),(4,0),(24,262144),(28,0),(32,262144),(36,0),(44,0),(52,0),(56,0),(60,0)):
+            emit(b'\x81\xbe'+struct.pack('<I',0x600+off)+struct.pack('<I',val));jump(b'\x0f\x85','fail')
+        emit(b'\x48\x8b\x86\x28\x06\x00\x00\x48\x85\xc0');jump(b'\x0f\x84','fail')
+        emit(b'\x48\x3d\x00\x00\x04\x00');jump(b'\x0f\x87','fail')
+        call(0x143,0x12000600,64);status(2)
+        ex_submit(0x144,1)
+        mark('ex_volume_end');call(0x143,0x12000600,64)
+        emit(b'\x83\xf8\x04');jump(b'\x0f\x84','ex_volume_end');status(10)
+        # Distinct pixel call serves as evidence only after all byte, directory and volume checks.
         emit(b'\x31\xdb');call(0x100,0x976332,0);status(0)
     if file_probe_94 and index==1:
         payload=b"aStyleOS: paged file read test.\nSecond line.\n"

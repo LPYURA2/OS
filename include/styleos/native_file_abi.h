@@ -47,4 +47,5 @@
 #define EX113_ENTER UINT64_C(0x141)
 #define EX113_UP UINT64_C(0x142)
 #define EX113_TAKE UINT64_C(0x143)
+#define EX117_VOLUME UINT64_C(0x144) /* ordinal -> request; TAKE expects 64-byte record */
 #endif

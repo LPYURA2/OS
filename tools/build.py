@@ -694,7 +694,7 @@ def build(arch, output, invalid=False, invalid_map=False, test_exception=False,
         if live_volume_46:flags.append('-DSTYLEOS_LIVE_VOLUME_46=1')
         if live_volume_50:flags.append('-DSTYLEOS_LIVE_VOLUME_50=1')
         paged_sources += ['kernel/stylefs_paged_object64.c','kernel/stylefs_paged_volume64.c','kernel/native_tea_stylefs.c']
-        if owned_shell_865:paged_sources += ['kernel/native_file_85.c','kernel/explorer_scope_111.c','kernel/explorer_queue_112.c']
+        if owned_shell_865:paged_sources += ['kernel/native_file_85.c','kernel/explorer_scope_111.c','kernel/explorer_queue_112.c','kernel/explorer_volume_115.c']
     if object_guest_37:
         flags.append('-DSTYLEOS_OBJECT_GUEST_37=1')
         paged_sources += ['kernel/stylefs_paged_object64.c']
