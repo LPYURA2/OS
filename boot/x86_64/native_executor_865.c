@@ -249,9 +249,17 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   }
 #endif
   slot->context.gpr[0]=status;slot->context.gpr[3]=value;
+#ifdef STYLEOS_FILE_PROBE_92
+  if(operation>=EX113_ROW&&operation<=EX113_TAKE){
+   arch_puts("STYLEOS EXPLORER114 CALL");fld848("pid",ticket->pid);fld848("op",operation);
+   fld848("status",status);fld848("value",value);arch_putc('\n');
+  }
+#endif
 #if defined(STYLEOS_FILE_PROBE_92) || defined(STYLEOS_FILE_PROBE_94) || defined(STYLEOS_FILE_PROBE_103)
-  arch_puts("STYLEOS FILE92 CALL");fld848("pid",ticket->pid);fld848("op",operation);
-  fld848("status",status);fld848("value",value);arch_putc('\n');
+  if(operation<=NF102_WRESULT){
+   arch_puts("STYLEOS FILE92 CALL");fld848("pid",ticket->pid);fld848("op",operation);
+   fld848("status",status);fld848("value",value);arch_putc('\n');
+  }
 #endif
  }
  const bool drop=operation>=DD_CALL_OFFER && operation<=DD_CALL_CANCEL;

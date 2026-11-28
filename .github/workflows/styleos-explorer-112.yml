@@ -1,7 +1,7 @@
 name: StyleOS Explorer SDK wire 112
 on:
   push:
-    branches: [feature/styleos-explorer-112, feature/styleos-explorer-113]
+    branches: [feature/styleos-explorer-112, feature/styleos-explorer-113, feature/styleos-explorer-114]
   workflow_dispatch:
 permissions:
   contents: read

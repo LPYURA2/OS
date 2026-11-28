@@ -798,6 +798,9 @@ if(index==1){
  uint64_t token=0;
  if(slot==S846_ROOT_COUNT||s92_file_probe_grant(p->pid,p->scheduler_handle,p->page_root,&token)!=PO64_OK)
   fail("file92-grant");
+ if(s113_explorer_offer(p->pid,p->scheduler_handle,p->page_root,1)!=PO64_OK)
+  fail("explorer114-grant");
+ arch_puts("STYLEOS EXPLORER114 GRANT");field("pid",p->pid);arch_putc('\n');
  volatile uint8_t *dst=s865_native_data_span(slot,p->pid,p->scheduler_handle,p->page_root,S846_DATA+0x200,8);
  if(!dst)fail("file92-delivery");
  for(unsigned i=0;i<8;++i)dst[i]=(uint8_t)(token>>(8*i));

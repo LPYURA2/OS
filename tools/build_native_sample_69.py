@@ -55,7 +55,39 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
         emit(b'\x48\xb8'+struct.pack('<Q',len(expected)<<32)+b'\x48\x39\xc2');jump(b'\x0f\x85','fail')
         for i,value in enumerate(expected):
             emit(b'\x80\xbe'+struct.pack('<I',0x300+i)+bytes([value]));jump(b'\x0f\x85','fail')
-        # Distinct pixel call serves as evidence only after all byte checks.
+        # 114: real directory grant to fixture root, separate from file grant.
+        # Every completion has to match the exact wire row, not just status.
+        def ex_submit(op,ordinal):
+            emit(b'\xbb'+struct.pack('<I',ordinal))
+            call(op,0,0);status(0)
+            emit(b'\x48\x85\xd2');jump(b'\x0f\x84','fail')
+            emit(b'\x48\x89\xd3')
+        def ex_take(label,result,row=False):
+            mark(label);call(0x143,0x12000600 if row else 0,296 if row else 0)
+            emit(b'\x83\xf8\x04');jump(b'\x0f\x84',label);status(result)
+        def ex_row(label,ordinal,kind,object_id,size,revision,name,bad_span=False):
+            ex_submit(0x140,ordinal)
+            if bad_span:call(0x143,0x12000ff0,296);status(1)
+            ex_take(label,0,True)
+            expected_wire=struct.pack('<IIIIQQQ',1,kind,len(name),0,object_id,size,revision)+name
+            expected_wire=expected_wire.ljust(296,b'\0')
+            # Compare a fixed header/name with immediate byte checks; all
+            # remaining bytes are zero (repe scasb on the private DATA).
+            end=40+len(name)
+            for i,value in enumerate(expected_wire[:end]):
+                emit(b'\x80\xbe'+struct.pack('<I',0x600+i)+bytes([value]))
+                jump(b'\x0f\x85','fail')
+            emit(b'\xbf'+struct.pack('<I',0x12000600+end)+b'\xb9'+struct.pack('<I',296-end)+b'\x31\xc0\xfc\xf3\xae')
+            jump(b'\x0f\x85','fail')
+            call(0x143,0x12000600,296);status(2)
+        ex_submit(0x142,0);ex_take('ex_root_up',2)
+        ex_row('ex_dir',1,2,3,0,0,b'd',True)
+        ex_submit(0x141,1);ex_take('ex_enter',0)
+        ex_row('ex_file',0,1,4,len(expected),1,b'x.txt')
+        ex_submit(0x140,1);ex_take('ex_end',10,True)
+        ex_submit(0x141,0);ex_take('ex_file_enter',2)
+        ex_submit(0x142,0);ex_take('ex_up',0)
+        # Distinct pixel call serves as evidence only after all byte and directory checks.
         emit(b'\x31\xdb');call(0x100,0x976332,0);status(0)
     if file_probe_94 and index==1:
         payload=b"aStyleOS: paged file read test.\nSecond line.\n"
