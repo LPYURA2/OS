@@ -100,6 +100,10 @@ bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,s
 void s88_native_file_reconcile(void);
 void s90_native_file_pump(void);
 enum po64_status s95_native_file_wait(uint32_t,uint64_t,uint64_t,uint64_t);
+/* Explicit trusted installer action, with separately authorized/provisioned
+ * Apps directory ID on v2 ID-managed volume. Not exposed to CPL3. */
+enum po64_status s106_install_approved(const struct po64_row *,uint64_t,unsigned *);
+bool s106_launch_installed(unsigned,uint64_t);
 enum po64_status s93_native_file_offer(uint32_t,uint64_t,uint64_t,const struct po64_row *,unsigned);
 #ifdef STYLEOS_FILE_PROBE_103
 enum po64_status s103_file_probe_offer(uint32_t,uint64_t,uint64_t);

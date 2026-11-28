@@ -477,6 +477,30 @@ bool s104_use_tea_file(const struct po64_row *row,const struct ntr104_registry *
  if(status!=NTSFS_OK)arch_puts("STYLEOS TEA69 STYLEFS REFUSED\n");
  return status==NTSFS_OK;
 }
+enum po64_status s106_install_tea_file(const struct po64_row *row,const struct ntr104_registry *registry,
+ uint64_t apps_parent,unsigned *slot){
+ if(!s41_root_view())return PO64_STALE;
+ struct po64_service *s=&s34_work.volume.objects;
+ uint64_t parent=s34_work.root_view.parent,first=s34_work.root_view.first;
+ enum po64_status rc=nts106_install(s,registry,406,row,apps_parent,
+    s69_package_scratch,sizeof s69_package_scratch,slot);
+ if(rc==PO64_OK){
+  struct sd64_key k=s34_key(1,'a');
+  if(po64_grant(s,101,&k,2,1,&s34_work.token)!=PO64_OK||!s42_load(parent,first)){
+   (void)pv64_close(&s34_work.volume);arch_puts("SFS106 POSTCOMMIT VIEW UNAVAILABLE\n");
+  }
+ }else if(!s->active)(void)pv64_close(&s34_work.volume);
+ return rc;
+}
+enum po64_status s106_resolve_tea_file(const struct ntr104_registry *registry,
+ unsigned slot,uint64_t apps_parent,struct po64_row *row){
+ if(!s41_root_view())return PO64_STALE;
+ struct po64_service *s=&s34_work.volume.objects;
+ enum po64_status rc=nts106_resolve(s,registry,406,slot,apps_parent,
+    s69_package_scratch,sizeof s69_package_scratch,row);
+ if(!s->active)(void)pv64_close(&s34_work.volume);
+ return rc;
+}
 bool s69_use_tea_file(const struct po64_row *row,const struct nts_pin *pin,
  ntsfs_consumer consumer,void *ctx){
  if(!s41_root_view()||!row||!pin||row->entry.kind!=SD64_FILE||

@@ -773,6 +773,13 @@ static bool sample104_consume_file(void *opaque,const uint8_t *bytes,size_t size
  if(s865_native_launch_tea(bytes,size,&pin,sample69_session,a->title,bounds,&c->out)!=PS_OK)return false;
  c->index=slot+1;return true;
 }
+enum po64_status s106_install_tea_file(const struct po64_row *,const struct ntr104_registry *,uint64_t,unsigned *);
+enum po64_status s106_resolve_tea_file(const struct ntr104_registry *,unsigned,uint64_t,struct po64_row *);
+enum po64_status s106_install_approved(const struct po64_row *row,uint64_t apps_parent,unsigned *slot){
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return PO64_BUSY;
+ if(!sample69_session_ready())return PO64_DENIED;
+ return s106_install_tea_file(row,&approved104,apps_parent,slot);
+}
 bool s865_launch_native_file(const struct po64_row *row){
  if(!row||row->entry.kind!=SD64_FILE||row->bytes<22||row->bytes>NTP105_MAX_PACKAGE||
     !native_ready||!s865_executor_idle()||!native_audit(0))return false;
@@ -810,6 +817,12 @@ if(index==1){
  arch_puts("STYLEOS TEA69 STYLEFS");field("id",row->entry.target);
  field("revision",row->revision);field("bytes",row->bytes);arch_putc('\n');
  return sample69_publish(index,c.out);
+}
+bool s106_launch_installed(unsigned slot,uint64_t apps_parent){
+ if(!native_ready||!s865_executor_idle()||!native_audit(0))return false;
+ struct po64_row row;
+ if(s106_resolve_tea_file(&approved104,slot,apps_parent,&row)!=PO64_OK)return false;
+ return s865_launch_native_file(&row);
 }
 #endif
 static void sample69_reconcile(void){
