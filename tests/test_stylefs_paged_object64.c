@@ -665,6 +665,89 @@ static void write100(void){
  assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,9,total,88);
  puts("Native file 100: bounded write stream, explicit commit, idle cancel, lock and owner cleanup PASS");
 }
+#ifdef STYLEOS_NATIVE_FILE_101_TEST
+static struct nf101_stream read101;
+static void stream_read101(void){
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ uint32_t pid=0,peer=0;
+ struct pr_admission spec={PR_NATIVE_USER,0,160,655360,4096,"Reader101"};
+ assert(pr_admit(&procs,&spec,&pid)==PR_OK&&usr_bind(&users,1,pid,160)==USR_OK);
+ spec.scheduler_handle=176;spec.page_root=720896;
+ assert(pr_admit(&procs,&spec,&peer)==PR_OK&&usr_bind(&users,1,peer,176)==USR_OK);
+ struct sd64_key a=key('a'),h=key('h');
+ uint64_t grant=0,empty=0,id=0,old=0;
+ const uint64_t total=SFS64_WINDOW_BYTES+17;
+ uint8_t data[NF85_READ_MAX];size_t n=999;enum po64_status result=PO64_INVALID;
+ assert(nf101_start(&read101,&nf)==PO64_OK&&nf101_start(&read101,&nf)==PO64_INVALID);
+ assert(nf85_grant_read(&nf,pid,160,655360,&a,4,9,&grant)==PO64_OK);
+ assert(nf85_grant_read(&nf,pid,160,655360,&h,5,1,&empty)==PO64_OK);
+ unsigned before=writes,rd_before=reads;
+ assert(nf101_open(&read101,peer,176,720896,grant,&id)==PO64_DENIED&&!id);
+ assert(nf101_open(&read101,pid,160,655360,grant,&id)==PO64_OK&&id);
+ assert(writes==before&&reads==rd_before);
+ assert(nf101_pump(&read101)&&read101.state==NF101_PULL);
+ rd_before=reads;
+ assert(nf101_pump(&read101)&&read101.state==NF101_READY&&reads-rd_before==8);
+ for(unsigned i=1;i<NF100_IDLE_LIMIT;++i)assert(!nf101_pump(&read101));
+ assert(nf101_pump(&read101)&&!service.busy);
+ assert(nf101_result(&read101,pid,160,655360,id,&result)==PO64_OK&&result==PO64_CANCELLED);
+ old=id;
+ assert(nf101_open(&read101,pid,160,655360,grant,&id)==PO64_OK&&id>old);
+ assert(nf101_pump(&read101)&&nf101_pump(&read101));
+ assert(nf101_take(&read101,peer,176,720896,id,0,data,sizeof data,&n)==PO64_DENIED&&n==999);
+ assert(nf101_take(&read101,pid,160,655360,old,0,data,sizeof data,&n)==PO64_DENIED&&n==999);
+ assert(nf101_take(&read101,pid,160,655360,id,1,data,sizeof data,&n)==PO64_INVALID&&n==999);
+ assert(nf101_take(&read101,pid,160,655360,id,0,data,sizeof data-1,&n)==PO64_FULL&&n==999);
+ assert(usr_lock(&users)==USR_OK&&nf101_pump(&read101)&&!service.busy);
+ assert(usr_select(&users,1)==USR_OK);
+ assert(nf101_result(&read101,pid,160,655360,id,&result)==PO64_OK&&result==PO64_CANCELLED);
+ assert(nf101_open(&read101,pid,160,655360,grant,&id)==PO64_OK);
+ assert(nf101_pump(&read101));
+ for(uint64_t at=0;at<total;){
+  rd_before=reads;
+  assert(nf101_pump(&read101)&&reads-rd_before>0&&reads-rd_before<=8);
+  assert(read101.state==NF101_READY&&read101.verified==(total-at<=sizeof data));
+  rd_before=reads;
+  assert(nf101_take(&read101,pid,160,655360,id,at,data,sizeof data,&n)==PO64_OK);
+  assert(n&&n<=sizeof data&&reads==rd_before&&writes==before);
+  for(size_t i=0;i<n;++i)assert(data[i]==byte(88,at+i));
+  for(size_t i=0;i<sizeof read101.data;++i)assert(!read101.data[i]);
+  at+=n;
+ }
+ assert(nf101_result(&read101,pid,160,655360,id,&result)==PO64_OK&&result==PO64_OK);
+ assert(nf101_open(&read101,pid,160,655360,empty,&id)==PO64_OK);
+ assert(nf101_pump(&read101));
+ rd_before=reads;
+ assert(nf101_pump(&read101)&&reads==rd_before&&!service.busy);
+ assert(nf101_result(&read101,pid,160,655360,id,&result)==PO64_OK&&result==PO64_OK);
+ /* Corrupt the last data sector after begin; earlier delivered chunks are
+  * provisional, final chunk must never be released on failed checksum. */
+ assert(nf101_open(&read101,pid,160,655360,grant,&id)==PO64_OK);
+ assert(nf101_pump(&read101));
+ struct sfs64_map map;struct sfs_extent64 ex;uint64_t local;size_t take;
+ assert(sfs64_map_decode(read101.reader.manifest,read101.reader.map_bytes,l.data_sectors,l.data_start,&map));
+ assert(sfs64_map_chunk(&map,total-1,1,&ex,&local,&take));
+ disk[2+D+I+ex.first+local/512][local%512]^=1;
+ for(uint64_t at=0;at<total-17;at+=4096){
+  assert(nf101_pump(&read101));
+  assert(nf101_take(&read101,pid,160,655360,id,at,data,sizeof data,&n)==PO64_OK&&n==4096);
+ }
+ assert(nf101_pump(&read101)&&!service.active&&!service.busy&&read101.state==NF101_DONE);
+ memset(data,0x5a,sizeof data);n=999;
+ assert(nf101_take(&read101,pid,160,655360,id,total-17,data,sizeof data,&n)==PO64_END&&n==999&&data[0]==0x5a);
+ assert(nf101_result(&read101,pid,160,655360,id,&result)==PO64_OK&&result==PO64_CORRUPT);
+ reopen();check('a',4,9,total,88);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(nf85_grant_read(&nf,pid,160,655360,&a,4,9,&grant)==PO64_OK);
+ assert(nf101_open(&read101,pid,160,655360,grant,&id)==PO64_OK);
+ assert(nf101_pump(&read101)&&nf101_pump(&read101)&&service.busy);
+ assert(pr_transition(&procs,pid,160,PR_FAULTED)==PR_OK);
+ assert(nf101_pump(&read101)&&!service.busy&&read101.state==NF101_IDLE);
+ assert(nf85_reconcile(&nf)==1);
+ assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,9,total,88);
+ puts("Native file 101: bounded provisional read stream, final CRC, idle cancel and owner cleanup PASS");
+}
+#endif
 #endif
 #endif
 #endif
@@ -929,6 +1012,9 @@ int main(void){
  write99();
 #ifdef STYLEOS_NATIVE_FILE_100_TEST
  write100();
+#ifdef STYLEOS_NATIVE_FILE_101_TEST
+ stream_read101();
+#endif
 #endif
 #endif
 #endif

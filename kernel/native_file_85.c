@@ -663,3 +663,133 @@ bool nf100_pump(struct nf100_stream *s){
  }
  return false;
 }
+
+static bool stream101_ready(const struct nf101_stream *s){return s&&ready(s->files);}
+static bool stream101_span(const struct nf101_stream *s,const void *p,size_t n){
+ return sep(p,n,s,sizeof *s)&&external_span(s->files,p,n);
+}
+static bool stream101_owner(struct nf101_stream *s,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
+ struct nf85_owner o;
+ return id&&id==s->id&&owner(s->files,pid,handle,root,true,&o)&&same(o,s->owner);
+}
+static bool stream101_valid(struct nf101_stream *s){
+ struct nf85_grant *g=find(s->files,s->owner,s->token);
+ return g&&g->mount==s->mount&&token_live(s->files,g)&&(g->rights&PO64_READ);
+}
+static void stream101_clear(struct nf101_stream *s){
+ struct nf85_service *f=s->files;uint64_t serial=s->serial;
+ wipe(s,sizeof *s);s->files=f;s->serial=serial;
+}
+static void stream101_done(struct nf101_stream *s,enum po64_status status){
+ wipe(s->data,sizeof s->data);s->buffered=0;s->idle=0;
+ s->state=NF101_DONE;s->status=status;s->cancel=false;
+ s->verified=status==PO64_OK;
+}
+enum po64_status nf101_start(struct nf101_stream *s,struct nf85_service *f){
+ if(!s||s->files||!ready(f)||!external_span(f,s,sizeof *s))return PO64_INVALID;
+ wipe(s,sizeof *s);s->files=f;return PO64_OK;
+}
+enum po64_status nf101_open(struct nf101_stream *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,uint64_t *id){
+ if(!stream101_ready(s)||!token||!stream101_span(s,id,sizeof *id))return PO64_INVALID;
+ if(s->busy||s->state!=NF101_IDLE||s->files->busy||s->files->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(s->files,pid,handle,root,true,&o))return PO64_DENIED;
+ struct nf85_grant *g=find(s->files,o,token);
+ if(!g||!(g->rights&PO64_READ))return PO64_DENIED;
+ if(!token_live(s->files,g))return PO64_STALE;
+ if(s->serial==UINT64_MAX)return PO64_FULL;
+ s->owner=o;s->id=++s->serial;s->token=token;s->mount=g->mount;
+ s->state=NF101_BEGIN;*id=s->id;return PO64_OK;
+}
+enum po64_status nf101_take(struct nf101_stream *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t id,uint64_t offset,uint8_t *out,size_t capacity,size_t *bytes){
+ if(!stream101_ready(s)||!capacity||capacity>NF85_READ_MAX||
+    !stream101_span(s,out,capacity)||!stream101_span(s,bytes,sizeof *bytes)||
+    !sep(out,capacity,bytes,sizeof *bytes))return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!stream101_owner(s,pid,handle,root,id))return PO64_DENIED;
+ if(s->state==NF101_DONE)return PO64_END;
+ if(s->state!=NF101_READY||s->cancel)return PO64_BUSY;
+ if(!stream101_valid(s))return PO64_STALE;
+ if(offset!=s->offset)return PO64_INVALID;
+ if(capacity<s->buffered)return PO64_FULL;
+ for(size_t i=0;i<s->buffered;++i)out[i]=s->data[i];
+ *bytes=s->buffered;s->offset+=s->buffered;
+ wipe(s->data,sizeof s->data);s->buffered=0;s->idle=0;
+ if(s->verified)stream101_done(s,PO64_OK);
+ else s->state=NF101_PULL;
+ return PO64_OK;
+}
+enum po64_status nf101_cancel(struct nf101_stream *s,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
+ if(!stream101_ready(s))return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!stream101_owner(s,pid,handle,root,id))return PO64_DENIED;
+ if(s->state==NF101_DONE)return PO64_BUSY;
+ s->cancel=true;return PO64_OK;
+}
+enum po64_status nf101_result(struct nf101_stream *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t id,enum po64_status *result){
+ if(!stream101_ready(s)||!stream101_span(s,result,sizeof *result))return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!stream101_owner(s,pid,handle,root,id))return PO64_DENIED;
+ if(s->state!=NF101_DONE)return PO64_BUSY;
+ *result=s->status==PO64_OK&&!stream101_valid(s)?PO64_STALE:s->status;
+ stream101_clear(s);return PO64_OK;
+}
+static bool stream101_sink(void *ctx,uint64_t at,const uint8_t *p,size_t n){
+ struct nf101_stream *s=ctx;
+ if(!s->busy||s->state!=NF101_PULL||at<s->offset||at-s->offset!=s->buffered||
+    s->buffered>sizeof s->data||n>sizeof s->data-s->buffered)return false;
+ for(size_t i=0;i<n;++i)s->data[s->buffered+i]=p[i];
+ s->buffered+=n;return true;
+}
+bool nf101_pump(struct nf101_stream *s){
+ if(!stream101_ready(s)||s->busy||s->files->busy||s->state==NF101_IDLE)return false;
+ struct nf85_owner o;
+ bool live=owner(s->files,s->owner.pid,s->owner.handle,s->owner.root,false,&o)&&same(o,s->owner);
+ if(s->state==NF101_DONE){if(!live){stream101_clear(s);return true;}return false;}
+ bool valid=live&&stream101_valid(s);
+ bool selected=live&&owner(s->files,o.pid,o.handle,o.root,true,&o);
+ bool waiting=s->state==NF101_READY;
+ if(waiting&&s->idle<NF100_IDLE_LIMIT)++s->idle;
+ if(!valid||!selected||s->cancel||(waiting&&s->idle>=NF100_IDLE_LIMIT)){
+  if(s->reader.active&&po96_cancel(s->files->fs,&s->reader)!=PO64_CANCELLED)return false;
+  stream101_done(s,valid?PO64_CANCELLED:PO64_STALE);
+  if(!live)stream101_clear(s);
+  return true;
+ }
+ if(waiting)return false;
+ if(s->state==NF101_BEGIN){
+  if(s->files->fs->busy)return false;
+  s->busy=true;
+  enum po64_status rc=po96_begin(s->files->fs,principal(s->owner.pid),s->token,&s->reader);
+  s->busy=false;
+  if(rc!=PO64_OK){stream101_done(s,rc);return true;}
+  struct sfs64_map map;
+  if(!sfs64_map_decode(s->reader.manifest,s->reader.map_bytes,s->reader.layout.data_sectors,
+       s->reader.layout.data_start,&map)){
+   if(po96_cancel(s->files->fs,&s->reader)!=PO64_CANCELLED)return false;
+   stream101_done(s,PO64_CORRUPT);return true;
+  }
+  s->total=map.file.bytes;s->state=NF101_PULL;return true;
+ }
+ if(s->state==NF101_PULL){
+  bool done=false;s->busy=true;
+  enum po64_status rc=po96_step(s->files->fs,&s->reader,stream101_sink,s,&done);
+  s->busy=false;
+  if(rc!=PO64_OK){
+   if(s->reader.active&&po96_cancel(s->files->fs,&s->reader)!=PO64_CANCELLED)return false;
+   stream101_done(s,rc);return true;
+  }
+  if(s->offset>s->total||s->buffered>s->total-s->offset||
+     done!=(s->buffered==s->total-s->offset)||(!done&&!s->buffered)){
+   if(s->reader.active&&po96_cancel(s->files->fs,&s->reader)!=PO64_CANCELLED)return false;
+   stream101_done(s,PO64_CORRUPT);return true;
+  }
+  s->verified=done;s->idle=0;
+  if(done&&!s->buffered)stream101_done(s,PO64_OK);
+  else s->state=NF101_READY;
+  return true;
+ }
+ return false;
+}

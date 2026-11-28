@@ -146,4 +146,31 @@ enum po64_status nf100_finish(struct nf100_stream *,uint32_t,uint64_t,uint64_t,u
 enum po64_status nf100_cancel(struct nf100_stream *,uint32_t,uint64_t,uint64_t,uint64_t);
 enum po64_status nf100_result(struct nf100_stream *,uint32_t,uint64_t,uint64_t,uint64_t,enum po64_status *);
 bool nf100_pump(struct nf100_stream *);
+/* Stage 101: trusted incremental read transport, one exclusive cursor.
+ * Each delivered chunk is PROVISIONAL until final result PO64_OK.
+ * Receiver must discard all staged output on any other result. CRC is
+ * whole-file integrity, not authentication or per-chunk validation.
+ * No retained pointers; open/take/cancel/result perform no disk I/O.
+ * Only pump reads disk. Same 64-opportunity idle policy as stage 100.
+ * Supervisor must arbitrate against all other volume cursors. */
+enum nf101_state { NF101_IDLE,NF101_BEGIN,NF101_PULL,NF101_READY,NF101_DONE };
+struct nf101_stream {
+ struct nf85_service *files;
+ struct nf85_owner owner;
+ uint64_t serial,id,token,mount,total,offset;
+ size_t buffered;
+ unsigned idle;
+ enum nf101_state state;
+ enum po64_status status;
+ bool busy,cancel,verified;
+ struct pp96_reader reader;
+ uint8_t data[NF85_READ_MAX];
+};
+enum po64_status nf101_start(struct nf101_stream *,struct nf85_service *);
+enum po64_status nf101_open(struct nf101_stream *,uint32_t,uint64_t,uint64_t,uint64_t,uint64_t *);
+enum po64_status nf101_take(struct nf101_stream *,uint32_t,uint64_t,uint64_t,uint64_t,uint64_t,
+ uint8_t *,size_t,size_t *);
+enum po64_status nf101_cancel(struct nf101_stream *,uint32_t,uint64_t,uint64_t,uint64_t);
+enum po64_status nf101_result(struct nf101_stream *,uint32_t,uint64_t,uint64_t,uint64_t,enum po64_status *);
+bool nf101_pump(struct nf101_stream *);
 #endif
