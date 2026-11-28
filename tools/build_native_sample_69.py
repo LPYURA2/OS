@@ -125,7 +125,8 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
         poll103('write_result',0x13f);expect_count(0)
         call103(0x13f);status103(2)
         emit(b'\x48\x8b\x9e\x00\x02\x00\x00')
-        call103(0x137);status103(3)
+        # Reconciliation has removed the old grant before user resumes.
+        call103(0x137);status103(2)
         emit(b'\x31\xdb');call103(0x100,0x976332);status103(0)
     mark('poll')
     emit(b'\xb8\x02\x01\x00\x00\x31\xdb\xb9\x00\x01\x00\x12\xba\x40\x00\x00\x00\xcd\x80')

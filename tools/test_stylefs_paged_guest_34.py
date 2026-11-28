@@ -408,7 +408,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                         if file_probe103:
                             calls=[v for _,v in records(lines,b"STYLEOS FILE92 CALL",("pid","op","status","value")) if v["pid"]==pid_num]
                             actual=[(v["op"],v["status"]) for v in calls if v["status"]!=4]
-                            wanted=[(0x134,0),(0x137,0),(0x139,1)]+[(0x139,0)]*3+[(0x139,10),(0x13e,0),(0x13e,2),(0x138,0)]+[(0x13a,0)]*3+[(0x13b,0),(0x13f,0),(0x13f,2),(0x137,3)]
+                            wanted=[(0x134,0),(0x137,0),(0x139,1)]+[(0x139,0)]*3+[(0x139,10),(0x13e,0),(0x13e,2),(0x138,0)]+[(0x13a,0)]*3+[(0x13b,0),(0x13f,0),(0x13f,2),(0x137,2)]
                             require(actual==wanted,"stream probe exact syscall sequence")
                             require([v["value"] for v in calls if v["op"]==0x139 and v["status"]==0]==[4096,4096,1],"stream read byte counts")
                             require(all(v["value"]==0 for v in calls if v["op"] in (0x13e,0x13f) and v["status"]==0),"stream final result")
