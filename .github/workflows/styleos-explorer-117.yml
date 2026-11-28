@@ -1,7 +1,7 @@
 name: StyleOS Explorer volume wire 117
 on:
   push:
-    branches: [feature/styleos-explorer-117]
+    branches: [feature/styleos-explorer-117, feature/styleos-explorer-118]
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,6 +12,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Verify diagnostic packages fit existing native executable bounds
+        run: |
+          set -euo pipefail
+          mkdir -p build/explorer-118/probe92
+          PYTHONPATH=tools python3 -c 'from pathlib import Path; from build_native_sample_69 import build; build(Path("build/explorer-118/probe92"),file_probe_92=True)'
       - name: Actual mounted StyleFS metadata GCC and Clang
         run: |
           set -euo pipefail

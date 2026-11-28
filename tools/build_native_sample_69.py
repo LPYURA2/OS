@@ -73,9 +73,11 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
             expected_wire=expected_wire.ljust(296,b'\0')
             # Compare a fixed header/name with immediate byte checks; all
             # remaining bytes are zero (repe scasb on the private DATA).
-            end=40+len(name)
-            for i,value in enumerate(expected_wire[:end]):
-                emit(b'\x80\xbe'+struct.pack('<I',0x600+i)+bytes([value]))
+            # Compare whole 32-bit words including zero name padding; no
+            # skipped wire bytes. The rest is checked by repe scasb.
+            end=(40+len(name)+3)&~3
+            for i in range(0,end,4):
+                emit(b'\x81\xbe'+struct.pack('<I',0x600+i)+expected_wire[i:i+4])
                 jump(b'\x0f\x85','fail')
             emit(b'\xbf'+struct.pack('<I',0x12000600+end)+b'\xb9'+struct.pack('<I',296-end)+b'\x31\xc0\xfc\xf3\xae')
             jump(b'\x0f\x85','fail')
@@ -189,7 +191,7 @@ def make(folder,index,name,color,file_probe_92=False,file_probe_94=False,file_pr
     mark('fail');emit(b'\x0f\x0b')
     for off,target in fix:struct.pack_into('<i',code,off,labels[target]-(off+4))
     wide=file_probe_103 and index==1
-    assert len(code)<=4096
+    assert len(code)<=4096, f'{name}: code {len(code)} exceeds single-page limit'
     blob=bytearray(4096)+code
     if wide:
         blob.extend(bytes(12288-len(blob)))

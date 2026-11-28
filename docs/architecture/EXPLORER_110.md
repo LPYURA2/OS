@@ -71,3 +71,6 @@ Proposed implementation order:
 
 No runtime code changed in this intake stage. The next engineering increment
 is real scoped enumeration. Memory/idle CPU target is not measured here.
+
+## Owner requirement 28 November 2026 — protected update reserve
+The user-visible space reported by Explorer must exclude capacity reserved exclusively for system updates and rollback. See [UPDATE_RESERVE_118.md](UPDATE_RESERVE_118.md). This is distinct from retained StyleFS filesystem metadata/data extents and must not be simulated by subtracting an arbitrary number from the UI. The existing live profile exposes only a constrained block slice; do not claim full-disk capacity. No production reservation is implemented by this documentation change.
