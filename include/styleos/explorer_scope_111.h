@@ -18,5 +18,6 @@ enum po64_status ex111_open(struct ex111_scope *,struct po64_service *,const str
 enum po64_status ex111_row(struct ex111_scope *,uint32_t,uint64_t,uint64_t,uint64_t,struct po64_row *);
 enum po64_status ex111_enter(struct ex111_scope *,uint32_t,uint64_t,uint64_t,uint64_t);
 enum po64_status ex111_up(struct ex111_scope *,uint32_t,uint64_t,uint64_t);
+bool ex111_authorized(const struct ex111_scope *,uint32_t,uint64_t,uint64_t);
 void ex111_close(struct ex111_scope *);
 #endif

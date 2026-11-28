@@ -5,6 +5,10 @@
 #endif
 #ifdef STYLEOS_EXPLORER_111_TEST
 #include <styleos/explorer_scope_111.h>
+#ifdef STYLEOS_EXPLORER_112_TEST
+#include <styleos/explorer_queue_112.h>
+#include <styleos/explorer_v1.h>
+#endif
 #endif
 #include <assert.h>
 #include <stdio.h>
@@ -1003,6 +1007,37 @@ int main(void){
   assert(usr_select(&users,2)==USR_OK);
   assert(ex111_up(&scope,peer,32,131072)==PO64_OK);
   assert(ex111_up(&scope,peer,32,131072)==PO64_DENIED);
+#ifdef STYLEOS_EXPLORER_112_TEST
+  struct ex112_queue q={0};
+  struct sty_explorer_row decoded={0};
+  uint8_t packet[STY_EXPLORER_ROW_BYTES];
+  uint64_t req=0,prior=0;
+  assert(ex111_open(&q.scope,&service,&users,peer,32,131072,5)==PO64_OK);
+  unsigned nr=reads;
+  assert(ex112_submit(&q,peer,33,131072,STY_EX_ROW,0,&req)==PO64_DENIED&&!req);
+  assert(ex112_submit(&q,peer,32,131072,STY_EX_ROW,0,&req)==PO64_OK&&req);
+  assert(ex112_take(&q,peer,32,131072,req,packet,sizeof packet)==PO64_BUSY);
+  assert(reads==nr);
+  assert(ex112_pump(&q));
+  nr=reads;
+  assert(ex112_take(&q,peer,32,135168,req,packet,sizeof packet)==PO64_DENIED);
+  assert(ex112_take(&q,peer,32,131072,req,packet,sizeof packet)==PO64_OK);
+  assert(reads==nr&&sty_explorer_decode(packet,sizeof packet,&decoded)&&decoded.id==6&&decoded.kind==2);
+  prior=req;packet[295]=1;
+  assert(!sty_explorer_decode(packet,sizeof packet,&decoded)&&decoded.id==6);
+  assert(ex112_submit(&q,peer,32,131072,STY_EX_ENTER,0,&req)==PO64_OK&&req>prior);
+  assert(ex112_pump(&q)&&ex112_take(&q,peer,32,131072,req,0,0)==PO64_OK);
+  assert(ex112_submit(&q,peer,32,131072,STY_EX_ROW,0,&req)==PO64_OK);
+  assert(ex112_pump(&q));
+  assert(usr_lock(&users)==USR_OK);
+  assert(ex112_take(&q,peer,32,131072,req,packet,sizeof packet)==PO64_DENIED);
+  assert(usr_select(&users,2)==USR_OK);
+  assert(ex112_take(&q,peer,32,131072,req,packet,sizeof packet)==PO64_OK);
+  assert(sty_explorer_decode(packet,sizeof packet,&decoded)&&decoded.id==2&&decoded.bytes==513&&decoded.revision==2);
+  ex112_discard(&q);
+  assert(!q.scope.active&&!q.id&&q.serial==req);
+  puts("EXPLORER112 deferred actual rows, SDK wire, identity and retirement PASS");
+#endif
   assert(writes==initial_writes);
   assert(po64_create_empty(&service,snap,&(struct sd64_key){.parent=5,.length=1,.name={'x'}},7)==PO64_OK);
   assert(ex111_row(&scope,peer,32,131072,0,&actual)==PO64_STALE);

@@ -18,6 +18,12 @@ static bool separated(const void *a,size_t n,const void *b,size_t m){
  return a&&b&&n<=UINTPTR_MAX-x&&m<=UINTPTR_MAX-y&&(x+n<=y||y+m<=x);
 }
 void ex111_close(struct ex111_scope *s){if(s)*s=(struct ex111_scope){0};}
+bool ex111_authorized(const struct ex111_scope *s,uint32_t pid,uint64_t handle,uint64_t root){
+ uint32_t session=0;
+ return s&&s->active&&s->fs&&s->depth&&s->depth<=EX111_DEPTH&&
+  identity(s->users,pid,handle,root,&session)&&pid==s->owner.pid&&
+  handle==s->owner.handle&&root==s->owner.root&&session==s->owner.session;
+}
 static enum po64_status check(struct ex111_scope *s,uint32_t pid,uint64_t handle,uint64_t root){
  if(!s||!s->active||!s->fs||!s->users||!s->depth||s->depth>EX111_DEPTH)return PO64_INVALID;
  uint32_t session=0;
