@@ -18,6 +18,7 @@ struct po64_service {
  struct dc64_node *nodes;size_t node_cap;
  struct sfs64_run *runs,*previous;size_t run_cap;
  struct po64_handle handles[PO64_HANDLES];
+ struct pp96_reader *reader;
 };
 enum po64_status po64_mount(struct po64_service *,struct bs_service *,const struct pp64_layout *,
  struct pp64_stream_workspace *,struct dc64_node *,size_t,struct sfs64_run *,size_t);
@@ -40,6 +41,15 @@ enum po64_status po64_revoke_owner(struct po64_service *,uint64_t principal);
 /* Sink receives provisional bytes; publish destination only on PO64_OK.
  * Kernel callback must not mutate trusted storage or reenter broker. */
 enum po64_status po64_read(struct po64_service *,uint64_t principal,uint64_t token,pp64_sink,void *);
+/* Resumable trusted object read. Holds exclusive service busy state
+ * between steps (ordinary mount/metadata/write/revoke calls refuse).
+ * Exact cursor is bound to service, no caller callbacks retained.
+ * Metadata begin is synchronous; only data phase has a sector budget.
+ * Supervisor must cancel on abandonment. No user ABI or concurrent
+ * access to the borrowed block layout. */
+enum po64_status po96_begin(struct po64_service *,uint64_t,uint64_t,struct pp96_reader *);
+enum po64_status po96_step(struct po64_service *,struct pp96_reader *,pp64_sink,void *,bool *);
+enum po64_status po96_cancel(struct po64_service *,struct pp96_reader *);
 /* Replace authorized exact revision. A durable commit revokes ALL old
  * handles; supervisor reauthorizes against the new snapshot. Cancellation
  * retains old handles only if the exact committed snapshot revalidates.

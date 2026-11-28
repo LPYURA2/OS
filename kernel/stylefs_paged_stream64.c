@@ -236,6 +236,69 @@ enum pp64_status pp64_get(struct bs_service *b,const struct pp64_layout *l,struc
  return ~sum==map.file.checksum?PP64_OK:PP64_CORRUPT;
 }
 
+static void pp96_wipe(void *p,size_t n){
+ volatile uint8_t *v=p;while(n--)*v++=0;
+}
+enum pp64_status pp96_begin(struct pp96_reader *r,struct bs_service *b,const struct pp64_layout *l,
+ struct pp64_stream_workspace *w,struct dc64_node *a,size_t cap,struct sfs64_run *runs,size_t rcap,
+ uint64_t expected,const struct sd64_key *key,uint64_t id,uint64_t rev){
+ if(!r||r->active||r->busy||!args(b,l,w,a,cap,runs,rcap,key)||!expected||id<=1||!rev||
+    !sep(r,sizeof *r,b,sizeof *b)||!sep(r,sizeof *r,l,sizeof *l)||!sep(r,sizeof *r,w,sizeof *w)||
+    !sep(r,sizeof *r,a,cap*sizeof *a)||!sep(r,sizeof *r,runs,rcap*sizeof *runs)||
+    !sep(r,sizeof *r,key,sizeof *key))return PP64_INVALID;
+ struct pp64_pair pair;
+ enum pp64_status rc=pp64_mount(b,l,&w->pair,a,cap,runs,rcap,&pair);
+ if(rc!=PP64_OK)return rc;
+ if(pair.sequence!=expected)return PP64_INVALID;
+ rc=check_key(b,l,w,key,id,rev);if(rc!=PP64_OK)return rc;
+ size_t len=0;
+ enum ip64_status ir=ip64_export(b,l->owner,l->inode,&w->pair.inode.root,id,&w->source,&len);
+ if(ir!=IP64_OK)return ip(ir);
+ struct sfs64_map map;
+ if(len>sizeof r->manifest||!sfs64_map_decode(w->source.map,len,l->data_sectors,l->data_start,&map)||
+    map.file.id!=id||map.file.revision!=rev)return PP64_CORRUPT;
+ pp96_wipe(r,sizeof *r);r->block=b;r->layout=*l;r->map_bytes=len;r->crc=UINT32_MAX;
+ for(size_t i=0;i<len;++i)r->manifest[i]=w->source.map[i];
+ r->active=true;return PP64_OK;
+}
+enum pp64_status pp96_cancel(struct pp96_reader *r){
+ if(!r||!r->active||r->busy)return PP64_INVALID;
+ pp96_wipe(r,sizeof *r);return PP64_CANCELLED;
+}
+enum pp64_status pp96_step(struct pp96_reader *r,pp64_sink sink,void *ctx,bool *done){
+ if(!r||!r->active||r->busy||!sink||!sep(done,sizeof *done,r,sizeof *r)||
+    !sep(done,sizeof *done,r->block,sizeof *r->block))return PP64_INVALID;
+ r->busy=true;
+ struct sfs64_map map;
+ enum pp64_status rc=PP64_OK;
+ uint8_t part[BS_SECTOR_BYTES];
+ if(r->map_bytes>sizeof r->manifest||
+    !sfs64_map_decode(r->manifest,r->map_bytes,r->layout.data_sectors,r->layout.data_start,&map)||
+    r->offset>map.file.bytes){rc=PP64_CORRUPT;goto finish;}
+ for(unsigned budget=0;budget<PP96_STEP_SECTORS&&r->offset<map.file.bytes;++budget){
+  uint64_t left=map.file.bytes-r->offset,local=0;
+  size_t wanted=left>sizeof part?sizeof part:(size_t)left,take=0,got=0;
+  struct sfs_extent64 extent;
+  if(!sfs64_map_chunk(&map,r->offset,wanted,&extent,&local,&take)||local%BS_SECTOR_BYTES){
+   rc=PP64_CORRUPT;goto finish;
+  }
+  if(sfs64_read_window(r->block,r->layout.owner,r->layout.data,extent,local,part,take,&got)!=BS_OK||got!=take){
+   rc=PP64_IO;goto finish;
+  }
+  r->crc=digest(r->crc,part,take);
+  if(!sink(ctx,r->offset,part,take)){rc=PP64_CANCELLED;goto finish;}
+  r->offset+=take;
+ }
+ if(r->offset<map.file.bytes){
+  pp96_wipe(part,sizeof part);r->busy=false;*done=false;return PP64_OK;
+ }
+ if(~r->crc!=map.file.checksum)rc=PP64_CORRUPT;
+finish:
+ pp96_wipe(part,sizeof part);pp96_wipe(r,sizeof *r);
+ if(rc==PP64_OK)*done=true;
+ return rc;
+}
+
 struct omit {
  struct bs_service *b;const struct pp64_layout *l;struct pp64_stream_workspace *w;
  const struct dc64_node *nodes;size_t count,at;uint64_t id;

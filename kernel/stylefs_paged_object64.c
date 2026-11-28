@@ -17,7 +17,7 @@ static enum po64_status status(enum pp64_status rc){
 static void forget(struct po64_service *s){
  for(unsigned i=0;i<PO64_HANDLES;i++)s->handles[i]=(struct po64_handle){0};
 }
-static void clear(struct po64_service *s){forget(s);s->active=false;}
+static void clear(struct po64_service *s){forget(s);s->reader=0;s->active=false;}
 static bool mode(struct bs_service *b,const struct pp64_layout *l,bool write){
  const uint64_t tokens[]={l->receipt,l->dir,l->inode,l->data};
  for(unsigned i=0;i<4;i++){
@@ -139,6 +139,42 @@ enum po64_status po64_read(struct po64_service *s,uint64_t principal,uint64_t to
  s->busy=false;
  rc=status(pr);
  if(rc!=PO64_OK&&rc!=PO64_CANCELLED)clear(s);
+ return rc;
+}
+
+enum po64_status po96_begin(struct po64_service *s,uint64_t principal,uint64_t token,struct pp96_reader *r){
+ if(!s||!principal||!token||!r)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ if(!span(s,r,sizeof *r)||r->active||r->busy)return PO64_INVALID;
+ struct po64_handle *h=find(s,principal,token);
+ if(!h||!(h->rights&PO64_READ))return PO64_DENIED;
+ enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
+ struct po64_handle copy=*h;
+ enum pp64_status pr=pp96_begin(r,s->block,&s->layout,s->work,s->nodes,s->node_cap,
+    s->runs,s->run_cap,s->pair.sequence,&copy.key,copy.id,copy.revision);
+ rc=status(pr);
+ if(rc!=PO64_OK){clear(s);return rc;}
+ s->reader=r;s->busy=true;return PO64_OK;
+}
+enum po64_status po96_step(struct po64_service *s,struct pp96_reader *r,pp64_sink sink,void *ctx,bool *done){
+ if(!s||!r||!sink||!done)return PO64_INVALID;
+ if(!s->active||!s->busy||s->reader!=r)return PO64_DENIED;
+ if(r->busy)return PO64_BUSY;
+ if(!span(s,done,sizeof *done)||!sep(done,sizeof *done,r,sizeof *r))return PO64_INVALID;
+ enum po64_status rc=status(pp96_step(r,sink,ctx,done));
+ if(!r->active){
+  s->reader=0;s->busy=false;
+  if(rc!=PO64_OK&&rc!=PO64_CANCELLED)clear(s);
+ }
+ return rc;
+}
+enum po64_status po96_cancel(struct po64_service *s,struct pp96_reader *r){
+ if(!s||!r)return PO64_INVALID;
+ if(!s->active||!s->busy||s->reader!=r)return PO64_DENIED;
+ if(r->busy)return PO64_BUSY;
+ enum po64_status rc=status(pp96_cancel(r));
+ if(rc==PO64_CANCELLED){s->reader=0;s->busy=false;}
  return rc;
 }
 

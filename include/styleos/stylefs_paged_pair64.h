@@ -61,6 +61,24 @@ enum pp64_status pp64_put(struct bs_service *,const struct pp64_layout *,struct 
 enum pp64_status pp64_get(struct bs_service *,const struct pp64_layout *,struct pp64_stream_workspace *,
  struct dc64_node *,size_t node_cap,struct sfs64_run *,size_t run_cap,
  uint64_t expected,const struct sd64_key *,uint64_t id,uint64_t revision,pp64_sink,void *);
+/* Stage 96: resumable trusted read, exclusive stable volume for the
+ * entire cursor lifetime. Begin still performs synchronous metadata
+ * validation. Step performs at most eight data-sector reads; each sink
+ * fragment is provisional until done=true and PP64_OK. No persistent
+ * callback or user pointer. Zero initialize once, cancel on abandonment.
+ * Never copy a live cursor or allow a competing writer/remount. */
+enum { PP96_STEP_SECTORS=8 };
+struct pp96_reader {
+ struct bs_service *block;struct pp64_layout layout;
+ uint64_t offset;size_t map_bytes;uint32_t crc;
+ bool active,busy;
+ uint8_t manifest[IP64_MAP_MAX];
+};
+enum pp64_status pp96_begin(struct pp96_reader *,struct bs_service *,const struct pp64_layout *,
+ struct pp64_stream_workspace *,struct dc64_node *,size_t,struct sfs64_run *,size_t,
+ uint64_t,const struct sd64_key *,uint64_t,uint64_t);
+enum pp64_status pp96_step(struct pp96_reader *,pp64_sink,void *,bool *done);
+enum pp64_status pp96_cancel(struct pp96_reader *);
 /* Same-volume copy into a new unused key and lifetime-unique ID.
  * Verify source CRC before publishing destination; source unchanged.
  * No reflink, overwrite, user callbacks or whole-file allocation. */

@@ -12,8 +12,8 @@ static struct pp64_stream_workspace w;
 static struct dc64_node nodes[128];
 static struct sfs64_run current[128],previous[128];
 static struct pp64_pair pair;
-static unsigned writes,fail;
-static bool rd(void *c,uint64_t n,uint8_t *p){(void)c;if(n>=N)return false;memcpy(p,disk[n],512);return true;}
+static unsigned writes,fail,reads;
+static bool rd(void *c,uint64_t n,uint8_t *p){(void)c;if(n>=N)return false;++reads;memcpy(p,disk[n],512);return true;}
 static bool wr(void *c,uint64_t n,const uint8_t *p){(void)c;assert(n<N);if(++writes==fail)return false;memcpy(disk[n],p,512);return true;}
 static bool fl(void *c){(void)c;memcpy(durable,disk,sizeof disk);return true;}
 static void attach(void){
@@ -212,6 +212,62 @@ static bool stream_probe_source(void *ctx,uint64_t at,uint8_t *p,size_t n){
  for(size_t i=0;i<n;++i)p[i]=byte(v->seed,at+i);
  v->seen+=n;++v->calls;return true;
 }
+#ifdef STYLEOS_NATIVE_FILE_96_TEST
+static struct pp96_reader cursor96;
+static bool sink96(void *ctx,uint64_t at,const uint8_t *p,size_t n){
+ assert(po96_cancel(&service,&cursor96)==PO64_BUSY);
+ assert(po64_unmount(&service)==PO64_BUSY);
+ return sink(ctx,at,p,n);
+}
+static void clean96(void){
+ const uint8_t *p=(const void *)&cursor96;
+ for(size_t i=0;i<sizeof cursor96;++i)assert(!p[i]);
+ assert(!service.busy&&!service.reader);
+}
+static void read96(void){
+ const uint64_t bytes=SFS64_WINDOW_BYTES+17;
+ struct sd64_key a=key('a'),h=key('h');
+ uint64_t grant=0,empty=0;unsigned before=writes;
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_grant(&service,888,&a,4,4,&grant)==PO64_OK);
+ assert(po64_grant(&service,888,&h,5,1,&empty)==PO64_OK);
+ assert(po96_begin(&service,889,grant,&cursor96)==PO64_DENIED);
+ assert(po96_begin(&service,888,grant,&cursor96)==PO64_OK);
+ struct pp96_reader other={0};bool done=true;
+ struct pattern v={123,UINT64_MAX,0};
+ assert(po96_step(&service,&other,sink96,&v,&done)==PO64_DENIED);
+ assert(po64_revoke(&service,888,grant)==PO64_BUSY);
+ unsigned start=reads;
+ assert(po96_step(&service,&cursor96,sink96,&v,&done)==PO64_OK&&!done);
+ assert(reads-start==8&&v.seen==4096);
+ assert(po96_cancel(&service,&cursor96)==PO64_CANCELLED);clean96();
+ assert(po96_begin(&service,888,grant,&cursor96)==PO64_OK);
+ v.seen=0;unsigned steps=0;
+ do{
+  start=reads;
+  assert(po96_step(&service,&cursor96,sink96,&v,&done)==PO64_OK);
+  assert(reads-start>0&&reads-start<=PP96_STEP_SECTORS);
+  ++steps;
+ }while(!done);
+ assert(steps==9&&v.seen==bytes&&writes==before);clean96();
+ assert(po96_begin(&service,888,empty,&cursor96)==PO64_OK);
+ start=reads;v.seen=0;done=false;
+ assert(po96_step(&service,&cursor96,sink96,&v,&done)==PO64_OK&&done&&!v.seen&&reads==start);clean96();
+ assert(po96_begin(&service,888,grant,&cursor96)==PO64_OK);
+ done=true;start=reads;
+ assert(po96_step(&service,&cursor96,cancel,0,&done)==PO64_CANCELLED&&done&&reads-start==1);clean96();
+ assert(po96_begin(&service,888,grant,&cursor96)==PO64_OK);
+ struct sfs64_map map;struct sfs_extent64 extent;uint64_t local;size_t take;
+ assert(sfs64_map_decode(cursor96.manifest,cursor96.map_bytes,l.data_sectors,l.data_start,&map));
+ assert(sfs64_map_chunk(&map,0,1,&extent,&local,&take));
+ disk[2+D+I+extent.first][0]^=1;
+ enum po64_status rc;done=false;
+ do{start=reads;rc=po96_step(&service,&cursor96,accept,0,&done);assert(reads-start<=8);}while(rc==PO64_OK&&!done);
+ assert(rc==PO64_CORRUPT&&!done&&!service.active&&writes==before);clean96();
+ reopen();check('a',4,4,bytes,123);
+ puts("Native file 96: resumable 8-sector data read, exclusive cursor, cancel and CRC rejection PASS");
+}
+#endif
 static void native_file87(void){
  assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
  uint32_t pid=0;
@@ -250,6 +306,9 @@ static void native_file87(void){
  assert(nf85_close(&nf,pid,64,262144,token)==PO64_OK);
  assert(po64_unmount(&service)==PO64_OK);
  puts("Native file 87: 64-bit offsets, 4KiB chunks, multi-window streaming, cancellation and durable reopen PASS");
+#ifdef STYLEOS_NATIVE_FILE_96_TEST
+ read96();
+#endif
 }
 #ifdef STYLEOS_NATIVE_FILE_89_TEST
 static struct nf89_queue queue;
