@@ -1,4 +1,7 @@
 #include <styleos/stylefs_paged_object64.h>
+#ifdef STYLEOS_NATIVE_FILE_85_TEST
+#include <styleos/native_file_85.h>
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -73,6 +76,56 @@ static bool write_source(void *ctx,uint64_t at,uint8_t *p,size_t n){
  assert(po64_unmount(&service)==PO64_BUSY);
  return source(ctx,at,p,n);
 }
+#ifdef STYLEOS_NATIVE_FILE_85_TEST
+static struct nf85_service nf;
+static struct pr_table procs;
+static struct ws_service wins;
+static struct usr_runtime users;
+static void native_file85(void){
+ pr_init(&procs);ws_init(&wins);
+ assert(usr_init(&users,&procs,&wins)==USR_OK);
+ uint32_t a=0,z=0,pid=0,peer=0;
+ assert(usr_create(&users,111,&a)==USR_OK&&usr_create(&users,222,&z)==USR_OK);
+ assert(usr_select(&users,a)==USR_OK);
+ struct pr_admission spec={PR_NATIVE_USER,0,16,65536,4096,"Editor"};
+ assert(pr_admit(&procs,&spec,&pid)==PR_OK&&usr_bind(&users,a,pid,16)==USR_OK);
+ spec.scheduler_handle=32;spec.page_root=131072;
+ assert(pr_admit(&procs,&spec,&peer)==PR_OK&&usr_bind(&users,z,peer,32)==USR_OK);
+ assert(nf85_start(&nf,&service,&users)==PO64_OK);
+ struct sd64_key k=key('a');uint64_t grant=0,other=0;
+ unsigned before=writes;
+ assert(nf85_grant_read(&nf,pid,17,65536,&k,2,1,&grant)==PO64_DENIED&&!grant);
+ assert(nf85_grant_read(&nf,pid,16,65536,&k,3,1,&grant)==PO64_DENIED&&!grant);
+ assert(nf85_grant_read(&nf,pid,16,65536,&k,2,1,&grant)==PO64_OK&&grant);
+ uint8_t data[514];memset(data,0x5a,sizeof data);size_t n=999;
+ assert(nf85_read(&nf,pid,16,65536,grant,data,512,&n)==PO64_FULL&&n==999);
+ for(unsigned i=0;i<sizeof data;++i)assert(data[i]==0x5a);
+ assert(nf85_read(&nf,pid,16,69632,grant,data,513,&n)==PO64_DENIED&&n==999);
+ assert(nf85_read(&nf,pid,16,65536,grant,data,513,&n)==PO64_OK&&n==513);
+ for(unsigned i=0;i<513;++i)assert(data[i]==byte(31,i));
+ assert(data[513]==0x5a);
+ for(unsigned i=0;i<NF85_READ_MAX;++i)assert(nf.scratch[i]==0);
+ assert(usr_lock(&users)==USR_OK);
+ assert(nf85_read(&nf,pid,16,65536,grant,data,513,&n)==PO64_DENIED);
+ assert(nf85_reconcile(&nf)==0);
+ assert(usr_select(&users,z)==USR_OK);
+ assert(nf85_read(&nf,peer,32,131072,grant,data,513,&n)==PO64_DENIED);
+ k=key('b');
+ assert(nf85_grant_read(&nf,peer,32,131072,&k,3,1,&other)==PO64_OK&&other!=grant);
+ assert(nf85_read(&nf,peer,32,131072,other,data,513,&n)==PO64_OK&&n==513);
+ for(unsigned i=0;i<513;++i)assert(data[i]==byte(44,i));
+ assert(nf85_close(&nf,peer,32,131072,grant)==PO64_DENIED);
+ assert(nf85_close(&nf,peer,32,131072,other)==PO64_OK);
+ assert(nf85_read(&nf,peer,32,131072,other,data,513,&n)==PO64_DENIED);
+ assert(usr_select(&users,a)==USR_OK);
+ assert(nf85_read(&nf,pid,16,65536,grant,data,513,&n)==PO64_OK);
+ assert(pr_transition(&procs,pid,16,PR_FAULTED)==PR_OK);
+ assert(nf85_reconcile(&nf)==1&&nf85_reconcile(&nf)==0);
+ assert(po64_read(&service,UINT64_C(0x8000000000000000)|pid,grant,accept,0)==PO64_DENIED);
+ assert(writes==before);
+ puts("Native file 85: real StyleFS object, owner/session, bounded read and cleanup PASS");
+}
+#endif
 int main(void){
  attach();assert(dc64_provision(&b,7,l.dir,D)==DC64_OK);
  assert(ir64_provision(&b,7,l.inode,I,F,1)==IP64_OK);
@@ -83,6 +136,9 @@ int main(void){
  assert(po64_mount(&service,&b,&l,&w,nodes,128,current,128)==PO64_DENIED);
  read_only();unsigned before=writes;
  assert(po64_mount(&service,&b,&l,&w,nodes,128,current,128)==PO64_OK);
+#ifdef STYLEOS_NATIVE_FILE_85_TEST
+ native_file85();
+#endif
  struct sd64_key a=key('a'),k=key('b');uint64_t other=0;
  assert(po64_grant(&service,10,&a,3,1,&token)==PO64_DENIED);
  assert(po64_grant(&service,10,&a,2,2,&token)==PO64_STALE);
