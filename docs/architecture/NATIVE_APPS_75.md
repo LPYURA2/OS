@@ -39,3 +39,38 @@ Prior context SHA 7549cc15141de4bef2be2f078694848d4905b533 CI 46070271923 13/13 
 
 ## 75 implementation 7 — fix actual mixed-size shell boundary failure
 CI 46071121795 expanded guest failed after all three real processes were admitted: 7 + 7 + 3 pages, followed by STYLEOS S850 FAIL native-shell-boundary. Evidence artifact 15232064303. The historical quiescent check still assumed 3 pages per process; snapshot likewise refused any resident_bytes != 12288. Replace both with exact per-slot extent/lease/generation/root/registry accounting, validate arena once at shell boundary and compare actual allocation descriptors; no repeated arena scan per row. Keep full independent frozen PTE audit at process snapshot and scheduling. New guest assertion uses real supervisor process API before dispatch and requires 28672, 28672, 12288 bytes and flags 3 (raw ticks and leased memory, not CPU percent). Prior 26b67f6 CI 46070659241 SUCCESS. No old test loosened. Fresh guest CI required; no claim of successful expanded execution yet. After proof proceed to forced-stop and IPC/SDK, not app UI.
+
+## Guest preemption acceptance
+
+At `aae0b0b9a72bba2d57fabb240c1ae5aee7a52750`, CI and a local replay
+both admitted two seven-page processes and a three-page legacy peer. In the
+failed CI trace the expanded apps ran their three-million-iteration loops and
+issued `INT 0x80` at `0x1000104b` in separate CR3s. UART recorded
+4,558,037 and 4,620,247 remaining LAPIC counts out of 5,000,000 at those
+yields. The trace contained six CPL3 traps and zero timer interrupts.
+[Original run and logs](https://github.com/LPYURA2/OS/actions/runs/46071448950/artifacts/15232488939)
+
+The explicitly pinned catalog admits `wide75`, `fault75` and `peer75` from
+the external disk. The programs now wait in CPL3 on private zero-initialized
+bytes. The expanded programs keep different markers in data page three and
+different stack values in page two across interrupts and yield. The harness
+waits for at least two real timer events at the wait-loop instructions of
+**each** process, then sends a second F9 through the desktop. On the safe
+root the test provider checks all three admission identities, the scheduler's
+tick counts and the three owned data spans before releasing any byte. The
+ordinary scheduler and LAPIC programming supply every timer interrupt.
+
+The verifier compares the ordered UART frames with QEMU's CPL3 trace,
+including CR3, PC, stack, vector, origin, RAX and flags. It requires the
+LAPIC retirement readbacks, another root running between slices, yield,
+the exact intended fault PC, a surviving legacy peer running after the fault,
+zero leased pages and zero disk writes. A missing timer event fails even if
+the terminal states look correct. The polling loops belong only to these
+CPU-bound acceptance workloads.
+
+Reproduce on QEMU 8.2.2 with `python3 tools/test_native_expanded_75_guest.py
+--output build/native-expanded-75` (use a new output directory). The
+`native-expanded-75-guest` artifact holds the UART, CPU trace, programs and
+result. The `native-expanded-75-boot-kit` artifact contains the matching ISO,
+external `expanded.raw` disk and image hashes. The ordinary desktop ISO is
+published separately. These results cover x86-64 QEMU with one vCPU and 128 MiB.

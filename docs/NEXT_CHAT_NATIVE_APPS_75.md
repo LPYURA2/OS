@@ -1,4 +1,36 @@
 # Continuation — Native applications 75
+
+## Current checkpoint — expanded CPL3 preemption
+
+Continue on `feature/styleos-native-apps-75`. The prior Work commit
+`5e3df1552019c7f5d0ae778e323fffb8db30dc3b` is in this branch's history.
+Work resumed from `aae0b0b9a72bba2d57fabb240c1ae5aee7a52750` with a clean
+checkout. The original failure reproduced locally and the failed CI evidence
+identified both fixed instruction loops finishing before the first LAPIC IRQ.
+[Failed run](https://github.com/LPYURA2/OS/actions/runs/46071448950) ·
+[Original guest evidence](https://github.com/LPYURA2/OS/actions/runs/46071448950/artifacts/15232488939)
+
+The diagnostic guest now requires two timer preemptions **per process** while
+two expanded apps and their legacy peer are all runnable. Two local QEMU 8.2.2
+boots each matched 18 CPL3 traps between QEMU and UART, including 4/3/2 IRQs in
+their wait loops. The peer ran after the isolated fault. All 17 leased app
+pages were released and the data disk received zero writes. See the
+[acceptance design](architecture/NATIVE_APPS_75.md#guest-preemption-acceptance)
+and [branch CI](https://github.com/LPYURA2/OS/actions/workflows/styleos-native-tea-launch-69.yml?query=branch%3Afeature%2Fstyleos-native-apps-75).
+The ordinary ISO and the diagnostic ISO with its external data disk are
+separate artifacts.
+
+**Next implementation.** Exercise forced termination of a multi-page process
+with the surviving peer still running. Exercise the real window IPC syscall
+with a buffer crossing two mapped private pages and a range crossing the end
+of the mapping. Verify queue contents, isolation and lease reclamation.
+Then continue the versioned package/SDK and graphics/file APIs. Develop and
+verify real standalone apps before installing them as system programs. Extend
+Deep Drop to future SDK clients after that integration. Whole-guest idle RAM
+and the 1 GiB target remain open measurements.
+
+## Earlier checkpoints, in chronological order
+
 Repository LPYURA2/OS, branch feature/styleos-native-apps-75. Base d549606395a0efc9a8146ea702a6c73886d65cf2 (documentation only over accepted code/test SHA cb30e3f91bf4dbfed6f0fb3c9477b9981283afbb, CI 46067891027 12/12 SUCCESS). Read AGENTS.md, docs/PROJECT.md, docs/architecture/NATIVE_APPS_75.md, NATIVE_APPS_TEA.md, DEEP_DROP_APP_CONTRACT.md, PERFORMANCE_ACCEPTANCE.md, docs/design/APPROVED_UI_REFERENCES.md and master plan https://github.com/LPYURA2/OS/blob/6550bde44df1eda3edf5627cb9553dc2c12f0628/docs/STYLEOS_MASTER_PLAN.md. Verify latest branch and CI. Stage 75 is the start of real native app infrastructure, not completed. Implement bounded runtime/SDK foundations, then real standalone Editor/Notes and other apps. Deep Drop base closed; full extension after apps, including future installed apps through common SDK. Preserve existing appearance, prior accepted code, main, and all regressions.
  
 ## Separate handoff for Astra / Work

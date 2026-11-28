@@ -8,7 +8,7 @@ import shutil
 import struct
 import subprocess
 import sys
-from collections import Counter
+from typing import NamedTuple
 from test_deep_drop_guest import Desktop, Run, firmware_path, digest, records, complete_lines, CONTROLLER, DEVICE
 from make_desktop_data import provision
 from irq_trace_accept_859 import HEADER
@@ -20,6 +20,26 @@ STACK=0x11000000
 P=4096
 EVENT=b'STYLEOS NATIVE EVENT'
 KEYS=('slot','pid','root','vector','error','rip','sp','flags','rax','state')
+ADMIT=b'STYLEOS WIDE75 ADMIT'
+LEGACY=b'STYLEOS NATIVE ADMIT'
+RELEASE=b'STYLEOS WIDE75 RELEASE'
+IRQ=b'STYLEOS NATIVE IRQ-RETIRE'
+IRQ_KEYS=('slot','root','initial','current','lvt','isr','irr')
+MIN_SLICES=2
+
+class Sites(NamedTuple):
+    wait: tuple
+    yielded: int
+    terminal: int
+
+if not __debug__:
+    raise RuntimeError('guest acceptance requires Python assertions')
+
+def wait_for_release(code,base,offset):
+    """PAUSE; CMP byte [RSI+offset],0; JE back to PAUSE."""
+    start=base+len(code)
+    code.extend(b'\xf3\x90\x80\xbe'+struct.pack('<I',offset)+b'\0\x74\xf5')
+    return (start,start+2,start+9)
 
 def elf(code,wide):
     if wide:
@@ -42,31 +62,45 @@ def payload(fault):
     def emit(b):code.extend(b)
     def fail_if_ne():emit(b'\x0f\x85');fix.append(len(code));emit(bytes(4))
     # Read initialized data in page 2, check zero BSS in page 3, write
-    # distinct marker there. Push/pop really uses the second stack page.
+    # distinct marker there and keep a private value on the second stack page.
     emit(b'\xbe'+struct.pack('<I',DATA+P))
     emit(b'\x48\x81\x3e\x78\x56\x34\x12');fail_if_ne()
     emit(b'\x48\x83\xbe\x00\x10\x00\x00\x00');fail_if_ne()
-    emit(b'\x48\xc7\x86\x00\x10\x00\x00\x67\x45\x23\x01')
-    emit(b'\x68\x21\x43\x65\x07\x5b\x81\xfb\x21\x43\x65\x07');fail_if_ne()
-    # Cross at least one real LAPIC time slice. No synthetic host event.
-    emit(b'\xb9'+struct.pack('<I',3000000)+b'\xff\xc9\x75\xfc')
+    marker=struct.pack('<I',0x1234567+int(fault))
+    sentinel=struct.pack('<I',0x7654321+int(fault))
+    emit(b'\x48\xc7\x86\x00\x10\x00\x00'+marker)
+    emit(b'\x68'+sentinel)
+    wait=wait_for_release(code,CODE+P,P+8)
     emit(b'\xb8\x01\x00\x00\x00\xcd\x80')
     yield_pc=CODE+P+len(code)
     emit(b'\x85\xc0');fail_if_ne()
-    emit(b'\x48\x81\xbe\x00\x10\x00\x00\x67\x45\x23\x01');fail_if_ne()
+    emit(b'\x5b\x81\xfb'+sentinel);fail_if_ne()
+    emit(b'\x48\x81\xbe\x00\x10\x00\x00'+marker);fail_if_ne()
     if fault:
         terminal=CODE+P+len(code);emit(b'\x0f\x0b')
     else:
         emit(b'\xb8\x02\x00\x00\x00\xcd\x80');terminal=CODE+P+len(code)
     failure=len(code);emit(b'\x0f\x0b')
     for off in fix:struct.pack_into('<i',code,off,failure-off-4)
-    return elf(code,True),yield_pc,terminal
+    return elf(code,True),Sites(wait,yield_pc,terminal)
+
+def legacy_payload():
+    call_yield=b'\xb8\x01\0\0\0\xcd\x80'
+    code=bytearray(call_yield)
+    first_yield=CODE+len(code)
+    code.extend(b'\xbe'+struct.pack('<I',DATA))
+    wait=wait_for_release(code,CODE,8)
+    # Remain runnable while both expanded apps exercise their terminal paths.
+    code.extend(call_yield*3+b'\xb8\x02\0\0\0\xcd\x80')
+    terminal=CODE+len(code)
+    code.extend(b'\x0f\x0b')
+    return elf(code,False),Sites(wait,first_yield,terminal)
 
 def prepare(out):
     disk=out/'expanded.raw'
     provision(disk)
-    good,yg,eg=payload(False);bad,yb,eb=payload(True)
-    peer=elf(b'\xb8\x01\0\0\0\xcd\x80\xb9'+struct.pack('<I',3000000)+b'\xff\xc9\x75\xfc\xb8\x02\0\0\0\xcd\x80\x0f\x0b',False)
+    good,good_sites=payload(False);bad,bad_sites=payload(True)
+    peer,peer_sites=legacy_payload()
     catalog=bytearray(2048)
     struct.pack_into('<8sII',catalog,0,b'STYLNAT1',1,3)
     with disk.open('r+b') as f:
@@ -76,24 +110,57 @@ def prepare(out):
             f.seek(lba*512);f.write(blob)
             (out/(name+'.elf')).write_bytes(blob)
         f.seek(3000*512);f.write(catalog)
-    return disk,hashlib.sha256(catalog).hexdigest(),(yg,eg,yb,eb)
+    return disk,hashlib.sha256(catalog).hexdigest(),(good_sites,bad_sites,peer_sites)
 
-def verify(trace,events,apps,pcs):
-    yg,eg,yb,eb=pcs
-    wide, fault=apps
-    roots=[wide['root'],fault['root']]
-    assert len(set(roots))==2
-    for app,y,terminal,v,state in ((wide,yg,eg,128,4),(fault,yb,eb,6,5)):
+def admissions(lines):
+    wide=[v for _,v in records(lines,ADMIT,('pid','gen','root','bytes'))]
+    peer=[v for _,v in records(lines,LEGACY,('slot','pid','gen','root','entry'))]
+    assert len(wide)==2 and all(v['bytes']==7*P for v in wide)
+    assert len(peer)==1 and peer[0]['entry']==CODE
+    apps=wide+peer
+    for key in ('pid','gen','root'):
+        assert len({a[key] for a in apps})==3 and all(a[key] for a in apps)
+    return apps
+
+def wait_slices(events,app,sites):
+    return [i for i,e in enumerate(events) if e['pid']==app['pid'] and e['root']==app['root']
+            and e['vector']==0x50 and e['state']==1 and e['rip'] in sites.wait]
+
+def verify(trace,lines,apps,pcs):
+    roots=[a['root'] for a in apps]
+    entries=list(records(lines,EVENT,KEYS))
+    events=[e for _,e in entries]
+    releases=list(records(lines,RELEASE,('first','second','peer')))
+    assert len(releases)==1, 'expected exactly one workload release'
+    release,ticks=releases[0]
+    before=[e for i,e in entries if i<release]
+    irqs=[tuple(v.values()) for _,v in records(lines,IRQ,IRQ_KEYS)]
+    assert irqs==[(e['slot'],e['root'],0,0,0x10050,0,0) for e in events if e['vector']==0x50], 'LAPIC retirement'
+    wait_counts=[]
+    for index,(app,sites,key) in enumerate(zip(apps,pcs,('first','second','peer'))):
+        sliced=wait_slices(before,app,sites)
+        assert len(sliced)>=MIN_SLICES, f'missing real preemption in wait loop for PID {app["pid"]}'
+        assert any(e['root']!=app['root'] for e in before[sliced[0]+1:sliced[-1]]), 'no peer ran between slices'
+        assert ticks[key]==sum(e['root']==app['root'] and e['vector']==0x50 for e in before)
+        wait_counts.append(len(sliced))
         ev=[e for e in events if e['pid']==app['pid']]
-        assert ev and all(e['root']==app['root'] and CODE+P<=e['rip']<CODE+2*P
-                          and STACK+P<e['sp']<=STACK+2*P for e in ev)
-        assert any(e['vector']==0x50 and e['state']==1 for e in ev), 'no real preemption'
-        assert any(e['vector']==128 and e['rax']==1 and e['rip']==y and e['state']==1 for e in ev)
-        assert (ev[-1]['vector'],ev[-1]['rip'],ev[-1]['state'])==(v,terminal,state)
+        base=CODE+(P if index<2 else 0)
+        top=STACK+(2 if index<2 else 1)*P
+        assert all(e['root']==app['root'] and base<=e['rip']<base+P and top-P<e['sp']<=top
+                   and e['flags']&0x202==0x202 and e['error']==0 for e in ev)
+        assert all(before[i]['sp']==top-(8 if index<2 else 0) for i in sliced)
+        yields=[e for e in ev if e['vector']==128 and e['rax']==1 and e['state']==1]
+        assert len(yields)==(1 if index<2 else 4) and yields[0]['rip']==sites.yielded
+        pre_yields=[e for e in before if e['root']==app['root'] and e['vector']==128]
+        assert pre_yields==([] if index<2 else yields[:1]), 'early voluntary completion'
+        expected=(6,sites.terminal,5) if index==1 else (128,sites.terminal,4)
+        assert (ev[-1]['vector'],ev[-1]['rip'],ev[-1]['state'])==expected
+        assert ev[-1]['sp']==top and (index==1 or ev[-1]['rax']==2)
         assert all(e['state']==1 for e in ev[:-1])
-    peer=[e for e in events if e['pid'] not in {wide['pid'],fault['pid']}]
-    assert peer and len({e['root'] for e in peer})==1 and peer[0]['root'] not in roots
-    assert peer[-1]['state']==4 and peer[-1]['vector']==128 and peer[-1]['rax']==2
+    fault_at=next(i for i,e in enumerate(events) if e['root']==roots[1] and e['vector']==6)
+    assert any(e['root']==roots[2] and e['vector']==128 and e['rax']==1 for e in events[fault_at+1:]), 'peer survival'
+    empty=list(records(lines,b'STYLEOS NATIVE EMPTY',('used','dispatches')))
+    assert len(empty)==1 and empty[0][0]>entries[-1][0] and empty[0][1]==dict(used=0,dispatches=len(events))
     # Bind serial observations to independent actual QEMU CPL3 trace. QEMU
     # INT software instruction IP precedes saved RIP by two bytes.
     data=trace.read_text();heads=list(HEADER.finditer(data))
@@ -102,13 +169,16 @@ def verify(trace,events,apps,pcs):
         if int(head[5])!=3:continue
         chunk=data[head.start():heads[i+1].start() if i+1<len(heads) else len(data)]
         root=int(re.search(r'\bCR3=([0-9a-fA-F]+)',chunk)[1],16)
-        if root not in roots+[peer[0]['root']]:continue
         vec=int(head[2],16)
+        assert root in roots and int(head[6],16)==0x5b and int(head[9],16)==0x63
+        assert vec in (6,0x50,128) and int(head[4])==int(vec==128), 'interrupt origin'
         rip=int(head[7],16)+(2 if vec==128 and head[4]=='1' else 0)
-        real.append((root,vec,rip,int(head[10],16),int(head[3],16)))
-    expected=[(e['root'],e['vector'],e['rip'],e['sp'],e['error']) for e in events]
+        rax=int(re.search(r'\bRAX=([0-9a-fA-F]+)',chunk)[1],16)
+        flags=int(re.search(r'\bRFL=([0-9a-fA-F]+)',chunk)[1],16)
+        real.append((root,vec,rip,int(head[10],16),int(head[3],16),rax,flags))
+    expected=[(e['root'],e['vector'],e['rip'],e['sp'],e['error'],e['rax'],e['flags']) for e in events]
     assert real==expected, 'CPL3 trace differs from UART'
-    return len(real)
+    return len(real),wait_counts
 
 def run(out):
     out=out.resolve();out.mkdir(parents=True,exist_ok=False)
@@ -141,6 +211,13 @@ def run(out):
             r.receipt(b'STYLEOS WIDE75 ACCOUNT',('first','second','peer','flags'),
                       first=7*P,second=7*P,peer=3*P,flags=3)
             r.receipt(b'STYLEOS NATIVE CATALOG',('valid','requested','accepted','resident'),valid=1,requested=3,accepted=3,resident=3)
+            apps=admissions(r.lines())
+            def all_preempted(lines):
+                ev=[v for _,v in records(lines,EVENT,KEYS)]
+                return all(len(wait_slices(ev,a,s))>=MIN_SLICES for a,s in zip(apps,pcs))
+            r.until(all_preempted,'two LAPIC preemptions in each private workload')
+            desktop.key('f9')
+            r.receipt(RELEASE,('first','second','peer'))
             r.receipt(b'STYLEOS NATIVE EMPTY',('used','dispatches'),used=0)
             desktop.screen('after');desktop.call('stop')
             stats=next(item['stats'] for item in desktop.call('query-blockstats')
@@ -150,14 +227,12 @@ def run(out):
         finally:
             if proc.poll() is None:proc.kill();proc.wait(timeout=15)
     lines=complete_lines(serial.read_bytes())
-    apps=[v for _,v in records(lines,b'STYLEOS WIDE75 ADMIT',('pid','gen','root','bytes'))]
-    assert len(apps)==2 and all(a['bytes']==7*P for a in apps)
-    events=[v for _,v in records(lines,EVENT,KEYS)]
-    count=verify(trace,events,apps,pcs)
+    count,slices=verify(trace,lines,apps,pcs)
     assert digest(disk)==before
     result=dict(status='PASS',qemu=version,verified_cpl3_events=count,expanded_apps=2,
-                legacy_apps=1,guest_disk_writes=0,residual_leased_app_pages=0,
-                iso_sha256=digest(iso),trace_sha256=digest(trace),uart_sha256=digest(serial))
+                legacy_apps=1,pre_release_loop_irqs=slices,leased_app_pages=[7,7,3],
+                guest_disk_writes=0,residual_leased_app_pages=0,iso_sha256=digest(iso),
+                data_disk_sha256=before,trace_sha256=digest(trace),uart_sha256=digest(serial))
     (out/'results.json').write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result),flush=True)
 

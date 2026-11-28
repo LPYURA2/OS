@@ -108,6 +108,52 @@ static bool wide_record(const uint8_t *r){
  static const uint8_t a[8]={'w','i','d','e','7','5',0,0},b[8]={'f','a','u','l','t','7','5',0};
  return nc_equal(r+40,a,8)||nc_equal(r+40,b,8);
 }
+/* Only this pinned three-program workload waits for a second F9. Keep the
+ * admission identities so a recycled slot can never receive the release. */
+static struct wide_owner {
+ unsigned slot;
+ uint32_t pid;
+ uint64_t generation,root;
+} wide_owners[3];
+static bool wide_waiting;
+static bool wide_catalog(void){
+ static const uint8_t names[3][8]={"wide75","fault75","peer75"};
+ for(unsigned i=0;i<3;i++)
+  if(!nc_equal(catalog+16+i*NC_RECORD+40,names[i],8))return false;
+ return true;
+}
+static bool remember_wide_owners(const struct pa_row *rows){
+ for(unsigned i=0;i<3;i++){
+  unsigned slot=0;
+  while(slot<S846_ROOT_COUNT&&bank862.slots[slot].pid!=rows[i].pid)++slot;
+  if(slot==S846_ROOT_COUNT)return false;
+  const struct rt862_bank_slot *s=&bank862.slots[slot];
+  wide_owners[i]=(struct wide_owner){slot,s->pid,s->handle,s->root};
+ }
+ wide_waiting=true;
+ return true;
+}
+static bool release_wide_workload(void){
+ volatile uint8_t *flags[3];
+ uint64_t ticks[3];
+ for(unsigned i=0;i<3;i++){
+  const struct wide_owner *o=&wide_owners[i];
+  const struct pr_entry *p=pr_find(pr_global(),o->pid);
+  if(!p||p->state!=PR_READY||p->scheduler_handle!=o->generation||
+     p->page_root!=o->root||p->cpu_ticks<2)return false;
+  ticks[i]=p->cpu_ticks;
+  uint64_t address=S846_DATA+(i==2?0u:2u*4096u)+8u;
+  flags[i]=s865_native_data_span(o->slot,o->pid,o->generation,o->root,address,1);
+  if(!flags[i]||*flags[i])return false;
+ }
+ /* Preflight all three before touching any flag. This serialized desktop
+  * action only ends user work; LAPIC delivery and scheduling are ordinary. */
+ for(unsigned i=0;i<3;i++)*flags[i]=1;
+ wide_waiting=false;
+ arch_puts("STYLEOS WIDE75 RELEASE");field("first",ticks[0]);field("second",ticks[1]);
+ field("peer",ticks[2]);arch_putc('\n');
+ return true;
+}
 static bool catalog_valid(unsigned *out){
  for(unsigned j=0;j<NC_SECTORS;j++)if(!s863_disk_read(NC_FIRST+j,catalog+512*j))return false;
  uint8_t digest[32];nte_sha256(catalog,sizeof catalog,digest);
@@ -332,6 +378,9 @@ static bool stop_step(void){
 }
 bool s865_native_catalog_request(void){
  if(native_catalog_busy||!s865_executor_idle())return false;
+ if(wide_waiting){
+  native_catalog_busy=true;bool ok=release_wide_workload();native_catalog_busy=false;return ok;
+ }
  if(stop_phase==1||stop_phase==2){
   native_catalog_busy=true;bool ok=stop_step();native_catalog_busy=false;return ok;
  }
@@ -382,7 +431,7 @@ bool s865_native_catalog_request(void){
  /* Before the first dispatch, require the real supervisor process API to
   * report both expanded leases and the legacy peer's actual allocation.
   * This path is limited to the explicit three-record fixture. */
- if(valid&&count==3&&accepted==3&&wide_record(catalog+16)&&wide_record(catalog+16+NC_RECORD)){
+ if(valid&&count==3&&accepted==3&&wide_catalog()){
   static struct pa_row rows[PA_MAX_ROWS];
   struct pa_reply reply={0};
   const struct pa_request query={.version=PA_VERSION,.order=PI_BY_PID};
@@ -390,7 +439,7 @@ bool s865_native_catalog_request(void){
      reply.returned!=3||reply.total!=3||
      reply.measurement_flags!=(PA_MEASURE_CPU_TICKS|PA_MEASURE_MEMORY_BYTES)||
      rows[0].resident_bytes!=7u*4096u||rows[1].resident_bytes!=7u*4096u||
-     rows[2].resident_bytes!=3u*4096u){
+     rows[2].resident_bytes!=3u*4096u||!remember_wide_owners(rows)){
    native_wipe(catalog,sizeof catalog);native_catalog_busy=false;
    arch_puts("STYLEOS WIDE75 FAIL process accounting\n");return false;
   }

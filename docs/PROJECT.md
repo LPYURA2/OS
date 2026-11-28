@@ -613,4 +613,11 @@ Owner clarification 28.11.2026: Deep Drop must also support future native applic
 ## Native apps 75 — start after bounded Deep Drop base acceptance
 74 runtime/test SHA cb30e3f91bf4dbfed6f0fb3c9477b9981283afbb, CI 46067891027 12/12 SUCCESS; owner contract docs d549606395a0efc9a8146ea702a6c73886d65cf2 (same runtime/tests, own CI independently tracked). [75 work plan](architecture/NATIVE_APPS_75.md), [continuation](NEXT_CHAT_NATIVE_APPS_75.md). Base text Deep Drop is accepted within tested limits; generalized extension deferred until real applications are integrated. Main unchanged.
 
-Owner clarification: finish native infrastructure first, create/test applications separately as standalone .tea, then integrate verified system applications. 75 first implementation: detached multi-page ELF staging and host acceptance candidate; actual mapped execution remains next. [75 architecture](architecture/NATIVE_APPS_75.md).
+Finish the native infrastructure first, then develop and test standalone .tea
+applications before integrating them as system programs. Stage 75 now runs two
+multi-page programs and a legacy peer under separate CPL3 roots in QEMU.
+The guest checks real timer preemption, memory accounting, fault isolation
+and final reclamation. The next runtime checks cover forced termination and
+cross-page IPC, followed by package, graphics and file APIs.
+[Stage 75 architecture](architecture/NATIVE_APPS_75.md#guest-preemption-acceptance) ·
+[Current handoff](NEXT_CHAT_NATIVE_APPS_75.md)
