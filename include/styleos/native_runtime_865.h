@@ -102,6 +102,7 @@ void s90_native_file_pump(void);
 /* Trusted supervisor only: authorize one directory for exact live owner.
  * No implicit grant from application identity or supplied filename. */
 enum po64_status s113_explorer_offer(uint32_t,uint64_t,uint64_t,uint64_t);
+enum po64_status s120_explorer_allow_edit(uint32_t,uint64_t,uint64_t);
 enum po64_status s95_native_file_wait(uint32_t,uint64_t,uint64_t,uint64_t);
 /* Explicit trusted installer action, with separately authorized/provisioned
  * Apps directory ID on v2 ID-managed volume. Not exposed to CPL3. */

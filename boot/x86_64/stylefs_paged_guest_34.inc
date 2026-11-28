@@ -337,16 +337,30 @@ enum po64_status s113_explorer_offer(uint32_t pid,uint64_t handle,uint64_t root,
  if(rc!=PO64_OK)ex112_discard(q);
  return rc;
 }
+enum po64_status s120_explorer_allow_edit(uint32_t pid,uint64_t handle,uint64_t root){
+ if(!s865_executor_idle())return PO64_DENIED;
+ return ex119_allow_edit(&s34_work.explorer.scope,pid,handle,root);
+}
 uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t op,uint64_t token,uint64_t address,uint64_t size,uint64_t *value){
  *value=0;
- if(op>=EX113_ROW&&op<=EX117_VOLUME){
+ if(op>=EX113_ROW&&op<=EX120_REFRESH){
   struct ex112_queue *q=&s34_work.explorer;
+  if(op==EX120_EDIT){
+   if(token||!address||size!=EX120_EDIT_BYTES)return PO64_INVALID;
+   const uint8_t *packet=(const uint8_t *)s865_native_data_span(slot,pid,handle,root,address,(size_t)size);
+   if(!packet)return PO64_INVALID;
+   return ex120_submit_edit(q,pid,handle,root,packet,(size_t)size,value);
+  }
+  if(op==EX120_REFRESH){
+   if(token||address||size)return PO64_INVALID;
+   return ex112_submit(q,pid,handle,root,6,0,value);
+  }
   if(op!=EX113_TAKE){
    if(address||size||(op==EX113_UP&&token))return PO64_INVALID;
    return ex112_submit(q,pid,handle,root,op==EX117_VOLUME?4u:(unsigned)(op-EX113_ROW+1),token,value);
   }
-  if((!address)!=(!size)||(size&&size!=EX112_WIRE_BYTES&&size!=EX117_VOLUME_BYTES))return PO64_INVALID;
+  if((!address)!=(!size)||(size&&size!=EX112_WIRE_BYTES&&size!=EX117_VOLUME_BYTES&&size!=EX120_RECEIPT_BYTES))return PO64_INVALID;
   uint8_t *out=0;
   if(size){
    out=(uint8_t *)s865_native_data_span(slot,pid,handle,root,address,(size_t)size);

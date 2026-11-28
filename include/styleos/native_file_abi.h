@@ -48,4 +48,6 @@
 #define EX113_UP UINT64_C(0x142)
 #define EX113_TAKE UINT64_C(0x143)
 #define EX117_VOLUME UINT64_C(0x144) /* ordinal -> request; TAKE expects 64-byte record */
+#define EX120_EDIT UINT64_C(0x145) /* private 320-byte input, RBX=0 */
+#define EX120_REFRESH UINT64_C(0x146) /* all args zero; TAKE 24-byte receipt */
 #endif

@@ -1,7 +1,7 @@
 name: StyleOS Explorer volume wire 117
 on:
   push:
-    branches: [feature/styleos-explorer-117, feature/styleos-explorer-118]
+    branches: [feature/styleos-explorer-117, feature/styleos-explorer-118, feature/styleos-explorer-120]
   workflow_dispatch:
 permissions:
   contents: read

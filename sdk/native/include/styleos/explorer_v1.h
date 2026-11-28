@@ -51,8 +51,39 @@ static inline struct sty_reply sty_explorer_submit(unsigned op,uint64_t ordinal)
  return sty_call(op==STY_EX_VOLUME?0x144u:0x140u+op-1,ordinal,0,0);
 }
 static inline struct sty_reply sty_explorer_take(uint64_t id,uint8_t *packet,size_t size){
- if(!id||(!packet)!=(!size)||(size&&size!=STY_EXPLORER_ROW_BYTES&&size!=STY_EXPLORER_VOLUME_BYTES))
+ if(!id||(!packet)!=(!size)||(size&&size!=STY_EXPLORER_ROW_BYTES&&size!=STY_EXPLORER_VOLUME_BYTES&&size!=24))
   return (struct sty_reply){STY_F_INVALID,0};
  return sty_call(0x143u,id,(uintptr_t)packet,size);
 }
+enum { STY_EX_EDIT_BYTES=320, STY_EX_RECEIPT_BYTES=24 };
+enum sty_ex_edit_op { STY_EX_NEW_FILE=1, STY_EX_NEW_DIR, STY_EX_RENAME, STY_EX_DELETE, STY_EX_MOVE_UP };
+struct sty_ex_receipt {uint64_t mount,sequence,directory;};
+static inline void sty_ex_put64(uint8_t *p,uint64_t v){
+ sty_put32(p,(uint32_t)v);sty_put32(p+4,(uint32_t)(v>>32));
+}
+static inline bool sty_ex_edit_encode(uint8_t *p,size_t n,unsigned op,unsigned ancestor,
+ struct sty_ex_receipt at,uint64_t ordinal,uint64_t object,uint64_t revision,const uint8_t *name,unsigned len){
+ if(!p||n!=STY_EX_EDIT_BYTES||!at.mount||!at.sequence||!at.directory||op<1||op>5||
+    (op<=2?(ordinal||object||revision):object<2)||(op!=5&&ancestor)||
+    (op==4?(name||len):(!name||!sty_ex_name(name,len))))return false;
+ /* Copy name before clearing packet to support a source inside output. */
+ uint8_t copy[255];for(unsigned i=0;i<len;++i)copy[i]=name[i];
+ for(unsigned i=0;i<STY_EX_EDIT_BYTES;++i)p[i]=0;
+ sty_put32(p,1);sty_put32(p+4,op);sty_put32(p+8,ancestor);sty_put32(p+12,len);
+ sty_ex_put64(p+16,at.mount);sty_ex_put64(p+24,at.sequence);sty_ex_put64(p+32,at.directory);
+ sty_ex_put64(p+40,ordinal);sty_ex_put64(p+48,object);sty_ex_put64(p+56,revision);
+ for(unsigned i=0;i<len;++i)p[64+i]=copy[i];
+ return true;
+}
+static inline bool sty_ex_receipt_decode(const uint8_t *p,size_t n,struct sty_ex_receipt *out){
+ if(!p||!out||n!=STY_EX_RECEIPT_BYTES)return false;
+ struct sty_ex_receipt v={sty_ex_le64(p),sty_ex_le64(p+8),sty_ex_le64(p+16)};
+ if(!v.mount||!v.sequence||!v.directory)return false;
+ *out=v;return true;
+}
+static inline struct sty_reply sty_ex_edit_submit(const uint8_t *p,size_t n){
+ if(!p||n!=STY_EX_EDIT_BYTES)return (struct sty_reply){STY_F_INVALID,0};
+ return sty_call(0x145u,0,(uintptr_t)p,n);
+}
+static inline struct sty_reply sty_ex_refresh(void){return sty_call(0x146u,0,0,0);}
 #endif

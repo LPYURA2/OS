@@ -223,7 +223,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   fld848("root",ticket->child_root);fld848("op",op);fld848("reply",reply);arch_putc('\n');
  }
  const uint64_t operation=pending860.gpr[0];
- if(kind==RT865_SYSCALL&&operation>=NF91_READ&&operation<=EX117_VOLUME){
+ if(kind==RT865_SYSCALL&&operation>=NF91_READ&&operation<=EX120_REFRESH){
   const struct pr_entry *caller=pr_find(runtime860->dispatcher.registry,ticket->pid);
   struct rt862_bank_slot *slot=&bank862.slots[id];
   if(!caller||caller->state!=PR_READY||caller->scheduler_handle!=ticket->handle||
@@ -250,7 +250,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
 #endif
   slot->context.gpr[0]=status;slot->context.gpr[3]=value;
 #ifdef STYLEOS_FILE_PROBE_92
-  if(operation>=EX113_ROW&&operation<=EX117_VOLUME){
+  if(operation>=EX113_ROW&&operation<=EX120_REFRESH){
    arch_puts("STYLEOS EXPLORER114 CALL");fld848("pid",ticket->pid);fld848("op",operation);
    fld848("status",status);fld848("value",value);arch_putc('\n');
   }

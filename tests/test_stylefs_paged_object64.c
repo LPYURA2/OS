@@ -1197,6 +1197,44 @@ int main(void){
   ex111_close(&scope);
   assert(po64_unmount(&service)==PO64_OK);
   reopen();assert(pair.id_floor==8);
+#ifdef STYLEOS_EXPLORER_120_TEST
+  assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+  struct ex112_queue q={0};
+  struct sty_ex_receipt at={0};
+  uint8_t request[STY_EX_EDIT_BYTES],receipt[STY_EX_RECEIPT_BYTES];
+  uint64_t id=0,prior_id=0;
+  assert(ex111_open(&q.scope,&service,&users,peer,32,131072,1)==PO64_OK);
+  assert(ex112_submit(&q,peer,32,131072,6,0,&id)==PO64_OK&&ex112_pump(&q));
+  assert(ex112_take(&q,peer,32,131072,id,receipt,sizeof receipt)==PO64_OK);
+  assert(sty_ex_receipt_decode(receipt,sizeof receipt,&at)&&at.directory==1);
+  assert(sty_ex_edit_encode(request,sizeof request,STY_EX_NEW_FILE,0,at,0,0,0,(const uint8_t *)"z",1));
+  assert(ex120_submit_edit(&q,peer,32,131072,request,sizeof request,&id)==PO64_DENIED);
+  assert(ex119_allow_edit(&q.scope,peer,32,131072)==PO64_OK);
+  request[319]=1;
+  assert(ex120_submit_edit(&q,peer,32,131072,request,sizeof request,&id)==PO64_INVALID);
+  request[319]=0;
+  old_writes=writes;unsigned old_reads=reads;
+  assert(ex120_submit_edit(&q,peer,33,131072,request,sizeof request,&id)==PO64_DENIED);
+  assert(ex120_submit_edit(&q,peer,32,131072,request,sizeof request,&id)==PO64_OK);
+  assert(ex112_take(&q,peer,32,131072,id,receipt,sizeof receipt)==PO64_BUSY);
+  assert(writes==old_writes&&reads==old_reads);
+  request[64]='y'; /* caller changes buffer after submit; queued copy immutable */
+  assert(ex112_pump(&q));
+  assert(ex112_take(&q,peer,32,131072,id,receipt,sizeof receipt-1)==PO64_INVALID);
+  assert(ex112_take(&q,peer,32,131072,id,receipt,sizeof receipt)==PO64_OK);
+  assert(ex112_take(&q,peer,32,131072,id,receipt,sizeof receipt)==PO64_DENIED);
+  assert(ex120_submit_edit(&q,peer,32,131072,request,sizeof request,&id)==PO64_STALE);
+  assert(sty_ex_receipt_decode(receipt,sizeof receipt,&at)&&at.directory==1);
+  assert(ex111_row(&q.scope,peer,32,131072,3,&item)==PO64_OK&&item.entry.target==9&&item.entry.key.name[0]=='z');
+  assert(sty_ex_edit_encode(request,sizeof request,STY_EX_DELETE,0,at,3,9,item.revision,0,0));
+  prior_id=id;
+  assert(ex120_submit_edit(&q,peer,32,131072,request,sizeof request,&id)==PO64_OK&&id>prior_id);
+  assert(ex112_pump(&q)&&ex112_take(&q,peer,32,131072,id,receipt,sizeof receipt)==PO64_OK);
+  assert(ex111_row(&q.scope,peer,32,131072,3,&item)==PO64_END);
+  ex112_discard(&q);
+  assert(po64_unmount(&service)==PO64_OK);reopen();assert(pair.id_floor==9);
+  puts("EXPLORER120 deferred namespace wire, immutable input, stale refusal and durable receipt PASS");
+#endif
   check('a',4,1,0,0);check('h',5,1,0,0);
   puts("EXPLORER119 scoped namespace edits, refresh and durable preservation PASS");
  }
