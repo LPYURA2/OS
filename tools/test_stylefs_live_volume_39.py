@@ -17,8 +17,9 @@ def main():
     args=p.parse_args()
     require(not (args.file_probe_92 or args.file_probe_94) or args.waiting_stop_only,"file probe needs isolated one-client stop")
     require(not(args.file_probe_92 and args.file_probe_94),"exclusive probe")
-    serial="STYLEOS-SFS44-DATA" if args.file_probe_94 else SERIAL
-    tag=b"STYLEOS-SFS44-PRIVATE-V1".ljust(512,b"\0") if args.file_probe_94 else TAG
+    # Keep the admitted TEA media identity separate from negative test cases.
+    tea_serial="STYLEOS-SFS44-DATA" if args.file_probe_94 else SERIAL
+    tea_tag=b"STYLEOS-SFS44-PRIVATE-V1".ljust(512,b"\0") if args.file_probe_94 else TAG
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     require(subprocess.check_output(["qemu-system-x86_64","--version"],text=True).startswith("QEMU emulator version 8.2.2 "), "unvalidated QEMU")
     fw=(firmware_path("OVMF_CODE","OVMF_CODE"),firmware_path("OVMF_VARS","OVMF_VARS"))
@@ -39,11 +40,11 @@ def main():
     require(("-DSTYLEOS_FILE_PROBE_94=1" in manifest["flags"])==args.file_probe_94,"save diagnostic isolation")
     iso=folder/"x86_64/StyleOS-owned-shell-865.iso"
     results=[]
-    for name,serial,tag,receipt in (() if args.waiting_stop_only else (("live",SERIAL,TAG,"SFS39 MOUNT PASS"),("foreign-tag",SERIAL,b"X"*512,"SFS39 REFUSE tag"))):
-        raw=out/(name+".raw");fixture(raw,N,volume,tag)
+    for name,case_serial,case_tag,receipt in (() if args.waiting_stop_only else (("live",SERIAL,TAG,"SFS39 MOUNT PASS"),("foreign-tag",SERIAL,b"X"*512,"SFS39 REFUSE tag"))):
+        raw=out/(name+".raw");fixture(raw,N,volume,case_tag)
         before=hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest()
         try:
-            results.append(boot(out/name,iso,raw,N,serial,receipt,0,fw,live=True,native_file88=True))
+            results.append(boot(out/name,iso,raw,N,case_serial,receipt,0,fw,live=True,native_file88=True))
             uart=(out/name/"debug.log").read_bytes()
             expected=1 if name=="live" else 0
             count=uart.splitlines().count(b"STYLEOS NATIVE FILE88 READY")
@@ -62,7 +63,7 @@ def main():
                     stream.seek(max(0,uart.stat().st_size-16384))
                     print(stream.read().decode("ascii",errors="replace"),flush=True)
             raise
-        require(read_sector(raw,0)==tag and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"readonly disk changed")
+        require(read_sector(raw,0)==case_tag and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"readonly disk changed")
         raw.unlink()
     volume.unlink()
     package=folder/"x86_64/Native-peer.tea"
@@ -75,10 +76,13 @@ def main():
     cases=(("tea-waiting-stop",package,True),) if args.waiting_stop_only else (("tea-valid",package,True),("tea-invalid",damaged,False))
     for name,source,valid in cases:
         volume=out/(name+"-volume.raw");run(tool,"newtea69",volume,source)
-        raw=out/(name+".raw");fixture(raw,N,volume,tag)
+        raw=out/(name+".raw");fixture(raw,N,volume,tea_tag)
         before=hashlib.sha256(volume.read_bytes()).digest()
+        # Assert the exact admitted identity before starting QEMU. Never
+        # reuse a foreign-tag fixture from the independent refusal loop.
+        require(read_sector(raw,0)==tea_tag,f"{name}: TEA media tag provisioning mismatch")
         try:
-            results.append(boot(out/name,iso,raw,N,serial,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only,native_file88=True,file_probe92=args.file_probe_92,file_probe94=args.file_probe_94))
+            results.append(boot(out/name,iso,raw,N,tea_serial,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only,native_file88=True,file_probe92=args.file_probe_92,file_probe94=args.file_probe_94))
         except Exception:
             # Bounded diagnostic tail in the job log even if upload fails.
             uart=out/name/"debug.log"
@@ -93,12 +97,12 @@ def main():
         require(uart.splitlines().count(b"STYLEOS NATIVE FILE90 QUEUE-READY")==1,
                 f"{name}: native file queue not initialized exactly once")
         after=hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest()
-        require(read_sector(raw,0)==tag and read_sector(raw,BOUNDARY-1)==SENTINEL,"protected sector changed")
+        require(read_sector(raw,0)==tea_tag and read_sector(raw,BOUNDARY-1)==SENTINEL,"protected sector changed")
         require((before!=after) if args.file_probe_94 else (before==after),"unexpected TEA volume mutation")
         if args.file_probe_94:
             # New VM, no native application launch. Existing real editor
             # must reopen the exact saved bytes; cold boot must not write.
-            results.append(boot(out/"cold",iso,raw,N,serial,"SFS39 MOUNT PASS",0,fw,live=True,cold44=True,native_file88=True))
+            results.append(boot(out/"cold",iso,raw,N,tea_serial,"SFS39 MOUNT PASS",0,fw,live=True,cold44=True,native_file88=True))
             require(after==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"cold boot changed volume")
             print("Native file 94 CPL3 save, explicit grant receipt, cold reopen and zero cold writes PASS",flush=True)
         raw.unlink();volume.unlink()

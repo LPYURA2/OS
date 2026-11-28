@@ -7,3 +7,6 @@ Stage 92 guest 140948197658 actual CPL3 read and byte checks reached, forced ret
 
 ## 94 preparation
 93 host job 140948585763 SUCCESS on prior candidate; rerun 93.1 CI 46135174383 still running at observation. Stage 94 separate writable diagnostic candidate, not accepted until real cold reopen and full CI pass.
+
+## Observed evidence
+93.1 CI 46135174383: focused native-file-92-guest 140948740246 and native-file-93-host 140948740280 SUCCESS; 27/29 at observation. Actual read with final lifecycle/zero-write checks and host approval mechanism passed. Full regression not yet confirmed. See 94 handoff.
