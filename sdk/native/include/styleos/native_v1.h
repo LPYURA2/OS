@@ -90,7 +90,7 @@ static inline struct sty_reply sty_window_patch(uint32_t window,const uint8_t *w
  if(!wire||bytes!=STY_PATCH_BYTES)return (struct sty_reply){STY_INVALID,0};
  return sty_call(STY_PATCH,window,(uintptr_t)wire,bytes);
 }
-#define STY_TEXT_RUNS 8u
+#define STY_TEXT_RUNS 32u
 #define STY_TEXT_GLYPHS 64u
 #define STY_TEXT_HEADER 12u
 #define STY_TEXT_RUN_BYTES 280u

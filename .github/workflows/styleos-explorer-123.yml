@@ -1,7 +1,7 @@
 name: StyleOS independent Explorer package 123
 on:
   push:
-    branches: [feature/styleos-explorer-123]
+    branches: [feature/styleos-explorer-123, feature/styleos-explorer-124]
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,6 +20,8 @@ jobs:
             "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-pie -no-pie -Isdk/native/include tests/test_explorer_app_123.c sdk/native/graphics.c -o "build/explorer-123/test-$cc"
             "build/explorer-123/test-$cc"
           done
+      - name: Expanded text layer host and COFF verification
+        run: python3 tools/test_native_window_channel.py --output build/explorer-text-124
       - uses: actions/upload-artifact@v4
         with:
           name: Explorer-123
@@ -28,3 +30,4 @@ jobs:
             build/explorer-123/Explorer.elf
             build/explorer-123/explorer.svg
             build/explorer-123/manifest.json
+            build/explorer-text-124/test.log

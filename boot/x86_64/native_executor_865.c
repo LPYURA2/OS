@@ -15,6 +15,8 @@ static struct {uint64_t generation,window;} input_wait70[PS_MAX_SLOTS];
 #include <styleos/native_window_channel.h>
 #include <styleos/native_runtime_865.h>
 #include <styleos/native_file_abi.h>
+/* Safe-root, interrupts-off serialized syscall staging. */
+static uint8_t native_text_stage124[NWC_TEXT_WIRE_MAX];
 #ifdef STYLEOS_LIVE_VOLUME_39
 static struct {uint64_t generation,request;} file_wait95[PS_MAX_SLOTS];
 #endif
@@ -290,15 +292,15 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
 #endif
   }else if(operation==NWC_CALL_TEXT){
    uint64_t generation=0,bytes=pending860.gpr[3];
-   uint8_t wire[NWC_TEXT_WIRE_MAX]={0};
-   if(bytes>=NWC_TEXT_HEADER&&bytes<=sizeof wire&&
+   uint8_t *wire=native_text_stage124;
+   if(bytes>=NWC_TEXT_HEADER&&bytes<=sizeof native_text_stage124&&
       s865_native_copy_data(id,ticket->pid,ticket->handle,ticket->child_root,
                             pending860.gpr[2],wire,(size_t)bytes))
     pixel=nwc_text_wire((struct nwc_service *)nwc_global(),ticket->pid,ticket->handle,
       ticket->child_root,pending860.gpr[1],wire,(size_t)bytes,&generation);
    slot->context.gpr[3]=pixel==NWC_OK?generation:0;
    volatile uint8_t *wipe=wire;
-   for(size_t j=0;j<sizeof wire;++j)wipe[j]=0;
+   for(size_t j=0;j<sizeof native_text_stage124;++j)wipe[j]=0;
 #ifdef STYLEOS_NATIVE_PINNED_CATALOG
    arch_puts("STYLEOS NATIVE TEXT-CALL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
    fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);fld848("bytes",bytes);

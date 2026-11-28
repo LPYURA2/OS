@@ -1,9 +1,9 @@
 /* Independent native read-only Explorer, no kernel headers or fake rows.
- * First viewport is intentionally bounded by the current 8-run text SDK.
+ * Expanded text SDK: independent name/type/size columns.
  * Trusted launcher must authorize a real root and supply 640x400 client bounds. */
 #include <styleos/explorer_v1.h>
 #include <styleos/graphics_v1.h>
-enum { WIDTH=640,HEIGHT=400,ROWS=3 };
+enum { WIDTH=640,HEIGHT=400,ROWS=8 };
 struct view {
  struct sty_explorer_row rows[ROWS];
  struct sty_explorer_volume volume;
@@ -118,11 +118,17 @@ static bool render(void){
  rect(174,36,WIDTH-174,40,t->panel);rect(0,370,WIDTH,30,t->bar);
  rect(4,v.computer?112:80,166,28,t->selection);
  if(!v.computer&&v.status==STY_F_OK&&v.count)
-  rect(184,102+v.selected*44,446,34,t->selection);
+  rect(184,116+v.selected*28,446,26,t->selection);
  label(12,8,600,t->fg,t->bar,"Проводник  |  F5 обновить  /  F6 тема");
  label(12,84,150,t->fg,v.computer?t->panel:t->selection,"Каталог");
  label(12,116,150,t->fg,v.computer?t->selection:t->panel,"Мой компьютер");
- label(188,45,434,t->fg,t->panel,v.computer?"Мой компьютер":"Имя  /  размер");
+ label(188,45,434,t->fg,t->panel,v.computer?"Мой компьютер":"Каталог StyleFS");
+ if(!v.computer){
+  rect(184,82,446,28,t->bar);
+  label(188,86,234,t->fg,t->bar,"Имя");
+  label(426,86,72,t->fg,t->bar,"Тип");
+  label(502,86,126,t->fg,t->bar,"Размер");
+ }
  if(v.computer&&v.status==STY_F_OK){
   struct sty_text_run *r=line(188,110,434,t->fg,t->body);
   r->count=decimal(r,literal(r,0,"Том: "),v.volume.volume_bytes);
@@ -136,14 +142,22 @@ static bool render(void){
   unsigned fill=(unsigned)(v.volume.free_bytes/scale);
   if(fill)rect(188,226,fill,8,t->accent);
  }else if(!v.computer&&v.status==STY_F_OK){
-  /* Four heading runs, three rows, one footer: SDK v1 limit. */
+  /* Seven headings, eight rows x three columns, one footer. */
   for(unsigned i=0;i<v.count;++i){
    const struct sty_explorer_row *a=&v.rows[i];
-   struct sty_text_run *r=line(188,106+i*44,434,t->fg,i==v.selected?t->selection:t->body);
-   unsigned at=literal(r,0,a->kind==2?"[П] ":"[Ф] ");
-   at=utf(r,at,a->name,a->name_bytes,32);
-   if(a->kind==1){at=literal(r,at,"  ");at=decimal(r,at,a->bytes);at=literal(r,at," Б");}
-   r->count=at;
+   unsigned y=119+i*28;
+   uint32_t bg=i==v.selected?t->selection:t->body;
+   struct sty_text_run *r=line(188,y,234,t->fg,bg);
+   r->count=utf(r,0,a->name,a->name_bytes,22);
+   label(426,y,72,t->fg,bg,a->kind==2?"Папка":"Файл");
+   r=line(502,y,126,t->fg,bg);
+   if(a->kind==2)r->count=literal(r,0,"—");
+   else {
+    uint64_t n=a->bytes;unsigned unit=0;
+    const char *units[]={" Б"," КиБ"," МиБ"," ГиБ"," ТиБ"," ПиБ"," ЭиБ"};
+    while(n>=1024&&unit<6){n/=1024;++unit;}
+    r->count=decimal(r,0,n);r->count=literal(r,r->count,units[unit]);
+   }
   }
  }
  label(12,375,616,t->fg,t->bar,status());
@@ -163,10 +177,10 @@ static void key(uint32_t k){
  if(k==0x0e){change_directory(true);return;}
  if(k==0x150||k==0x50){
   if(v.selected+1<v.count)++v.selected;
-  else if(v.more){v.first+=v.count;load();}
+  else if(v.more&&v.first<=UINT64_MAX-v.count){v.first+=v.count;load();}
  }else if(k==0x148||k==0x48){
   if(v.selected)--v.selected;
-  else if(v.first){v.first=v.first>=3?v.first-3:0;load();}
+  else if(v.first){v.first=v.first>=ROWS?v.first-ROWS:0;load();}
  }
 }
 void explorer_main(void){
@@ -183,8 +197,8 @@ void explorer_main(void){
    if(ev.kind==STY_POINTER&&ev.down){
     int32_t x=(int32_t)sty_le32(ev.bytes),y=(int32_t)sty_le32(ev.bytes+4);
     if(x>=0&&x<174&&y>=80&&y<140){v.computer=y>=112;load();break;}
-    if(!v.computer&&v.status==STY_F_OK&&x>=184&&x<630&&y>=102&&y<234){
-     unsigned i=(unsigned)(y-102)/44;
+    if(!v.computer&&v.status==STY_F_OK&&x>=184&&x<630&&y>=116&&y<116+ROWS*28){
+     unsigned i=(unsigned)(y-116)/28;
      if(i<v.count){v.selected=i;break;}
     }
    }

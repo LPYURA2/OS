@@ -187,6 +187,34 @@ int main(void)
     assert(nwc_publish_tile(&ipc,pid_b,32,131072,win_b,pixels,1,1)==NWC_DENIED);
     /* Closing a window immediately revokes its IPC; port will be zeroed when
      * the trusted compositor calls reconcile. */
+    assert(nwc_publish_frame(&ipc,pid_a,16,65536,0,&frame,1)==NWC_OK);
+    assert(nwc_frame_generation(&ipc,pid_a,16,65536,0,&gen)==NWC_OK&&gen==11);
+    static uint8_t expanded[NWC_TEXT_WIRE_MAX+NWC_TEXT_RUN_BYTES];
+    expanded[0]=1;expanded[4]=11;expanded[8]=NWC_TEXT_RUNS;
+    for(unsigned i=0;i<NWC_TEXT_RUNS;++i){
+        uint8_t *r=expanded+NWC_TEXT_HEADER+i*NWC_TEXT_RUN_BYTES;
+        unsigned x=(i%4)*100;
+        r[0]=(uint8_t)x;r[1]=(uint8_t)(x>>8);r[4]=(uint8_t)((i/4)*30);r[8]=90;
+        r[12]=255;r[13]=255;r[14]=255;r[20]=1;r[24]=(uint8_t)('A'+i%26);
+    }
+    gen=999;
+    assert(nwc_text_wire(&ipc,pid_b,32,131072,win_a,expanded,NWC_TEXT_WIRE_MAX,&gen)==NWC_DENIED&&gen==999);
+    expanded[NWC_TEXT_WIRE_MAX-1]=1;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,expanded,NWC_TEXT_WIRE_MAX,&gen)==NWC_INVALID&&gen==999);
+    assert(nwc_visible_text(&ipc,win_a,&text_count)&&!text_count);
+    expanded[NWC_TEXT_WIRE_MAX-1]=0;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,expanded,NWC_TEXT_WIRE_MAX,&gen)==NWC_OK&&gen==12);
+    line=nwc_visible_text(&ipc,win_a,&text_count);
+    assert(line&&text_count==32&&line[31].cp[0]=='F'&&line[31].x==300);
+    expanded[4]=12;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,expanded,NWC_TEXT_WIRE_MAX,&gen)==NWC_OK&&gen==12);
+    expanded[8]=33;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,expanded,sizeof expanded,&gen)==NWC_INVALID&&gen==12);
+    assert(nwc_visible_text(&ipc,win_a,&text_count)&&text_count==32);
+    expanded[8]=0;
+    assert(nwc_text_wire(&ipc,pid_a,16,65536,0,expanded,NWC_TEXT_HEADER,&gen)==NWC_OK&&gen==13);
+    assert(nwc_visible_text(&ipc,win_a,&text_count)&&!text_count);
+    puts("EXPLORER124 32 text runs atomic publication and refusal PASS");
     assert(ws_close_app(&windows,pid_a,win_a)==WS_OK);
     assert(nwc_send_key(&ipc,win_a,'X',0,true)==NWC_DENIED);
     assert(nwc_reconcile(&ipc)==1 && nwc_port_count(&ipc)==1);

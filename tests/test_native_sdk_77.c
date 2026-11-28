@@ -69,7 +69,7 @@ int main(void){
  C(sty_window_generation(7).status==STY_EMPTY&&calls==7&&args[0]==STY_FRAME_GEN&&args[1]==7&&args[2]==0&&args[3]==0);
  uint8_t text[STY_TEXT_HEADER+STY_TEXT_RUN_BYTES];memset(text,0x5a,sizeof text);
  struct sty_text_run line={.x=4,.y=6,.width=90,.foreground=0xffffff,.count=1,.cp={0x421}};
- C(sty_text_wire_size(0)==12&&sty_text_wire_size(8)==2252&&!sty_text_wire_size(9));
+ C(sty_text_wire_size(0)==12&&sty_text_wire_size(8)==2252&&sty_text_wire_size(32)==8972&&!sty_text_wire_size(33));
  line.cp[0]=0xd800;
  C(!sty_text_encode(text,sizeof text,5,&line,1)&&text[0]==0x5a);
  line.cp[0]=0x421;
@@ -78,6 +78,13 @@ int main(void){
  C(sty_window_text(0,text,291).status==STY_INVALID&&calls==7);
  C(sty_window_text(7,text,sizeof text).status==STY_EMPTY&&calls==8&&args[0]==STY_TEXT_LAYER&&args[1]==7&&args[2]==(uintptr_t)text&&args[3]==sizeof text);
  C(sty_text_encode(text,12,6,0,0)&&sty_le32(text+8)==0);
+ static struct sty_text_run many[STY_TEXT_RUNS];
+ static uint8_t wide_text[STY_TEXT_WIRE_MAX];
+ for(unsigned i=0;i<STY_TEXT_RUNS;++i){many[i]=line;many[i].cp[0]='A'+i%26;}
+ C(sty_text_encode(wide_text,sizeof wide_text,6,many,32)&&sty_le32(wide_text+8)==32);
+ C(sty_le32(wide_text+STY_TEXT_HEADER+31*STY_TEXT_RUN_BYTES+24)=='F');
+ many[31].cp[63]=1;
+ C(!sty_text_encode(wide_text,sizeof wide_text,7,many,32)&&sty_le32(wide_text+4)==6);
  C(sty_file_read(0,1).status==STY_F_INVALID&&sty_file_read(1,0).status==STY_F_INVALID&&calls==8);
  C(sty_file_read(UINT64_C(0x100000001),4096).status==STY_EMPTY&&calls==9&&args[0]==NF91_READ&&args[1]==UINT64_C(0x100000001)&&args[2]==0&&args[3]==4096);
  C(sty_file_write(1,0,1).status==STY_F_INVALID&&sty_file_write(1,wire,0).status==STY_F_INVALID&&calls==9);

@@ -54,7 +54,7 @@ struct nwc_patch {
 /* Compact retained text over the rectangle frame, below raster patches.
  * Each opaque line clips glyphs to its own width and fixed 20px height.
  * Initial trusted service contract, not a public wire or arbitrary font. */
-enum { NWC_TEXT_RUNS=8,NWC_TEXT_GLYPHS=64,NWC_TEXT_HEIGHT=20 };
+enum { NWC_TEXT_RUNS=32,NWC_TEXT_GLYPHS=64,NWC_TEXT_HEIGHT=20 };
 struct nwc_text_run {
     uint32_t x,y,width,foreground,background,count;
     uint32_t cp[NWC_TEXT_GLYPHS];
@@ -166,6 +166,8 @@ enum nwc_status nwc_publish_text(struct nwc_service *,uint32_t,uint64_t,uint64_t
 #define NWC_TEXT_HEADER 12u
 #define NWC_TEXT_RUN_BYTES 280u
 #define NWC_TEXT_WIRE_MAX (NWC_TEXT_HEADER+NWC_TEXT_RUNS*NWC_TEXT_RUN_BYTES)
+/* Serialized single-CPU safe-root broker only; immutable staged wire.
+ * Bounded scratch is not on the supervisor stack. */
 enum nwc_status nwc_text_wire(struct nwc_service *,uint32_t,uint64_t,uint64_t,
     uint64_t window,const uint8_t *,size_t,uint64_t *generation);
 const struct nwc_text_run *nwc_visible_text(const struct nwc_service *,uint32_t,unsigned *count);
