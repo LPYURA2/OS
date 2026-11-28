@@ -15,6 +15,7 @@
 #include <styleos/native_tea_stylefs.h>
 #if defined(STYLEOS_LIVE_VOLUME_39) && defined(STYLEOS_OWNED_SHELL_865)
 #include <styleos/native_file_85.h>
+#include <styleos/explorer_queue_112.h>
 #include "native_executor_865.h"
 #endif
 #include <styleos/native_runtime_865.h>
@@ -130,6 +131,7 @@ struct s34_work {
  struct nf85_service native_files;
  struct nf89_queue native_queue;
  struct nf102_service native_streams;
+ struct ex112_queue explorer;
 #endif
  struct s34_guard guard;
  uint64_t token;
@@ -214,6 +216,18 @@ static void s37_replace(struct bs_service *svc,const struct pp64_layout *l){
  * to blocks and no file capability issued merely because a process exists.
  * Called only at serialized safe-root supervisor/retirement boundaries. */
 void s88_native_file_reconcile(void){
+ struct ex112_queue *ex=&s34_work.explorer;
+ if(ex->scope.active){
+  const struct nf85_owner o=ex->scope.owner;
+  const struct usr_runtime *u=usr_global();
+  const struct pr_entry *p=u&&u->processes?pr_find(u->processes,o.pid):0;
+  const struct usr_session *session=u?usr_find(u,o.session):0;
+  if(!p||!pr_is_live(u->processes,o.pid)||p->scheduler_handle!=o.handle||
+     p->page_root!=o.root||!session||session->state==USR_CLOSED||
+     !ex->scope.fs->active||ex->scope.fs->mount_id!=ex->scope.snapshot.mount)
+   ex112_discard(ex);
+ }
+
  struct nf85_service *s=&s34_work.native_files;
  struct nf89_queue *q=&s34_work.native_queue;
  if(!s->ready){
@@ -251,6 +265,7 @@ void s90_native_file_pump(void){
   uint64_t sequence=q->files->fs->pair.sequence;
 #endif
   (void)nf102_pump(&s34_work.native_streams);
+  if(!q->files->fs->busy)(void)ex112_pump(&s34_work.explorer);
 #ifdef STYLEOS_LIVE_VOLUME_44
   /* All old capabilities and Explorer rows expire after a native save.
    * Rebuild the trusted shell view, without changing the app's durable
@@ -310,9 +325,31 @@ enum po64_status s95_native_file_wait(uint32_t pid,uint64_t handle,uint64_t root
  if(!s34_work.native_queue.files)return PO64_STALE;
  return nf95_wait(&s34_work.native_queue,pid,handle,root,id);
 }
+enum po64_status s113_explorer_offer(uint32_t pid,uint64_t handle,uint64_t root,uint64_t directory){
+ if(!s865_executor_idle())return PO64_DENIED;
+ s88_native_file_reconcile();
+ struct ex112_queue *q=&s34_work.explorer;
+ if(q->scope.active||q->state)return PO64_BUSY;
+ if(!s34_work.volume.attached||!s34_work.volume.objects.active)return PO64_STALE;
+ return ex111_open(&q->scope,&s34_work.volume.objects,usr_global(),pid,handle,root,directory);
+}
 uint64_t s91_native_file_call(unsigned slot,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t op,uint64_t token,uint64_t address,uint64_t size,uint64_t *value){
  *value=0;
+ if(op>=EX113_ROW&&op<=EX113_TAKE){
+  struct ex112_queue *q=&s34_work.explorer;
+  if(op!=EX113_TAKE){
+   if(address||size||(op==EX113_UP&&token))return PO64_INVALID;
+   return ex112_submit(q,pid,handle,root,(unsigned)(op-EX113_ROW+1),token,value);
+  }
+  if((!address)!=(!size)||(size&&size!=EX112_WIRE_BYTES))return PO64_INVALID;
+  uint8_t *out=0;
+  if(size){
+   out=(uint8_t *)s865_native_data_span(slot,pid,handle,root,address,(size_t)size);
+   if(!out)return PO64_INVALID;
+  }
+  return ex112_take(q,pid,handle,root,token,out,(size_t)size);
+ }
  if(op>=NF102_ROPEN&&op<=NF102_WRESULT){
   if(!s34_work.native_streams.queue)return NF91_UNAVAILABLE;
   uint8_t *packet=0;

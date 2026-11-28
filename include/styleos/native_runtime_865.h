@@ -99,6 +99,9 @@ bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,s
 /* Supervisor-only bridge on the live mounted volume. No app-facing ABI. */
 void s88_native_file_reconcile(void);
 void s90_native_file_pump(void);
+/* Trusted supervisor only: authorize one directory for exact live owner.
+ * No implicit grant from application identity or supplied filename. */
+enum po64_status s113_explorer_offer(uint32_t,uint64_t,uint64_t,uint64_t);
 enum po64_status s95_native_file_wait(uint32_t,uint64_t,uint64_t,uint64_t);
 /* Explicit trusted installer action, with separately authorized/provisioned
  * Apps directory ID on v2 ID-managed volume. Not exposed to CPL3. */

@@ -41,4 +41,10 @@
 #define NF91_MAX 4096u
 #define NF102_PACKET_MAX (NF102_HEADER+NF91_MAX)
 #define NF91_UNAVAILABLE 11u
+/* Directory submit: RBX ordinal, RCX/RDX zero. Take: RBX request,
+ * private DATA output of 296 bytes for row, zero span for navigation. */
+#define EX113_ROW UINT64_C(0x140)
+#define EX113_ENTER UINT64_C(0x141)
+#define EX113_UP UINT64_C(0x142)
+#define EX113_TAKE UINT64_C(0x143)
 #endif
