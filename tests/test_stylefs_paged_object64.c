@@ -3,6 +3,9 @@
 #include <styleos/native_file_85.h>
 #include <styleos/native_file_abi.h>
 #endif
+#ifdef STYLEOS_EXPLORER_111_TEST
+#include <styleos/explorer_scope_111.h>
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -981,6 +984,46 @@ int main(void){
  assert(po64_change_directory(&service,snap,&inner_row,&nested)==PO64_OK);
  assert(po64_snapshot(&service,&snap)==PO64_OK);
  assert(po64_child_at(&service,snap,6,0,&file_row)==PO64_OK&&file_row.entry.target==2);
+#ifdef STYLEOS_EXPLORER_111_TEST
+ {
+  struct ex111_scope scope={0};
+  struct po64_row actual={0},saved={0};
+  uint32_t peer=0;
+  for(unsigned i=0;i<PR_MAX_PROCESSES;++i)
+   if(users.owners[i].session_id==2)peer=users.owners[i].pid;
+  assert(peer&&usr_select(&users,2)==USR_OK);
+  unsigned initial_writes=writes;
+  assert(ex111_open(&scope,&service,&users,peer,33,131072,5)==PO64_DENIED&&!scope.active);
+  assert(ex111_open(&scope,&service,&users,peer,32,131072,5)==PO64_OK);
+  assert(ex111_open(&scope,&service,&users,peer,32,131072,1)==PO64_INVALID);
+  assert(ex111_up(&scope,peer,32,131072)==PO64_DENIED);
+  assert(ex111_row(&scope,peer,32,131072,0,&actual)==PO64_OK);
+  assert(actual.entry.target==6&&actual.entry.kind==SD64_DIRECTORY);
+  memcpy(&saved,&actual,sizeof saved);
+  assert(ex111_row(&scope,peer,32,135168,0,&actual)==PO64_DENIED&&!memcmp(&actual,&saved,sizeof actual));
+  assert(ex111_row(&scope,peer,32,131072,1,&actual)==PO64_END&&!memcmp(&actual,&saved,sizeof actual));
+  assert(ex111_enter(&scope,peer,32,131072,0)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,0,&actual)==PO64_OK&&actual.entry.target==2&&actual.bytes==513&&actual.revision==2);
+  assert(ex111_enter(&scope,peer,32,131072,0)==PO64_DENIED);
+  assert(usr_lock(&users)==USR_OK);
+  assert(ex111_row(&scope,peer,32,131072,0,&actual)==PO64_DENIED);
+  assert(usr_select(&users,2)==USR_OK);
+  assert(ex111_up(&scope,peer,32,131072)==PO64_OK);
+  assert(ex111_up(&scope,peer,32,131072)==PO64_DENIED);
+  assert(writes==initial_writes);
+  assert(po64_create_empty(&service,snap,&(struct sd64_key){.parent=5,.length=1,.name={'x'}},7)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,0,&actual)==PO64_STALE);
+  ex111_close(&scope);
+  assert(po64_snapshot(&service,&snap)==PO64_OK);
+  assert(ex111_open(&scope,&service,&users,peer,32,131072,5)==PO64_OK);
+  assert(ex111_row(&scope,peer,32,131072,1,&actual)==PO64_OK&&actual.entry.target==7);
+  ex111_close(&scope);
+  assert(po64_change_file(&service,snap,&actual,0)==PO64_OK);
+  assert(po64_snapshot(&service,&snap)==PO64_OK);
+  puts("EXPLORER111 real scoped directory navigation, owner denial, mutation refresh PASS");
+ }
+#endif
+
  assert(po64_change_file(&service,snap,&file_row,&d)==PO64_OK);
  assert(po64_snapshot(&service,&snap)==PO64_OK);
  assert(po64_child_at(&service,snap,1,3,&inner_row)==PO64_OK&&inner_row.entry.target==6);
