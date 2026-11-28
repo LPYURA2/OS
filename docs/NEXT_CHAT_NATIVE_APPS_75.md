@@ -2,6 +2,10 @@
 
 ## Current checkpoint — expanded CPL3 preemption
 
+The verified code and tests are at `691d4299e98dd50f0d47919c4d6323040dd9067a`.
+[CI 14/14 SUCCESS](https://github.com/LPYURA2/OS/actions/runs/46127161578) ·
+[Evidence, ordinary ISO and diagnostic kit](test-results/NATIVE_APPS_75_PREEMPTION.md).
+
 Continue on `feature/styleos-native-apps-75`. The prior Work commit
 `5e3df1552019c7f5d0ae778e323fffb8db30dc3b` is in this branch's history.
 Work resumed from `aae0b0b9a72bba2d57fabb240c1ae5aee7a52750` with a clean
@@ -28,6 +32,16 @@ Then continue the versioned package/SDK and graphics/file APIs. Develop and
 verify real standalone apps before installing them as system programs. Extend
 Deep Drop to future SDK clients after that integration. Whole-guest idle RAM
 and the 1 GiB target remain open measurements.
+
+**Сообщение для нового чата**
+
+> Продолжаем StyleOS, LPYURA2/OS, ветка feature/styleos-native-apps-75.
+> Проверенный код 691d4299e98dd50f0d47919c4d6323040dd9067a, CI 46127161578,
+> 14/14 PASS. В QEMU сверены 18 событий CPL3, вытеснения 4/3/2, остаток страниц 0.
+> Проверь текущий HEAD и этот NEXT_CHAT. Следующий шаг — принудительное
+> завершение многостраничного процесса при живом соседе и оконный IPC через
+> границу страниц, включая отказ за пределами отображения. Общий SDK,
+> графические и файловые API и штатные .tea-приложения остаются впереди.
 
 ## Earlier checkpoints, in chronological order
 
