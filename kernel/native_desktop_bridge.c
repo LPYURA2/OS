@@ -75,6 +75,22 @@ static unsigned ordered(const struct nwc_service *ipc,int width,int height,uint3
     }
     return count;
 }
+/* Only one immediately following patch can use the narrow damage path.
+ * Missed generations, resize, full frame, move and removal use old/new bounds. */
+static bool patch_step(const struct nwc_service *ipc,struct ndb_seen old,
+                       struct ndb_seen next,int width,int height,struct desk_box *out)
+{
+    if(old.window_id!=next.window_id||old.generation==UINT32_MAX||
+       next.generation!=old.generation+1||!desk_box_equal(old.rect,next.rect))return false;
+    unsigned latest=0;
+    const struct nwc_patch *patch=nwc_visible_patches(ipc,next.window_id,&latest);
+    const struct ws_window *w=ws_find(ipc->windows,next.window_id);
+    if(!patch||!latest||!w)return false;
+    const struct nwc_patch *q=&patch[latest-1];
+    const struct nwc_rect r={q->x,q->y,q->w,q->h,0};
+    *out=frame_clip(&w->bounds,&r,width,height);
+    return true;
+}
 unsigned ndb_track_top(const struct nwc_service *ipc,struct ndb_tracker *tracker,
                        int width,int height,uint32_t top,struct desk_damage *damage)
 {
@@ -85,16 +101,26 @@ unsigned ndb_track_top(const struct nwc_service *ipc,struct ndb_tracker *tracker
         struct ndb_seen previous=tracker->last[i];
         bool unchanged=false;
         for(unsigned j=0;j<count;++j)
-            if(previous.window_id==next[j].window_id && same(previous,next[j])){
-                unchanged=true;break;
+            if(previous.window_id==next[j].window_id){
+                if(same(previous,next[j])){unchanged=true;break;}
+                struct desk_box patch={0};
+                if(patch_step(ipc,previous,next[j],width,height,&patch)){
+                    if(patch.w){desk_damage_add(damage,patch);++changes;}
+                    unchanged=true;break;
+                }
             }
         if(!unchanged){desk_damage_add(damage,previous.rect);++changes;}
     }
     for(unsigned i=0;i<count;++i){
         bool unchanged=false;
         for(unsigned j=0;j<tracker->count;++j)
-            if(next[i].window_id==tracker->last[j].window_id &&
-               same(next[i],tracker->last[j])){unchanged=true;break;}
+            if(next[i].window_id==tracker->last[j].window_id){
+                struct desk_box patch={0};
+                if(same(next[i],tracker->last[j])||
+                   patch_step(ipc,tracker->last[j],next[i],width,height,&patch)){
+                    unchanged=true;break;
+                }
+            }
         if(!unchanged){desk_damage_add(damage,next[i].rect);++changes;}
     }
     /* A relative order reversal changes overlapping pixels even when both
@@ -144,6 +170,20 @@ unsigned ndb_paint_top(const struct nwc_service *ipc,int width,int height,uint32
                     for(int x=r.x;x<r.x+r.w;++x)plot(opaque,x,y,frame->rect[j].rgb);
                 unsigned n=(unsigned)r.w*(unsigned)r.h;
                 painted=n>UINT32_MAX-painted?UINT32_MAX:painted+n;
+            }
+            unsigned latest=0;
+            const struct nwc_patch *patch=nwc_visible_patches(ipc,window->id,&latest);
+            if(patch)for(unsigned j=0;j<NWC_PATCH_SLOTS;++j){
+                const struct nwc_patch *q=&patch[j];
+                if(!q->w)continue;
+                struct nwc_rect rect={q->x,q->y,q->w,q->h,0};
+                struct desk_box r=frame_clip(&window->bounds,&rect,width,height);
+                for(int y=r.y;y<r.y+r.h;++y)for(int x=r.x;x<r.x+r.w;++x){
+                    unsigned sx=(unsigned)(x-window->bounds.x)-q->x;
+                    unsigned sy=(unsigned)(y-window->bounds.y)-q->y;
+                    plot(opaque,x,y,q->pixel[sy*q->w+sx]);
+                    if(painted<UINT32_MAX)++painted;
+                }
             }
             continue;
         }

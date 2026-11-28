@@ -42,6 +42,14 @@ struct nwc_frame {
     uint32_t window_id,generation,count;
     struct nwc_rect rect[NWC_FRAME_RECTS];
 };
+/* Initial sparse raster cache over an opaque retained frame. Each cell
+ * is a complete aligned 16x16 block (smaller only at the window edge).
+ * Explicit capacity refusal; never evict or silently lose visible pixels. */
+enum { NWC_PATCH_SLOTS=4 };
+struct nwc_patch {
+    uint32_t x,y,w,h;
+    uint32_t pixel[NWC_TILE_PIXELS];
+};
 struct nwc_port {
     uint32_t window_id, owner_pid, session_id;
     uint64_t scheduler_handle, user_root;
@@ -51,6 +59,8 @@ struct nwc_port {
     struct nwc_tile tile;
     bool has_tile;
     struct nwc_frame frame;
+    struct nwc_patch patches[NWC_PATCH_SLOTS];
+    unsigned patch_latest; /* 1-based last changed cell; 0 after full frame */
 };
 struct nwc_service {
     const struct pr_table *registry;
@@ -112,6 +122,14 @@ enum nwc_status nwc_publish_frame(struct nwc_service *,uint32_t,uint64_t,uint64_
 /* Serialized trusted compositor only, alias invalid after mutation. */
 const struct nwc_frame *nwc_visible_frame(const struct nwc_service *,uint32_t);
 bool nwc_frame_valid(const struct nwc_port *,const struct ws_window *);
+/* Trusted staged kernel copy, same authority as frame publication.
+ * Expected generation prevents delayed updates to a replaced frame.
+ * Input must not alias service storage. No user syscall exposure yet. */
+enum nwc_status nwc_publish_patch(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+    uint64_t window,uint32_t expected,uint32_t x,uint32_t y,
+    const uint32_t *,unsigned w,unsigned h);
+const struct nwc_patch *nwc_visible_patches(const struct nwc_service *,uint32_t window,
+    unsigned *latest);
 /* Read-only condition for a trusted serialized wait broker. Same authority
  * checks as receive; no event consumption or output pointer. */
 enum nwc_status nwc_input_ready(struct nwc_service *,uint32_t,uint64_t,uint64_t,uint64_t);

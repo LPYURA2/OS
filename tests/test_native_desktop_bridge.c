@@ -199,10 +199,38 @@ int main(void)
     update(0);
     assert(ws_compositor_restart(&windows)==3);
     update(0);
+    /* Staged sparse pixel updates: exact owner and frame generation, no
+     * change on invalid RGB/shape/stale/capacity, actual strip damage. */
+    for(unsigned i=0;i<NWC_TILE_PIXELS;++i)pattern[i]=0xface01;
+    assert(nwc_publish_patch(&ipc,p1,16,65536,w2,2,16,16,pattern,16,16)==NWC_DENIED);
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,1,16,16,pattern,16,16)==NWC_STALE);
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,2,17,16,pattern,16,16)==NWC_INVALID);
+    pattern[255]=0x1000000;
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,2,16,16,pattern,16,16)==NWC_INVALID);
+    pattern[255]=0xface01;update(0);
+    memcpy(baseline,framebuffer,sizeof baseline);
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,2,16,16,pattern,16,16)==NWC_OK);
+    struct desk_damage patch_damage={0};
+    assert(ndb_track_top(&ipc,&tracked,800,540,raised,&patch_damage)==1);
+    assert(!patch_damage.all&&desk_present(&patch_damage,scene)==256);
+    for(unsigned y=0;y<600;++y)for(unsigned x=0;x<800;++x)
+        assert(framebuffer[y*800u+x]==(x>=26&&x<42&&y>=32&&y<48?0xface01:baseline[y*800u+x]));
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,3,16,16,pattern,16,16)==NWC_OK);
+    update(0);
+    for(unsigned i=1;i<NWC_PATCH_SLOTS;++i)
+        assert(nwc_publish_patch(&ipc,p2,32,131072,w2,2+i,16+16*i,16,pattern,16,16)==NWC_OK);
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,6,80,16,pattern,16,16)==NWC_FULL);
+    update(2); /* skipped generations: conservative full window damage */
+    assert(framebuffer[32u*800u+26u]==0xface01&&framebuffer[32u*800u+74u]==0xface01);
+    assert(ws_set_minimized(&windows,p2,w2,true)==WS_OK);
+    assert(nwc_publish_patch(&ipc,p2,32,131072,w2,6,16,16,pattern,16,16)==NWC_DENIED);
+    update(1);
+    assert(ws_set_minimized(&windows,p2,w2,false)==WS_OK);update(1);
+    for(unsigned i=0;i<NWC_TILE_PIXELS;++i)pattern[i]=0xabcdef;
     assert(nwc_publish_tile(&ipc,p2,32,131072,w2,pattern,16,16)==NWC_OK);
     assert(!nwc_visible_frame(&ipc,w2));
     struct nwc_tile restored={0};
-    assert(nwc_visible_tile(&ipc,w2,&restored)==NWC_OK&&restored.generation==3);
+    assert(nwc_visible_tile(&ipc,w2,&restored)==NWC_OK&&restored.generation==7);
     update(2);
     assert(framebuffer[135u*800u+309u]==0x142030);
     assert(ndb_route_pointer(&ipc,&input,800,540,10,16,1,0,true,false,false));
