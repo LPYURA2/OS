@@ -1,0 +1,28 @@
+name: StyleOS Explorer volume metadata 115
+on:
+  push:
+    branches: [feature/styleos-explorer-115]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  explorer-volume-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Actual mounted StyleFS metadata GCC and Clang
+        run: |
+          set -euo pipefail
+          mkdir -p build/explorer-115
+          for cc in gcc clang; do
+            "$cc" -std=c11 -O1 -g -Wall -Wextra -Werror -DSTYLEFS_HOST_FORMAT -DSTYLEOS_EXPLORER_115_TEST -fsanitize=address,undefined -fno-pie -no-pie -Iinclude tests/test_stylefs_paged_volume64.c kernel/{stylefs_paged_volume64,stylefs_paged_object64,stylefs_paged_stream64,stylefs_paged_pair64,stylefs_inode_root64,stylefs_inode_pages64,stylefs_namespace64,stylefs_dircommit64,stylefs_directory64,stylefs_alloc64,stylefs_map64,stylefs_extent64,block_service,explorer_volume_115}.c -o "build/explorer-115/$cc"
+            "build/explorer-115/$cc" | tee "build/explorer-115/$cc.log"
+            grep -F 'EXPLORER115 actual volume geometry, empty list, remount and detach PASS' "build/explorer-115/$cc.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: explorer-volume-115
+          path: build/explorer-115/*.log

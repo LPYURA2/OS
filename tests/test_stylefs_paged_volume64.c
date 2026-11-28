@@ -1,4 +1,7 @@
 #include <styleos/stylefs_paged_volume64.h>
+#ifdef STYLEOS_EXPLORER_115_TEST
+#include <styleos/explorer_volume_115.h>
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -76,6 +79,20 @@ int main(void){
  unsigned before=writes;
  assert(pv64_mount(&v,&b,g,8,&geom,true,&w,nodes,128,current,previous,128)==PO64_OK&&grants()==4);
  struct sd64_key k=key('a');
+#ifdef STYLEOS_EXPLORER_115_TEST
+ struct ex115_volume_info info={0},saved={0};
+ struct pv64_volume *list[]={&v};
+ assert(ex115_volume_at(&b,list,1,0,&info)==PO64_OK);
+ assert(info.device_generation==g&&info.mount==v.objects.mount_id&&info.sequence==v.objects.pair.sequence&&
+        info.start_sector==0&&info.volume_bytes==(uint64_t)N*512&&info.device_bytes==(uint64_t)N*512&&info.writable);
+ memcpy(&saved,&info,sizeof info);
+ assert(ex115_volume_at(&b,list,1,1,&info)==PO64_END&&!memcmp(&info,&saved,sizeof info));
+ assert(ex115_volume_at(&b,0,0,0,&info)==PO64_END&&!memcmp(&info,&saved,sizeof info));
+ struct pv64_volume *dup[]={&v,&v};
+ assert(ex115_volume_at(&b,dup,2,0,&info)==PO64_INVALID&&!memcmp(&info,&saved,sizeof info));
+ assert(ex115_volume_info(&v,(struct ex115_volume_info *)&v)==PO64_INVALID);
+ assert(writes==before);
+#endif
  assert(po64_grant_access(&v.objects,10,&k,2,1,PO64_READ|PO64_WRITE,&t)==PO64_OK);
  p.seen=0;assert(po64_read(&v.objects,10,t,reentry,&p)==PO64_OK&&p.seen==513);
  assert(writes==before);
@@ -86,7 +103,16 @@ int main(void){
  assert(po64_grant(&v.objects,10,&k,2,2,&other)==PO64_OK&&other>t);
  p.seen=0;assert(po64_read(&v.objects,10,other,sink,&p)==PO64_OK&&p.seen==513);
  assert(po64_write(&v.objects,10,other,0,0,0)==PO64_DENIED);
+#ifdef STYLEOS_EXPLORER_115_TEST
+ assert(ex115_volume_at(&b,list,1,0,&info)==PO64_OK&&!info.writable&&info.mount!=saved.mount);
+ assert(info.sequence!=saved.sequence);
+ memcpy(&saved,&info,sizeof info);
+#endif
  assert(bs_detach(&b,g)==BS_OK);
+#ifdef STYLEOS_EXPLORER_115_TEST
+ assert(ex115_volume_at(&b,list,1,0,&info)==PO64_STALE&&!memcmp(&info,&saved,sizeof info));
+ puts("EXPLORER115 actual volume geometry, empty list, remount and detach PASS");
+#endif
  assert(po64_read(&v.objects,10,other,sink,&p)==PO64_STALE);
  assert(pv64_close(&v)==PO64_OK&&grants()==0);
  puts("STYLEFS 38 MOUNTED VOLUME PASS: owned grants, partial rollback, persistent handles, readonly mount, detach");
