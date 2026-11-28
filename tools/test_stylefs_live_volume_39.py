@@ -39,6 +39,11 @@ def main():
             expected=1 if name=="live" else 0
             count=uart.splitlines().count(b"STYLEOS NATIVE FILE88 READY")
             require(count==expected,f"{name}: native file bind count {count}, expected {expected}")
+            lines=uart.splitlines()
+            state=b"STYLEOS FILE88 BOOT-STATE "+(b"ready" if expected else b"unavailable")
+            desk=[i for i,x in enumerate(lines) if x.startswith(b"STYLEOS S863 READY ")]
+            require(lines.count(state)==1 and bool(desk) and lines.index(state)<desk[0],
+                    f"{name}: wrong file boot state or readiness order")
         except Exception:
             uart=out/name/"debug.log"
             if uart.exists():

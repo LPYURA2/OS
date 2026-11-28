@@ -1,3 +1,6 @@
+## 2026-11-28 — Startup readiness requirement (88.2 candidate)
+Owner requires all mandatory services ready before interactive desktop; optional resources explicitly unavailable if not admitted. [Boot readiness contract](architecture/BOOT_READINESS_88.md), [owner requirements](STYLEOS_OWNER_REQUIREMENTS.md), [handoff](NEXT_CHAT_NATIVE_APPS_88.md). Stage 88.1 CI 46133339530 still running at observation; 88.2 strengthens live-volume startup barrier, no claim of full system readiness yet.
+
 ## 2026-11-28 — StyleOS product direction and native applications 83 candidate
 StyleOS is not intended to compete with Windows or Linux; high everyday usability and sustainable development are the owner priorities. See [owner requirements](STYLEOS_OWNER_REQUIREMENTS.md). Stage 82 CI 46130513032 19/21 successful at observation; candidate compact retained text rendering follows. [Handoff](NEXT_CHAT_NATIVE_APPS_83.md).
 

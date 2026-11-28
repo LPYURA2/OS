@@ -1095,6 +1095,18 @@ void s863_shell_observe(const struct desk_event *ev,unsigned x,unsigned y,unsign
  if(inputs!=3||batch>32||(!ev)!=(!batch))fail("863-shell-input");
 #ifdef STYLEOS_LIVE_VOLUME_39
  if(s34_work.observations<2)s39_read();
+#ifdef STYLEOS_OWNED_SHELL_865
+ if(!ev){
+  /* Before the interactive desktop-ready receipt, independently of
+   * runnable applications. An external volume is optional: refusal
+   * never becomes authority to mount or format another device. */
+  s88_native_file_reconcile();
+  if(s34_work.volume.objects.active&&s34_work.native_files.ready)
+   arch_puts("STYLEOS FILE88 BOOT-STATE ready\n");
+  else
+   arch_puts("STYLEOS FILE88 BOOT-STATE unavailable\n");
+ }
+#endif
 #endif
  if(!ev){
 #ifdef STYLEOS_TEST_DESKTOP_RTC_RUNTIME_863

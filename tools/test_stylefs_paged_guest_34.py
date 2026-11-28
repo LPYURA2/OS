@@ -143,19 +143,14 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                 require(b"SFS39 DESKTOP READ PASS" in uart.read_bytes().splitlines(),
                         "mounted object not readable before input")
                 if native_file88:
-                    # Prove initialization with no input or app launch.
-                    # Do not treat an eventual application-triggered bind as a pass.
-                    deadline=time.monotonic()+40
-                    while time.monotonic()<deadline and proc.poll() is None:
-                        lines=uart.read_bytes().splitlines()
-                        require(not any(b" FAIL " in x for x in lines),"guest failure before native file bind")
-                        count=lines.count(b"STYLEOS NATIVE FILE88 READY")
-                        require(count<=1,"duplicate native file initialization")
-                        if count==1:
-                            break
-                        time.sleep(.05)
-                    else:
-                        raise RuntimeError("native file service did not initialize before input")
+                    # The first interactive-ready receipt is the barrier,
+                    # not an eventual successful bind after input.
+                    lines=uart.read_bytes().splitlines()
+                    ready=[i for i,x in enumerate(lines) if x==b"STYLEOS NATIVE FILE88 READY"]
+                    state=[i for i,x in enumerate(lines) if x==b"STYLEOS FILE88 BOOT-STATE ready"]
+                    desk=[i for i,x in enumerate(lines) if x.startswith(b"STYLEOS S863 READY ")]
+                    require(len(ready)==len(state)==1 and bool(desk) and ready[0]<state[0]<desk[0],
+                            "native file service not ready at first interactive desktop barrier")
                 # A single relative mouse event, not an absolute-coordinate helper.
                 d.call("input-send-event", events=[{"type":"rel","data":{"axis":"x","value":20}}])
                 # Desktop.wait_uart prepends STYLEOS DESKTOP; this receipt
