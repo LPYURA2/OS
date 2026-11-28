@@ -586,6 +586,86 @@ static void write99(void){
  assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,8,513,55);check('h',5,1,0,0);
  puts("Native file 99: queued staged save, deferred cancellation, lock, fault and durable publication PASS");
 }
+#ifdef STYLEOS_NATIVE_FILE_100_TEST
+static struct nf100_stream stream100;
+static void write100(void){
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ uint32_t pid=0,peer=0;
+ struct pr_admission spec={PR_NATIVE_USER,0,128,524288,4096,"Stream100"};
+ assert(pr_admit(&procs,&spec,&pid)==PR_OK&&usr_bind(&users,1,pid,128)==USR_OK);
+ spec.scheduler_handle=144;spec.page_root=589824;
+ assert(pr_admit(&procs,&spec,&peer)==PR_OK&&usr_bind(&users,1,peer,144)==USR_OK);
+ struct sd64_key a=key('a');uint64_t grant=0,id=0,old=0;
+ const uint64_t total=SFS64_WINDOW_BYTES+17;
+ uint8_t data[NF85_READ_MAX];enum po64_status result=PO64_INVALID;
+ assert(nf100_start(&stream100,&nf)==PO64_OK&&nf100_start(&stream100,&nf)==PO64_INVALID);
+ assert(nf85_grant_access(&nf,pid,128,524288,&a,4,8,PO64_WRITE,&grant)==PO64_OK);
+ unsigned before=writes,rd_before=reads;
+ assert(nf100_open(&stream100,peer,144,589824,grant,total,&id)==PO64_DENIED&&!id);
+ assert(nf100_open(&stream100,pid,128,524288,grant,total,&id)==PO64_OK&&id);
+ assert(writes==before&&reads==rd_before);
+ assert(nf100_finish(&stream100,pid,128,524288,id)==PO64_BUSY);
+ assert(nf100_pump(&stream100)&&stream100.state==NF100_NEED&&service.busy);
+ for(unsigned i=1;i<NF100_IDLE_LIMIT;++i)assert(!nf100_pump(&stream100));
+ assert(nf100_pump(&stream100)&&!service.busy&&stream100.state==NF100_DONE);
+ assert(nf100_result(&stream100,pid,128,524288,id,&result)==PO64_OK&&result==PO64_CANCELLED);
+ old=id;
+ assert(nf100_open(&stream100,pid,128,524288,grant,total,&id)==PO64_OK&&id>old);
+ assert(nf100_pump(&stream100));
+ assert(nf100_feed(&stream100,pid,128,524288,id,1,data,sizeof data)==PO64_INVALID);
+ assert(nf100_feed(&stream100,peer,144,589824,id,0,data,sizeof data)==PO64_DENIED);
+ assert(nf100_feed(&stream100,pid,128,524288,old,0,data,sizeof data)==PO64_DENIED);
+ assert(nf100_feed(&stream100,pid,128,524288,id,0,data,sizeof data-1)==PO64_INVALID);
+ for(unsigned i=0;i<sizeof data;++i)data[i]=byte(88,i);
+ before=writes;rd_before=reads;
+ assert(nf100_feed(&stream100,pid,128,524288,id,0,data,sizeof data)==PO64_OK);
+ assert(writes==before&&reads==rd_before);
+ assert(nf100_pump(&stream100)&&stream100.offset==4096&&writes-before==8);
+ assert(usr_lock(&users)==USR_OK&&nf100_pump(&stream100)&&!service.busy);
+ assert(usr_select(&users,1)==USR_OK);
+ assert(nf100_result(&stream100,pid,128,524288,id,&result)==PO64_OK&&result==PO64_CANCELLED);
+ assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,8,513,55);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(nf85_grant_access(&nf,pid,128,524288,&a,4,8,PO64_WRITE,&grant)==PO64_OK);
+ assert(nf100_open(&stream100,pid,128,524288,grant,total,&id)==PO64_OK);
+ assert(nf100_pump(&stream100));
+ uint64_t sequence=service.pair.sequence;
+ for(uint64_t at=0;at<total;){
+  size_t n=total-at>sizeof data?sizeof data:(size_t)(total-at);
+  for(size_t i=0;i<n;++i)data[i]=byte(88,at+i);
+  before=writes;rd_before=reads;
+  assert(nf100_feed(&stream100,pid,128,524288,id,at,data,n)==PO64_OK);
+  memset(data,0,sizeof data);
+  assert(writes==before&&reads==rd_before);
+  assert(nf100_pump(&stream100)&&writes-before>0&&writes-before<=8&&stream100.offset==at+n);
+  assert(service.pair.sequence==sequence);
+  for(unsigned i=0;i<sizeof stream100.data;++i)assert(!stream100.data[i]);
+  at+=n;
+ }
+ assert(stream100.state==NF100_STAGED&&service.busy);
+ assert(nf100_result(&stream100,pid,128,524288,id,&result)==PO64_BUSY);
+ before=writes;rd_before=reads;
+ assert(nf100_finish(&stream100,pid,128,524288,id)==PO64_OK&&writes==before&&reads==rd_before);
+ assert(nf100_pump(&stream100)&&!service.busy&&service.pair.sequence>sequence);
+ assert(nf100_result(&stream100,pid,128,524288,id,&result)==PO64_OK&&result==PO64_OK);
+ assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,9,total,88);check('h',5,1,0,0);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(nf85_grant_access(&nf,pid,128,524288,&a,4,9,PO64_WRITE,&grant)==PO64_OK);
+ assert(nf100_open(&stream100,pid,128,524288,grant,0,&id)==PO64_OK);
+ assert(nf100_pump(&stream100)&&stream100.state==NF100_STAGED);
+ assert(nf100_finish(&stream100,pid,128,524288,id)==PO64_OK);
+ assert(nf100_cancel(&stream100,pid,128,524288,id)==PO64_OK);
+ assert(nf100_pump(&stream100)&&!service.busy);
+ assert(nf100_result(&stream100,pid,128,524288,id,&result)==PO64_OK&&result==PO64_CANCELLED);
+ assert(nf100_open(&stream100,pid,128,524288,grant,total,&id)==PO64_OK);
+ assert(nf100_pump(&stream100)&&service.busy);
+ assert(pr_transition(&procs,pid,128,PR_FAULTED)==PR_OK);
+ assert(nf100_pump(&stream100)&&stream100.state==NF100_IDLE&&!service.busy);
+ assert(nf85_reconcile(&nf)==1);
+ assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,9,total,88);
+ puts("Native file 100: bounded write stream, explicit commit, idle cancel, lock and owner cleanup PASS");
+}
+#endif
 #endif
 #endif
 int main(void){
@@ -847,6 +927,9 @@ int main(void){
  write98();
 #ifdef STYLEOS_NATIVE_FILE_99_TEST
  write99();
+#ifdef STYLEOS_NATIVE_FILE_100_TEST
+ write100();
+#endif
 #endif
 #endif
 #endif

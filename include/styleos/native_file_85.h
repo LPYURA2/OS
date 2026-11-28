@@ -117,4 +117,33 @@ enum po64_status nf89_cancel(struct nf89_queue *,uint32_t,uint64_t,uint64_t,uint
  * Write completion never copies data. Cancel never rolls back a commit. */
 enum po64_status nf89_take(struct nf89_queue *,uint32_t,uint64_t,uint64_t,uint64_t request,
  uint8_t *out,size_t capacity,size_t *bytes,enum po64_status *result);
+/* Stage 100: trusted incremental write transport. One stream per service
+ * under exclusive supervisor arbitration; not yet a user syscall.
+ * Zero-initialize once. No retained client pointers. All feed calls copy
+ * exact sequential 4KiB chunks (short final chunk allowed). Begin/feed/
+ * finish/cancel/result do not issue I/O; only pump may do so.
+ * A stalled client gets 64 supervisor pump opportunities before cancel,
+ * NOT a wall-clock timeout. Commit is explicitly requested after staging.
+ * All borrowed filesystem storage and caller spans remain disjoint. */
+enum { NF100_IDLE_LIMIT=64 };
+enum nf100_state { NF100_IDLE,NF100_BEGIN,NF100_NEED,NF100_DATA,NF100_STAGED,NF100_COMMIT,NF100_DONE };
+struct nf100_stream {
+ struct nf85_service *files;
+ struct nf85_owner owner;
+ uint64_t serial,id,token,mount,total,offset;
+ size_t buffered;
+ unsigned idle;
+ enum nf100_state state;
+ enum po64_status status;
+ bool busy,cancel;
+ struct pp98_writer writer;
+ uint8_t data[NF85_READ_MAX];
+};
+enum po64_status nf100_start(struct nf100_stream *,struct nf85_service *);
+enum po64_status nf100_open(struct nf100_stream *,uint32_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t *);
+enum po64_status nf100_feed(struct nf100_stream *,uint32_t,uint64_t,uint64_t,uint64_t,uint64_t,const uint8_t *,size_t);
+enum po64_status nf100_finish(struct nf100_stream *,uint32_t,uint64_t,uint64_t,uint64_t);
+enum po64_status nf100_cancel(struct nf100_stream *,uint32_t,uint64_t,uint64_t,uint64_t);
+enum po64_status nf100_result(struct nf100_stream *,uint32_t,uint64_t,uint64_t,uint64_t,enum po64_status *);
+bool nf100_pump(struct nf100_stream *);
 #endif

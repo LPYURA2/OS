@@ -541,3 +541,125 @@ enum po64_status nf95_wait(struct nf89_queue *q,uint32_t pid,uint64_t handle,uin
  if(!owner(q->files,pid,handle,root,true,&o))return PO64_BUSY;
  return r->state==NF89_DONE?PO64_OK:PO64_BUSY;
 }
+
+static bool stream100_ready(const struct nf100_stream *s){return s&&ready(s->files);}
+static bool stream100_span(const struct nf100_stream *s,const void *p,size_t n){
+ return sep(p,n,s,sizeof *s)&&external_span(s->files,p,n);
+}
+static bool stream100_owner(struct nf100_stream *s,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
+ struct nf85_owner o;
+ return id&&id==s->id&&owner(s->files,pid,handle,root,true,&o)&&same(o,s->owner);
+}
+static void stream100_clear(struct nf100_stream *s){
+ struct nf85_service *f=s->files;uint64_t serial=s->serial;
+ wipe(s,sizeof *s);s->files=f;s->serial=serial;
+}
+static void stream100_done(struct nf100_stream *s,enum po64_status status){
+ wipe(s->data,sizeof s->data);s->buffered=0;s->idle=0;
+ s->status=status;s->state=NF100_DONE;s->cancel=false;
+}
+enum po64_status nf100_start(struct nf100_stream *s,struct nf85_service *f){
+ if(!s||s->files||!ready(f)||!external_span(f,s,sizeof *s))return PO64_INVALID;
+ wipe(s,sizeof *s);s->files=f;return PO64_OK;
+}
+enum po64_status nf100_open(struct nf100_stream *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t token,uint64_t total,uint64_t *id){
+ if(!stream100_ready(s)||!token||!stream100_span(s,id,sizeof *id))return PO64_INVALID;
+ if(s->busy||s->state!=NF100_IDLE||s->files->busy||s->files->fs->busy)return PO64_BUSY;
+ struct nf85_owner o;if(!owner(s->files,pid,handle,root,true,&o))return PO64_DENIED;
+ struct nf85_grant *g=find(s->files,o,token);
+ if(!g||!(g->rights&PO64_WRITE))return PO64_DENIED;
+ if(!token_live(s->files,g))return PO64_STALE;
+ if(s->serial==UINT64_MAX)return PO64_FULL;
+ s->owner=o;s->id=++s->serial;s->token=token;s->mount=g->mount;s->total=total;
+ s->state=NF100_BEGIN;*id=s->id;return PO64_OK;
+}
+enum po64_status nf100_feed(struct nf100_stream *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t id,uint64_t offset,const uint8_t *data,size_t n){
+ if(!stream100_ready(s)||!n||n>NF85_READ_MAX||!stream100_span(s,data,n))return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!stream100_owner(s,pid,handle,root,id))return PO64_DENIED;
+ if(s->state!=NF100_NEED||s->cancel)return PO64_BUSY;
+ if(offset!=s->offset||offset>=s->total)return PO64_INVALID;
+ uint64_t left=s->total-offset;size_t expected=left>NF85_READ_MAX?NF85_READ_MAX:(size_t)left;
+ if(n!=expected)return PO64_INVALID;
+ for(size_t i=0;i<n;++i)s->data[i]=data[i];
+ s->buffered=n;s->idle=0;s->state=NF100_DATA;return PO64_OK;
+}
+enum po64_status nf100_finish(struct nf100_stream *s,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
+ if(!stream100_ready(s))return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!stream100_owner(s,pid,handle,root,id))return PO64_DENIED;
+ if(s->state!=NF100_STAGED||s->cancel)return PO64_BUSY;
+ s->state=NF100_COMMIT;s->idle=0;return PO64_OK;
+}
+enum po64_status nf100_cancel(struct nf100_stream *s,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
+ if(!stream100_ready(s))return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!stream100_owner(s,pid,handle,root,id))return PO64_DENIED;
+ if(s->state==NF100_DONE)return PO64_BUSY;
+ s->cancel=true;return PO64_OK;
+}
+enum po64_status nf100_result(struct nf100_stream *s,uint32_t pid,uint64_t handle,uint64_t root,
+ uint64_t id,enum po64_status *result){
+ if(!stream100_ready(s)||!stream100_span(s,result,sizeof *result))return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!stream100_owner(s,pid,handle,root,id))return PO64_DENIED;
+ if(s->state!=NF100_DONE)return PO64_BUSY;
+ *result=s->status;stream100_clear(s);return PO64_OK;
+}
+static bool stream100_source(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ struct nf100_stream *s=ctx;
+ if(!s->busy||s->state!=NF100_DATA||at<s->offset||
+    at-s->offset>s->buffered||n>s->buffered-(size_t)(at-s->offset))return false;
+ for(size_t i=0;i<n;++i)p[i]=s->data[(size_t)(at-s->offset)+i];
+ return true;
+}
+bool nf100_pump(struct nf100_stream *s){
+ if(!stream100_ready(s)||s->busy||s->files->busy||s->state==NF100_IDLE)return false;
+ struct nf85_owner o;
+ bool live=owner(s->files,s->owner.pid,s->owner.handle,s->owner.root,false,&o)&&same(o,s->owner);
+ if(s->state==NF100_DONE){if(!live){stream100_clear(s);return true;}return false;}
+ struct nf85_grant *g=live?find(s->files,o,s->token):0;
+ bool valid=g&&g->mount==s->mount&&token_live(s->files,g)&&(g->rights&PO64_WRITE);
+ bool selected=live&&owner(s->files,o.pid,o.handle,o.root,true,&o);
+ bool waiting=s->state==NF100_NEED||s->state==NF100_STAGED;
+ if(waiting&&s->idle<NF100_IDLE_LIMIT)++s->idle;
+ if(!valid||!selected||s->cancel||(waiting&&s->idle>=NF100_IDLE_LIMIT)){
+  enum po64_status rc=PO64_CANCELLED;
+  if(s->writer.active){
+   s->busy=true;rc=po98_cancel(s->files->fs,&s->writer);s->busy=false;
+   if(s->writer.active)return false;
+  }
+  if(rc==PO64_CANCELLED&&!valid)rc=PO64_STALE;
+  stream100_done(s,rc);if(!live)stream100_clear(s);
+  return true;
+ }
+ if(waiting)return false;
+ if(s->state==NF100_BEGIN){
+  if(s->files->fs->busy)return false;
+  s->busy=true;
+  enum po64_status rc=po98_begin(s->files->fs,principal(s->owner.pid),s->token,s->total,&s->writer);
+  s->busy=false;
+  if(rc!=PO64_OK)stream100_done(s,rc);
+  else s->state=s->total?NF100_NEED:NF100_STAGED;
+  return true;
+ }
+ if(s->state==NF100_DATA){
+  bool done=false;s->busy=true;
+  enum po64_status rc=po98_step(s->files->fs,&s->writer,stream100_source,s,&done);
+  s->busy=false;
+  if(rc!=PO64_OK){if(!s->writer.active)stream100_done(s,rc);return true;}
+  if(s->writer.offset!=s->offset+s->buffered||done!=(s->writer.offset==s->total)){
+   s->cancel=true;return true;
+  }
+  s->offset=s->writer.offset;wipe(s->data,sizeof s->data);s->buffered=0;s->idle=0;
+  s->state=done?NF100_STAGED:NF100_NEED;return true;
+ }
+ if(s->state==NF100_COMMIT){
+  s->busy=true;enum po64_status rc=po98_commit(s->files->fs,&s->writer);s->busy=false;
+  if(!s->writer.active)stream100_done(s,rc);
+  return true;
+ }
+ return false;
+}
