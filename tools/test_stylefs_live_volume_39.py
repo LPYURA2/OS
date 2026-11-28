@@ -13,8 +13,12 @@ def main():
     p=argparse.ArgumentParser();p.add_argument("--output",type=Path,required=True)
     p.add_argument("--waiting-stop-only",action="store_true")
     p.add_argument("--file-probe-92",action="store_true")
+    p.add_argument("--file-probe-94",action="store_true")
     args=p.parse_args()
-    require(not args.file_probe_92 or args.waiting_stop_only,"file probe needs isolated one-client stop")
+    require(not (args.file_probe_92 or args.file_probe_94) or args.waiting_stop_only,"file probe needs isolated one-client stop")
+    require(not(args.file_probe_92 and args.file_probe_94),"exclusive probe")
+    serial="STYLEOS-SFS44-DATA" if args.file_probe_94 else SERIAL
+    tag=b"STYLEOS-SFS44-PRIVATE-V1".ljust(512,b"\0") if args.file_probe_94 else TAG
     out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
     require(subprocess.check_output(["qemu-system-x86_64","--version"],text=True).startswith("QEMU emulator version 8.2.2 "), "unvalidated QEMU")
     fw=(firmware_path("OVMF_CODE","OVMF_CODE"),firmware_path("OVMF_VARS","OVMF_VARS"))
@@ -25,13 +29,14 @@ def main():
         *[ROOT/("kernel/"+s+".c") for s in ("stylefs_paged_stream64","stylefs_paged_pair64","stylefs_inode_root64","stylefs_inode_pages64","stylefs_namespace64","stylefs_dircommit64","stylefs_directory64","stylefs_alloc64","stylefs_map64","stylefs_extent64","block_service")],"-o",tool)
     volume=out/"provision.raw";run(tool,"new39",volume)
     folder=out/"build"
-    run("python3",ROOT/"tools/build.py","--arch","x86_64","--desktop-owned-shell-865","--live-volume-39",
-        *(["--file-probe-92"] if args.file_probe_92 else []),"--output",folder)
+    run("python3",ROOT/"tools/build.py","--arch","x86_64","--desktop-owned-shell-865","--live-volume-44" if args.file_probe_94 else "--live-volume-39",
+        *(["--file-probe-92"] if args.file_probe_92 else ["--file-probe-94"] if args.file_probe_94 else []),"--output",folder)
     manifest=json.loads((folder/"x86_64/owned-shell-compiler.json").read_text())
-    require(manifest["profile"]=="live-volume-39" and "-DSTYLEOS_LIVE_VOLUME_39=1" in manifest["flags"] and
+    require(manifest["profile"]==("live-volume-44" if args.file_probe_94 else "live-volume-39") and "-DSTYLEOS_LIVE_VOLUME_39=1" in manifest["flags"] and
         "kernel/stylefs_paged_volume64.c" in manifest["sources"] and
         "kernel/native_file_85.c" in manifest["sources"],"profile proof")
     require(("-DSTYLEOS_FILE_PROBE_92=1" in manifest["flags"])==args.file_probe_92,"diagnostic isolation")
+    require(("-DSTYLEOS_FILE_PROBE_94=1" in manifest["flags"])==args.file_probe_94,"save diagnostic isolation")
     iso=folder/"x86_64/StyleOS-owned-shell-865.iso"
     results=[]
     for name,serial,tag,receipt in (() if args.waiting_stop_only else (("live",SERIAL,TAG,"SFS39 MOUNT PASS"),("foreign-tag",SERIAL,b"X"*512,"SFS39 REFUSE tag"))):
@@ -70,10 +75,10 @@ def main():
     cases=(("tea-waiting-stop",package,True),) if args.waiting_stop_only else (("tea-valid",package,True),("tea-invalid",damaged,False))
     for name,source,valid in cases:
         volume=out/(name+"-volume.raw");run(tool,"newtea69",volume,source)
-        raw=out/(name+".raw");fixture(raw,N,volume,TAG)
+        raw=out/(name+".raw");fixture(raw,N,volume,tag)
         before=hashlib.sha256(volume.read_bytes()).digest()
         try:
-            results.append(boot(out/name,iso,raw,N,SERIAL,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only,native_file88=True,file_probe92=args.file_probe_92))
+            results.append(boot(out/name,iso,raw,N,serial,"SFS39 MOUNT PASS",0,fw,live=True,tea69=valid,tea_stop_only=args.waiting_stop_only,native_file88=True,file_probe92=args.file_probe_92,file_probe94=args.file_probe_94))
         except Exception:
             # Bounded diagnostic tail in the job log even if upload fails.
             uart=out/name/"debug.log"
@@ -87,10 +92,20 @@ def main():
         require(count==1,f"{name}: native file service bind count {count}, expected 1")
         require(uart.splitlines().count(b"STYLEOS NATIVE FILE90 QUEUE-READY")==1,
                 f"{name}: native file queue not initialized exactly once")
-        require(read_sector(raw,0)==TAG and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"TEA volume changed")
+        after=hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest()
+        require(read_sector(raw,0)==tag and read_sector(raw,BOUNDARY-1)==SENTINEL,"protected sector changed")
+        require((before!=after) if args.file_probe_94 else (before==after),"unexpected TEA volume mutation")
+        if args.file_probe_94:
+            # New VM, no native application launch. Existing real editor
+            # must reopen the exact saved bytes; cold boot must not write.
+            results.append(boot(out/"cold",iso,raw,N,serial,"SFS39 MOUNT PASS",0,fw,live=True,cold44=True,native_file88=True))
+            require(after==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"cold boot changed volume")
+            print("Native file 94 CPL3 save, explicit grant receipt, cold reopen and zero cold writes PASS",flush=True)
         raw.unlink();volume.unlink()
     (out/"results.json").write_text(json.dumps(results,indent=2)+"\n")
-    if args.waiting_stop_only:
+    if args.file_probe_94:
+        print("FILE94 SAVE AND RETIRE PASS")
+    elif args.waiting_stop_only:
         print("TEA70 WAITING STOP PASS: fresh native application, confirmed UI stop, resource retirement, zero writes")
     else:
         print("STYLEFS 39 LIVE VOLUME PASS: mount, desktop ready, input-boundary read, foreign media refusal, zero writes")

@@ -4,3 +4,6 @@ Base 1ec0eaca7f05642751eb8dd92e247f3a7226d67a; 92 guest CI 46134999718 pending a
 
 ## 93.1 — inherited 92 harness correction
 Stage 92 guest 140948197658 actual CPL3 read and byte checks reached, forced retirement and zero resident/pages/owners/windows/ports observed. Python harness then failed because expected bytes shadowed lifecycle expected list. Rename only diagnostic variable to expected_file; all assertions retained. No positive write guest or final disk unchanged assertion claim yet. Repeat full regression and 93 host approval tests. Previous candidate 10986a3b0699c734025198680727706a18aa0905 remains parent. No main change.
+
+## 94 preparation
+93 host job 140948585763 SUCCESS on prior candidate; rerun 93.1 CI 46135174383 still running at observation. Stage 94 separate writable diagnostic candidate, not accepted until real cold reopen and full CI pass.

@@ -2,7 +2,7 @@
 The ordinary boot image contains approved package bytes, not linked app code."""
 import hashlib,struct,zipfile
 from tea_package import pack,inspect
-def make(folder,index,name,color,file_probe_92=False):
+def make(folder,index,name,color,file_probe_92=False,file_probe_94=False):
     code=bytearray()
     labels={};fix=[]
     def emit(b):code.extend(b)
@@ -46,6 +46,34 @@ def make(folder,index,name,color,file_probe_92=False):
         call(0x132,0x12000300,64);status(2)
         # Distinct pixel call serves as evidence only after all byte checks.
         emit(b'\x31\xdb');call(0x100,0x976332,0);status(0)
+    if file_probe_94 and index==1:
+        payload=b"aStyleOS: paged file read test.\nSecond line.\n"
+        def call94(op,addr,size):
+            emit(b'\xb8'+struct.pack('<I',op)+b'\xb9'+struct.pack('<I',addr)+b'\xba'+struct.pack('<I',size)+b'\xcd\x80')
+        def status94(n):
+            emit(b'\x83\xf8'+bytes([n]));jump(b'\x0f\x85','fail')
+        # RECEIVE is one-shot; the supervisor, not client, decides rights.
+        emit(b'\x31\xdb');call94(0x134,0,0);status94(0)
+        emit(b'\x48\x85\xd2');jump(b'\x0f\x84','fail')
+        emit(b'\x48\x89\x96\x00\x02\x00\x00')
+        call94(0x134,0,0);status94(10)
+        emit(b'\x48\x8b\x9e\x00\x02\x00\x00')
+        call94(0x131,0x12000ff0,len(payload));status94(1)
+        for i,value in enumerate(payload):
+            emit(b'\xc6\x86'+struct.pack('<I',0x300+i)+bytes([value]))
+        call94(0x131,0x12000300,len(payload));status94(0)
+        emit(b'\x48\x85\xd2');jump(b'\x0f\x84','fail')
+        emit(b'\x48\x89\xd3')
+        mark('save_take')
+        call94(0x132,0,0)
+        emit(b'\x83\xf8\x04');jump(b'\x0f\x84','save_take')
+        status94(0)
+        emit(b'\x48\x85\xd2');jump(b'\x0f\x85','fail')
+        call94(0x132,0,0);status94(2)
+        # Old revision capability may not silently authorize another save.
+        emit(b'\x48\x8b\x9e\x00\x02\x00\x00')
+        call94(0x131,0x12000300,len(payload));status94(2)
+        emit(b'\x31\xdb');call94(0x100,0x976332,0);status94(0)
     mark('poll')
     emit(b'\xb8\x02\x01\x00\x00\x31\xdb\xb9\x00\x01\x00\x12\xba\x40\x00\x00\x00\xcd\x80')
     emit(b'\x85\xc0');jump(b'\x0f\x85','poll')
@@ -75,9 +103,9 @@ def make(folder,index,name,color,file_probe_92=False):
         '#define '+prefix+'bytes '+str(len(package))+'u\n'+arr(prefix+'manifest',meta)+
         arr(prefix+'pkg_hash',hashlib.sha256(package).digest())+
         arr(prefix+'elf_hash',hashlib.sha256(blob).digest()))
-def build(folder,file_probe_92=False):
+def build(folder,file_probe_92=False,file_probe_94=False):
     (folder/'native_sample_69.h').write_text(
-        make(folder,0,'Native-sample',0x2579a1)+make(folder,1,'Native-peer',0x976332,file_probe_92=file_probe_92))
+        make(folder,0,'Native-sample',0x2579a1)+make(folder,1,'Native-peer',0x976332,file_probe_92=file_probe_92,file_probe_94=file_probe_94))
     # Both approved packages must carry independent executable identities.
     first=(folder/'Native-sample.elf').read_bytes()
     second=(folder/'Native-peer.elf').read_bytes()

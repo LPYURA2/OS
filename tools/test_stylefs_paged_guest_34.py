@@ -78,7 +78,7 @@ def build(folder, n):
             "-DSTYLEOS_PAGED_GUEST_34=1" in manifest["flags"] and
             "kernel/ata_runtime_48.c" in manifest["sources"],"profile proof")
     return folder/"x86_64/StyleOS-owned-shell-865.iso"
-def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False, file_probe92=False):
+def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, save44=False, cold44=False, namespace46=None, tea69=None, tea_stop_only=False, native_file88=False, file_probe92=False, file_probe94=False):
     folder.mkdir()
     uart = folder/"debug.log"; nvram = folder/"OVMF_VARS.fd"
     shutil.copyfile(fw[1], nvram)
@@ -218,7 +218,7 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                     d.key("a")
                     d.key("ctrl-s")
                     wait_exact(b"SFS44 SAVE PASS")
-                elif not cold44 and not namespace46:
+                elif not cold44 and not namespace46 and not file_probe94:
                     d.key("a")
                     wait_exact(b"SFS43 EDIT REFUSED")
                 d.key("f2")
@@ -372,6 +372,17 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                             require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"client byte comparison marker absent")
                             (folder/"file-probe-92.json").write_text(json.dumps({"pid":pid_num,"calls":calls,"bytes":len(expected_file)},indent=2)+"\n")
                             print("Native file 92 CPL3 read, invalid span, read-only denial, exact content and one-shot completion PASS",flush=True)
+                        if file_probe94:
+                            calls=[v for _,v in records(lines,b"STYLEOS FILE92 CALL",("pid","op","status","value")) if v["pid"]==pid_num]
+                            require([(v["op"],v["status"]) for v in calls[:4]]==[(0x134,0),(0x134,10),(0x131,1),(0x131,0)],"write probe approval and submission")
+                            require(calls[0]["value"] and calls[3]["value"],"grant and request IDs")
+                            tail=calls[4:]
+                            require(len(tail)>=3 and all(v["op"]==0x132 and v["status"]==4 for v in tail[:-3]) and
+                                    [(v["op"],v["status"]) for v in tail[-3:]]==[(0x132,0),(0x132,2),(0x131,2)],"durable completion and revocation")
+                            require(tail[-3]["value"]==0,"write completion result")
+                            pixels=records(lines,b"STYLEOS NATIVE PIXEL",("pid","gen","root","window","rgb","status"))
+                            require(any(v["pid"]==pid_num and v["rgb"]==0x976332 and v["status"]==0 for _,v in pixels),"save client success marker absent")
+                            (folder/"file-probe-94.json").write_text(json.dumps({"pid":pid_num,"calls":calls},indent=2)+"\n")
                         snapshot_count=sum(x==b"STYLEOS PROCESSES END" for x in lines)
                         d.key("f8");wait_exact(b"STYLEOS PROCESSES END",snapshot_count+1)
                         from native_process_view_02 import decimal,ROW,HEADER,END
@@ -427,9 +438,9 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
             require(b"STYLEOS S863S DMA-AFTER " in uart.read_bytes() and b"STYLEOS S863S BAR4 " in uart.read_bytes(), "missing owned-root DMA admission receipts")
             require(not any(b" FAIL " in x for x in uart.read_bytes().splitlines()),"kernel failure receipt")
             written=final["wr_bytes"]-disk_stats_before["wr_bytes"]
-            require(written>0 if save44 or namespace46 in ("create","delete") else written==expected_writes, "write byte count")
+            require(written>0 if save44 or file_probe94 or namespace46 in ("create","delete") else written==expected_writes, "write byte count")
             require(final["unmap_bytes"]==disk_stats_before["unmap_bytes"], "unexpected unmap")
-            if expected_writes or save44 or namespace46 in ('create','delete'):
+            if expected_writes or save44 or file_probe94 or namespace46 in ('create','delete'):
                 require(final["flush_operations"]-disk_stats_before["flush_operations"]>=2, "flush evidence")
             for k in ("failed_wr_operations","invalid_wr_operations","failed_flush_operations","invalid_flush_operations"):
                 require(final.get(k,0)==disk_stats_before.get(k,0), k)

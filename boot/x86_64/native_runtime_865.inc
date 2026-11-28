@@ -764,6 +764,11 @@ bool s865_launch_native_file(const struct po64_row *row){
  if(!dst)fail("file92-delivery");
  for(unsigned i=0;i<8;++i)dst[i]=(uint8_t)(token>>(8*i));
  arch_puts("STYLEOS FILE92 GRANT");field("pid",p->pid);field("token",token);arch_putc('\n');
+#elif defined(STYLEOS_FILE_PROBE_94)
+ const struct pr_entry *p=pr_find(pr_global(),c.out.pid);
+ if(!p||s94_file_probe_offer(p->pid,p->scheduler_handle,p->page_root)!=PO64_OK)
+  fail("file94-offer");
+ arch_puts("STYLEOS FILE94 OFFER");field("pid",p->pid);arch_putc('\n');
 #endif
  arch_puts("STYLEOS TEA69 STYLEFS");field("id",row->entry.target);
  field("revision",row->revision);field("bytes",row->bytes);arch_putc('\n');
