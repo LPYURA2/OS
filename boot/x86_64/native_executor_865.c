@@ -542,6 +542,9 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
  (void)usr_reconcile((struct usr_runtime *)usr_global());
  (void)nwc_reconcile((struct nwc_service *)nwc_global());
  native_drop_reconcile();
+#ifdef STYLEOS_LIVE_VOLUME_39
+  s88_native_file_reconcile();
+#endif
  /* Cleanup identity only; dispatch zero is not a trap or dispatch ticket. */
  const struct rt862_selection identity={id,0,pid,generation,child,safe};
  retire865_identity(&identity,audit,retire,opaque);
@@ -565,6 +568,9 @@ enum ps_status s865_executor_stop(unsigned id,uint32_t pid,uint64_t generation,
 void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uint64_t,uint64_t),void *opaque){
  if(!s865_executor_idle()||!audit||!retire)fail848("native-poll-boundary");
  native_drop_reconcile();
+#ifdef STYLEOS_LIVE_VOLUME_39
+  s88_native_file_reconcile();
+#endif
  if(!pr_snapshot(runtime860->dispatcher.registry,0,0,true))return;
  if(!audit(opaque))fail848("native-poll-audit");
 #ifndef STYLEOS_NATIVE_PINNED_CATALOG
@@ -601,6 +607,9 @@ void s865_executor_poll(bool (*audit)(void *),bool (*retire)(void *,unsigned,uin
   (void)usr_reconcile((struct usr_runtime *)usr_global());
   (void)nwc_reconcile((struct nwc_service *)nwc_global());
   native_drop_reconcile();
+#ifdef STYLEOS_LIVE_VOLUME_39
+  s88_native_file_reconcile();
+#endif
   s865_retire_terminal(&ticket,audit,retire,opaque);
  }
  if(!s865_executor_idle())fail848("native-poll-return");

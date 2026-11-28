@@ -88,6 +88,13 @@ bool s865_native_shell_probe_available(void);
  * On failure leave kernel destination unchanged. Destination is trusted
  * separate kernel scratch, not caller controlled. */
 bool s865_native_copy_data(unsigned,uint32_t,uint64_t,uint64_t,uint64_t,void *,size_t);
+#ifdef STYLEOS_LIVE_VOLUME_39
+#include <styleos/native_file_85.h>
+/* Supervisor-only bridge on the live mounted volume. No app-facing ABI. */
+void s88_native_file_reconcile(void);
+enum po64_status s88_native_file_grant(uint32_t,uint64_t,uint64_t,
+ const struct po64_row *,unsigned,uint64_t *);
+#endif
 /* Trusted compositor release between two visible native windows. */
 void native_drop_gesture(uint32_t source_window,uint32_t target_window);
 /* Trusted panel release: exact observed task token, rollback on refusal.

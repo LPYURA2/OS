@@ -13,6 +13,10 @@
 #include <styleos/stylefs_paged_volume64.h>
 #include <styleos/desktop_paged_view.h>
 #include <styleos/native_tea_stylefs.h>
+#if defined(STYLEOS_LIVE_VOLUME_39) && defined(STYLEOS_OWNED_SHELL_865)
+#include <styleos/native_file_85.h>
+#include "native_executor_865.h"
+#endif
 #include <styleos/native_runtime_865.h>
 #ifdef STYLEOS_LIVE_VOLUME_50
 #define S34_SERIAL "STYLEOS-SFS50-DATA  "
@@ -122,6 +126,9 @@ struct s34_work {
  struct sfs64_run current[32],previous[32];
 #ifdef STYLEOS_LIVE_VOLUME_39
  struct pv64_volume volume;
+#ifdef STYLEOS_OWNED_SHELL_865
+ struct nf85_service native_files;
+#endif
  struct s34_guard guard;
  uint64_t token;
  unsigned observations;
@@ -200,6 +207,32 @@ static void s37_replace(struct bs_service *svc,const struct pp64_layout *l){
 #ifdef STYLEOS_LIVE_VOLUME_39
 /* Long-lived backend and volume are in the attested writable image, never
  * on the boot stack. Read-only grants; no legacy raw-sector exposure. */
+#ifdef STYLEOS_OWNED_SHELL_865
+/* Borrow the existing live object service: no second mount, no new grants
+ * to blocks and no file capability issued merely because a process exists.
+ * Called only at serialized safe-root supervisor/retirement boundaries. */
+void s88_native_file_reconcile(void){
+ struct nf85_service *s=&s34_work.native_files;
+ if(s->ready){(void)nf85_reconcile(s);return;}
+ if(!s34_work.volume.attached||!s34_work.volume.objects.active)return;
+ const struct usr_runtime *u=usr_global();
+ if(!u||!u->ready)return;
+ if(nf85_start(s,&s34_work.volume.objects,u)!=PO64_OK)return;
+ arch_puts("STYLEOS NATIVE FILE88 READY\n");
+}
+/* Trusted picker/launcher entry, not reachable from application code.
+ * Exact row and rights must already be approved by the supervisor;
+ * no selection, authorization or raw path lookup occurs here.
+ * Synchronous grant validates the exact underlying revision. */
+enum po64_status s88_native_file_grant(uint32_t pid,uint64_t handle,uint64_t root,
+ const struct po64_row *row,unsigned rights,uint64_t *token){
+ if(!row||row->entry.kind!=SD64_FILE||!s865_executor_idle())return PO64_DENIED;
+ s88_native_file_reconcile();
+ if(!s34_work.native_files.ready||!s34_work.volume.objects.active)return PO64_STALE;
+ return nf85_grant_access(&s34_work.native_files,pid,handle,root,&row->entry.key,
+                          row->entry.target,row->revision,rights,token);
+}
+#endif
 static void s39_read(void){
  struct po64_service *s=&s34_work.volume.objects;
  if(!s->active)return;

@@ -26,13 +26,17 @@ def main():
     run("python3",ROOT/"tools/build.py","--arch","x86_64","--desktop-owned-shell-865","--live-volume-39","--output",folder)
     manifest=json.loads((folder/"x86_64/owned-shell-compiler.json").read_text())
     require(manifest["profile"]=="live-volume-39" and "-DSTYLEOS_LIVE_VOLUME_39=1" in manifest["flags"] and
-        "kernel/stylefs_paged_volume64.c" in manifest["sources"],"profile proof")
+        "kernel/stylefs_paged_volume64.c" in manifest["sources"] and
+        "kernel/native_file_85.c" in manifest["sources"],"profile proof")
     iso=folder/"x86_64/StyleOS-owned-shell-865.iso"
     results=[]
     for name,serial,tag,receipt in (() if args.waiting_stop_only else (("live",SERIAL,TAG,"SFS39 MOUNT PASS"),("foreign-tag",SERIAL,b"X"*512,"SFS39 REFUSE tag"))):
         raw=out/(name+".raw");fixture(raw,N,volume,tag)
         before=hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest()
         results.append(boot(out/name,iso,raw,N,serial,receipt,0,fw,live=True))
+        uart=(out/name/"debug.log").read_bytes()
+        require(uart.count(b"STYLEOS NATIVE FILE88 READY")== (1 if name=="live" else 0),
+                "native file service must bind exactly once, only on admitted media")
         require(read_sector(raw,0)==tag and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"readonly disk changed")
         raw.unlink()
     volume.unlink()
@@ -58,6 +62,8 @@ def main():
                     stream.seek(max(0,uart.stat().st_size-16384))
                     print(stream.read().decode("ascii",errors="replace"),flush=True)
             raise
+        uart=(out/name/"debug.log").read_bytes()
+        require(uart.count(b"STYLEOS NATIVE FILE88 READY")==1,"native file service live binding")
         require(read_sector(raw,0)==TAG and read_sector(raw,BOUNDARY-1)==SENTINEL and before==hashlib.sha256(b"".join(read_sector(raw,x) for x in range(START,N))).digest(),"TEA volume changed")
         raw.unlink();volume.unlink()
     (out/"results.json").write_text(json.dumps(results,indent=2)+"\n")
