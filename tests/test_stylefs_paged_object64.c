@@ -473,6 +473,69 @@ static void native_file89(void){
 #endif
 #endif
 #endif
+#ifdef STYLEOS_NATIVE_FILE_98_TEST
+static struct pp98_writer writer98;
+static bool source98(void *ctx,uint64_t at,uint8_t *p,size_t n){
+ assert(po98_cancel(&service,&writer98)==PO64_BUSY);
+ assert(po64_unmount(&service)==PO64_BUSY);
+ return source(ctx,at,p,n);
+}
+static void clean98(void){
+ const uint8_t *p=(const void *)&writer98;
+ for(size_t i=0;i<sizeof writer98;++i)assert(!p[i]);
+ assert(!service.busy&&!service.writer);
+}
+static void write98(void){
+ struct sd64_key a=key('a'),h=key('h');
+ uint64_t grant=0,ro=0,bytes=SFS64_WINDOW_BYTES+17;
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_grant_access(&service,999,&a,4,5,PO64_READ|PO64_WRITE,&grant)==PO64_OK);
+ assert(po64_grant(&service,999,&h,5,1,&ro)==PO64_OK);
+ assert(po98_begin(&service,999,ro,bytes,&writer98)==PO64_DENIED);
+ assert(po98_begin(&service,998,grant,bytes,&writer98)==PO64_DENIED);
+ assert(po98_begin(&service,999,grant,bytes,&writer98)==PO64_OK);
+ struct pp98_writer wrong={0};bool done=true;
+ struct pattern v={201,UINT64_MAX,0};
+ assert(po98_step(&service,&wrong,source98,&v,&done)==PO64_DENIED);
+ assert(po98_commit(&service,&writer98)==PO64_INVALID);
+ unsigned start=writes,read_start=reads;
+ assert(po98_step(&service,&writer98,source98,&v,&done)==PO64_OK&&!done);
+ assert(writes-start==8&&reads-read_start<=16&&writer98.offset==4096);
+ assert(po64_revoke(&service,999,grant)==PO64_BUSY);
+ assert(po98_cancel(&service,&writer98)==PO64_CANCELLED);clean98();
+ assert(po64_unmount(&service)==PO64_OK);reopen();
+ check('a',4,5,513,77);check('h',5,1,0,0);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_grant_access(&service,999,&a,4,5,PO64_WRITE,&grant)==PO64_OK);
+ assert(po98_begin(&service,999,grant,bytes,&writer98)==PO64_OK);
+ fail=writes+1;done=true;
+ assert(po98_step(&service,&writer98,source98,&v,&done)==PO64_UNCERTAIN&&done&&!service.active);
+ clean98();reopen();check('a',4,5,513,77);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_grant_access(&service,999,&a,4,5,PO64_WRITE,&grant)==PO64_OK);
+ assert(po98_begin(&service,999,grant,bytes,&writer98)==PO64_OK);
+ unsigned steps=0;
+ do{
+  start=writes;read_start=reads;
+  assert(po98_step(&service,&writer98,source98,&v,&done)==PO64_OK);
+  assert(writes-start>0&&writes-start<=8&&reads-read_start<=16);
+  ++steps;
+ }while(!done);
+ assert(steps==9&&writer98.offset==bytes&&service.pair.sequence==writer98.pair.sequence);
+ assert(po98_commit(&service,&writer98)==PO64_OK);clean98();
+ assert(po64_write(&service,999,grant,0,0,0)==PO64_DENIED);
+ assert(po64_unmount(&service)==PO64_OK);reopen();
+ check('a',4,6,bytes,201);check('h',5,1,0,0);
+ assert(po64_mount_rw(&service,&b,&l,&w,nodes,128,current,previous,128)==PO64_OK);
+ assert(po64_grant_access(&service,999,&a,4,6,PO64_WRITE,&grant)==PO64_OK);
+ assert(po98_begin(&service,999,grant,0,&writer98)==PO64_OK);
+ start=writes;done=false;
+ assert(po98_step(&service,&writer98,0,0,&done)==PO64_OK&&done&&writes==start);
+ assert(po98_commit(&service,&writer98)==PO64_OK);clean98();
+ assert(po64_unmount(&service)==PO64_OK);reopen();check('a',4,7,0,0);check('h',5,1,0,0);
+ puts("Native file 98: bounded staged write, cancellation, uncertain recovery, durable commit and empty replacement PASS");
+}
+#endif
 int main(void){
  attach();assert(dc64_provision(&b,7,l.dir,D)==DC64_OK);
  assert(ir64_provision(&b,7,l.inode,I,F,1)==IP64_OK);
@@ -728,6 +791,9 @@ int main(void){
  native_file87();
 #ifdef STYLEOS_NATIVE_FILE_89_TEST
  native_file89();
+#ifdef STYLEOS_NATIVE_FILE_98_TEST
+ write98();
+#endif
 #endif
 #endif
 #endif

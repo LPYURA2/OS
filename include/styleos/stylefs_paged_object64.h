@@ -19,6 +19,7 @@ struct po64_service {
  struct sfs64_run *runs,*previous;size_t run_cap;
  struct po64_handle handles[PO64_HANDLES];
  struct pp96_reader *reader;
+ struct pp98_writer *writer;
 };
 enum po64_status po64_mount(struct po64_service *,struct bs_service *,const struct pp64_layout *,
  struct pp64_stream_workspace *,struct dc64_node *,size_t,struct sfs64_run *,size_t);
@@ -50,6 +51,13 @@ enum po64_status po64_read(struct po64_service *,uint64_t principal,uint64_t tok
 enum po64_status po96_begin(struct po64_service *,uint64_t,uint64_t,struct pp96_reader *);
 enum po64_status po96_step(struct po64_service *,struct pp96_reader *,pp64_sink,void *,bool *);
 enum po64_status po96_cancel(struct po64_service *,struct pp96_reader *);
+/* Resumable authorized replacement. One exclusive transaction; only
+ * supervisor may use these calls. DONE from step means staged, NOT
+ * published. Only commit success changes the file's visible revision. */
+enum po64_status po98_begin(struct po64_service *,uint64_t,uint64_t,uint64_t,struct pp98_writer *);
+enum po64_status po98_step(struct po64_service *,struct pp98_writer *,pp64_source,void *,bool *);
+enum po64_status po98_commit(struct po64_service *,struct pp98_writer *);
+enum po64_status po98_cancel(struct po64_service *,struct pp98_writer *);
 /* Replace authorized exact revision. A durable commit revokes ALL old
  * handles; supervisor reauthorizes against the new snapshot. Cancellation
  * retains old handles only if the exact committed snapshot revalidates.

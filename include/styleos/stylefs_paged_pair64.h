@@ -79,6 +79,25 @@ enum pp64_status pp96_begin(struct pp96_reader *,struct bs_service *,const struc
  uint64_t,const struct sd64_key *,uint64_t,uint64_t);
 enum pp64_status pp96_step(struct pp96_reader *,pp64_sink,void *,bool *done);
 enum pp64_status pp96_cancel(struct pp96_reader *);
+/* Stage 98: resumable replacement of an existing exact revision.
+ * Exclusive supervisor owns layout, workspace, allocator and cursor for
+ * entire lifetime. Metadata preparation/publication still synchronous.
+ * Each data step stages and verifies <=8 sectors. No callback retained.
+ * Cancellation before publication leaves selected revision intact;
+ * uncertain media outcome requires recovery, never automatic retry. */
+struct pp98_writer {
+ struct bs_service *block;struct pp64_layout layout;
+ struct pp64_stream_workspace *work;struct dc64_node *nodes;
+ struct sfs64_run *current;size_t node_cap,run_cap,map_bytes,run_count;
+ struct pp64_pair pair;struct sfs64_file file;
+ uint64_t offset;uint32_t crc;bool active,busy;
+};
+enum pp64_status pp98_begin(struct pp98_writer *,struct bs_service *,const struct pp64_layout *,
+ struct pp64_stream_workspace *,struct dc64_node *,size_t,struct sfs64_run *,struct sfs64_run *,size_t,
+ uint64_t,const struct sd64_key *,uint64_t,uint64_t,uint64_t);
+enum pp64_status pp98_step(struct pp98_writer *,pp64_source,void *,bool *);
+enum pp64_status pp98_commit(struct pp98_writer *,struct pp64_pair *);
+enum pp64_status pp98_cancel(struct pp98_writer *);
 /* Same-volume copy into a new unused key and lifetime-unique ID.
  * Verify source CRC before publishing destination; source unchanged.
  * No reflink, overwrite, user callbacks or whole-file allocation. */

@@ -17,7 +17,7 @@ static enum po64_status status(enum pp64_status rc){
 static void forget(struct po64_service *s){
  for(unsigned i=0;i<PO64_HANDLES;i++)s->handles[i]=(struct po64_handle){0};
 }
-static void clear(struct po64_service *s){forget(s);s->reader=0;s->active=false;}
+static void clear(struct po64_service *s){forget(s);s->reader=0;s->writer=0;s->active=false;}
 static bool mode(struct bs_service *b,const struct pp64_layout *l,bool write){
  const uint64_t tokens[]={l->receipt,l->dir,l->inode,l->data};
  for(unsigned i=0;i<4;i++){
@@ -176,6 +176,55 @@ enum po64_status po96_cancel(struct po64_service *s,struct pp96_reader *r){
  enum po64_status rc=status(pp96_cancel(r));
  if(rc==PO64_CANCELLED){s->reader=0;s->busy=false;}
  return rc;
+}
+
+enum po64_status po98_begin(struct po64_service *s,uint64_t principal,uint64_t token,uint64_t bytes,struct pp98_writer *r){
+ if(!s||!principal||!token||!r)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ if(!span(s,r,sizeof *r)||r->active||r->busy)return PO64_INVALID;
+ struct po64_handle *h=find(s,principal,token);
+ if(!s->writable||!h||!(h->rights&PO64_WRITE))return PO64_DENIED;
+ enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
+ struct po64_handle copy=*h;
+ rc=status(pp98_begin(r,s->block,&s->layout,s->work,s->nodes,s->node_cap,s->runs,s->previous,
+   s->run_cap,s->pair.sequence,&copy.key,copy.id,copy.revision,bytes));
+ if(rc!=PO64_OK){clear(s);return rc;}
+ s->writer=r;s->busy=true;return PO64_OK;
+}
+static enum po64_status end98(struct po64_service *s,enum po64_status rc){
+ s->writer=0;s->busy=false;
+ if(rc==PO64_CANCELLED){
+  enum po64_status check=live(s);return check==PO64_OK?rc:check;
+ }
+ if(rc!=PO64_OK)clear(s);
+ return rc;
+}
+enum po64_status po98_step(struct po64_service *s,struct pp98_writer *r,pp64_source source,void *ctx,bool *done){
+ if(!s||!r||!done)return PO64_INVALID;
+ if(!s->active||!s->busy||s->writer!=r)return PO64_DENIED;
+ if(r->busy)return PO64_BUSY;
+ if(!span(s,done,sizeof *done)||!sep(done,sizeof *done,r,sizeof *r))return PO64_INVALID;
+ enum po64_status rc=status(pp98_step(r,source,ctx,done));
+ return r->active?rc:end98(s,rc);
+}
+enum po64_status po98_commit(struct po64_service *s,struct pp98_writer *r){
+ if(!s||!r)return PO64_INVALID;
+ if(!s->active||!s->busy||s->writer!=r)return PO64_DENIED;
+ if(r->busy)return PO64_BUSY;
+ if(r->offset!=r->file.bytes)return PO64_INVALID;
+ struct pp64_pair next;
+ enum po64_status rc=status(pp98_commit(r,&next));
+ if(r->active)return rc;
+ if(rc==PO64_OK){s->pair=next;forget(s);}
+ return end98(s,rc);
+}
+enum po64_status po98_cancel(struct po64_service *s,struct pp98_writer *r){
+ if(!s||!r)return PO64_INVALID;
+ if(!s->active||!s->busy||s->writer!=r)return PO64_DENIED;
+ if(r->busy)return PO64_BUSY;
+ enum po64_status rc=status(pp98_cancel(r));
+ return r->active?rc:end98(s,rc);
 }
 
 enum po64_status po64_write(struct po64_service *s,uint64_t principal,uint64_t token,uint64_t bytes,pp64_source source,void *ctx){

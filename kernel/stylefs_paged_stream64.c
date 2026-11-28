@@ -299,6 +299,96 @@ finish:
  return rc;
 }
 
+enum pp64_status pp98_begin(struct pp98_writer *r,struct bs_service *b,const struct pp64_layout *l,
+ struct pp64_stream_workspace *w,struct dc64_node *a,size_t cap,struct sfs64_run *current,
+ struct sfs64_run *previous,size_t rcap,uint64_t expected,const struct sd64_key *key,
+ uint64_t id,uint64_t rev,uint64_t bytes){
+ if(!r||r->active||r->busy||!args(b,l,w,a,cap,current,rcap,key)||
+    !expected||id<=1||!rev||rev==UINT64_MAX)return PP64_INVALID;
+ const void *p[]={r,b,l,w,a,current,previous,key};
+ size_t n[]={sizeof *r,sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *current,
+             rcap*sizeof *previous,sizeof *key};
+ for(unsigned i=0;i<8;++i)for(unsigned j=0;j<i;++j)if(!sep(p[i],n[i],p[j],n[j]))return PP64_INVALID;
+ struct pp64_pair pair;
+ enum pp64_status rc=pp64_mount(b,l,&w->pair,a,cap,current,rcap,&pair);
+ if(rc!=PP64_OK)return rc;
+ if(pair.sequence!=expected)return PP64_INVALID;
+ if(expected==UINT64_MAX||pair.inode_epoch==UINT64_MAX)return PP64_FULL;
+ rc=pp64_prepare(b,l,&w->pair,a,cap,current,rcap,&pair);
+ if(rc!=PP64_OK)return rc;
+ if(pair.sequence!=expected)return PP64_INVALID;
+ rc=check_key(b,l,w,key,id,rev);if(rc!=PP64_OK)return rc;
+ size_t nr=0;
+ rc=pp64_plan(b,l,&w->pair,a,cap,current,previous,rcap,expected,bytes,w->plan,PP64_FILE_RUNS,&nr);
+ if(rc!=PP64_OK)return rc;
+ struct sfs64_file f={id,rev+1,bytes,0};size_t len=sfs64_map_length(nr);
+ if(!len||len>sizeof w->manifest||!sfs64_map_encode(w->manifest,len,f,l->data_sectors,l->data_start,w->plan,nr))
+  return PP64_CORRUPT;
+ pp96_wipe(r,sizeof *r);
+ r->block=b;r->layout=*l;r->work=w;r->nodes=a;r->node_cap=cap;r->current=current;r->run_cap=rcap;
+ r->pair=pair;r->file=f;r->map_bytes=len;r->run_count=nr;r->crc=UINT32_MAX;r->active=true;
+ return PP64_OK;
+}
+enum pp64_status pp98_cancel(struct pp98_writer *r){
+ if(!r||!r->active||r->busy)return PP64_INVALID;
+ pp96_wipe(r,sizeof *r);return PP64_CANCELLED;
+}
+static bool writer_span(struct pp98_writer *r,const void *p,size_t n){
+ return sep(p,n,r,sizeof *r)&&sep(p,n,r->block,sizeof *r->block)&&
+  sep(p,n,r->work,sizeof *r->work)&&sep(p,n,r->nodes,r->node_cap*sizeof *r->nodes)&&
+  sep(p,n,r->current,r->run_cap*sizeof *r->current);
+}
+enum pp64_status pp98_step(struct pp98_writer *r,pp64_source source,void *ctx,bool *done){
+ if(!r||!r->active||r->busy||!writer_span(r,done,sizeof *done)||
+    (r->file.bytes&&!source))return PP64_INVALID;
+ r->busy=true;enum pp64_status rc=PP64_OK;
+ struct sfs64_map map;
+ uint8_t part[BS_SECTOR_BYTES],check[BS_SECTOR_BYTES];
+ if(r->map_bytes>sizeof r->work->manifest||
+    !sfs64_map_decode(r->work->manifest,r->map_bytes,r->layout.data_sectors,r->layout.data_start,&map)||
+    map.file.id!=r->file.id||map.file.revision!=r->file.revision||
+    map.file.bytes!=r->file.bytes||r->offset>r->file.bytes){rc=PP64_CORRUPT;goto end;}
+ for(unsigned budget=0;budget<PP96_STEP_SECTORS&&r->offset<r->file.bytes;++budget){
+  uint64_t left=r->file.bytes-r->offset,local=0;
+  size_t wanted=left>sizeof part?sizeof part:(size_t)left,take=0,written=0;
+  struct sfs_extent64 extent;
+  if(!sfs64_map_chunk(&map,r->offset,wanted,&extent,&local,&take)||local%BS_SECTOR_BYTES){
+   rc=PP64_CORRUPT;goto end;
+  }
+  if(!source(ctx,r->offset,part,take)){rc=PP64_CANCELLED;goto end;}
+  if(sfs64_stage_window(r->block,r->layout.owner,r->layout.data,extent,local,part,take,&written)!=BS_OK||
+     written!=take||bs_read_sector(r->block,r->layout.owner,r->layout.data,extent.first+local/512,check)!=BS_OK){
+   rc=PP64_UNCERTAIN;goto end;
+  }
+  for(size_t i=0;i<sizeof check;++i)if(check[i]!=(i<take?part[i]:0)){rc=PP64_UNCERTAIN;goto end;}
+  r->crc=digest(r->crc,part,take);r->offset+=take;
+ }
+end:
+ pp96_wipe(part,sizeof part);pp96_wipe(check,sizeof check);
+ r->busy=false;
+ if(rc!=PP64_OK){pp96_wipe(r,sizeof *r);return rc;}
+ *done=r->offset==r->file.bytes;return PP64_OK;
+}
+enum pp64_status pp98_commit(struct pp98_writer *r,struct pp64_pair *out){
+ if(!r||!r->active||r->busy||r->offset!=r->file.bytes||
+    !writer_span(r,out,sizeof *out))return PP64_INVALID;
+ r->busy=true;struct pp64_stream_workspace *w=r->work;
+ struct sfs64_file f=r->file;f.checksum=~r->crc;
+ enum pp64_status rc=PP64_CORRUPT;
+ if(r->run_count>PP64_FILE_RUNS||r->map_bytes!=sfs64_map_length(r->run_count)||
+    !sfs64_map_encode(w->manifest,r->map_bytes,f,r->layout.data_sectors,r->layout.data_start,w->plan,r->run_count))
+  goto end;
+ struct ir64_state *inode=&w->pair.inode;
+ struct merge m={.b=r->block,.l=&r->layout,.w=w,.nodes=r->nodes,.count=(size_t)w->pair.dir.count,
+  .manifest_len=r->map_bytes,.old=inode->root,.id=f.id,.error=PP64_OK};
+ enum ip64_status ir=ir64_publish(inode,&w->pair.iw,r->current,r->run_cap,inode->root.files,next,&m);
+ if(ir!=IP64_OK){rc=ir==IP64_CANCELLED&&m.error!=PP64_OK?m.error:ip(ir);goto end;}
+ rc=pp64_commit(r->block,&r->layout,&w->pair,r->nodes,r->node_cap,r->current,r->run_cap,
+    r->pair.sequence,r->pair.dir_epoch,inode->root.epoch,out);
+end:
+ pp96_wipe(r,sizeof *r);return rc;
+}
+
 struct omit {
  struct bs_service *b;const struct pp64_layout *l;struct pp64_stream_workspace *w;
  const struct dc64_node *nodes;size_t count,at;uint64_t id;
