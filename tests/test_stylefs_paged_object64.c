@@ -90,7 +90,12 @@ static void native_file85(void){
  struct pr_admission spec={PR_NATIVE_USER,0,16,65536,4096,"Editor"};
  assert(pr_admit(&procs,&spec,&pid)==PR_OK&&usr_bind(&users,a,pid,16)==USR_OK);
  spec.scheduler_handle=32;spec.page_root=131072;
- assert(pr_admit(&procs,&spec,&peer)==PR_OK&&usr_bind(&users,z,peer,32)==USR_OK);
+ assert(pr_admit(&procs,&spec,&peer)==PR_OK);
+ /* The inactive user must refuse binding; explicitly select and return. */
+ assert(usr_bind(&users,z,peer,32)==USR_DENIED);
+ assert(usr_select(&users,z)==USR_OK);
+ assert(usr_bind(&users,z,peer,32)==USR_OK);
+ assert(usr_select(&users,a)==USR_OK);
  assert(nf85_start(&nf,&service,&users)==PO64_OK);
  struct sd64_key k=key('a');uint64_t grant=0,other=0;
  unsigned before=writes;
@@ -99,6 +104,9 @@ static void native_file85(void){
  assert(nf85_grant_read(&nf,pid,16,65536,&k,2,1,&grant)==PO64_OK&&grant);
  uint8_t data[514];memset(data,0x5a,sizeof data);size_t n=999;
  assert(nf85_read(&nf,pid,16,65536,grant,data,512,&n)==PO64_FULL&&n==999);
+ assert(nf85_read(&nf,pid,16,65536,grant,nf.scratch,512,&n)==PO64_INVALID&&n==999);
+ assert(nf85_read(&nf,pid,16,65536,grant,(uint8_t *)&n,sizeof n,&n)==PO64_INVALID&&n==999);
+ assert(nf85_read(&nf,pid,16,65536,grant,(uint8_t *)&service,sizeof service<=NF85_READ_MAX?sizeof service:1,&n)==PO64_INVALID&&n==999);
  for(unsigned i=0;i<sizeof data;++i)assert(data[i]==0x5a);
  assert(nf85_read(&nf,pid,16,69632,grant,data,513,&n)==PO64_DENIED&&n==999);
  assert(nf85_read(&nf,pid,16,65536,grant,data,513,&n)==PO64_OK&&n==513);
@@ -119,6 +127,12 @@ static void native_file85(void){
  assert(nf85_read(&nf,peer,32,131072,other,data,513,&n)==PO64_DENIED);
  assert(usr_select(&users,a)==USR_OK);
  assert(nf85_read(&nf,pid,16,65536,grant,data,513,&n)==PO64_OK);
+ /* Revoked exact object grant is stale, never silently reissued. */
+ assert(nf85_grant_read(&nf,pid,16,65536,&(struct sd64_key){.parent=1,.length=1,.name={'a'}},2,1,&other)==PO64_OK);
+ assert(po64_revoke(&service,UINT64_C(0x8000000000000000)|pid,other)==PO64_OK);
+ n=999;
+ assert(nf85_read(&nf,pid,16,65536,other,data,513,&n)==PO64_STALE&&n==999);
+ assert(nf85_reconcile(&nf)==1);
  assert(pr_transition(&procs,pid,16,PR_FAULTED)==PR_OK);
  assert(nf85_reconcile(&nf)==1&&nf85_reconcile(&nf)==0);
  assert(po64_read(&service,UINT64_C(0x8000000000000000)|pid,grant,accept,0)==PO64_DENIED);

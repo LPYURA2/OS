@@ -8,6 +8,11 @@ static bool sep(const void *a,size_t n,const void *b,size_t m){
 static bool ready(const struct nf85_service *s){
  return s&&s->ready&&s->fs&&s->sessions&&s->sessions->ready&&s->sessions->processes;
 }
+static bool external_span(const struct nf85_service *s,const void *p,size_t n){
+ return sep(p,n,s,sizeof *s)&&sep(p,n,s->fs,sizeof *s->fs)&&
+  sep(p,n,s->sessions,sizeof *s->sessions)&&
+  sep(p,n,s->sessions->processes,sizeof *s->sessions->processes);
+}
 static bool owner(const struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
                   bool selected,struct nf85_owner *out){
  if(!ready(s)||!pid||!handle||!root||(root&4095u))return false;
@@ -65,8 +70,8 @@ size_t nf85_reconcile(struct nf85_service *s){
 }
 enum po64_status nf85_grant_read(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
  const struct sd64_key *key,uint64_t id,uint64_t revision,uint64_t *token){
- if(!ready(s)||!key||!token||!sep(token,sizeof *token,s,sizeof *s)||
-    !sep(key,sizeof *key,s,sizeof *s)||!sep(key,sizeof *key,token,sizeof *token))return PO64_INVALID;
+ if(!ready(s)||!key||!token||!external_span(s,token,sizeof *token)||
+    !external_span(s,key,sizeof *key)||!sep(key,sizeof *key,token,sizeof *token))return PO64_INVALID;
  if(s->busy||s->fs->busy)return PO64_BUSY;
  struct nf85_owner o;if(!owner(s,pid,handle,root,true,&o))return PO64_DENIED;
  nf85_reconcile(s);
@@ -90,7 +95,7 @@ static bool collect(void *opaque,uint64_t offset,const uint8_t *p,size_t n){
 enum po64_status nf85_read(struct nf85_service *s,uint32_t pid,uint64_t handle,uint64_t root,
  uint64_t token,uint8_t *out,size_t capacity,size_t *bytes){
  if(!ready(s)||!token||!out||!bytes||!capacity||capacity>NF85_READ_MAX||
-    !sep(out,capacity,s,sizeof *s)||!sep(bytes,sizeof *bytes,s,sizeof *s)||
+    !external_span(s,out,capacity)||!external_span(s,bytes,sizeof *bytes)||
     !sep(out,capacity,bytes,sizeof *bytes))return PO64_INVALID;
  if(s->busy||s->fs->busy)return PO64_BUSY;
  struct nf85_owner o;if(!owner(s,pid,handle,root,true,&o))return PO64_DENIED;
