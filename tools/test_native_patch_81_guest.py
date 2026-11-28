@@ -23,7 +23,7 @@ def before_release(desktop,r,apps):
             shot.check(111,113,'224466')
             shot.check(128,113,'224466')
             return True
-        except (AssertionError,ValueError):
+        except (AssertionError,ValueError,RuntimeError):
             return False
     r.until(visible,'actual patch and unchanged neighbor pixels')
 
