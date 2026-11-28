@@ -20,4 +20,26 @@ bool sty_utf8_next(const uint8_t *,size_t bytes,uint32_t *codepoint,size_t *used
  * valid Unicode scalars use '?'. Not shaping or general Unicode fonts. */
 bool sty_glyph_advance(uint32_t codepoint,uint32_t *advance);
 bool sty_text_measure(const uint8_t *,size_t bytes,uint32_t *width);
+/* Local, app-owned XRGB8888 raster. No shared memory or compositor authority.
+ * Storage supplied by caller, initialized by begin. Max 64 KiB, including
+ * row padding, for this initial SDK. A small viewport/strip is intentional.
+ * Dirty bounds are a conservative union of actually modified pixels. */
+#define STY_SURFACE_PIXELS 16384u
+struct sty_damage { uint32_t x,y,w,h; };
+struct sty_surface {
+ uint32_t *pixels;
+ size_t capacity;
+ uint32_t width,height,stride;
+ struct sty_damage dirty;
+};
+bool sty_surface_begin(struct sty_surface *,uint32_t *pixels,size_t capacity,
+ uint32_t width,uint32_t height,uint32_t stride,uint32_t rgb);
+bool sty_surface_fill(struct sty_surface *,int32_t x,int32_t y,
+ uint32_t width,uint32_t height,uint32_t rgb);
+bool sty_surface_text(struct sty_surface *,int32_t x,int32_t y,
+ const uint8_t *utf8,size_t bytes,uint32_t rgb);
+/* Only clear after consumer has successfully copied dirty data; caller
+ * serializes drawing and consumption. Does not publish anything to kernel. */
+bool sty_surface_damage(const struct sty_surface *,struct sty_damage *);
+bool sty_surface_clear_damage(struct sty_surface *);
 #endif

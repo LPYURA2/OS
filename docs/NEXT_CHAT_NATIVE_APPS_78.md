@@ -5,3 +5,6 @@ New branch adds allocation-free clipped rectangle builder and strict UTF-8 decod
 
 Owner will supply application mockups when infrastructure is accepted. Do not begin product UI or change approved designs prematurely.
 Astra: preserve all checkpoints, reconcile unpublished work separately; no reset or force-push. Main untouched. Preserve prior source and ISO. Beta target 4 GiB RAM/20 GB disk, <1 GiB idle goal still unmeasured.
+
+## Observed results
+Stage 77.2 CI 46129381517: all 17 jobs SUCCESS. Stage 78 CI 46129596740: graphics host job 140931627989 SUCCESS, 190 checks each GCC/Clang, object sizes 14905/14563 bytes (not RAM measurements); 16/18 jobs successful at observation, ordinary-shell and StyleFS still running. Confirm remaining jobs before final acceptance.
