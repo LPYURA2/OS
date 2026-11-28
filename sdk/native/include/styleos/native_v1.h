@@ -12,7 +12,7 @@ enum sty_window_status { STY_OK=0,STY_INVALID,STY_NOT_READY,STY_DENIED,
  STY_MISSING,STY_FULL,STY_EMPTY,STY_STALE,STY_OVERFLOW };
 enum sty_event_kind { STY_KEY=1,STY_TEXT=2,STY_POINTER=3,STY_DROP=4 };
 enum sty_operation { STY_YIELD=1,STY_EXIT=2,STY_PIXEL=0x100,STY_TILE=0x101,
- STY_INPUT=0x102,STY_FRAME=0x103 };
+ STY_INPUT=0x102,STY_FRAME=0x103,STY_PATCH=0x120,STY_FRAME_GEN=0x121 };
 struct sty_reply { uint64_t status,value; };
 struct sty_rect { uint32_t x,y,w,h,rgb; };
 _Static_assert(sizeof(struct sty_rect)==20,"rectangle ABI");
@@ -57,6 +57,33 @@ static inline uint64_t sty_window_pixel(uint32_t window,uint32_t rgb){
 static inline uint64_t sty_window_tile(uint32_t window,const uint32_t *data,unsigned w,unsigned h){
  if(!data||!w||!h||w>16||h>16)return STY_INVALID;
  return sty_call(STY_TILE,window,(uintptr_t)data,((uint64_t)h<<16)|w).status;
+}
+/* Candidate wire v1: fixed-size LE packet in caller private DATA.
+ * Generation obtained from frame query or previous successful patch.
+ * No-op patch returns the unchanged generation; failure returns zero. */
+#define STY_PATCH_BYTES 1048u
+static inline void sty_put32(uint8_t *p,uint32_t v){
+ for(unsigned i=0;i<4;++i)p[i]=(uint8_t)(v>>(8*i));
+}
+static inline bool sty_patch_encode(uint8_t *wire,size_t bytes,uint32_t generation,
+ uint32_t x,uint32_t y,unsigned w,unsigned h,const uint32_t *pixels){
+ if(!wire||bytes!=STY_PATCH_BYTES||!generation||!pixels||!w||!h||w>16||h>16||x%16||y%16)return false;
+ uintptr_t a=(uintptr_t)wire,b=(uintptr_t)pixels;
+ size_t n=(size_t)w*h*sizeof *pixels;
+ if(bytes>UINTPTR_MAX-a||n>UINTPTR_MAX-b||
+    !(a+bytes<=b||b+n<=a))return false;
+ for(unsigned i=0;i<w*h;++i)if(pixels[i]>0xffffffu)return false;
+ sty_put32(wire,1);sty_put32(wire+4,generation);sty_put32(wire+8,x);
+ sty_put32(wire+12,y);sty_put32(wire+16,w);sty_put32(wire+20,h);
+ for(unsigned i=0;i<256;++i)sty_put32(wire+24+4*i,i<w*h?pixels[i]:0);
+ return true;
+}
+static inline struct sty_reply sty_window_generation(uint32_t window){
+ return sty_call(STY_FRAME_GEN,window,0,0);
+}
+static inline struct sty_reply sty_window_patch(uint32_t window,const uint8_t *wire,size_t bytes){
+ if(!wire||bytes!=STY_PATCH_BYTES)return (struct sty_reply){STY_INVALID,0};
+ return sty_call(STY_PATCH,window,(uintptr_t)wire,bytes);
 }
 static inline uint64_t sty_yield(void){return sty_call(STY_YIELD,0,0,0).status;}
 #endif

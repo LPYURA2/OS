@@ -128,6 +128,16 @@ bool nwc_frame_valid(const struct nwc_port *,const struct ws_window *);
 enum nwc_status nwc_publish_patch(struct nwc_service *,uint32_t,uint64_t,uint64_t,
     uint64_t window,uint32_t expected,uint32_t x,uint32_t y,
     const uint32_t *,unsigned w,unsigned h);
+/* Fixed LE wire: version, expected frame generation, x, y, w, h,
+ * then 256 RGB24 u32 pixels (unused tail must be zero). Authenticated
+ * safe-root broker copies entire 1048 bytes before calling. */
+#define NWC_CALL_PATCH UINT64_C(0x120)
+#define NWC_CALL_FRAME_GEN UINT64_C(0x121)
+#define NWC_PATCH_BYTES 1048u
+enum nwc_status nwc_frame_generation(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+    uint64_t window,uint64_t *generation);
+enum nwc_status nwc_patch_wire(struct nwc_service *,uint32_t,uint64_t,uint64_t,
+    uint64_t window,const uint8_t *,size_t,uint64_t *generation);
 const struct nwc_patch *nwc_visible_patches(const struct nwc_service *,uint32_t window,
     unsigned *latest);
 /* Read-only condition for a trusted serialized wait broker. Same authority

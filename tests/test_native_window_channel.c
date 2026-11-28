@@ -101,8 +101,36 @@ int main(void)
     assert(nwc_publish_block(&ipc,pid_a,16,65536,0,block,2,2)==NWC_OK);
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==4 &&
            tile.width==2 && tile.height==2 && !memcmp(tile.pixel,block,sizeof block) && tile.pixel[4]==0);
+    /* Wire is fully validated before publication; failures preserve
+     * generation and previous frame. No pointer from the wire is used. */
+    struct nwc_rect frame={0,0,500,300,0x123456};
+    assert(nwc_publish_frame(&ipc,pid_a,16,65536,win_a,&frame,1)==NWC_OK);
+    uint64_t gen=999;
+    assert(nwc_frame_generation(&ipc,pid_b,32,131072,win_a,&gen)==NWC_DENIED&&gen==999);
+    assert(nwc_frame_generation(&ipc,pid_a,16,65536,0,&gen)==NWC_OK&&gen==5);
+    uint8_t patch[NWC_PATCH_BYTES]={0};
+    patch[0]=1;patch[4]=5;patch[8]=16;patch[12]=16;patch[16]=16;patch[20]=16;
+    patch[24]=0x33;patch[25]=0x22;patch[26]=0x11;
+    gen=999;
+    for(size_t n=0;n<NWC_PATCH_BYTES;++n)
+        assert(nwc_patch_wire(&ipc,pid_a,16,65536,0,patch,n,&gen)==NWC_INVALID&&gen==999);
+    patch[0]=2;
+    assert(nwc_patch_wire(&ipc,pid_a,16,65536,0,patch,sizeof patch,&gen)==NWC_INVALID&&gen==999);
+    patch[0]=1;patch[27]=1;
+    assert(nwc_patch_wire(&ipc,pid_a,16,65536,0,patch,sizeof patch,&gen)==NWC_INVALID&&gen==999);
+    patch[27]=0;
+    assert(nwc_patch_wire(&ipc,pid_b,32,131072,win_a,patch,sizeof patch,&gen)==NWC_DENIED&&gen==999);
+    assert(nwc_patch_wire(&ipc,pid_a,16,65536,0,patch,sizeof patch,&gen)==NWC_OK&&gen==6);
+    assert(nwc_patch_wire(&ipc,pid_a,16,65536,0,patch,sizeof patch,&gen)==NWC_STALE&&gen==6);
+    patch[4]=6;
+    assert(nwc_patch_wire(&ipc,pid_a,16,65536,0,patch,sizeof patch,&gen)==NWC_OK&&gen==6);
+    unsigned latest=0;
+    const struct nwc_patch *view=nwc_visible_patches(&ipc,win_a,&latest);
+    assert(view&&latest&&view[latest-1].pixel[0]==0x112233);
+    assert(nwc_publish_block(&ipc,pid_a,16,65536,0,block,2,2)==NWC_OK);
+    assert(!nwc_visible_patches(&ipc,win_a,&latest));
     assert(ws_compositor_restart(&windows)==2);
-    assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==4);
+    assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_OK && tile.generation==7);
     assert(ws_set_minimized(&windows,pid_a,win_a,true)==WS_OK);
     assert(nwc_visible_tile(&ipc,win_a,&tile)==NWC_DENIED);
     assert(nwc_send_key(&ipc,win_a,'X',0,true)==NWC_DENIED);

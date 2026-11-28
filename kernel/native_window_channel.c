@@ -431,6 +431,41 @@ enum nwc_status nwc_publish_patch(struct nwc_service *s,uint32_t pid,uint64_t ha
     p->patches[slot]=next;p->patch_latest=slot+1;++p->frame.generation;
     return NWC_OK;
 }
+enum nwc_status nwc_frame_generation(struct nwc_service *s,uint32_t pid,uint64_t handle,
+    uint64_t root,uint64_t window,uint64_t *generation)
+{
+    if(!generation)return NWC_INVALID;
+    uint32_t win=0;
+    enum nwc_status status=resolve_port(s,pid,handle,root,window,&win);
+    if(status!=NWC_OK)return status;
+    const struct nwc_port *p=find_port(s,win);
+    if(!p)return NWC_MISSING;
+    if(!authentic(p,pid,handle,root)||!selected(s,p))return NWC_DENIED;
+    if(!p->frame.count||!nwc_frame_valid(p,ws_find(s->windows,win)))return NWC_NOT_READY;
+    *generation=p->frame.generation;
+    return NWC_OK;
+}
+static uint32_t patch_u32(const uint8_t *p)
+{
+    return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);
+}
+enum nwc_status nwc_patch_wire(struct nwc_service *s,uint32_t pid,uint64_t handle,
+    uint64_t root,uint64_t window,const uint8_t *wire,size_t bytes,uint64_t *generation)
+{
+    if(!generation||!wire||bytes!=NWC_PATCH_BYTES||patch_u32(wire)!=1)return NWC_INVALID;
+    uint32_t expected=patch_u32(wire+4),x=patch_u32(wire+8),y=patch_u32(wire+12),
+        w=patch_u32(wire+16),h=patch_u32(wire+20);
+    if(!expected||!w||!h||w>16||h>16)return NWC_INVALID;
+    uint32_t pixels[NWC_TILE_PIXELS];
+    for(unsigned i=0;i<NWC_TILE_PIXELS;++i){
+        pixels[i]=patch_u32(wire+24+4*i);
+        if(i<w*h?pixels[i]>0xffffffu:pixels[i]!=0)return NWC_INVALID;
+    }
+    enum nwc_status result=nwc_publish_patch(s,pid,handle,root,window,expected,x,y,pixels,w,h);
+    if(result!=NWC_OK)return result;
+    /* Serialized caller: no authority or generation change can interleave. */
+    return nwc_frame_generation(s,pid,handle,root,window,generation);
+}
 const struct nwc_patch *nwc_visible_patches(const struct nwc_service *s,uint32_t win,unsigned *latest)
 {
     if(!latest||!nwc_visible_frame(s,win))return 0;
