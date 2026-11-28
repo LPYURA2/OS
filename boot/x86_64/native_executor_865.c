@@ -283,7 +283,7 @@ struct rt865_slice run865(const struct rt862_selection *ticket,
   }else if(pending860.gpr[0]==NWC_CALL_PIXEL){
    pixel=nwc_publish_pixel((struct nwc_service *)nwc_global(),
     ticket->pid,ticket->handle,ticket->child_root,pending860.gpr[1],pending860.gpr[2]);
-#if defined(STYLEOS_NATIVE_PINNED_CATALOG) || defined(STYLEOS_FILE_PROBE_92) || defined(STYLEOS_FILE_PROBE_94) || defined(STYLEOS_FILE_PROBE_103)
+#if defined(STYLEOS_NATIVE_PINNED_CATALOG) || defined(STYLEOS_FILE_PROBE_92) || defined(STYLEOS_FILE_PROBE_94) || defined(STYLEOS_FILE_PROBE_103) || defined(STYLEOS_EXPLORER_PROBE_121)
    arch_puts("STYLEOS NATIVE PIXEL");fld848("pid",ticket->pid);fld848("gen",ticket->handle);
    fld848("root",ticket->child_root);fld848("window",pending860.gpr[1]);
    fld848("rgb",pending860.gpr[2]);fld848("status",pixel);arch_putc('\n');

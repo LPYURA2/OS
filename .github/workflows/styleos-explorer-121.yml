@@ -1,7 +1,7 @@
 name: StyleOS Explorer mutation guest 121
 on:
   push:
-    branches: [feature/styleos-explorer-121]
+    branches: [feature/styleos-explorer-121, feature/styleos-explorer-122]
   workflow_dispatch:
 permissions:
   contents: read
