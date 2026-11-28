@@ -484,3 +484,29 @@ enum po64_status po64_copy_file(struct po64_service *s,struct po64_snapshot snap
   s->runs,s->previous,s->run_cap,snap.sequence,&src,old->entry.target,old->revision,old->bytes,&dst,new_id,&next);
  return edit_finish(s,pr,&next);
 }
+
+enum po64_status po116_space(struct po64_service *s,struct po64_snapshot snap,
+ struct sfs64_run *readonly_scratch,struct sfs64_space *out){
+ if(!s||!snap.mount||!snap.sequence)return PO64_INVALID;
+ if(s->busy)return PO64_BUSY;
+ if(!s->active)return PO64_STALE;
+ if(!span(s,out,sizeof *out))return PO64_INVALID;
+ if(snap.mount!=s->mount_id||snap.sequence!=s->pair.sequence)return PO64_STALE;
+ struct sfs64_run *prior=s->previous;
+ if(s->writable){if(readonly_scratch)return PO64_INVALID;}
+ else{
+  size_t n=s->run_cap*sizeof *readonly_scratch;
+  if(!span(s,readonly_scratch,n)||!sep(out,sizeof *out,readonly_scratch,n))return PO64_INVALID;
+  prior=readonly_scratch;
+ }
+ enum po64_status rc=live(s);if(rc!=PO64_OK)return rc;
+ struct sfs64_space value;
+ enum pp64_status p=pp116_space(s->block,&s->layout,&s->work->pair,s->nodes,s->node_cap,
+  s->runs,prior,s->run_cap,snap.sequence,&value);
+ if(p!=PP64_OK){
+  /* Do not hide a transport/corruption failure or continue on a failed mount. */
+  if(p==PP64_IO||p==PP64_CORRUPT||p==PP64_UNCERTAIN)clear(s);
+  return status(p);
+ }
+ *out=value;return PO64_OK;
+}

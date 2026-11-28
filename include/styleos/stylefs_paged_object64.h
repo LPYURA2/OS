@@ -75,6 +75,10 @@ struct po64_row {
  uint64_t bytes,revision;
 };
 enum po64_status po64_snapshot(struct po64_service *,struct po64_snapshot *);
+/* Trusted read-only query of allocatable data sectors at exact snapshot.
+ * RW uses owned previous scratch (argument NULL). RO caller supplies a
+ * disjoint run_cap-sized array. No grants, writes, or user pointers. */
+enum po64_status po116_space(struct po64_service *,struct po64_snapshot,struct sfs64_run *,struct sfs64_space *);
 enum po64_status po64_child_at(struct po64_service *,struct po64_snapshot,
  uint64_t parent,uint64_t ordinal,struct po64_row *);
 /* Supervisor-only namespace mutation. Caller authorizes both directories

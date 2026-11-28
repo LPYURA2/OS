@@ -37,6 +37,12 @@ enum pp64_status pp64_prepare(struct bs_service *,const struct pp64_layout *,str
 enum pp64_status pp64_plan(struct bs_service *,const struct pp64_layout *,struct pp64_workspace *,
  struct dc64_node *,size_t node_cap,struct sfs64_run *current,struct sfs64_run *previous,size_t run_cap,
  uint64_t expected_sequence,uint64_t bytes,struct sfs64_run *out,size_t slots,size_t *count);
+/* Read-only allocator space; same validated retained inventory as plan.
+ * Does not reserve or retire anything. Refuse unpublished newer roots.
+ * No output on failure. Counts free data sectors, not metadata slots. */
+enum pp64_status pp116_space(struct bs_service *,const struct pp64_layout *,struct pp64_workspace *,
+ struct dc64_node *,size_t,struct sfs64_run *,struct sfs64_run *,size_t,
+ uint64_t expected,struct sfs64_space *);
 /* Trusted synchronous streaming supervisor; no reentrant callbacks or
  * competing writers. File IDs must be lifetime-unique. One map per file
  * fits one page; more fragmented plans return FULL. Buffers are disjoint.

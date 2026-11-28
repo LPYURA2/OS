@@ -93,22 +93,51 @@ int main(void){
  assert(ex115_volume_info(&v,(struct ex115_volume_info *)&v)==PO64_INVALID);
  assert(writes==before);
 #endif
+#ifdef STYLEOS_EXPLORER_116_TEST
+ struct po64_snapshot sp;
+ struct sfs64_space free_space={0},saved_space={0};
+ assert(po64_snapshot(&v.objects,&sp)==PO64_OK);
+ assert(po116_space(&v.objects,sp,0,&free_space)==PO64_OK);
+ assert(free_space.free_sectors==F-1-2);
+ memcpy(&saved_space,&free_space,sizeof free_space);
+ assert(po116_space(&v.objects,sp,previous,&free_space)==PO64_INVALID&&!memcmp(&saved_space,&free_space,sizeof free_space));
+ assert(writes==before);
+#endif
  assert(po64_grant_access(&v.objects,10,&k,2,1,PO64_READ|PO64_WRITE,&t)==PO64_OK);
  p.seen=0;assert(po64_read(&v.objects,10,t,reentry,&p)==PO64_OK&&p.seen==513);
  assert(writes==before);
  p.seed=55;assert(po64_write(&v.objects,10,t,513,source,&p)==PO64_OK);
+#ifdef STYLEOS_EXPLORER_116_TEST
+ assert(po116_space(&v.objects,sp,0,&free_space)==PO64_STALE&&!memcmp(&saved_space,&free_space,sizeof free_space));
+ assert(po64_snapshot(&v.objects,&sp)==PO64_OK);
+ unsigned after_write=writes;
+ assert(po116_space(&v.objects,sp,0,&free_space)==PO64_OK);
+ assert(free_space.free_sectors==F-1-4&&writes==after_write);
+#endif
  assert(pv64_close(&v)==PO64_OK&&grants()==0);
  assert(pv64_close(&v)==PO64_OK);
  assert(pv64_mount(&v,&b,g,8,&geom,false,&w,nodes,128,current,0,128)==PO64_OK);
  assert(po64_grant(&v.objects,10,&k,2,2,&other)==PO64_OK&&other>t);
  p.seen=0;assert(po64_read(&v.objects,10,other,sink,&p)==PO64_OK&&p.seen==513);
  assert(po64_write(&v.objects,10,other,0,0,0)==PO64_DENIED);
+#ifdef STYLEOS_EXPLORER_116_TEST
+ assert(po64_snapshot(&v.objects,&sp)==PO64_OK);
+ assert(po116_space(&v.objects,sp,0,&free_space)==PO64_INVALID);
+ assert(po116_space(&v.objects,sp,current,&free_space)==PO64_INVALID);
+ assert(po116_space(&v.objects,sp,previous,&free_space)==PO64_OK);
+ assert(free_space.free_sectors==F-1-4&&writes==after_write);
+ memcpy(&saved_space,&free_space,sizeof free_space);
+#endif
 #ifdef STYLEOS_EXPLORER_115_TEST
  assert(ex115_volume_at(&b,list,1,0,&info)==PO64_OK&&!info.writable&&info.mount!=saved.mount);
  assert(info.sequence!=saved.sequence);
  memcpy(&saved,&info,sizeof info);
 #endif
  assert(bs_detach(&b,g)==BS_OK);
+#ifdef STYLEOS_EXPLORER_116_TEST
+ assert(po116_space(&v.objects,sp,previous,&free_space)==PO64_STALE&&!memcmp(&saved_space,&free_space,sizeof free_space));
+ puts("EXPLORER116 actual free sectors, retained snapshot protection, readonly and stale refusal PASS");
+#endif
 #ifdef STYLEOS_EXPLORER_115_TEST
  assert(ex115_volume_at(&b,list,1,0,&info)==PO64_STALE&&!memcmp(&info,&saved,sizeof info));
  puts("EXPLORER115 actual volume geometry, empty list, remount and detach PASS");

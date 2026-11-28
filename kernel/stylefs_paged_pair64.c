@@ -265,14 +265,11 @@ enum pp64_status pp64_prepare(struct bs_service *b,const struct pp64_layout *l,s
  if(d.epoch!=cur.dir_epoch||i.root.epoch!=cur.inode_epoch)return PP64_CORRUPT;
  *out=check;return PP64_OK;
 }
-enum pp64_status pp64_plan(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
+/* Shared allocator inventory for planning and read-only space statistics.
+ * Caller has validated all disjoint spans; no prepare/retire/write. */
+static enum pp64_status retained_inventory(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
  struct dc64_node *a,size_t cap,struct sfs64_run *current,struct sfs64_run *previous,size_t rcap,
- uint64_t expected,uint64_t bytes,struct sfs64_run *out,size_t slots,size_t *count){
- if(!cap||cap>SIZE_MAX/sizeof *a||!rcap||rcap>SIZE_MAX/sizeof *current||slots>SIZE_MAX/sizeof *out||!expected||
-    (!out&&slots))return PP64_INVALID;
- const void *p[]={b,l,w,a,current,previous,count,out};
- size_t n[]={sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *current,rcap*sizeof *previous,sizeof *count,slots*sizeof *out};
- for(unsigned i=0;i<(slots?8u:7u);i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PP64_INVALID;
+ uint64_t expected,size_t *count_current,size_t *count_previous){
  struct pp64_pair pair;
  enum pp64_status rc=pp64_mount(b,l,w,a,cap,current,rcap,&pair);
  if(rc!=PP64_OK)return rc;
@@ -296,7 +293,36 @@ enum pp64_status pp64_plan(struct bs_service *b,const struct pp64_layout *l,stru
    if(ir!=IP64_OK)return from_ip(ir);
   }else if(ir!=IP64_CORRUPT)return from_ip(ir);
  }
+ *count_current=nc;*count_previous=np;return PP64_OK;
+}
+enum pp64_status pp64_plan(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *current,struct sfs64_run *previous,size_t rcap,
+ uint64_t expected,uint64_t bytes,struct sfs64_run *out,size_t slots,size_t *count){
+ if(!cap||cap>SIZE_MAX/sizeof *a||!rcap||rcap>SIZE_MAX/sizeof *current||slots>SIZE_MAX/sizeof *out||!expected||
+    (!out&&slots))return PP64_INVALID;
+ const void *p[]={b,l,w,a,current,previous,count,out};
+ size_t n[]={sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *current,rcap*sizeof *previous,sizeof *count,slots*sizeof *out};
+ for(unsigned i=0;i<(slots?8u:7u);i++)for(unsigned j=0;j<i;j++)if(!sep(p[i],n[i],p[j],n[j]))return PP64_INVALID;
+ size_t nc=0,np=0;
+ enum pp64_status rc=retained_inventory(b,l,w,a,cap,current,previous,rcap,expected,&nc,&np);
+ if(rc!=PP64_OK)return rc;
  enum sfs64_alloc_status ar=sfs64_allocate(l->data_sectors,l->data_start,
   (struct sfs64_inventory){current,nc},(struct sfs64_inventory){previous,np},bytes,out,slots,count);
  return ar==SFS64_ALLOC_OK?PP64_OK:ar==SFS64_ALLOC_FULL||ar==SFS64_ALLOC_OUTPUT?PP64_FULL:PP64_INVALID;
+}
+
+enum pp64_status pp116_space(struct bs_service *b,const struct pp64_layout *l,struct pp64_workspace *w,
+ struct dc64_node *a,size_t cap,struct sfs64_run *current,struct sfs64_run *previous,size_t rcap,
+ uint64_t expected,struct sfs64_space *out){
+ if(!cap||cap>SIZE_MAX/sizeof *a||!rcap||rcap>SIZE_MAX/sizeof *current||!expected)return PP64_INVALID;
+ const void *p[]={b,l,w,a,current,previous,out};
+ size_t n[]={sizeof *b,sizeof *l,sizeof *w,cap*sizeof *a,rcap*sizeof *current,rcap*sizeof *previous,sizeof *out};
+ for(unsigned i=0;i<7;++i)for(unsigned j=0;j<i;++j)if(!sep(p[i],n[i],p[j],n[j]))return PP64_INVALID;
+ size_t nc=0,np=0;
+ enum pp64_status rc=retained_inventory(b,l,w,a,cap,current,previous,rcap,expected,&nc,&np);
+ if(rc!=PP64_OK)return rc;
+ struct sfs64_space result;
+ if(sfs64_space_query(l->data_sectors,l->data_start,(struct sfs64_inventory){current,nc},
+     (struct sfs64_inventory){previous,np},&result)!=SFS64_ALLOC_OK)return PP64_INVALID;
+ *out=result;return PP64_OK;
 }
