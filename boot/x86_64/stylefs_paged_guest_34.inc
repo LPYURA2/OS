@@ -227,14 +227,29 @@ void s88_native_file_reconcile(void){
   if(!s34_work.volume.objects.active||nf89_start(q,s)!=PO64_OK)return;
   arch_puts("STYLEOS NATIVE FILE90 QUEUE-READY\n");
  }
- (void)nf89_reconcile(q);
+ (void)nf97_reconcile(q);
+ /* Cursor cancellation can release the exclusive object service. */
+ (void)nf85_reconcile(s);
 }
 /* Only the safe supervisor poll may run one bounded request. No user
  * callback or disk I/O in the trap continuation. A transaction can still
  * block the supervisor on slow I/O; not a preemptible disk worker yet. */
 void s90_native_file_pump(void){
  if(!s865_executor_idle())return;
- if(s34_work.native_queue.files)(void)nf89_pump(&s34_work.native_queue);
+ if(s34_work.native_queue.files){
+  struct nf89_queue *q=&s34_work.native_queue;
+  uint64_t before=q->read97_id;
+  (void)nf97_pump(q);
+#if defined(STYLEOS_FILE_PROBE_92) || defined(STYLEOS_FILE_PROBE_94)
+  if(!before&&q->read97_id){
+   arch_puts("STYLEOS FILE97 BEGIN");field("request",q->read97_id);arch_putc('\n');
+  }else if(before&&!q->read97_id){
+   arch_puts("STYLEOS FILE97 END");field("request",before);arch_putc('\n');
+  }
+#else
+  (void)before;
+#endif
+ }
 }
 /* Trusted callers only. Queue owns copies; no app VAs or direct syscall. */
 enum po64_status s90_native_file_submit(uint32_t pid,uint64_t handle,uint64_t root,
@@ -330,7 +345,7 @@ enum po64_status s94_file_probe_offer(uint32_t pid,uint64_t handle,uint64_t root
 #endif
 static void s39_read(void){
  struct po64_service *s=&s34_work.volume.objects;
- if(!s->active)return;
+ if(!s->active||s->busy)return;
  uint64_t seen=0;
  if(po64_read(s,101,s34_work.token,s34_sink,&seen)!=PO64_OK||seen!=S34_BYTES){
   (void)pv64_close(&s34_work.volume);
@@ -414,7 +429,7 @@ bool s69_use_tea_file(const struct po64_row *row,const struct nts_pin *pin,
 #ifdef STYLEOS_LIVE_VOLUME_44
 bool s44_writable(void){
  struct po64_service *s=&s34_work.volume.objects;
- return s41_root_view()&&s->writable;
+ return s41_root_view()&&s->writable&&!s->busy;
 }
 struct s44_source_ctx {const char *text;size_t bytes;};
 static bool s44_source(void *ctx,uint64_t at,uint8_t *out,size_t n){
@@ -538,6 +553,7 @@ bool s46_input(unsigned key,unsigned mods,uint32_t cp,uint64_t protected_id){
 bool s42_select(unsigned row,bool open){
  struct dp41_view *v=&s34_work.root_view;
  if(!s41_root_view()||row>=v->count)return false;
+ if(open&&s34_work.volume.objects.busy)return true;
  v->selected=row;
  if(!open)return true;
  if(v->rows[row].entry.kind==SD64_FILE){
@@ -556,6 +572,7 @@ bool s42_select(unsigned row,bool open){
 bool s42_navigate(unsigned key){
  struct dp41_view *v=&s34_work.root_view;
  if(!s41_root_view())return false;
+ if(s34_work.volume.objects.busy&&(key==0x1c||key==0x11c||key==0x0e||key==0x149||key==0x151))return true;
  switch(key){
  case 0x148:if(v->selected)v->selected--;return true;
  case 0x150:if(v->selected+1<v->count)v->selected++;return true;

@@ -419,6 +419,42 @@ static void native_file89(void){
  assert(nf85_grant_read(&nf,pid,80,327680,&a,4,5,&token)==PO64_OK);
  puts("Native file 95: wait readiness, lock, cancellation and revocation PASS");
 #endif
+#ifdef STYLEOS_NATIVE_FILE_97_TEST
+ /* Small-file read now spans metadata admission and data step. */
+ n=999;memset(out,0x5a,sizeof out);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf97_pump(&queue)&&queue.read97_id==request&&service.busy);
+ assert(nf89_take(&queue,pid,80,327680,request,out,sizeof out,&n,&result)==PO64_BUSY&&n==999);
+ assert(nf89_cancel(&queue,peer,96,393216,request)==PO64_DENIED);
+ assert(usr_lock(&users)==USR_OK);
+ assert(nf97_reconcile(&queue)==1&&!queue.read97_id&&!service.busy);
+ assert(!nf97_pump(&queue));
+ assert(usr_select(&users,1)==USR_OK&&nf97_pump(&queue)&&service.busy);
+ unsigned read_before=reads;
+ assert(nf97_pump(&queue)&&reads-read_before==2&&!service.busy);
+ assert(nf89_take(&queue,pid,80,327680,request,out,sizeof out,&n,&result)==PO64_OK&&n==513&&result==PO64_OK);
+ for(unsigned i=0;i<513;++i)assert(out[i]==byte(77,i));
+ assert(out[513]==0x5a);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,512,&request)==PO64_OK);
+ assert(nf97_pump(&queue)&&!service.busy&&!queue.read97_id);
+ assert(nf89_take(&queue,pid,80,327680,request,0,0,&n,&result)==PO64_OK&&!n&&result==PO64_FULL);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf97_pump(&queue)&&service.busy);
+ assert(nf89_cancel(&queue,pid,80,327680,request)==PO64_OK&&!service.busy);
+ assert(nf89_take(&queue,pid,80,327680,request,0,0,&n,&result)==PO64_OK&&!n&&result==PO64_CANCELLED);
+ assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
+ assert(nf97_pump(&queue)&&service.busy);
+ assert(pr_transition(&procs,pid,80,PR_FAULTED)==PR_OK);
+ assert(nf97_reconcile(&queue)==1&&!queue.read97_id&&!service.busy);
+ assert(nf85_reconcile(&nf)==1);
+ for(unsigned i=0;i<NF89_SLOTS;++i){
+  const uint8_t *p=(const void *)&queue.slots[i];
+  for(size_t j=0;j<sizeof queue.slots[i];++j)assert(!p[j]);
+ }
+ const uint8_t *cp=(const void *)&queue.read97;
+ for(size_t i=0;i<sizeof queue.read97;++i)assert(!cp[i]);
+ puts("Native file 97: queued metadata/data steps, lock restart, size refusal, cancel and fault cleanup PASS");
+#else
  assert(nf89_submit(&queue,pid,80,327680,token,NF89_READ,0,513,&request)==PO64_OK);
  assert(nf89_pump(&queue));
  assert(pr_transition(&procs,pid,80,PR_FAULTED)==PR_OK);
@@ -428,6 +464,7 @@ static void native_file89(void){
   for(size_t j=0;j<sizeof queue.slots[i];++j)assert(!p[j]);
  }
  assert(nf85_reconcile(&nf)==1);
+#endif
  assert(po64_unmount(&service)==PO64_OK);reopen();
  check('a',4,5,513,77);check('h',5,1,0,0);
  puts("Native file 89: deferred immutable requests, owner isolation, cancellation, completion and cleanup PASS");

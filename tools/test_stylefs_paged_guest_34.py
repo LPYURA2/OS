@@ -372,6 +372,9 @@ def boot(folder, iso, raw, n, serial, receipt, expected_writes, fw, live=False, 
                                     calls[-2]["value"]>calls[2]["value"] and calls[-1]["value"]==len(expected_file)<<32,
                                     "atomic read wait completion without busy poll")
                             wait_id=calls[-2]["value"]
+                            for marker in (b"STYLEOS FILE97 BEGIN",b"STYLEOS FILE97 END"):
+                                matches=[v["request"] for _,v in records(lines,marker,("request",))]
+                                require(matches==[calls[2]["value"],wait_id],"queued read step receipts")
                             for marker in (b"STYLEOS FILE95 PARK",b"STYLEOS FILE95 WAKE"):
                                 matches=[v for _,v in records(lines,marker,("pid","gen","request")) if v["pid"]==pid_num]
                                 require(matches==[{"pid":pid_num,"gen":gen,"request":wait_id}],"exact file wait receipt")

@@ -345,12 +345,97 @@ bool nf89_pump(struct nf89_queue *q){
  r->bytes=n;r->status=status;r->state=NF89_DONE;q->busy=false;
  return true;
 }
+static struct nf89_request *read97_request(struct nf89_queue *q){
+ for(unsigned i=0;i<NF89_SLOTS;++i)
+  if(q->read97_id&&q->slots[i].id==q->read97_id&&q->slots[i].state==NF89_PENDING&&q->slots[i].op==NF89_READ)
+   return &q->slots[i];
+ return 0;
+}
+static bool read97_stop(struct nf89_queue *q){
+ if(q->read97.active&&po96_cancel(q->files->fs,&q->read97)!=PO64_CANCELLED)return false;
+ q->read97_id=0;q->read97_seen=0;return true;
+}
+size_t nf97_reconcile(struct nf89_queue *q){
+ if(!qready(q)||q->busy||q->files->busy)return 0;
+ size_t n=0;
+ if(q->read97_id){
+  struct nf89_request *r=read97_request(q);struct nf85_owner o;
+  bool live=r&&owner(q->files,r->owner.pid,r->owner.handle,r->owner.root,false,&o)&&same(o,r->owner);
+  struct nf85_grant *g=live?find(q->files,o,r->token):0;
+  bool valid=g&&g->mount==r->mount&&token_live(q->files,g)&&(g->rights&PO64_READ);
+  bool selected=live&&owner(q->files,o.pid,o.handle,o.root,true,&o);
+  if(!valid||!selected){
+   if(!read97_stop(q))return 0;
+   if(r){
+    wipe(r->data,sizeof r->data);
+    if(!live)wipe(r,sizeof *r);
+    else if(!valid){r->bytes=0;r->status=PO64_STALE;r->state=NF89_DONE;}
+    /* Selected session may resume the pending request from the start. */
+   }
+   ++n;
+  }
+ }
+ return n+nf89_reconcile(q);
+}
+static bool read97_sink(void *ctx,uint64_t at,const uint8_t *p,size_t n){
+ struct nf89_queue *q=ctx;struct nf89_request *r=read97_request(q);
+ if(!q->busy||!r||at!=q->read97_seen||q->read97_seen>r->bytes||n>r->bytes-q->read97_seen)return false;
+ for(size_t i=0;i<n;++i)r->data[q->read97_seen+i]=p[i];
+ q->read97_seen+=n;return true;
+}
+static void read97_complete(struct nf89_queue *q,struct nf89_request *r,enum po64_status status){
+ size_t bytes=status==PO64_OK?q->read97_seen:0;
+ if(status!=PO64_OK)wipe(r->data,sizeof r->data);
+ r->bytes=bytes;r->status=status;r->state=NF89_DONE;
+ q->read97_id=0;q->read97_seen=0;
+}
+bool nf97_pump(struct nf89_queue *q){
+ if(!qready(q)||q->busy||q->files->busy)return false;
+ (void)nf97_reconcile(q);
+ struct nf89_request *r=read97_request(q);
+ if(q->read97_id){
+  if(!r||!q->read97.active)return false;
+  bool done=false;q->busy=true;
+  enum po64_status status=po96_step(q->files->fs,&q->read97,read97_sink,q,&done);
+  q->busy=false;
+  if(status==PO64_OK&&!done)return true;
+  if(q->read97.active&&!read97_stop(q))return false;
+  read97_complete(q,r,status);
+  return true;
+ }
+ if(q->files->fs->busy)return false;
+ for(unsigned i=0;i<NF89_SLOTS;++i){
+  struct nf89_request *p=&q->slots[i];struct nf85_owner o;
+  if(p->state!=NF89_PENDING||!owner(q->files,p->owner.pid,p->owner.handle,p->owner.root,true,&o)||
+    !same(o,p->owner))continue;
+  if(!r||p->id<r->id)r=p;
+ }
+ if(!r)return false;
+ if(r->op!=NF89_READ)return nf89_pump(q);
+ q->busy=true;
+ enum po64_status status=po96_begin(q->files->fs,principal(r->owner.pid),r->token,&q->read97);
+ if(status==PO64_OK){
+  struct sfs64_map map;
+  if(!sfs64_map_decode(q->read97.manifest,q->read97.map_bytes,q->read97.layout.data_sectors,
+                      q->read97.layout.data_start,&map))status=PO64_CORRUPT;
+  else if(map.file.bytes>r->bytes)status=PO64_FULL;
+  else {q->read97_id=r->id;q->read97_seen=0;}
+  if(status!=PO64_OK){
+   if(po96_cancel(q->files->fs,&q->read97)!=PO64_CANCELLED){q->busy=false;return false;}
+  }
+ }
+ q->busy=false;
+ if(status!=PO64_OK)read97_complete(q,r,status);
+ return true;
+}
 enum po64_status nf89_cancel(struct nf89_queue *q,uint32_t pid,uint64_t handle,uint64_t root,uint64_t id){
  if(!qready(q)||!id)return PO64_INVALID;
- if(q->busy||q->files->busy||q->files->fs->busy)return PO64_BUSY;
+ if(q->busy||q->files->busy)return PO64_BUSY;
  struct nf85_owner o;if(!owner(q->files,pid,handle,root,true,&o))return PO64_DENIED;
  struct nf89_request *r=qfind(q,o,id);if(!r)return PO64_DENIED;
  if(r->state!=NF89_PENDING)return PO64_BUSY;
+ if(q->files->fs->busy&&q->read97_id!=id)return PO64_BUSY;
+ if(q->read97_id==id&&!read97_stop(q))return PO64_BUSY;
  wipe(r->data,sizeof r->data);r->bytes=0;r->status=PO64_CANCELLED;r->state=NF89_DONE;
  return PO64_OK;
 }
